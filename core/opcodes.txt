@@ -1,0 +1,15 @@
+16		bipush		byte
+17		sipush		byte1, byte2
+18		ldc		indexbyte
+19		ldc_w		indexbyte1, indexbyte2
+24		dload		indexbyte
+25		aload		indexbyte
+44		aload_2
+86		sastore
+87		pop
+153	(-103)	ifeq		branchbyte1, branchbyte2
+167	(-89)	goto		branchbyte1, branchbyte2
+178	(-78)	getstatic	indexbyte1, indexbyte2
+182	(-74)	invokevirtual	indexbyte1, indexbyte2
+184	(-72)	invokestatic	indexbyte1, indexbyte2
+

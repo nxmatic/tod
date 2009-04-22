@@ -1,0 +1,4 @@
+Running InsertBench of PostgresCollectorLight with 10000 events.
+Finished. Total time: 111.0s.
+ Event count: 12,730. Rate: 114ev/s.
+ Storage: 0.0MB. Rate: 0.000MB/s

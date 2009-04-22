@@ -1,0 +1,96 @@
+<project name="TOD-evdb1" default="jar" basedir="."
+	xmlns:aspectj="antlib:org.aspectj">
+
+    <target name="init">
+   		<property file="../tod.plugin/ant.settings"/> <!-- This is optional, only for skip.deps-->
+    	
+		<property name="version" value="dev"/>
+    	
+        <property name="build.dir" value="${basedir}/build"/>
+        <property name="src-main.dir" value="${basedir}/src"/>
+        <property name="classes-main.dir" value="${basedir}/classes-main"/>
+
+        <property name="zz.utils.dir" value="${basedir}/../zz.utils"/>
+        <property name="tod.dir" value="${basedir}/../TOD"/>
+        <property name="tod-agent.dir" value="${basedir}/../TOD-agent"/>
+        <property name="tod-dbgrid.dir" value="${basedir}/../TOD-dbgrid"/>
+
+        <property name="lib.dir" value="${tod-dbgrid.dir}/lib"/>
+
+        <path id="main.classpath">
+        	<pathelement path="${tod.dir}/build/tod-debugger.jar"/>
+        	<pathelement path="${tod-agent.dir}/build/tod-agent15.jar"/>
+        	<pathelement path="${tod-dbgrid.dir}/build/tod-dbgrid.jar"/>
+        	<pathelement path="${tod.dir}/lib/aspectjrt.jar"/>
+            <pathelement path="${zz.utils.dir}/build/zz.utils.jar"/>
+        </path>
+    	
+    </target>
+
+    <target name="clean" depends="init">
+        <delete includeemptydirs="true" failonerror="false">
+            <fileset dir="${build.dir}"/>
+            <fileset dir="${classes-main.dir}"/>
+        </delete>
+    </target>
+
+    <target name="compile-main" depends="init, dep.all">
+        <mkdir dir="${classes-main.dir}"/>
+    	
+        <aspectj:iajc
+        	source="1.5" target="1.5"
+        	debug="yes" nowarn="yes"
+            srcdir="${src-main.dir}"
+            destdir="${classes-main.dir}"
+        	aspectpathref="main.classpath"
+            classpathref="main.classpath"/>
+    	
+    </target>
+	
+	<target name="compile" depends="compile-main"/>
+	
+	<target name="jar" depends="compile">
+        <mkdir dir="${build.dir}"/>
+		<jar destfile="${build.dir}/tod-evdb1.jar" basedir="${classes-main.dir}"/>
+	</target>
+	
+	<target name="dep.zz.utils" depends="init" unless="skip.deps">
+		<ant 
+			antfile="${zz.utils.dir}/build.xml" 
+			dir="${zz.utils.dir}" 
+			target="jar"
+			inheritall="false"/>
+		<echo message="Finished building zz.utils"/>
+	</target>
+	
+	<target name="dep.tod-dbgrid" depends="init" unless="skip.deps">
+		<ant 
+			antfile="${tod-dbgrid.dir}/build.xml" 
+			dir="${tod-dbgrid.dir}" 
+			target="jar"
+			inheritall="false"/>
+		<echo message="Finished building tod-dbgrid"/>
+	</target>	
+	
+	<target name="dep.tod-agent" depends="init" unless="skip.deps">
+		<ant 
+			antfile="${tod-agent.dir}/build.xml" 
+			dir="${tod-agent.dir}" 
+			target="jar"
+			inheritall="false"/>
+		<echo message="Finished building tod-agent"/>
+	</target>	
+	
+	<target name="dep.tod" depends="init" unless="skip.deps">
+		<echo message="Building TOD..."/>
+		<ant 
+			antfile="${tod.dir}/build.xml" 
+			dir="${tod.dir}" 
+			target="jar"
+			inheritall="false"/>
+		<echo message="Finished building TOD"/>
+	</target>
+	
+	
+	<target name="dep.all" depends="dep.zz.utils, dep.tod-agent, dep.tod-dbgrid, dep.tod"/>
+</project>

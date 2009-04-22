@@ -1,0 +1,5 @@
+# Col. 1: time (ms)
+# Col. 2: events
+# Col. 3: dy/dx
+# Col. 4: avg
+0.5509999990463257 2820.0 5117.967340981622 Infinity

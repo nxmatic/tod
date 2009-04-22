@@ -1,0 +1,4 @@
+Running InsertBench of BerkeleyCollector with 100000 events.
+Finished. Total time: 8.3s.
+ Event count: 103,660. Rate: 12,519ev/s.
+ Storage: 46.1MB. Rate: 5.566MB/s

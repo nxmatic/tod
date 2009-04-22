@@ -1,0 +1,120 @@
+<project name="TOD" default="jar" basedir="." 
+	xmlns:aspectj="antlib:org.aspectj">
+
+    <target name="init">
+   		<property file="../tod.plugin/ant.settings"/> <!-- This is optional, only for skip.deps-->
+    	
+		<property name="version" value="dev"/>
+    	
+        <property name="build.dir" value="${basedir}/build"/>
+        <property name="lib.dir" value="${basedir}/lib"/>
+        <property name="src-debugger.dir" value="${basedir}/src/debugger"/>
+        <property name="src-test.dir" value="${basedir}/src/test"/>
+        <property name="src-testcase.dir" value="${basedir}/src/testcase"/>
+        <property name="resources.dir" value="${basedir}/resources"/>
+        <property name="classes-debugger.dir" value="${basedir}/classes-debugger"/>
+        <property name="classes-test.dir" value="${basedir}/classes-test"/>
+        <property name="classes-testcase.dir" value="${basedir}/classes-testcase"/>
+    	
+        <property name="tod-agent.dir" value="${basedir}/../TOD-agent"/>
+        <property name="zz.utils.dir" value="${basedir}/../zz.utils"/>
+        <property name="zz.jinterp.dir" value="${basedir}/../zz.jinterp"/>
+
+    	
+        <path id="debugger.classpath">
+            <pathelement path="${zz.utils.dir}/build/zz.utils.jar"/>
+            <pathelement path="${zz.jinterp.dir}/build/zz.jinterp.jar"/>
+        	<pathelement path="${tod-agent.dir}/build/tod-agent15.jar"/>
+        	
+            <pathelement path="${lib.dir}/asm-all-3.2-svn.jar"/>
+            <pathelement path="${lib.dir}/jython-2.2.1.jar"/>
+            <pathelement path="${lib.dir}/lucene-core-2.0.0.jar"/>
+            <pathelement path="${lib.dir}/infovis.jar"/>
+            <pathelement path="${lib.dir}/aspectjrt.jar"/>
+        </path>
+    	
+        <path id="test.classpath">
+            <pathelement path="${zz.utils.dir}/build/zz.utils.jar"/>
+        	<pathelement path="${tod-agent.dir}/build/tod-agent15.jar"/>
+        	
+        	<pathelement path="${classes-debugger.dir}"/>
+        	
+            <pathelement path="${lib.dir}/junit-4.1.jar"/>
+            <pathelement path="${lib.dir}/aspectjrt.jar"/>
+        </path>
+
+    </target>
+
+    <target name="clean" depends="init">
+        <delete includeemptydirs="true" failonerror="false">
+            <fileset dir="${build.dir}"/>
+            <fileset dir="${classes-debugger.dir}"/>
+            <fileset dir="${classes-test.dir}"/>
+            <fileset dir="${classes-testcase.dir}"/>
+        </delete>
+    </target>
+
+    <target name="compile-debugger" depends="init, dep.all">
+        <mkdir dir="${classes-debugger.dir}"/>
+    	
+        <aspectj:iajc
+        	source="1.5" target="1.5"
+        	debug="yes" 
+        	srcdir="${src-debugger.dir}"
+            destdir="${classes-debugger.dir}"
+            classpathref="debugger.classpath"/>
+    	
+    	<copy todir="${classes-debugger.dir}">
+    		<fileset dir="${resources.dir}"/>
+    	</copy>
+    </target>
+	
+    <target name="compile-test" depends="init, dep.all, compile-debugger">
+        <mkdir dir="${classes-test.dir}"/>
+        <aspectj:iajc 
+        	source="1.5" target="1.5"
+        	debug="yes" nowarn="yes"
+            srcdir="${src-test.dir}"
+            destdir="${classes-test.dir}"
+            classpathref="test.classpath"/>
+    </target>
+	
+    <target name="compile-testcase" depends="init, dep.all">
+        <mkdir dir="${classes-testcase.dir}"/>
+        <aspectj:iajc
+        	source="1.5" target="1.5"
+        	debug="yes" nowarn="yes"
+            srcdir="${src-testcase.dir}"
+            destdir="${classes-testcase.dir}"
+            classpathref="debugger.classpath"/>
+    </target>
+	
+	<target name="compile" depends="dep.all, compile-debugger, compile-test, compile-testcase"/>
+	
+	<target name="jar" depends="compile">
+        <mkdir dir="${build.dir}"/>
+		<jar destfile="${build.dir}/tod-debugger.jar" basedir="${classes-debugger.dir}"/>
+		<jar destfile="${build.dir}/tod-test.jar" basedir="${classes-test.dir}"/>
+		<jar destfile="${build.dir}/tod-testcase.jar" basedir="${classes-testcase.dir}"/>
+	</target>
+		
+	<target name="dep.zz.utils" depends="init" unless="skip.deps">
+		<ant 
+			antfile="${zz.utils.dir}/build.xml" 
+			dir="${zz.utils.dir}" 
+			target="jar"
+			inheritall="false"/>
+		<echo message="Finished building zz.utils"/>
+	</target>
+	
+	<target name="dep.tod-agent" depends="init" unless="skip.deps">
+		<ant 
+			antfile="${tod-agent.dir}/build.xml" 
+			dir="${tod-agent.dir}" 
+			target="jar"
+			inheritall="false"/>
+		<echo message="Finished building tod-agent"/>
+	</target>
+	
+	<target name="dep.all" depends="dep.zz.utils, dep.tod-agent"/>
+</project>

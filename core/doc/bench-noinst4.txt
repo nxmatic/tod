@@ -1,0 +1,33 @@
+Computations[1]: 2.919s
+Computations[2]: 2.912s
+Computations[3]: 2.913s
+Computations[4]: 2.912s
+Computations[5]: 2.909s
+Computations[6]: 2.911s
+Computations[7]: 2.910s
+Computations[8]: 2.910s
+Computations[9]: 2.910s
+Computations[10]: 2.909s
+Computations: 2.912s
+Own methods[1]: 1.447s
+Own methods[2]: 1.447s
+Own methods[3]: 1.445s
+Own methods[4]: 1.445s
+Own methods[5]: 1.448s
+Own methods[6]: 1.448s
+Own methods[7]: 1.447s
+Own methods[8]: 1.449s
+Own methods[9]: 1.450s
+Own methods[10]: 1.447s
+Own methods: 1.447s
+Java methods[1]: 3.704s
+Java methods[2]: 3.705s
+Java methods[3]: 3.705s
+Java methods[4]: 3.699s
+Java methods[5]: 3.709s
+Java methods[6]: 3.705s
+Java methods[7]: 3.701s
+Java methods[8]: 3.703s
+Java methods[9]: 3.705s
+Java methods[10]: 3.703s
+Java methods: 3.704s

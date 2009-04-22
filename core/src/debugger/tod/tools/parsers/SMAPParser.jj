@@ -1,0 +1,270 @@
+options 
+{
+  STATIC = true;
+}
+
+PARSER_BEGIN(SMAPParser)
+
+package tod.tools.parsers;
+
+import tod.tools.parsers.smap.*;
+import tod.tools.parsers.smap.LineSection.LineInfo;
+import tod.tools.parsers.smap.LineSection.InputLineInfo;
+import tod.tools.parsers.smap.LineSection.OutputLineInfo;
+import tod.tools.parsers.smap.LineSection.StartLine;
+import java.util.*;
+
+public class SMAPParser 
+{
+}
+
+PARSER_END(SMAPParser)
+
+
+TOKEN : 
+{
+	<SMAP: "SMAP">
+	|
+	<CR: "\r" | "\n" | "\r\n">
+	| 
+	<STAR_STRATUM: "*S">
+	|
+	<STAR_FILE: "*F">
+	|
+	<STAR_LINE: "*L">
+	|
+	<STAR_END: "*E">
+	|
+	<STAR_OTHER: "*" ~["S", "F", "L", "E"]>
+	|
+	<STRING: (<STRCHAR>)+>
+	|
+	<STRCHAR: ["0"-"9", "a"-"z", "A"-"Z", "_", "."]>
+	|
+	<NUMBER: (<NUMCHAR>)+>
+	|
+	<NUMCHAR: ["0"-"9"]>
+}
+
+SKIP :
+{
+	" "
+}
+
+String string():
+{
+	Token t;
+}
+{
+	t = <STRING>
+	{
+		return t.image;
+	}
+}
+
+int number():
+{
+	String s;
+}
+{
+	s = string()
+	{
+		return Integer.parseInt(s);
+	}
+}
+
+
+SMAP smap():
+{
+	AbstractSection sect;
+	List sections = new ArrayList();
+	String outputFileName;
+	String defaultStratum;
+}
+{
+	(
+		<SMAP> <CR>
+		outputFileName = string() <CR>
+		defaultStratum = string() <CR>
+		
+		( 
+			sect = section() {if (sect != null) sections.add(sect);}
+		)+ 
+	
+		<STAR_END> <CR>
+	)
+	{
+		return new SMAP(outputFileName, defaultStratum, sections);
+	}
+}
+
+AbstractSection section():
+{
+	AbstractSection s;
+}
+{
+	(
+		s = stratumSection()
+		|
+		s = fileSection()
+		|
+		s = lineSection()
+		|
+		s = otherSection()
+	)
+	{
+		return s;
+	}
+}
+
+AbstractSection stratumSection():
+{
+	String id;
+}
+{
+	(
+		<STAR_STRATUM>
+		id = string()
+		<CR>
+	)
+	{
+		return new StratumSection(id);
+	}
+}
+
+AbstractSection fileSection():
+{
+	FileInfo info;
+	List infos = new ArrayList();
+}
+{
+	(
+		<STAR_FILE> <CR>
+		(
+			info = fileInfo() { infos.add(info); }
+		)+
+	)
+	{
+		return new FileSection(infos);
+	}
+}
+
+FileInfo fileInfo():
+{
+	int id;
+	String name;
+	String absName;
+}
+{
+	(
+		id = number()
+		name = string()
+		<CR>
+	)
+	{
+		return new FileInfo(id, name);
+	}
+	|
+	(
+		"+"
+		id = number()
+		name = string()
+		<CR>
+		absName = string()
+		<CR>
+	)
+	{
+		return new FileInfo(id, name, absName);
+	}
+}
+
+AbstractSection lineSection():
+{
+	LineInfo info;
+	List infos = new ArrayList();
+}
+{
+	(
+		<STAR_LINE> <CR>
+		(
+			info = lineInfo() { infos.add(info); }
+		)+
+	)
+	{
+		return new LineSection(infos);
+	}
+}
+
+LineInfo lineInfo():
+{
+	InputLineInfo in;
+	OutputLineInfo out;
+}
+{
+	(
+		in = inputLineInfo()
+		":"
+		out = outputLineInfo()
+		<CR>
+	)
+	{
+		return new LineInfo(in, out);
+	}
+}
+
+InputLineInfo inputLineInfo():
+{
+	StartLine in;
+	int rep = 1;
+}
+{
+	(
+		in = startLine()
+		("," rep = number())?
+	)
+	{
+		return new InputLineInfo(in, rep);
+	}
+}
+
+OutputLineInfo outputLineInfo():
+{
+	StartLine out;
+	int inc = 1;
+}
+{
+	(
+		out = startLine()
+		("," inc = number())?
+	)
+	{
+		return new OutputLineInfo(out, inc);
+	}
+}
+
+StartLine startLine():
+{
+	int n;
+	int id = -1;
+}
+{
+	(
+		n = number()
+		("#" id = number())?
+	)
+	{
+		return new StartLine(n, id);
+	} 
+}
+
+
+
+AbstractSection otherSection():
+{
+}
+{
+	(<STAR_OTHER> <CR> (string() <CR>)*)
+	{
+		return null;
+	}	
+}

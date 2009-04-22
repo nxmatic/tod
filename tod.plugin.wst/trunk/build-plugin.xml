@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project default="plugin" name="TOD WST plugin">
+
+	<target name="settings">
+		<property file="../tod.plugin/ant.settings"/>
+		<fail 
+			message="Please copy ant.settings.template to ant.settings (in tod.plugin), and set the variables in it."
+			unless="eclipse.home"/>
+	</target>	
+	
+	<target name="init" depends="settings">
+		<property name="build.dir" value="${basedir}/build"/>
+		<property name="lib.dir" value="${basedir}/lib"/>
+		<property name="plugin.dir" value="${build.dir}/tod.plugin.wst"/>
+		<property name="classes.dir" value="${basedir}/classes"/>
+		<property name="src.dir" value="${basedir}/src"/>
+
+		<property name="tod.dir" value="${basedir}/../TOD"/>
+		<property name="zz.utils.dir" value="${basedir}/../zz.utils"/>
+		<property name="zz.eclipse.utils.dir" value="${basedir}/../zz.eclipse.utils"/>
+		<property name="tod.plugin.dir" value="${basedir}/../tod.plugin"/>
+
+		<path id="default.classpath">
+			<pathelement path="${tod.dir}/build/tod-debugger.jar"/>
+			<pathelement path="${zz.utils.dir}/build/zz.utils.jar"/>
+			<pathelement path="${zz.eclipse.utils.dir}/build/zz.eclipse.utils/plugin.jar"/>
+			<pathelement path="${tod.plugin.dir}/build/tod.plugin/plugin.jar"/>
+			
+			<fileset dir="${eclipse.home}/plugins">
+				<include name="**/*.jar"/>
+			</fileset>
+		</path>
+
+	</target>
+
+	<target name="clean" depends="init">
+		<delete failonerror="false">
+			<fileset dir="${classes.dir}"/>
+			<fileset dir="${build.dir}"/>
+		</delete>
+	</target>
+
+	<target name="compile" depends="init">
+		<mkdir dir="${classes.dir}"/>
+		<javac compiler="javac1.5" source="1.5" target="1.5" srcdir="${src.dir}"
+			nowarn="true"
+			destdir="${classes.dir}"
+			debug="true"
+	      	deprecation="on"
+			classpathref="default.classpath">
+		</javac>
+	</target>
+
+	<target name="jar" depends="init, compile">
+		<delete failonerror="false">
+			<fileset dir="${plugin.dir}"/>
+		</delete>
+
+		<mkdir dir="${plugin.dir}"/>
+
+		<jar jarfile="${plugin.dir}/plugin.jar" index="true">
+			<fileset dir="${classes.dir}" />
+		</jar>
+	</target>
+
+	<target name="plugin" depends="init, jar">
+		<copy todir="${plugin.dir}">
+			<fileset dir="${basedir}" includes="lib/* icons/*" />
+		</copy>
+		<exec executable="./mkDeployPlugin.pl" />
+	</target>
+
+</project>

@@ -1,0 +1,54 @@
+#! /bin/bash
+
+
+export NATIVE=..
+
+[ -n "$LIB_DIR" ] || export LIB_DIR=../lib
+[ -n "$BUILD_DIR" ] || export BUILD_DIR=../build
+
+CLASSPATH=''
+
+CLASSPATH="$CLASSPATH:$LIB_DIR/asm-all-3.1.jar"
+CLASSPATH="$CLASSPATH:$LIB_DIR/lucene-core-2.0.0.jar"
+
+if [ -n "$WORKSPACE" ]
+then
+	CLASSPATH="$CLASSPATH:$WORKSPACE/TOD/lib/aspectjrt.jar"
+	CLASSPATH="$CLASSPATH:$WORKSPACE/TOD-agent/bin"
+	CLASSPATH="$CLASSPATH:$WORKSPACE/TOD/bin"
+	CLASSPATH="$CLASSPATH:$WORKSPACE/TOD-evdb1/bin"
+	CLASSPATH="$CLASSPATH:$WORKSPACE/TOD-evdbng/bin"
+	CLASSPATH="$CLASSPATH:$WORKSPACE/TOD-dbgrid/bin"
+	CLASSPATH="$CLASSPATH:$WORKSPACE/zz.utils/bin"
+else
+	CLASSPATH="$CLASSPATH:$LIB_DIR/aspectjrt.jar"
+	CLASSPATH="$CLASSPATH:$LIB_DIR/tod-agent15.jar"
+	CLASSPATH="$CLASSPATH:$LIB_DIR/tod-debugger.jar"
+	CLASSPATH="$CLASSPATH:$LIB_DIR/tod-evdb1.jar"
+	CLASSPATH="$CLASSPATH:$LIB_DIR/tod-evdbng.jar"
+	CLASSPATH="$CLASSPATH:$LIB_DIR/tod-test.jar"
+	CLASSPATH="$CLASSPATH:$BUILD_DIR/tod-dbgrid.jar"
+	CLASSPATH="$CLASSPATH:$LIB_DIR/zz.utils.jar"
+fi
+
+export CLASSPATH
+echo CLASSPATH=$CLASSPATH
+
+[ -n "$LOCAL_STORAGE" ] || export LOCAL_STORAGE=~/tmp
+[ -n "$SHARED_STORAGE" ] || export SHARED_STORAGE=~/tmp
+
+[ -n "$MASTER_HOST" ] || export MASTER_HOST=localhost
+
+[ -n "$DATA_DIR" ] || export DATA_DIR=$LOCAL_STORAGE/tod
+[ -n "$EVENTS_FILE" ] || export EVENTS_FILE=$SHARED_STORAGE/tod/events-raw.bin
+[ -n "$LOCATIONS_FILE" ] || export LOCATIONS_FILE=$SHARED_STORAGE/tod/locations.bin
+
+[ -n "$PAGE_BUFFER_SIZE" ] || export PAGE_BUFFER_SIZE=200m
+[ -n "$JVM_HEAP_SIZE" ] || export JVM_HEAP_SIZE=500m
+[ -n "$JVM_DIRECTMEM_SIZE" ] || export JVM_DIRECTMEM_SIZE=2000m
+[ -n "$SUB_FACTOR" ] || export SUB_FACTOR="1"
+[ -n "$GRID_IMPL" ] || export GRID_IMPL="uniform"
+
+[ -n "$CHECK_SAME_HOST" ] || export CHECK_SAME_HOST="false"
+
+# LOCK_FILE=$LOCAL_STORAGE/tod/lock

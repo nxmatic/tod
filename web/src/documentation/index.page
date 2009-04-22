@@ -1,0 +1,49 @@
+---
+title: Introduction
+inMenu: true
+directoryName: Documentation
+---
+h1. Introduction
+
+TOD is an omniscient debugger for Java that can be used as a standalone application or within a Java IDE (it is currently available as an Eclipse plugin). TOD combines an easy-to-use interactive navigation interface with a highly scalable trace database that can record hundreds of million events. TOD can be obtained free of charge in the {link: /download.page} section. Interested developpers can also obtain the source code (see {link: source.page}). You can also obtain scientific publications about TOD on the "Pleiad page":http://pleiad.dcc.uchile.cl/research/software/tod.
+
+This small introduction explains why omniscient debugging is interesting by comparing it to classical debugging approaches. 
+
+h2. The problems of classic debugging approaches
+
+It is often harder to find the _cause_ of a bug than to fix it once the cause has been found. This is due to the fact that the symptoms of the bug usually manifest long after its root cause occurs. Unfortunately, classic debugging techniques are innefficient at helping the programmer link the symptoms to the cause.
+
+h3. Breakpoint-based debugging
+
+p=. !images/BreakpointBasedDebugging.jpg!
+
+A breakpoint-based debugger is the kind of debugger found in most Integrated Development Environments (Eclipse, Netbeans, IDEA, Visual Studio, etc.). It is characterized by the use of _breakpoints_ that tell the debugger to halt execution when a particular source code location is reached. While execution is halted, the programmer can do two things: inspect the state of the program, and continue execution step by step.
+
+The problem with breakpoint-based debugging is that when execution is halted at some point, the history of the program is lost. If the cause of the bug has already occurred, the programmer must restart the program, with another set of breakpoints, in the hope that they will help getting closer to the root cause. On the other hand, if the breakpoint is placed before the cause of the bug occurs, the programmer must execute the program step by step until the cause is found. This is an extremely tedious process, because the number of steps to perform can be very large, and the programmer might at some point perform one step too much, thus missing the cause of the bug, and the whole process must be started over again.
+
+h3. Log-based debugging
+
+p=. !images/LogBasedDebugging.jpg!
+
+Log-based debugging consists in inserting informative print statements in the source code of the program. When the program is executed a _log_ is generated and can be analyzed in the hope that relevant information has been captured. This approach has a notorious advantage over breakpoint-based debugging: the history of the program is not lost. However it also has some serious drawbacks:
+
+* *Source code pollution.* The manual insertion of print statements pollute the source code of the program, making it more difficult to understand.
+ 
+* *Print statements must be inserted a-priori.* The programmer must have some idea of the possible places where the bug hides so that he can insert print statements at those locations. If the programmer runs the program, reproduces the bug and notices that more information is needed, then more print statements must be inserted and the program must be executed again.
+
+The two above issues can be mitigated by the use of automatic logging facilities. But there is a third issue, which is maybe the most important:
+
+* *Information overload.* Log-based debugging can produce huge amounts of information, which must be manually analyzed. This can be a daunting task.
+
+h2. Omniscient debugging
+
+p=. !images/OmniscientDebugging.jpg!
+
+Omniscient debuggers combine the advantages of both breakpoint-based debugging and log-based debugging: they _automatically_ record the activity of the program, and they let the user _interactively_ navigate in the recorded history. As with a breakpoint-based debugger, the programmer can follow the execution step by step and inspect the state of the program, but with added benefits:
+
+* Stepping can go both forward and backward.
+* It is possible to inspect the state of the program as it was at any point in time.
+* It is possible to follow through causal links: if when inspecting the state of a particular variable the programmer notices that its value is incorrect, the debugger lets her direcly jump to the point when the variable acquired its value.
+
+Proceed to {link: internals.page}
+

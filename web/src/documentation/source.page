@@ -1,0 +1,97 @@
+---
+title: Source code
+---
+h1. Source code
+
+h2. Access
+
+The source code of TOD is available through our Subversion repository: http://pleiad.dcc.uchile.cl/svn/tod/ (username/password: @guest@/@guest@). It is also possible to browse the source code "online":http://pleiad.dcc.uchile.cl/trac/tod/browser.
+
+h2. Getting started with development
+
+h3. Tooling
+
+We currently only support "Eclipse":http://www.eclipse.org/ as a development environment, although others should also work fine. You need a recent Eclipse version (at least 3.3) and the following plugins:
+
+* "Subclipse":http://subclipse.tigris.org/ (Subversion client)
+* "AJDT":http://www.eclipse.org/ajdt/ (AspectJ Developement Tools)
+ 
+h3. Checking our the source code
+
+If you check out the source code with Subclipse you don't need to create and configure the projects, as the project metadata is stored in SVN. Just go to the Subclipse SVN repositories view and check out the following modules from our "subversion repository":http://pleiad.dcc.uchile.cl/svn/tod/.
+
+h4. TOD core 
+
+* agent/trunk
+* core/trunk
+* dbgrid/trunk
+* evdbng/trunk (current version of event database) and/or evdb1/trunk (old version)
+
+h4. Eclipse plugin
+
+* tod.plugin/trunk
+* tod.plugin.ajdt
+
+h4. Additional libraries
+
+These libraries are in a separate repository: http://pleiad.dcc.uchile.cl/svn/zz/devel/.
+
+* zz.utils
+* zz.eclipse.utils
+
+h3. Native agent
+
+TOD uses a JVMTI native agent to instrument the debugged program at load time. This agent must be compiled for each supported platform. The source code for the agent is in TOD-agent/src/native, the makefile contains instructions on how to build it. But you can also download precompiled versions, which you must place in the TOD-agent directory:
+
+* Linux x86 (32 bits): "libtod-agent.so":http://pleiad.dcc.uchile.cl/files/tod/tod-agent/libtod-agent.so
+* Linux x64 (64 bits): "libtod-agent_x64.so":http://pleiad.dcc.uchile.cl/files/tod/tod-agent/libtod-agent_x64.so
+* MacOS intel: "libtod-agent.dylib":http://pleiad.dcc.uchile.cl/files/tod/tod-agent/libtod-agent.dylib
+* Windows: "tod-agent.dll":http://pleiad.dcc.uchile.cl/files/tod/tod-agent/tod-agent.dll
+
+h3. Launching
+
+Now that you have the code, there are basically three different things you might want to launch: the Eclipse plugin, the database, and the standalone GUI.
+
+h4. Eclipse plugin
+
+This launches a second Eclipse instance with the TOD plugin.
+
+Launch configuration (Eclipse Application):
+
+*VM arguments*: @-ea -Ddev.path=${workspace_loc} -Xmx256m -XX:MaxPermSize=128m@
+
+h4. Database
+
+There are two version of the database: evdb1 (which is the database that is currently used by default in TOD) and evdbng (a better, faster version that is still in development).
+
+Launch configuration (AspectJ/Java Application):
+
+*Project*: @TOD-evdb1@ (or @TOD-evdbng@ if you want the new database)
+<br/>
+*Main class*: @tod.impl.dbgrid.GridMaster@
+<br/>
+*Program arguments*: @0@
+<br/>
+*VM arguments*: @-Dmaster-timeout=0 -Xmx384m -server -ea@ (and @-Ddbimpl=evdbng@ for the new database)
+
+h4. Standalone GUI
+
+This is the same GUI as that used in the Eclipse plugin, but its runs without Eclipse.
+
+Launch configuration (AspectJ/Java Application):
+
+*Project*: @TOD-evdb1@ (or @TOD-evdbng@ if you want the new database)
+<br/>
+*Main class*: @tod.gui.StandaloneUI@
+<br/>
+*Program arguments*: @tod-dbgrid-remote:localhost@ (or replace localhost by the host that runs the database)
+<br/>
+*VM arguments*: @-ea@ (and @-Ddbimpl=evdbng@ for the new database)
+
+h2. License
+
+TOD and the TOD Eclipse plugin are distributed under the GPL v2.
+Additional libraries zz.utils and zz.eclipse.utils are in the public domain.
+External libraries have their own licenses.
+
+TOD uses an implementation of the MD5 algorithm "derived from the RSA Data Security, Inc. MD5 Message-Digest Algorithm".

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry excluding="tod/plugin/fxviews/" kind="src" path="src"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/TOD-dbgrid"/>
+	<classpathentry kind="src" path="/TOD-core">
+		<attributes>
+			<attribute name="org.eclipse.ajdt.aspectpath" value="true"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry exported="true" kind="lib" path="lib/log4j.jar"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry kind="con" path="org.eclipse.pde.core.requiredPlugins"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/zz.utils"/>
+	<classpathentry kind="lib" path="lib/infovis.jar" sourcepath="/infovis-0.9beta2"/>
+	<classpathentry kind="lib" path="lib/asm-all-3.2-svn.jar"/>
+	<classpathentry kind="output" path="bin"/>
+</classpath>

@@ -1,0 +1,240 @@
+\documentclass[10pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{ucs}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{moreverb} 
+
+\begin{document}
+\title{Tercera semana de trabajo [14 - 18 de abril]}
+\author{Milton Inostroza Aguilera}
+\date{20 Abril de 2008}
+\clearpage
+\maketitle
+
+\begin{abstract}
+En la reconstrucción del capturador de huella ha quedado claro en que lugar se deben registrar los distintos objetos [clases, metodos, funciones, variables locales, atributos].\\
+
+Se ha interiorizado en el funcionamiento de threads y sockets en Python.\\
+
+\end{abstract}
+\pagebreak
+\section{Desarrollo}
+La semana comenzó por escribir la nueva estructura del capturador de huella.  Para esto se trabajó en las siguientes etapas:
+\begin{itemize}
+\item Momento en que una clase debe ser registrada.
+\item Momento en que un método debe ser registrado.
+\item Momento en que una función debe ser registrada.
+\item Momento en que una variable local debe ser registrada.
+\item Momento en que un atributo debe ser registrado.
+\end{itemize} 
+
+\subsection{Registro de clase}
+El mejor momento para registrar la clase y sus métodos asociados es cuando el programador termina de definirla en su programa.  Dentro de nuestro capturador cuando se gatille un evento textit{return} preguntaremos en \textit{locals} si es que la función \textit{\_\_init\_\_} esta en este diccionario, si es así, estamos en la presencia de la definición de una clase.  El siguiente ejemplo describe este caso:\\
+
+\begin{minipage}{5.5cm}
+\begin{verbatim}
+class myclass:
+
+    def __init__(self):
+        self.a = 10
+        x = 8
+        return
+
+    def mymethod(self, q):
+        self.b = q
+        return
+\end{verbatim}
+\end{minipage}
+\begin{minipage}{5.5cm}
+  Al momento de definir la clase el \textit{return} nos interesa:
+\begin{verbatim}
+{
+    '__module__':'__main__',
+    'mymethod':<function mymethod>,
+    '__init__':<function __init__>
+}
+\end{verbatim}
+
+Como se puede observar en locals están todas las funciones que representan los métodos de \textit{myclass}.
+\end{minipage}
+\\
+
+\subsection{Registro de método}
+
+Para registrar un método el mejor lugar para hacer esto es cuando nos encontramos con un evento del tipo \textit{call}.  Preguntamos por el atributo \textit{self} en el diccionario \textit{locals}, si es que este está debemos registrar el método.\\
+
+Buscamos en nuestras clases registradas con anterioridad, utilizando el atributo \textit{self} del diccionario \textit{locals} y obtenemos la clase asociada a self de la siguiente manera:
+
+\begin{verbatim}
+type(self).__name__
+\end{verbatim}
+
+Si la clase es encontrada se añade al registro de métodos utilizando el id global que este mismo método tiene en la clase que fue definida.\\
+
+No he pensado en el caso que el objeto sea un método y su clase no sea encontrada, hasta el momento sólo se sale \textit{\_\_trace\_\_} sin hacer nada.
+
+\subsection{Registro de función}
+
+Para registrar una función el mejor lugar para hacer esto es cuando nos encontramos con un evento del tipo \textit{call}.  Preguntamos por el atributo \textit{self} en el diccionario \textit{locals}, si es que este no está y la función \textit{isfunction} nos entrega un valor TRUE, debemos registrar la función.\\
+
+\subsection{Registro de atributos}
+
+Para registrar los atributos de una clase se hace a través de la clase \textit{Descriptor}.  El programador en la definición de su clase debe explicitar una herencia con la clase \textit{Descriptor}.
+
+\subsection{Registro de variables locales}
+
+Para registrar las variables locales se debe tener la siguiente consideración:\\
+
+Cuando el programador pone explicitamente la instrucción \textit{return} en su trozo de código, las variables locales sólo seran capturadas cuando se genere el evento \textit{line}.  En el caso que el programador no ponga la instrucción \textit{return}, las variables locales seran capturadas cuando generen los eventos \textit{line} y \textit{return}.\\
+
+Es importante señalar que por un asunto de optimización y precisión por cada evento se analiza el bytecode de la instrucción para ver si es que realmente corresponde a una modificación de una o varias variables locales.\\
+
+\subsection{Análisis de eventos generados}
+Antes de revisar los ejemplos de código es importante señalar que los mensajes están compuestos por [register] y los eventos estan compuestos por [set, call, return].  Después de esta aclaración se revisan los mensajes que el capturador de huellas envía para estos ejemplos:
+\\
+
+\begin{minipage}{5.5cm}
+\begin{boxedverbatim}
+def prueba():
+    x = 10
+    a = 0
+    x = 15
+    y = x = a = 1
+
+prueba()
+\end{boxedverbatim}
+\end{minipage}
+\begin{minipage}{5.5cm}
+Genera los siguientes eventos/mensajes:
+\begin{enumerate}
+\item register prueba , id = 5 , args= \{\}
+\item call prueba , id = 5 , args = {} ,llamado id = -1
+\item register x = 0
+\item set x = 10 , id= 0, ...
+\item register a = 1
+\item set a = 0 , id= 1 , ...
+\item set x = 15 , id= 0 , ...
+\item register y = 2
+\item set y = 1 , id= 2 , ...
+\item set x = 1 , id= 0 , ...
+\item set a = 1 , id= 1 , ...
+\item return\\
+\end{enumerate}
+\end{minipage}
+\\
+Es importante señalar que \textit{register} indica el nombre de la variable local y su identificador local.\\
+\\
+\begin{minipage}{6cm}
+\begin{boxedverbatim}
+class clasePrueba(Descriptor):
+
+    def __init__(self):
+        x = 1
+        self.w = 20
+        self. h = 50
+        x = self.w
+
+    def impresion(self):
+        print 'hola'
+
+    def asignacion(self):
+        j = 4
+\end{boxedverbatim}
+\end{minipage}
+\begin{minipage}{5cm}
+Genera los siguientes mensajes:
+\begin{enumerate}
+\item register clasePrueba , id = 1 , code = code...
+\item register asignacion = 2
+\item register impresion = 3
+\item register \_\_init\_\_ = 4
+\item return\\
+\end{enumerate}
+\end{minipage}\\
+\\
+Los mensajes \textit{register} se generan cuando el programador termina de escribir su clase.  Note que no es necesario que el programador cree una instancia de la clase.
+
+
+\begin{minipage}{5.5cm}
+\begin{boxedverbatim}
+class clasePrueba(Descriptor):
+
+    def __init__(self):
+        x = 1
+        self.w = 20
+        self. h = 50
+        x = self.w
+
+    def impresion(self):
+        print 'hola'
+
+    def asignacion(self):
+        j = 4
+
+objeto = clasePrueba()
+objeto.asignacion()
+\end{boxedverbatim}
+\end{minipage}
+\begin{minipage}{5.5cm}
+Genera los siguientes eventos/mensajes:
+
+\begin{enumerate}
+\item register \_\_init\_\_ , id = 4 , idClass =  1 , args= {'self': 0}
+\item register self = 0
+\item call \_\_init\_\_ , id = 4 , target = 1 , args = {'self': 0} ...
+\item register x = 1
+\item set x = 1 , id= 1 ...
+\item register w = 6
+\item set w = 20 id = 6
+\item register h = 7
+\item set h = 50 id = 7
+\item set x = 20 , id= 1
+\item return
+\item register asignacion , id = 2 , idClass =  1 , args= {'self': 0}
+\item register self = 0
+\item call asignacion , id = 2 , target = 1 , args = {'self': 0} ...
+\item register j = 1
+\item set j = 4 , id= 1 ...
+\item return\\
+\end{enumerate}
+\end{minipage}
+\\
+
+Se han omitido algunos atributos de los eventos para facilitar la ya complicada lectura de los mismos.
+
+\subsection{Modificaciones}
+
+Al momento de pensar que teniamos nuestro capturador de eventos listo, surgieron diversas necesidades que son comentadas en esta sección.\\
+\\
+Se debe identificar el objeto desde el cual se esta llamando el objeto actual.  Esto es posible de hacer con la instrucción:
+
+\begin{verbatim}
+frame.f_back
+\end{verbatim}
+\\
+\\
+\\
+Se debe implementar la profundidad que tiene el evento generado.  Esto es posible de hacer agregando el atributo \textit{\_\_depthFrame\_\_} a \textit{frame.f\_locals}.\\
+\\
+Se debe implementar un time stamp por cada evento.  Se utiliza la libreria time y la función time para generar un timestamp con precisión del orden de los nanosegundos.\\
+\\
+Se debe marcar cada frame con su propio timestamp en el momento que sea requerido.  Se agrega el atributo \textit{\_\_timeStampFrame\_\_} a \textit{frame.f\_locals}.\\
+\\
+Se implementa un identificador global de Probe.\\
+\\
+Por cada generación de evento se imprime la estructura de Probe, que es la siguiente: (ProbeId, f\_lasti,MethodId|FunctionId|LocalId|AttributeId).\\
+\\
+Se debe agregar un dato más llamado ThreadId, el cual indica en que thread estamos.  Para esto se investigó un poco la librería que implementa threads en Python y se logra que por cada thread que lanze el programador de forma transparente cada thread tome \textit{\_\_trace\_\_}como su función para su propio \textit{sys.settrace}.\\
+
+
+
+\pagebreak
+
+\begin{thebibliography}{2}
+\bibitem{inspect2} Module of Python: http://lfw.org/python/inspect.py
+\bibitem{bytecode} Bytecode of Python: http://docs.python.org/lib/bytecodes.html
+\end{thebibliography}
+\end{document}

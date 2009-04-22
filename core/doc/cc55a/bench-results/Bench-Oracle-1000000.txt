@@ -1,0 +1,4 @@
+Running InsertBench of OracleCollector with 1000000 events.
+Finished. Total time: 1620.3s.
+ Event count: 1,003,230. Rate: 619ev/s.
+ Storage: 0.0MB. Rate: 0.000MB/s

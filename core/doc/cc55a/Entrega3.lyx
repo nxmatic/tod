@@ -1,0 +1,4377 @@
+#LyX 1.4.2 created this file. For more info see http://www.lyx.org/
+\lyxformat 245
+\begin_document
+\begin_header
+\textclass article
+\begin_preamble
+\usepackage{algorithm}
+\usepackage[noend]{algorithmic}
+\usepackage{tabularx}
+\usepackage{psfrag}
+\usepackage{graphicx}
+
+\usepackage{multicol}
+\setlength{\columnseprule}{0.4pt}
+\end_preamble
+\language english
+\inputencoding auto
+\fontscheme default
+\graphics default
+\paperfontsize 12
+\spacing single
+\papersize default
+\use_geometry false
+\use_amsmath 1
+\cite_engine basic
+\use_bibtopic false
+\paperorientation portrait
+\secnumdepth 3
+\tocdepth 3
+\paragraph_separation indent
+\defskip medskip
+\quotes_language swedish
+\papercolumns 1
+\papersides 1
+\paperpagestyle default
+\tracking_changes false
+\output_changes false
+\end_header
+
+\begin_body
+
+\begin_layout Title
+Database Management for a 
+\newline
+Trace Oriented Debugger 
+\newline
+
+\shape italic
+\size larger
+Scaling up
+\end_layout
+
+\begin_layout Author
+Guillaume Pothier
+\end_layout
+
+\begin_layout Standard
+\begin_inset LatexCommand \tableofcontents{}
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Section
+Introduction
+\end_layout
+
+\begin_layout Standard
+In step #2 we presented benchmarks of three types of database back-ends
+ for TOD, our trace-oriented debugger: 
+\end_layout
+
+\begin_layout Itemize
+Relational, with PostgreSQL and Oracle 10g.
+ These provided a throughput of less than 1.000 events/s.
+ 
+\end_layout
+
+\begin_layout Itemize
+Generic, with Berkeley DB Java Edition.
+ The throughput was almost 10.000 events/s.
+ 
+\end_layout
+
+\begin_layout Itemize
+In order to obtain an upper bound on the efficiency we also implemented
+ a raw back-end that only stores events and doesn't allow queries.
+ It is able to handle between 500.000 and 1.000.000 events/s.
+ 
+\end_layout
+
+\begin_layout Standard
+In this phase of the project we strive to support at least 100.000 events/s
+ so both relational and generic back-ends have to be ruled out.
+ The only remaining possibility is to implement a custom back-end, leveraging
+ the highly constrained nature of our data and queries.
+ 
+\begin_inset VSpace defskip
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+This document is divided into two parts: in section 
+\begin_inset LatexCommand \ref{sec:Indexing-schemes}
+
+\end_inset
+
+ we devise efficient indexing schemes to speed up our queries.
+ Then section 
+\begin_inset LatexCommand \ref{sec:grid}
+
+\end_inset
+
+ shows how our problem is amenable to parallelization, and in particular
+ that we can scale up quite linearly with respect to the number of nodes.
+ 
+\end_layout
+
+\begin_layout Section
+Indexing schemes
+\begin_inset LatexCommand \label{sec:Indexing-schemes}
+
+\end_inset
+
+ 
+\end_layout
+
+\begin_layout Standard
+In this section we propose indexing schemes especially crafted for our highly
+ constrained data.
+ Each of the following subsections focus on one of the three main types
+ of queries presented in earlier documents: generic filtering, statistics
+ and control flow.
+\end_layout
+
+\begin_layout Subsection
+Generic filtering
+\begin_inset LatexCommand \label{sub:Generic-filtering}
+
+\end_inset
+
+ 
+\end_layout
+
+\begin_layout Standard
+Filtering queries return a cursor that can be used to iterate in timestamp
+ order over a set of events meeting a particular condition.
+ The filtering condition is a boolean combination of 
+\begin_inset Formula $f=C$
+\end_inset
+
+ comparisons, where 
+\begin_inset Formula $f$
+\end_inset
+
+ is a field of the event and 
+\begin_inset Formula $C$
+\end_inset
+
+ is a constant.
+ 
+\end_layout
+
+\begin_layout Standard
+Two important peculiarities of our application should be noted: 
+\end_layout
+
+\begin_layout Itemize
+Events arrive almost
+\begin_inset Foot
+status collapsed
+
+\begin_layout Standard
+Events of different threads might arrive out of order because of the way
+ network packets are sent.
+ Nevertheless, reordering them is rather cheap as only the last few events
+ must be taken into account.
+ From here on we assume that the events have been reordered before they
+ reach the backend.
+\end_layout
+
+\end_inset
+
+ ordered by timestamp, and for each thread exactly ordered by serial number.
+ 
+\end_layout
+
+\begin_layout Itemize
+Events are never deleted from the database.
+ As a corollary, there is no reason for a given field value to disappear.
+ 
+\end_layout
+
+\begin_layout Standard
+We can leverage these characteristics to implement a fairly efficient indexing
+ scheme in which matching events are found without ever accessing the event
+ records themselves, relying solely on indexes.
+ The remaining of this section describes the n-ary merge join algorithm
+ used to find matching events and discusses its I/O and space efficiency.
+ 
+\end_layout
+
+\begin_layout Subsubsection
+N-ary merge join
+\begin_inset Foot
+status collapsed
+
+\begin_layout Standard
+We named this algorithm after the well known sort-merge join used by many
+ database management systems.
+ In our application the sort step is not necessary.
+\end_layout
+
+\end_inset
+
+ algorithm 
+\end_layout
+
+\begin_layout Standard
+Let 
+\begin_inset Formula $S=\left\langle s_{1},...,s_{n}\right\rangle $
+\end_inset
+
+ be a stream of 
+\begin_inset Formula $n$
+\end_inset
+
+ heterogeneous tuples where each 
+\begin_inset Formula $s_{i}$
+\end_inset
+
+ can have a value for certain fields chosen among the set 
+\begin_inset Formula $F=\left\{ f_{0},...,f_{k}\right\} $
+\end_inset
+
+.
+ Let 
+\begin_inset Formula $D_{j}$
+\end_inset
+
+ be the domain of 
+\begin_inset Formula $f_{j}$
+\end_inset
+
+, i.e.
+ the set of all distinct values that can be taken by 
+\begin_inset Formula $f_{j}$
+\end_inset
+
+ for any tuple 
+\begin_inset Formula $s_{i}$
+\end_inset
+
+.
+ The 
+\begin_inset Formula $f_{0}$
+\end_inset
+
+ field is particular:
+\end_layout
+
+\begin_layout Itemize
+There must exist a complete order on 
+\begin_inset Formula $D_{0}$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Itemize
+Every tuple has at least the field 
+\begin_inset Formula $f_{0}$
+\end_inset
+
+, and the tuples of 
+\begin_inset Formula $S$
+\end_inset
+
+ are ordered by their value of 
+\begin_inset Formula $f_{0}$
+\end_inset
+
+.
+ 
+\end_layout
+
+\begin_layout Standard
+In our application 
+\begin_inset Formula $S$
+\end_inset
+
+ is quite naturally the stream of recorded events and 
+\begin_inset Formula $f_{0}$
+\end_inset
+
+ is the timestamp field.
+ We now define 
+\begin_inset Formula $I_{j}:D_{j}\mapsto(D_{0},\mathbb{N})^{*}$
+\end_inset
+
+ the 
+\emph on
+index
+\emph default
+ of 
+\begin_inset Formula $S$
+\end_inset
+
+ on 
+\begin_inset Formula $f_{j}$
+\end_inset
+
+ as a function that maps any possible value 
+\begin_inset Formula $v$
+\end_inset
+
+ of 
+\begin_inset Formula $f_{j}$
+\end_inset
+
+ to a list of pairs of the form 
+\begin_inset Formula $(v_{0},i)$
+\end_inset
+
+ ordered by 
+\begin_inset Formula $v_{0}$
+\end_inset
+
+.
+ Such a pair appears in an index 
+\begin_inset Formula $I_{j}(v)$
+\end_inset
+
+ if and only if the tuple 
+\begin_inset Formula $s_{i}$
+\end_inset
+
+ has 
+\begin_inset Formula $v$
+\end_inset
+
+ as the value of 
+\begin_inset Formula $f_{j}$
+\end_inset
+
+ and 
+\begin_inset Formula $v_{0}$
+\end_inset
+
+ as the value of 
+\begin_inset Formula $f_{0}$
+\end_inset
+
+.
+ Formally:
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula \[
+\forall v\in D_{j},1\leq i\leq n:(v_{0},i)\in I_{j}(v)\Leftrightarrow\exists s_{i}\in S,s_{i}.f_{j}=v\wedge s_{i}.f_{0}=v_{0}\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset VSpace defskip
+\end_inset
+
+We shall now see how these indexes can be used to find the tuples that match
+ a boolean condition on their fields.
+\end_layout
+
+\begin_layout Subsubsection*
+Single-term conditions
+\end_layout
+
+\begin_layout Standard
+In the case of a simple 
+\begin_inset Formula $f_{j}=C$
+\end_inset
+
+ condition we can retrieve matching tuples ordered by 
+\begin_inset Formula $f_{0}$
+\end_inset
+
+ by obtaining 
+\begin_inset Formula $I_{j}(C)$
+\end_inset
+
+ and retaining 
+\begin_inset Formula $s_{i}$
+\end_inset
+
+ for each 
+\begin_inset Formula $(v_{0},i)$
+\end_inset
+
+ pair.
+ 
+\end_layout
+
+\begin_layout Subsubsection*
+Conjunctive conditions
+\end_layout
+
+\begin_layout Standard
+Let us now consider a conjunctive boolean condition 
+\begin_inset Formula $f_{j_{1}}=C_{1}\wedge\ldots\wedge f_{j_{m}}=C_{m}$
+\end_inset
+
+.
+ The n-ary merge join algorithm permits to identify matching tuples without
+ actually accessing them.
+ The idea is to obtain all of the 
+\begin_inset Formula $I_{j_{l}}(C_{l})$
+\end_inset
+
+ and to maintain a pointer to a current 
+\begin_inset Formula $(v_{0_{l}},i_{l})$
+\end_inset
+
+ for each.
+ Then we start a loop in which at every step we check if all of the 
+\begin_inset Formula $i_{l}$
+\end_inset
+
+ are equal, in which case we add 
+\begin_inset Formula $s_{i}$
+\end_inset
+
+ to the result, and then advance the pointer of the pair that has the minimum
+ value of 
+\begin_inset Formula $v_{0}$
+\end_inset
+
+.
+ If multiple pairs share the minimum value of 
+\begin_inset Formula $v_{0}$
+\end_inset
+
+ we advance the pointer of any one of them.
+ See algorithm 
+\begin_inset LatexCommand \ref{alg:merge-join}
+
+\end_inset
+
+ for details.
+ As each index is scanned only once and there is no nested loop, merge join
+ run in linear time with respect to the sum of the sizes of the considered
+ indexes.
+ 
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float algorithm
+wide false
+sideways false
+status collapsed
+
+\begin_layout Caption
+
+\noun on
+merge
+\noun default
+-
+\noun on
+join
+\noun default
+
+\begin_inset LatexCommand \label{alg:merge-join}
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+merge-join(
+\begin_inset Formula $S$
+\end_inset
+
+, 
+\begin_inset Formula $j_{1}$
+\end_inset
+
+,\SpecialChar \ldots{}
+,
+\begin_inset Formula $j_{m}$
+\end_inset
+
+,
+\begin_inset Formula $C_{1}$
+\end_inset
+
+,\SpecialChar \ldots{}
+,
+\begin_inset Formula $C_{m}$
+\end_inset
+
+):
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+begin{algorithmic}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+STATE
+\end_layout
+
+\end_inset
+
+ 
+\begin_inset Formula $result\leftarrow\emptyset$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+FOR{
+\end_layout
+
+\end_inset
+
+
+\begin_inset Formula $l=1$
+\end_inset
+
+ to 
+\begin_inset Formula $m$
+\end_inset
+
+
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+STATE
+\end_layout
+
+\end_inset
+
+ 
+\begin_inset Formula $index[l]\leftarrow I_{j_{l}}(C_{l})$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+STATE
+\end_layout
+
+\end_inset
+
+ 
+\begin_inset Formula $pos[l]\leftarrow1$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+ENDFOR
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+WHILE{
+\end_layout
+
+\end_inset
+
+there are more elements
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+STATE
+\end_layout
+
+\end_inset
+
+ 
+\begin_inset Formula $match\leftarrow true$
+\end_inset
+
+, 
+\begin_inset Formula $refI\leftarrow-1$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+STATE
+\end_layout
+
+\end_inset
+
+ 
+\begin_inset Formula $minL\leftarrow-1$
+\end_inset
+
+, 
+\begin_inset Formula $minV0\leftarrow+\infty$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+FOR{
+\end_layout
+
+\end_inset
+
+
+\begin_inset Formula $l=1$
+\end_inset
+
+ to 
+\begin_inset Formula $m$
+\end_inset
+
+
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+STATE
+\end_layout
+
+\end_inset
+
+ 
+\begin_inset Formula $currentI\leftarrow index[l][pos[l]].i$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+STATE
+\end_layout
+
+\end_inset
+
+ 
+\begin_inset Formula $currentV0\leftarrow index[l][pos[l]].v0$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+IF{
+\end_layout
+
+\end_inset
+
+
+\begin_inset Formula $refI=-1$
+\end_inset
+
+
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+STATE
+\end_layout
+
+\end_inset
+
+ 
+\begin_inset Formula $refI\leftarrow currentI$
+\end_inset
+
+ 
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+ELSIF{
+\end_layout
+
+\end_inset
+
+
+\begin_inset Formula $currentI\neq refI$
+\end_inset
+
+ 
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+STATE
+\end_layout
+
+\end_inset
+
+ 
+\begin_inset Formula $match\leftarrow false$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+ENDIF
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+IF{
+\end_layout
+
+\end_inset
+
+
+\begin_inset Formula $currentV0<minV0$
+\end_inset
+
+
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+STATE
+\end_layout
+
+\end_inset
+
+ 
+\begin_inset Formula $minV0\leftarrow currentV0$
+\end_inset
+
+ 
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+STATE
+\end_layout
+
+\end_inset
+
+ 
+\begin_inset Formula $minL\leftarrow l$
+\end_inset
+
+ 
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+ENDIF
+\end_layout
+
+\begin_layout Standard
+
+
+\backslash
+ENDFOR
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+IF{
+\end_layout
+
+\end_inset
+
+
+\begin_inset Formula $match$
+\end_inset
+
+
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+STATE
+\end_layout
+
+\end_inset
+
+ 
+\begin_inset Formula $result\leftarrow result\cup\{ s_{refI}\}$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+ENDIF
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+STATE
+\end_layout
+
+\end_inset
+
+ 
+\begin_inset Formula $pos[minL]\leftarrow pos[minL]+1$
+\end_inset
+
+ 
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+ENDWHILE
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+%
+\backslash
+RETURN
+\end_layout
+
+\end_inset
+
+ 
+\begin_inset Formula $result$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+end{algorithmic}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Subsubsection*
+Generic boolean conditions
+\end_layout
+
+\begin_layout Standard
+We can generalize to any compound boolean condition: we perform a merge
+ join for each conjunction and a merge (like in merge sort) for each disjunction.
+ The cost thus remains linear with respect to the sum of the sizes of the
+ considered indexes.
+\end_layout
+
+\begin_layout Standard
+Note that both merge join and merge are stream operators: they produce an
+ output tuple as soon as they have received enough input tuples, without
+ ever needing to get back to already used input tuples, or to access 
+\begin_inset Quotes sld
+\end_inset
+
+future
+\begin_inset Quotes srd
+\end_inset
+
+ input tuples.
+ It is therefore possible to pipeline both operators so that no intermediate
+ results have to be stored.
+\end_layout
+
+\begin_layout Subsubsection
+I/O efficiency of queries
+\begin_inset LatexCommand \label{sub:IO-efficiency-queries}
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+In this section we compare the I/O costs of the indexed and indexless approaches.
+ Tuples and index entries are stored on hard disk in pages of length 
+\begin_inset Formula $P$
+\end_inset
+
+; the entries for any given index are stored together in the same pages.
+ Let us call 
+\begin_inset Formula $\left\Vert s\right\Vert $
+\end_inset
+
+ the average size in bytes of a tuple and 
+\begin_inset Formula $\left\Vert (v_{0},i)\right\Vert $
+\end_inset
+
+ the size in bytes of a 
+\begin_inset Formula $(v_{0},i)$
+\end_inset
+
+ index entry.
+\end_layout
+
+\begin_layout Subsubsection*
+Cost of the indexed approach
+\end_layout
+
+\begin_layout Standard
+We consider a compound boolean condition where terms are of the form 
+\begin_inset Formula $f_{j_{l}}=C_{l}$
+\end_inset
+
+ for 
+\begin_inset Formula $1\leq l\leq m$
+\end_inset
+
+.
+ We do not care about the actual boolean operators between the terms: as
+ merge joins and merges can be pipelined the I/O cost depends only on the
+ sizes of considered indexes.
+\end_layout
+
+\begin_layout Standard
+The cost of the indexed approach is determined as follows.
+ We determine the number of index pages that must be read:
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula \[
+N=\frac{\left\Vert (v_{0},i)\right\Vert }{P}\cdot\sum_{l=1}^{m}\left|I_{l}(X)\right|\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Then we determine the number of tuple pages that must be read, assuming
+ an even distribution of matches in the tuple stream:
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula \[
+M=min\left(\left|result\right|,\frac{\left\Vert s\right\Vert }{P}\cdot\left|S\right|\right)\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+The total I/O cost of the query is 
+\begin_inset Formula $N+M$
+\end_inset
+
+, as we do not write the results to disk but instead stream them to the
+ client.
+\end_layout
+
+\begin_layout Subsubsection*
+Numerical estimation
+\end_layout
+
+\begin_layout Standard
+The average size of a tuple in 
+\begin_inset Formula $S$
+\end_inset
+
+ is 
+\begin_inset Formula $\left\Vert s\right\Vert =42$
+\end_inset
+
+ bytes
+\begin_inset Foot
+status collapsed
+
+\begin_layout Standard
+We derive this figure from the results of the benchmarks presented in the
+ previous deliverable.
+\end_layout
+
+\end_inset
+
+ and the size of a 
+\begin_inset Formula $(v_{0},i)$
+\end_inset
+
+ pair is 
+\begin_inset Formula $\left\Vert (v_{0},i)\right\Vert =16$
+\end_inset
+
+ bytes
+\begin_inset Foot
+status collapsed
+
+\begin_layout Standard
+Two 64 bits integers
+\end_layout
+
+\end_inset
+
+.
+ Unfortunately we do not have statistics of actual event streams and indexes
+ generated by real world programs.
+ However it is possible to make a rough estimation of a simple case.
+\end_layout
+
+\begin_layout Standard
+Let us consider two fields 
+\begin_inset Formula $f_{1}$
+\end_inset
+
+ and 
+\begin_inset Formula $f_{2}$
+\end_inset
+
+, which could be FieldId and ObjectId for instance, and the request 
+\begin_inset Formula $f_{1}=X\wedge f_{2}=Y$
+\end_inset
+
+.
+ There are 
+\begin_inset Formula $\left|S\right|=10,000,000$
+\end_inset
+
+ events, of which 10% have a value for 
+\begin_inset Formula $f_{1}$
+\end_inset
+
+ and 50% have a value for 
+\begin_inset Formula $f_{2}$
+\end_inset
+
+.
+ Additionally we have 
+\begin_inset Formula $\left|D_{1}\right|=100$
+\end_inset
+
+ distinct values of 
+\begin_inset Formula $f_{1}$
+\end_inset
+
+ and 
+\begin_inset Formula $\left|D_{2}\right|=1,000$
+\end_inset
+
+ distinct values for 
+\begin_inset Formula $f_{2}$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Standard
+Assuming a uniform distribution of the values of 
+\begin_inset Formula $f_{1}$
+\end_inset
+
+ and 
+\begin_inset Formula $f_{2}$
+\end_inset
+
+ in the event stream, we obtain:
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula \begin{eqnarray*}
+\left|I_{1}(X)\right| & = & \frac{10}{100}\cdot\frac{1}{\left|D_{1}\right|}\cdot\left|S\right|=10,000\end{eqnarray*}
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula \[
+\left|I_{2}(Y)\right|=\frac{50}{100}\cdot\frac{1}{\left|D_{2}\right|}\cdot\left|S\right|=5,000\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Further assuming that 
+\begin_inset Formula $f_{1}$
+\end_inset
+
+ and 
+\begin_inset Formula $f_{2}$
+\end_inset
+
+ are independent, the number of matching tuples would be: 
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula \[
+\left|result\right|=\left(\frac{10}{100}\cdot\frac{1}{\left|D_{1}\right|}\right)\cdot\left(\frac{50}{100}\cdot\frac{1}{\left|D_{2}\right|}\right)\cdot\left|S\right|=5\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+If the page size is 
+\begin_inset Formula $P=4096$
+\end_inset
+
+ we obtain a total number of pages reads of:
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula \[
+\left\lceil \frac{16}{4096}\cdot(10,000+5,000)+5\right\rceil =64\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Assuming a rather conservative page access time of 20ms, the query would
+ execute in 1.26s.
+\begin_inset Foot
+status collapsed
+
+\begin_layout Standard
+A page access time of 20ms corresponds to a throughput of around 200KB/s.
+ We know that for sequential accesses we can achieve a 20MB/s throughput.
+ Real figures are probably in-between.
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Subsubsection*
+Cost of the indexless approach
+\end_layout
+
+\begin_layout Standard
+A brute force approach reading all tuples would require a number of page
+ accesses of:
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula \[
+\left|S\right|\cdot\frac{\left\Vert s\right\Vert }{P}\approx100,000\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+With the same 20ms access time the query would execute in 33mn.
+ Beyond the 1600-fold improvement, it is encouraging to note that the 1.26s
+ estimated response time of the indexed approach is compatible with interactive
+ applications.
+\end_layout
+
+\begin_layout Subsubsection
+Space requirements and I/O efficiency of index creation
+\begin_inset LatexCommand \label{sub:creation-space-io}
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Having showed that our indexing scheme allows for very fast query execution
+ it remains to demonstrate that it is feasible to implement it.
+ In particular we must show that its space requirements are reasonable and
+ that the indexes can be efficiently created.
+ 
+\end_layout
+
+\begin_layout Standard
+For each tuple 
+\begin_inset Formula $s_{i}$
+\end_inset
+
+ that streams into the back-end there are at most 
+\begin_inset Formula $\left|F\right|-1$
+\end_inset
+
+ indexes to update (there is no index on 
+\begin_inset Formula $f_{0}$
+\end_inset
+
+).
+ As tuples arrive ordered by their value of 
+\begin_inset Formula $f_{0}$
+\end_inset
+
+, updating an index only means appending the pair 
+\begin_inset Formula $(s_{i}.f_{0},i)$
+\end_inset
+
+, as shown in algorithm 
+\begin_inset LatexCommand \ref{alg:update-indexes}
+
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float algorithm
+wide false
+sideways false
+status open
+
+\begin_layout Caption
+
+\noun on
+update-indexes
+\noun default
+
+\begin_inset LatexCommand \label{alg:update-indexes}
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+update-indexes(
+\begin_inset Formula $i$
+\end_inset
+
+, 
+\begin_inset Formula $s_{i}$
+\end_inset
+
+, 
+\begin_inset Formula $F=\{ f_{0},\ldots,f_{k}\}$
+\end_inset
+
+):
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+begin{algorithmic}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+FOR{
+\end_layout
+
+\end_inset
+
+
+\begin_inset Formula $j=1$
+\end_inset
+
+ to 
+\begin_inset Formula $k$
+\end_inset
+
+
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+STATE
+\end_layout
+
+\end_inset
+
+ 
+\begin_inset Formula $I_{j}(s_{i}.f_{j})\leftarrow I_{j}(s_{i}.f_{j})\cup\{(s_{i}.f_{0},i)\}$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+ENDFOR
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+end{algorithmic}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+We can consider in a first approximation that TOD uses 6 different fields
+ in addition to the timestamp: BehaviorId, FieldId, ObjectId, ThreadId,
+ LocalVarId, BytecodeIndex (we will refine this estimation later).
+ This means that for each event, which occupies 42 bytes in average, we
+ need 
+\begin_inset Formula $6\cdot16=96$
+\end_inset
+
+ bytes of additional index space.
+ 
+\end_layout
+
+\begin_layout Standard
+The Raw storage back-end we implemented achieved a throughput 5 to 10 times
+ superior to our objective of 100,000 events/s.
+ As we are only slightly more than triplicating the amount of data to store,
+ we should still be above our objective under one condition: we must be
+ efficient on the I/O.
+ To that effect we should only write full index pages to the disk, which
+ implies that we must have enough RAM to keep the last page of each used
+ index in a buffer.
+\end_layout
+
+\begin_layout Standard
+The number of distinct indexes is:
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula \[
+\sum_{j=1}^{k}\left|D_{j}\right|\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Let us try to estimate that quantity.
+ BehaviorId, FieldId, LocalVarId and BytecodeIndex only depend on the structure
+ of the code, not on the number of events.
+ If the debugged program has 10,000 classes, with 100 fields per class,
+ 100 behaviors per class and 100 local variables per behavior we would have
+ the following counts:
+\begin_inset VSpace defskip
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\noindent
+\align center
+\begin_inset ERT
+status collapsed
+
+\begin_layout Standard
+
+
+\backslash
+begin{tabularx}{200pt}{|c|X|}
+\end_layout
+
+\begin_layout Standard
+
+
+\backslash
+hline 
+\end_layout
+
+\begin_layout Standard
+
+field&
+\end_layout
+
+\begin_layout Standard
+
+$
+\backslash
+left|D_{field}
+\backslash
+right|$
+\backslash
+tabularnewline
+\end_layout
+
+\begin_layout Standard
+
+
+\backslash
+hline
+\end_layout
+
+\begin_layout Standard
+
+
+\backslash
+hline 
+\end_layout
+
+\begin_layout Standard
+
+BehaviorId&
+\end_layout
+
+\begin_layout Standard
+
+1,000,000
+\backslash
+tabularnewline
+\end_layout
+
+\begin_layout Standard
+
+
+\backslash
+hline 
+\end_layout
+
+\begin_layout Standard
+
+FieldId&
+\end_layout
+
+\begin_layout Standard
+
+1,000,000
+\backslash
+tabularnewline
+\end_layout
+
+\begin_layout Standard
+
+
+\backslash
+hline 
+\end_layout
+
+\begin_layout Standard
+
+LocalVarId&
+\end_layout
+
+\begin_layout Standard
+
+100
+\backslash
+tabularnewline
+\end_layout
+
+\begin_layout Standard
+
+
+\backslash
+hline 
+\end_layout
+
+\begin_layout Standard
+
+BytecodeIndex&
+\end_layout
+
+\begin_layout Standard
+
+65536%
+\end_layout
+
+\begin_layout Standard
+
+
+\backslash
+footnote{As per the Java Virtual Machine Specification%
+\end_layout
+
+\begin_layout Standard
+
+}
+\backslash
+tabularnewline
+\end_layout
+
+\begin_layout Standard
+
+
+\backslash
+hline
+\end_layout
+
+\begin_layout Standard
+
+
+\backslash
+end{tabularx}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset VSpace defskip
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+ThreadId and ObjectId are more difficult to evaluate.
+ Their domain can be really huge given that the program can repetitively
+ create and destroy objects and threads.
+ However, only a fraction of all threads and objects can be in use at any
+ given point in time: all live objects must fit within the memory allocated
+ to the JVM, all all live threads must be reasonably executable by the CPU.
+ Thus, although the back-end will not delete information about old entities,
+ it is sufficient to have buffer space for the currently used ones.
+ Let us then complete our table:
+\begin_inset VSpace defskip
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\align center
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+begin{tabularx}{150pt}{|c|X|}
+\end_layout
+
+\begin_layout Standard
+
+
+\backslash
+hline 
+\end_layout
+
+\begin_layout Standard
+
+field&
+\end_layout
+
+\begin_layout Standard
+
+$
+\backslash
+left|D'_{field}
+\backslash
+right|$
+\backslash
+tabularnewline
+\end_layout
+
+\begin_layout Standard
+
+
+\backslash
+hline
+\end_layout
+
+\begin_layout Standard
+
+
+\backslash
+hline 
+\end_layout
+
+\begin_layout Standard
+
+ThreadId&
+\end_layout
+
+\begin_layout Standard
+
+1,000
+\backslash
+tabularnewline
+\end_layout
+
+\begin_layout Standard
+
+
+\backslash
+hline 
+\end_layout
+
+\begin_layout Standard
+
+ObjectId&
+\end_layout
+
+\begin_layout Standard
+
+10,000,000%
+\end_layout
+
+\begin_layout Standard
+
+
+\backslash
+footnote{Estimation based on a JVM heap size of the order of 1GB.%
+\end_layout
+
+\begin_layout Standard
+
+}
+\backslash
+tabularnewline
+\end_layout
+
+\begin_layout Standard
+
+
+\backslash
+hline
+\end_layout
+
+\begin_layout Standard
+
+
+\backslash
+end{tabularx}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset VSpace defskip
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Our back-end should ideally have access to about 12,000,000 buffer pages.
+ Keeping the same 
+\begin_inset Formula $P=4096$
+\end_inset
+
+ as before this amounts to more than 40GB of RAM, capacity which is currently
+ available only on enterprise-class 64 bits machines.
+ 
+\end_layout
+
+\begin_layout Standard
+In order to get back to a realistic solution we must cut down the memory
+ requirements.
+ One possibility would be to have 
+\emph on
+write
+\emph default
+ buffer pages smaller than 
+\emph on
+read
+\emph default
+ buffer pages.
+ For instance if we reduce the write page size to 128 bytes we would need
+ 1.5GB of RAM, which is a much more reasonable capacity.
+ It remains to be seen, however, what would be the I/O throughput in this
+ case.
+ We cannot provide a theoretical answer for this problem, we must implement
+ some benchmarks to sort it out.
+\end_layout
+
+\begin_layout Subsubsection
+Refining the index structure
+\begin_inset LatexCommand \label{sub:refining}
+
+\end_inset
+
+ 
+\end_layout
+
+\begin_layout Standard
+Several details were omitted in the previous sections, which we will now
+ include to our solution.
+\end_layout
+
+\begin_layout Subsubsection*
+Timing issues
+\end_layout
+
+\begin_layout Standard
+It is possible for several events of the same thread to share the same timestamp
+ value: although timestamps are reported with nanosecond precision, they
+ are not actually accurate to the nanosecond.
+ Moreover, even if they were, there would still be the possibility of two
+ events occurring at less than a nanosecond interval.
+\begin_inset Foot
+status collapsed
+
+\begin_layout Standard
+It is almost impossible for such a situation to occur with the current generatio
+n of CPUs: if we take a clock speed of 4GHz it would mean that two events
+ would have to be sent in less than 4 clock cycles.
+ It might occur in the future if faster chips are produced.
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+A solution to this problem would be to alter timestamp values so that they
+ are indeed distinct for all events of any given thread.
+ We can achieve this by shifting them a few bits to the left and use the
+ free bits to differentiate events of the same thread that share the same
+ timestamp.
+ The free bits are those introduced by the shift and those that are not
+ used in the original value because of the lack of accuracy.
+\end_layout
+
+\begin_layout Standard
+The original timestamp value is a 64 bits integer with nanosecond precision.
+ The largest duration that can be represented is then 
+\begin_inset Formula $2^{64}\cdot10^{-9}$
+\end_inset
+
+ seconds, about 584 years.
+ Shifting by 8 bits would reduce it to around two years and permit 256 events
+ per nanosecond in a single thread, which is more than enough for our purpose.
+ 
+\end_layout
+
+\begin_layout Standard
+Note that to compare the timestamps of two events of different threads we
+ must use the original timestamps, not the altered ones: if both had the
+ same timestamp, we must not give a false notion of ordering.
+\end_layout
+
+\begin_layout Subsubsection*
+Hierarchical indexing 
+\begin_inset LatexCommand \label{sub:hierarchical-indexes}
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+When a client issues a generic filter query he might not need the whole
+ result set; he might even not need more than one event.
+ Let us recall that a generic filter query returns a cursor that can be
+ used by the client to actually retrieve successive matching events.
+ The cursor can be moved forward and backward by one event, and can also
+ be positioned directly at a specific position given a reference event or
+ timestamp.
+ In order to efficiently service such requests the indexes themselves must
+ be indexed by timestamp.
+\end_layout
+
+\begin_layout Standard
+Fortunately this additional indexing is relatively cheap as we can use a
+ multilevel clustered index.
+ Let us call level-0 the index we already described.
+ Whenever a level-0 index page is full, we add a 
+\begin_inset Formula $(v_{0},pid)$
+\end_inset
+
+ entry to a level-1 index, where 
+\begin_inset Formula $v_{0}$
+\end_inset
+
+ is taken from the first 
+\begin_inset Formula $(v_{0},i)$
+\end_inset
+
+ pair of the filled level-0 page, and 
+\begin_inset Formula $pid$
+\end_inset
+
+ is a pointer to that page.
+ Level-1 index entries themselves accumulate in pages, and when such a page
+ is full we add an entry to a level-2 index, and so on, as shown in figure
+ 
+\begin_inset LatexCommand \ref{fig:Hierarchical-indexes}
+
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float figure
+wide false
+sideways false
+status open
+
+\begin_layout Caption
+Hierarchical indexes
+\begin_inset LatexCommand \label{fig:Hierarchical-indexes}
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+psfrag{_v0i}{
+\end_layout
+
+\end_inset
+
+
+\begin_inset Formula $(v_{0},i)$
+\end_inset
+
+
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+psfrag{_v0pid}{
+\end_layout
+
+\end_inset
+
+
+\begin_inset Formula $(v_{0},pid)$
+\end_inset
+
+
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset Graphics
+	filename hierarchical_indexes.eps
+	clip
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+A 
+\begin_inset Formula $(v_{0},pid)$
+\end_inset
+
+ entry occupies 12 bytes, as we need use only 4 bytes for 
+\begin_inset Formula $pid$
+\end_inset
+
+.
+ It can be easily seen that the storage cost of this method is quite low:
+ for each 
+\begin_inset Formula $P=4096$
+\end_inset
+
+ bytes of level-
+\begin_inset Formula $i$
+\end_inset
+
+ index we generate 12 bytes of level-
+\begin_inset Formula $(i+1)$
+\end_inset
+
+ index.
+ A level-
+\begin_inset Formula $(i+1)$
+\end_inset
+
+ page if filled for every 
+\begin_inset Formula $\left\lfloor \frac{4096}{12}\right\rfloor =341$
+\end_inset
+
+ level-
+\begin_inset Formula $i$
+\end_inset
+
+ page.
+ The number of index levels is logarithmic with respect to the number of
+ index entries.
+ For instance, an index with 10,000,000 entries would have 
+\begin_inset Formula $\left\lceil log_{341}(10,000,000)\right\rceil =3$
+\end_inset
+
+ additional index levels.
+\begin_inset VSpace defskip
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Although the storage space cost of this method is very low there is an overhead
+ in either I/O or RAM.
+ We have already seen in section 
+\begin_inset LatexCommand \ref{sub:creation-space-io}
+
+\end_inset
+
+ that the current page of each level-0 index should be kept in RAM.
+ With the multilevel index there are two possibilities: 
+\end_layout
+
+\begin_layout Itemize
+The current page of all the levels above a particular level-0 index can
+ be kept in RAM.
+ In this case an extra I/O cost is incurred only when an upper level page
+ is full: as a level-
+\begin_inset Formula $(i+1)$
+\end_inset
+
+ page if filled for every 341 level-
+\begin_inset Formula $i$
+\end_inset
+
+ page, the I/O overhead is negligible.
+ On the other hand the RAM requirements are multiplied by the number of
+ index levels, which in practice should not be more than 4.
+\end_layout
+
+\begin_layout Itemize
+Only the current page of the level-0 index can be kept in RAM.
+ In this scenario whenever a level-0 page is filled, the current level-1
+ page must be read from disk, updated and then written back to disk.
+ Overlooking the level-2 page accesses needed every 341 level-0 accesses,
+ the amount of page accesses is tripled.
+\end_layout
+
+\begin_layout Standard
+Any in-between combination of the above is of course possible.
+ We are confident that even with the overhead of the multilevel index scheme
+ we can attain our goal of handling 100,000 events/s, though benchmarks
+ alone can confirm or infirm this conjecture.
+ 
+\end_layout
+
+\begin_layout Standard
+Usage of the multilevel index for queries is straightforward and permits
+ to locate the event that is closest to a given timestamp in as many page
+ reads as there are levels in the index.
+\end_layout
+
+\begin_layout Subsubsection*
+Choosing the right fields
+\end_layout
+
+\begin_layout Standard
+The last point we must refine is the choice of the fields on which we construct
+ the indexes.
+ Let us consider the same simplified model that we considered for our benchmarks
+, which consists of only three kinds of events:
+\end_layout
+
+\begin_layout Itemize
+Field write (Timestamp, ThreadId, BytecodeIndex, FieldId, Target, Value).
+\end_layout
+
+\begin_layout Itemize
+Local variable write (Timestamp, ThreadId, BytecodeIndex, VariableId, Value).
+\end_layout
+
+\begin_layout Itemize
+Behavior enter (Timestamp, ThreadId, BehaviorId, Target, Arguments) and
+ exit (Timestamp, ThreadId, BehaviorId, Result).
+\end_layout
+
+\begin_layout Standard
+Additionally we consider that every event has a virtual field indicating
+ its kind.
+ We can use our indexing method verbatim for the ThreadId, BytecodeIndex,
+ FieldId, VariableId, BehaviorId and Kind fields.
+\end_layout
+
+\begin_layout Standard
+There is an issue however with the Value, Target, Arguments and Result fields.
+ They all refer to Java objects and thus their values are object ids, but
+ they have different semantics.
+ We saw in section 
+\begin_inset LatexCommand \ref{sub:creation-space-io}
+
+\end_inset
+
+ that maintaining an index for an ObjectId field is very expensive in terms
+ of memory requirements, so if we create an index for each one of these
+ fields our problem becomes intractable.
+ On the other hand if we maintain only one global ObjectId index we cannot
+ process a query like 
+\begin_inset Formula $Kind=FieldWrite\wedge Target=objectX$
+\end_inset
+
+ as it would return not only the field write events whose Target is objectX,
+ but also those whose 
+\emph on
+Value
+\emph default
+ is objectX.
+\end_layout
+
+\begin_layout Standard
+Fortunately we can make a small modification to the ObjectId index so that
+ such a request would work.
+ Instead of storing 
+\begin_inset Formula $(v_{0},i)$
+\end_inset
+
+ pairs we store 
+\begin_inset Formula $(v_{0},i,r)$
+\end_inset
+
+ tuples, where 
+\begin_inset Formula $r$
+\end_inset
+
+ indicates the 
+\emph on
+role
+\emph default
+ of the ObjectId value in the event.
+ Table 
+\begin_inset LatexCommand \ref{tab:ObjectId-roles-encoding}
+
+\end_inset
+
+ shows a possible encoding.
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float table
+wide false
+sideways false
+status open
+
+\begin_layout Caption
+ObjectId roles encoding
+\begin_inset LatexCommand \label{tab:ObjectId-roles-encoding}
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset Tabular
+<lyxtabular version="3" rows="5" columns="2">
+<features islongtable="true">
+<column alignment="center" valignment="top" width="0">
+<column alignment="left" valignment="top" leftline="true" width="0">
+<row topline="true" bottomline="true">
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Standard
+\begin_inset Formula $r$
+\end_inset
+
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Standard
+role
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row topline="true">
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Standard
+\begin_inset Formula $-1$
+\end_inset
+
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Standard
+Target
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row topline="true">
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Standard
+\begin_inset Formula $-2$
+\end_inset
+
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Standard
+Value
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row topline="true">
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Standard
+\begin_inset Formula $-3$
+\end_inset
+
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Standard
+Result
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row topline="true" bottomline="true">
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Standard
+\begin_inset Formula $\geq0$
+\end_inset
+
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Standard
+Arguments, indicating the argument index
+\end_layout
+
+\end_inset
+</cell>
+</row>
+</lyxtabular>
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+As a single byte suffices to represent 
+\begin_inset Formula $r$
+\end_inset
+
+ it is immediate that the cost of this alteration is minimal.
+ The merge join algorithm would have to be slightly modified so that it
+ accepts an additional argument giving a condition on 
+\begin_inset Formula $r$
+\end_inset
+
+ for each occurrence of a condition on an ObjectId field, and considers
+ only those index entries that match that condition.
+ As a corollary the algorithm could be given multiple ObjectId conditions
+ with different conditions on 
+\begin_inset Formula $r$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Subsection
+Statistics
+\begin_inset LatexCommand \label{sub:Statistics}
+
+\end_inset
+
+ 
+\end_layout
+
+\begin_layout Standard
+Statistic queries permit to obtain an approximation of the evolution of
+ 
+\emph on
+event densities
+\emph default
+ over time for a set of events corresponding to any generic filtering query.
+ A statistic query is formulated as:
+\end_layout
+
+\begin_layout Itemize
+A boolean condition on event fields, like in generic filtering queries (see
+ 
+\begin_inset LatexCommand \ref{sub:Generic-filtering}
+
+\end_inset
+
+).
+\end_layout
+
+\begin_layout Itemize
+A time slice length 
+\begin_inset Formula $\delta t$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Itemize
+A timestamp range defined by initial timestamp 
+\begin_inset Formula $t_{i}$
+\end_inset
+
+ and final timestamp 
+\begin_inset Formula $t_{f}$
+\end_inset
+
+, such that 
+\begin_inset Formula $(t_{f}-t_{i})=k\cdot\delta t$
+\end_inset
+
+ with 
+\begin_inset Formula $k\in\mathbb{N}$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Standard
+The response is a list giving an approximation of the number of matching
+ events that occurred during each of the 
+\begin_inset Formula $k$
+\end_inset
+
+ time slices in the specified interval.
+\end_layout
+
+\begin_layout Standard
+A simple and exact solution would be to issue a generic filtering query
+ and appropriately count the resulting events, but this would not be scalable:
+ there might be a huge number of matching events in the considered interval.
+\end_layout
+
+\begin_layout Standard
+Instead, we can leverage existing indexes (as defined in section 
+\begin_inset LatexCommand \ref{sub:hierarchical-indexes}
+
+\end_inset
+
+) to provide approximated answers.
+ Let us remember that there are two kinds of index pages: level-0 pages
+ contain 
+\begin_inset Formula $(v_{0},i)$
+\end_inset
+
+ entries, while pages corresponding to higher levels contain 
+\begin_inset Formula $(v_{0},pid)$
+\end_inset
+
+ entries, where 
+\begin_inset Formula $v_{0}$
+\end_inset
+
+ represents a timestamp value, 
+\begin_inset Formula $i$
+\end_inset
+
+ represents a pointer to an event and 
+\begin_inset Formula $pid$
+\end_inset
+
+ represents a pointer to an index page.
+ As index entries have a fixed size we can know the number of entries in
+ each page (except possibly for the last page of each level, which might
+ not be full).
+ Let us call 
+\begin_inset Formula $n_{i}$
+\end_inset
+
+ the number of entries per page in level-
+\begin_inset Formula $i$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Subsubsection*
+Single-term conditions
+\end_layout
+
+\begin_layout Standard
+For a simple 
+\begin_inset Formula $f_{j}=C$
+\end_inset
+
+ boolean condition we know that index 
+\begin_inset Formula $I_{j}$
+\end_inset
+
+ references all matching events.
+ Let 
+\begin_inset Formula $e_{1}$
+\end_inset
+
+and 
+\begin_inset Formula $e_{2}$
+\end_inset
+
+ be two successive entries in the corresponding level-1 index.
+ As level-1 entries are generated whenever a level-0 page is full, we deduce
+ that during the interval between 
+\begin_inset Formula $e_{1}.v_{0}$
+\end_inset
+
+ and 
+\begin_inset Formula $e_{2}.v_{0}$
+\end_inset
+
+ there are 
+\begin_inset Formula $n_{0}$
+\end_inset
+
+ matching events.
+ This can be generalized to higher levels as well.
+\end_layout
+
+\begin_layout Standard
+Assuming a uniform distribution of events we can use this information to
+ calculate average event densities for each requested time slice, as shown
+ in figure 
+\begin_inset LatexCommand \ref{fig:uniform-simple-stats}
+
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float figure
+wide false
+sideways false
+status collapsed
+
+\begin_layout Caption
+Event density approximation for single term condition assuming a uniform
+ distribution of events
+\begin_inset LatexCommand \label{fig:uniform-simple-stats}
+
+\end_inset
+
+
+\begin_inset VSpace defskip
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+psfrag{_1n0}{
+\end_layout
+
+\end_inset
+
+
+\begin_inset Formula $1n_{i}$
+\end_inset
+
+
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+psfrag{_2n0}{
+\end_layout
+
+\end_inset
+
+
+\begin_inset Formula $2n_{i}$
+\end_inset
+
+
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+psfrag{_3n0}{
+\end_layout
+
+\end_inset
+
+
+\begin_inset Formula $3n_{i}$
+\end_inset
+
+
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+psfrag{_4n0}{
+\end_layout
+
+\end_inset
+
+
+\begin_inset Formula $4n_{i}$
+\end_inset
+
+
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+psfrag{_5n0}{
+\end_layout
+
+\end_inset
+
+
+\begin_inset Formula $5n_{i}$
+\end_inset
+
+
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+psfrag{_6n0}{
+\end_layout
+
+\end_inset
+
+
+\begin_inset Formula $6n_{i}$
+\end_inset
+
+
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+psfrag{_1dt}{
+\end_layout
+
+\end_inset
+
+
+\begin_inset Formula $1\delta t$
+\end_inset
+
+
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+psfrag{_2dt}{
+\end_layout
+
+\end_inset
+
+
+\begin_inset Formula $2\delta t$
+\end_inset
+
+
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+psfrag{_3dt}{
+\end_layout
+
+\end_inset
+
+
+\begin_inset Formula $3\delta t$
+\end_inset
+
+
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+psfrag{_4dt}{
+\end_layout
+
+\end_inset
+
+
+\begin_inset Formula $4\delta t$
+\end_inset
+
+
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+psfrag{_5dt}{
+\end_layout
+
+\end_inset
+
+
+\begin_inset Formula $5\delta t$
+\end_inset
+
+
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+psfrag{_6dt}{
+\end_layout
+
+\end_inset
+
+
+\begin_inset Formula $6\delta t$
+\end_inset
+
+
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+psfrag{_7dt}{
+\end_layout
+
+\end_inset
+
+
+\begin_inset Formula $7\delta t$
+\end_inset
+
+
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+psfrag{_8dt}{
+\end_layout
+
+\end_inset
+
+
+\begin_inset Formula $8\delta t$
+\end_inset
+
+
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset Graphics
+	filename uniform_simple_stats.eps
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Subsubsection*
+Compound conditions
+\end_layout
+
+\begin_layout Standard
+!!! Here we must show how to combine multiple indexes.
+\end_layout
+
+\begin_layout Subsubsection*
+Non-uniform event distributions
+\end_layout
+
+\begin_layout Standard
+!!! What information can we collect to make the approximations more precise.
+\end_layout
+
+\begin_layout Subsection
+Control flow reconstitution
+\begin_inset LatexCommand \label{sub:Control-flow-reconstitution}
+
+\end_inset
+
+ 
+\end_layout
+
+\begin_layout Standard
+The control flow of a program is the order in which its instructions are
+ executed, which is basically what TOD records.
+ 
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status collapsed
+
+\begin_layout Standard
+
+
+\backslash
+begin{multicols}{3}
+\end_layout
+
+\begin_layout Standard
+
+[Consider the following program:]
+\end_layout
+
+\begin_layout Standard
+
+
+\backslash
+setlength{
+\backslash
+columnseprule}{0.4pt}
+\end_layout
+
+\begin_layout Standard
+
+
+\backslash
+begin{verbatim}
+\end_layout
+
+\begin_layout Standard
+
+main()
+\end_layout
+
+\begin_layout Standard
+
+  i = foo()
+\end_layout
+
+\begin_layout Standard
+
+  j = bar(10)
+\end_layout
+
+\begin_layout Standard
+
+  return i+j
+\end_layout
+
+\begin_layout Standard
+
+
+\backslash
+end{verbatim}
+\end_layout
+
+\begin_layout Standard
+
+
+\backslash
+columnbreak
+\end_layout
+
+\begin_layout Standard
+
+
+\backslash
+begin{verbatim}
+\end_layout
+
+\begin_layout Standard
+
+foo()
+\end_layout
+
+\begin_layout Standard
+
+  k = 1
+\end_layout
+
+\begin_layout Standard
+
+  for i = 1 to 3 do:
+\end_layout
+
+\begin_layout Standard
+
+    bar(k)
+\end_layout
+
+\begin_layout Standard
+
+    k = k*2
+\end_layout
+
+\begin_layout Standard
+
+  return k
+\end_layout
+
+\begin_layout Standard
+
+
+\backslash
+end{verbatim}
+\end_layout
+
+\begin_layout Standard
+
+
+\backslash
+columnbreak
+\end_layout
+
+\begin_layout Standard
+
+
+\backslash
+begin{verbatim}
+\end_layout
+
+\begin_layout Standard
+
+bar(k)
+\end_layout
+
+\begin_layout Standard
+
+  c = k+k
+\end_layout
+
+\begin_layout Standard
+
+  d = k*k
+\end_layout
+
+\begin_layout Standard
+
+  return c+d
+\end_layout
+
+\begin_layout Standard
+
+
+\backslash
+end{verbatim}
+\end_layout
+
+\begin_layout Standard
+
+
+\backslash
+end{multicols}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+The control flow of this program is shown in figure 
+\begin_inset LatexCommand \ref{fig:cflow-rep}
+
+\end_inset
+
+a.
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float figure
+wide false
+sideways false
+status collapsed
+
+\begin_layout Caption
+Representations of the control flow.
+\begin_inset LatexCommand \label{fig:cflow-rep}
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+begin{multicols}{2}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\align center
+(a) As a flat sequence
+\end_layout
+
+\begin_layout Standard
+\align center
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+begin{verbatim} 
+\end_layout
+
+\begin_layout Standard
+
+Enter(main, [])
+\end_layout
+
+\begin_layout Standard
+
+Enter(foo, []) 
+\end_layout
+
+\begin_layout Standard
+
+Write(k, 1) 
+\end_layout
+
+\begin_layout Standard
+
+Write(i, 1) 
+\end_layout
+
+\begin_layout Standard
+
+Enter(bar, [1]) 
+\end_layout
+
+\begin_layout Standard
+
+Write(c, 2) 
+\end_layout
+
+\begin_layout Standard
+
+Write(d, 1) 
+\end_layout
+
+\begin_layout Standard
+
+Exit(bar, 3) 
+\end_layout
+
+\begin_layout Standard
+
+Write(k, 2) 
+\end_layout
+
+\begin_layout Standard
+
+Write(i, 2) 
+\end_layout
+
+\begin_layout Standard
+
+Enter(bar, [2]) 
+\end_layout
+
+\begin_layout Standard
+
+Write(c, 4) 
+\end_layout
+
+\begin_layout Standard
+
+Write(d, 4) 
+\end_layout
+
+\begin_layout Standard
+
+Exit(bar, 8) 
+\end_layout
+
+\begin_layout Standard
+
+Write(k, 4) 
+\end_layout
+
+\begin_layout Standard
+
+Write(i, 3) 
+\end_layout
+
+\begin_layout Standard
+
+Enter(bar, [4]) 
+\end_layout
+
+\begin_layout Standard
+
+Write(c, 8) 
+\end_layout
+
+\begin_layout Standard
+
+Write(d, 16) 
+\end_layout
+
+\begin_layout Standard
+
+Exit(bar, 24) 
+\end_layout
+
+\begin_layout Standard
+
+Write(k, 8)
+\end_layout
+
+\begin_layout Standard
+
+Exit(foo, 8) 
+\end_layout
+
+\begin_layout Standard
+
+Write(i, 8)
+\end_layout
+
+\begin_layout Standard
+
+Enter(bar, [10]) 
+\end_layout
+
+\begin_layout Standard
+
+Write(c, 20) 
+\end_layout
+
+\begin_layout Standard
+
+Write(d, 100) 
+\end_layout
+
+\begin_layout Standard
+
+Exit(bar, 120) 
+\end_layout
+
+\begin_layout Standard
+
+Write(j, 120)
+\end_layout
+
+\begin_layout Standard
+
+Exit(main, 128)
+\end_layout
+
+\begin_layout Standard
+
+
+\backslash
+end{verbatim}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+columnbreak
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\align center
+(b) As a tree
+\end_layout
+
+\begin_layout Standard
+\align center
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+begin{verbatim}
+\end_layout
+
+\begin_layout Standard
+
+Enter(main, [])
+\end_layout
+
+\begin_layout Standard
+
+  Enter(foo, []) 
+\end_layout
+
+\begin_layout Standard
+
+    Write(k, 1) 
+\end_layout
+
+\begin_layout Standard
+
+    Write(i, 1) 
+\end_layout
+
+\begin_layout Standard
+
+    Enter(bar, [1]) 
+\end_layout
+
+\begin_layout Standard
+
+      Write(c, 2) 
+\end_layout
+
+\begin_layout Standard
+
+      Write(d, 1) 
+\end_layout
+
+\begin_layout Standard
+
+      Exit(bar, 3) 
+\end_layout
+
+\begin_layout Standard
+
+    Write(k, 2) 
+\end_layout
+
+\begin_layout Standard
+
+    Write(i, 2) 
+\end_layout
+
+\begin_layout Standard
+
+    Enter(bar, [2]) 
+\end_layout
+
+\begin_layout Standard
+
+      Write(c, 4) 
+\end_layout
+
+\begin_layout Standard
+
+      Write(d, 4) 
+\end_layout
+
+\begin_layout Standard
+
+      Exit(bar, 8) 
+\end_layout
+
+\begin_layout Standard
+
+    Write(k, 4) 
+\end_layout
+
+\begin_layout Standard
+
+    Write(i, 3) 
+\end_layout
+
+\begin_layout Standard
+
+    Enter(bar, [4]) 
+\end_layout
+
+\begin_layout Standard
+
+      Write(c, 8) 
+\end_layout
+
+\begin_layout Standard
+
+      Write(d, 16) 
+\end_layout
+
+\begin_layout Standard
+
+      Exit(bar, 24) 
+\end_layout
+
+\begin_layout Standard
+
+    Write(k, 8)
+\end_layout
+
+\begin_layout Standard
+
+    Exit(foo, 8) 
+\end_layout
+
+\begin_layout Standard
+
+  Write(i, 8)
+\end_layout
+
+\begin_layout Standard
+
+  Enter(bar, [10]) 
+\end_layout
+
+\begin_layout Standard
+
+    Write(c, 20) 
+\end_layout
+
+\begin_layout Standard
+
+    Write(d, 100) 
+\end_layout
+
+\begin_layout Standard
+
+    Exit(bar, 120) 
+\end_layout
+
+\begin_layout Standard
+
+  Write(j, 120)
+\end_layout
+
+\begin_layout Standard
+
+  Exit(main, 128)
+\end_layout
+
+\begin_layout Standard
+
+
+\backslash
+end{verbatim}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+
+\backslash
+end{multicols}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Although the control flow is, strictly speaking, a flat sequence of events,
+ it can be useful to represent it as a tree.
+ In that case internal nodes represent the execution of a behavior and their
+ children represent the instructions that were executed during the execution
+ of that behavior.
+ If the instruction is a behavior call, the corresponding child is another
+ node, otherwise it is a leaf.
+ The result of applying this method to the above program is shown in figure
+ 
+\begin_inset LatexCommand \ref{fig:cflow-rep}
+
+\end_inset
+
+b.
+ Such a representation is much easier to understand.
+ Moreover, an interactive application can let the user expand or collapse
+ nodes so that he can concentrate on the parts that are of interest to him.
+\end_layout
+
+\begin_layout Standard
+The goal of control flow reconstitution in TOD is precisely to transform
+ the flat sequence of events into a tree.
+ Such a transformation is conceptually simple to achieve: for each thread
+ of the debugged application we maintain a stack whose top element is the
+ behavior enter event that corresponds to the currently executing behavior;
+ this event is called the 
+\emph on
+current parent
+\emph default
+.
+ Whenever a new event is received for the same thread, it becomes the next
+ child of the current parent, and additionally if the new event is a behavior
+ enter event, it is pushed onto the stack and becomes the current parent.
+ Conversely, if the new event is a behavior exit event, the current parent
+ is popped from the stack.
+ 
+\end_layout
+
+\begin_layout Standard
+\begin_inset VSpace defskip
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+It is fortunately possible to implement this algorithm with a rather low
+ I/O overhead.
+ Whenever a behavior enter event arrives, we set up a simple structure consistin
+g of a linked list of pages that will store pointers to children events.
+ In order to avoid wasting storage space, the first page of each such structure
+ can be smaller than the global page size 
+\begin_inset Formula $P$
+\end_inset
+
+ defined in section 
+\begin_inset LatexCommand \ref{sub:IO-efficiency-queries}
+
+\end_inset
+
+ and each new page within the same structure is twice the size of its predecesso
+r until the global page size is reached.
+ In order to reduce I/O overhead we must maintain the last page of as many
+ children list structures as possible in RAM.
+ 
+\end_layout
+
+\begin_layout Standard
+Let us estimate the amount of RAM required for control flow tree reconstitution.
+ We can observe that the size of any one of the per-thread stacks is the
+ same as the actual size of the corresponding thread's stack in the JVM,
+ and although by default the JVM allocates as much as 2MB of stack per thread,
+ it is extremely uncommon to have more than a few hundred elements on the
+ stack.
+ If we allow for 1,000 live threads and a stack depth of 1,000 for each,
+ we would need buffer space for 1,000,000 items.
+ Each item being an 8-bytes event pointer, we would only need 8MB of RAM
+ for the stacks.
+\end_layout
+
+\begin_layout Standard
+As far as children lists are concerned, maintaining in memory the last page
+ of the children list corresponding to the current parent event of each
+ thread would require at most 
+\begin_inset Formula $1,000\cdot P\approx4$
+\end_inset
+
+MB of RAM.
+ Maintaining the last pages of the 
+\begin_inset Formula $n$
+\end_inset
+
+ top current parents for each thread would thus require 
+\begin_inset Formula $n\cdot4$
+\end_inset
+
+MB of RAM so it seems reasonable to expect that we will be able to buffer
+ at least a few levels of children lists for each thread, thus reducing
+ the I/O overhead.
+ It is also possible to use the same trick of small write page size as in
+ 
+\begin_inset LatexCommand \ref{sub:creation-space-io}
+
+\end_inset
+
+ to augment the number of levels that can be buffered.
+\end_layout
+
+\begin_layout Subsection
+Summary
+\end_layout
+
+\begin_layout Standard
+In this section we tried to show that our goal of handling 100,000 events/s
+ is attainable with current commodity hardware.
+ We have seen that the amount of RAM is of utmost importance to keep I/O
+ costs low.
+ We can summarize the required amount of RAM as follows:
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula \[
+\underbrace{\left(O+C+T\right)\cdot P_{w}}_{a}+\underbrace{3\cdot\left(O+C+T\right)\cdot P_{w}}_{b}+\underbrace{T\cdot D\cdot P_{w}}_{c}\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+With:
+\begin_inset VSpace defskip
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset Tabular
+<lyxtabular version="3" rows="5" columns="2">
+<features>
+<column alignment="center" valignment="top" width="0">
+<column alignment="left" valignment="top" width="0">
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Standard
+\begin_inset Formula $T$
+\end_inset
+
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Standard
+Expected maximum simultaneously alive threads
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Standard
+\begin_inset Formula $O$
+\end_inset
+
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Standard
+Expected maximum simultaneously alive objects
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Standard
+\begin_inset Formula $C$
+\end_inset
+
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Standard
+Number of code items (behaviors, fields, local variables)
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Standard
+\begin_inset Formula $D$
+\end_inset
+
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Standard
+Expected average thread stack depth
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Standard
+\begin_inset Formula $P_{w}$
+\end_inset
+
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Standard
+
+\emph on
+Write
+\emph default
+ page size in bytes
+\end_layout
+
+\end_inset
+</cell>
+</row>
+</lyxtabular>
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset VSpace defskip
+\end_inset
+
+The 
+\begin_inset Formula $a$
+\end_inset
+
+ part corresponds to the buffer pages for the main indexes defined in 
+\begin_inset LatexCommand \ref{sub:creation-space-io}
+
+\end_inset
+
+.
+ The 
+\begin_inset Formula $b$
+\end_inset
+
+ part corresponds to the hierarchical indexes defined in 
+\begin_inset LatexCommand \ref{sub:hierarchical-indexes}
+
+\end_inset
+
+.
+ The 
+\begin_inset Formula $c$
+\end_inset
+
+ part corresponds to the control flow reconstitution described in 
+\begin_inset LatexCommand \ref{sub:Control-flow-reconstitution}
+
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Section
+Scaling up with a debugging grid
+\begin_inset LatexCommand \label{sec:grid}
+
+\end_inset
+
+ 
+\end_layout
+
+\begin_layout Standard
+In section 
+\begin_inset LatexCommand \ref{sub:hierarchical-indexes}
+
+\end_inset
+
+ we showed that with a single commodity machine we can achieve a throughput
+ of 100.000 incoming events/s and still be able to perform queries efficiently,
+ ie.
+ at a speed compatible with interactive applications.
+ In this section we aim to show that the database backend can be parallelized
+ and that its throughput increases linearly in terms of the number of nodes,
+ within certain limits.
+ In the following we first propose a distributed architecture and then proceed
+ to show how it can be applied to the three type of queries we aim to support.
+\end_layout
+
+\begin_layout Subsection
+Architecture
+\begin_inset LatexCommand \label{sub:GridArchitecture}
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+The architecture of the distributed backend is shown in figure 
+\begin_inset LatexCommand \ref{fig:DebuggingGrid}
+
+\end_inset
+
+.
+ It consists in three layers:
+\end_layout
+
+\begin_layout Itemize
+A 
+\emph on
+dispatcher
+\emph default
+ that receives the events from the debugged host and distributes them to
+ a number of database nodes so that the load on each node is balanced.
+ The decision of which node should receive an event is almost arbitrary
+ and does not require much processing.
+\end_layout
+
+\begin_layout Itemize
+A number of 
+\emph on
+database nodes
+\emph default
+, each of which receives a subset of all generated events.
+ They are individually able to index events and process queries in the same
+ way as the non distributed backend described in section 
+\begin_inset LatexCommand \ref{sec:Indexing-schemes}
+
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Itemize
+A 
+\emph on
+query aggregator
+\emph default
+ that receives queries from the client (debugger UI), passes them to each
+ database node and aggregates the results before sending them back to the
+ client.
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float figure
+wide false
+sideways false
+status collapsed
+
+\begin_layout Caption
+Architecture of the distributed database backend.
+\begin_inset LatexCommand \label{fig:DebuggingGrid}
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\align center
+\begin_inset Graphics
+	filename DGA.pdf
+	lyxscale 20
+	width 80col%
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Additionally each event is identifiable by an id which comprises three parts:
+ 
+\end_layout
+
+\begin_layout Itemize
+Thread id: the thread on the debugged host that generated the event.
+\end_layout
+
+\begin_layout Itemize
+Serial number: within each thread events obtain successive serial numbers.
+\end_layout
+
+\begin_layout Itemize
+Node: the database node on which the event is stored.
+\end_layout
+
+\begin_layout Standard
+This architecture is well suited to our problem because queries don't need
+ to perform any kind of joins between events, except in a very confined
+ way for control flow reconstitution.
+ Thus all database nodes perform the same query independently and then send
+ their results to the aggregator which is able to merge them efficiently.
+ The detailed process for each type of query is explained in the next section.
+\end_layout
+
+\begin_layout Standard
+Because the dispatcher does not store events on disk and does not perform
+ any CPU intensive processing, the throughput of this architecture is linear
+ in terms of the number of database nodes until the link bandwidth is saturated
+ (assuming reasonable memory bandwidth and CPU power).
+ For instance, a system with 30 database nodes and a 1Gb/s link could handle
+ about 3 million events/s.
+ 
+\end_layout
+
+\begin_layout Subsection
+Queries
+\end_layout
+
+\begin_layout Subsubsection
+Generic filtering
+\begin_inset LatexCommand \label{sub:GridGeneric-filtering}
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Filtering queries are straightforward to implement with the distributed
+ backend.
+ The events can be distributed randomly amongst database nodes.
+ When a query is issued, the aggregator sends it to each node for processing;
+ once all nodes are ready, the aggregator merges the results in linear time.
+\end_layout
+
+\begin_layout Standard
+Let us recall that the client doesn't obtain all matching events at once
+ but rather uses a cursor that allows him to navigate in the virtual stream
+ of matching events.
+ The distributed query processing can be sketched as follows: each database
+ node processes the query and makes the first matching event available to
+ the aggregator.
+ Each time the client advances the cursor, the aggregator identifies the
+ oldest of all available events and pulls it, causing the corresponding
+ database node to advance its own internal cursor and make the next event
+ avaible to the aggregator.
+\end_layout
+
+\begin_layout Standard
+If matching events are uniformly distributed amongst database nodes, the
+ time to retrieve a sequence of matching events is reduced linearly in terms
+ of the number of nodes, until the link bandwidth is saturated.
+ Thus, the distributed architecture accelerates both storage and retrieval
+ of events.
+\end_layout
+
+\begin_layout Subsubsection
+Statistics
+\begin_inset LatexCommand \label{sub:GridStatistics}
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Subsubsection
+Control flow reconstitution
+\begin_inset LatexCommand \label{sub:GridControl-flow-reconstitution}
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+As in the non distributed backend, we store pointers to children events
+ with each behavior enter event.
+ As children events are not necessarily stored in the same node as their
+ parent, the dispatcher must notify the node that contains the parent event
+ whenever an event is sent to another node.
+ This means that in general, two messages are sent to the database nodes
+ upon event reception.
+\end_layout
+
+\begin_layout Section
+Debugging distributed applications
+\end_layout
+
+\begin_layout Section
+Future work
+\end_layout
+
+\begin_layout Section
+Conclusion
+\end_layout
+
+\end_body
+\end_document

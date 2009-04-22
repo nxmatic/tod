@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="src" path="src/main"/>
+	<classpathentry kind="src" path="src/test"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry kind="src" path="/TOD-core">
+		<attributes>
+			<attribute name="org.eclipse.ajdt.aspectpath" value="true"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry combineaccessrules="false" kind="src" path="/zz.utils"/>
+	<classpathentry kind="lib" path="lib/junit-4.1.jar"/>
+	<classpathentry kind="lib" path="lib/lucene-core-2.0.0.jar"/>
+	<classpathentry kind="lib" path="lib/pom.jar"/>
+	<classpathentry kind="lib" path="lib/reflex-core.jar"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/TOD-agent"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/TOD-dbgrid"/>
+	<classpathentry kind="con" path="org.eclipse.ajdt.core.ASPECTJRT_CONTAINER"/>
+	<classpathentry kind="output" path="bin"/>
+</classpath>

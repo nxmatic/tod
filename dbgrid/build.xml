@@ -1,0 +1,154 @@
+<project name="TOD-dbgrid" default="jar" basedir="."
+	xmlns:aspectj="antlib:org.aspectj">
+
+    <target name="init">
+   		<property file="../tod.plugin/ant.settings"/> <!-- This is optional, only for skip.deps-->
+    	
+		<property name="version" value="dev"/>
+    	
+        <property name="scripts.dir" value="${basedir}/scripts"/>
+        <property name="build.dir" value="${basedir}/build"/>
+        <property name="lib.dir" value="${basedir}/lib"/>
+        <property name="src-main.dir" value="${basedir}/src/main"/>
+        <property name="src-test.dir" value="${basedir}/src/test"/>
+        <property name="classes-main.dir" value="${basedir}/classes-main"/>
+        <property name="classes-test.dir" value="${basedir}/classes-test"/>
+    	
+        <property name="zz.utils.dir" value="${basedir}/../zz.utils"/>
+        <property name="tod-agent.dir" value="${basedir}/../TOD-agent"/>
+        <property name="tod-evdb1.dir" value="${basedir}/../TOD-evdb1"/>
+        <property name="tod-evdbng.dir" value="${basedir}/../TOD-evdbng"/>
+        <property name="tod.dir" value="${basedir}/../TOD"/>
+    	
+        <path id="main.classpath">
+        	<pathelement path="${tod-agent.dir}/build/tod-agent15.jar"/>
+        	<pathelement path="${tod.dir}/build/tod-debugger.jar"/>
+        	<pathelement path="${tod.dir}/lib/aspectjrt.jar"/>
+            <pathelement path="${zz.utils.dir}/build/zz.utils.jar"/>
+        	
+            <pathelement path="${lib.dir}/lucene-core-2.0.0.jar"/>
+        </path>
+    	
+        <path id="test.classpath">
+        	<pathelement path="${tod-agent.dir}/build/tod-agent15.jar"/>
+        	<pathelement path="${tod.dir}/build/tod-debugger.jar"/>
+        	<pathelement path="${tod.dir}/build/tod-test.jar"/>
+        	<pathelement path="${tod.dir}/lib/aspectjrt.jar"/>
+            <pathelement path="${zz.utils.dir}/build/zz.utils.jar"/>
+        	
+        	<pathelement path="${classes-main.dir}"/>
+        	
+            <pathelement path="${lib.dir}/junit-4.1.jar"/>
+        </path>
+
+    </target>
+
+    <target name="clean" depends="init">
+        <delete includeemptydirs="true" failonerror="false">
+            <fileset dir="${build.dir}"/>
+            <fileset dir="${classes-main.dir}"/>
+            <fileset dir="${classes-test.dir}"/>
+        </delete>
+    </target>
+
+    <target name="compile-main" depends="init, dep.all">
+        <mkdir dir="${classes-main.dir}"/>
+    	
+        <aspectj:iajc
+        	source="1.5" target="1.5"
+        	debug="yes" nowarn="yes"
+            srcdir="${src-main.dir}"
+            destdir="${classes-main.dir}"
+        	aspectpathref="main.classpath"
+            classpathref="main.classpath"/>
+    	
+    </target>
+	
+    <target name="compile-test" depends="init, dep.all, compile-main">
+        <mkdir dir="${classes-test.dir}"/>
+    	
+        <aspectj:iajc
+        	source="1.5" target="1.5"
+        	debug="yes" nowarn="yes"
+            srcdir="${src-test.dir}"
+            destdir="${classes-test.dir}"
+        	aspectpathref="test.classpath"
+            classpathref="test.classpath"/>
+    </target>
+	
+	<target name="compile" depends="compile-main, compile-test"/>
+	
+	<target name="jar" depends="compile">
+        <mkdir dir="${build.dir}"/>
+		<jar destfile="${build.dir}/tod-dbgrid.jar" basedir="${classes-main.dir}"/>
+		<jar destfile="${build.dir}/tod-dbgrid-test.jar" basedir="${classes-test.dir}"/>
+	</target>
+	
+	<target name="release-db" depends="jar">
+		<zip destfile="${build.dir}/tod-db.zip">
+			<zipfileset dir="." prefix="tod-${version}"
+				includes="scripts/**, build/tod-*.jar, lib/*.jar"/>
+			
+			<zipfileset dir="${tod-agent.dir}/build" prefix="tod-${version}/lib" includes="tod-agent.jar"/>
+			<zipfileset dir="${tod-evdb1.dir}/build" prefix="tod-${version}/lib" includes="tod-evdb1.jar"/>
+			<zipfileset dir="${tod-evdbng.dir}/build" prefix="tod-${version}/lib" includes="tod-evdbng.jar"/>
+			<zipfileset dir="${tod.dir}/build" prefix="tod-${version}/lib" includes="tod-debugger.jar"/>
+			<zipfileset dir="${zz.utils.dir}/build" prefix="tod-${version}/lib" includes="zz.utils.jar"/>
+		</zip>
+
+		<tar destfile="${build.dir}/tod-db.tar.gz" compression="gzip">
+			<tarfileset dir="." prefix="tod-${version}" mode="755"
+				includes="scripts/*.sh"/>
+			
+			<tarfileset dir="." prefix="tod-${version}"
+				includes="scripts/**, build/tod-*.jar, lib/*.jar"
+				excludes="scripts/*.sh, scripts/collector.log"/>
+			
+			<tarfileset dir="${tod-agent.dir}/build" prefix="tod-${version}/lib" includes="tod-agent.jar"/>
+			<tarfileset dir="${tod-evdb1.dir}/build" prefix="tod-${version}/lib" includes="tod-evdb1.jar"/>
+			<tarfileset dir="${tod-evdbng.dir}/build" prefix="tod-${version}/lib" includes="tod-evdbng.jar"/>
+			<tarfileset dir="${tod.dir}/build" prefix="tod-${version}/lib" includes="tod-debugger.jar"/>
+			<tarfileset dir="${zz.utils.dir}/build" prefix="tod-${version}/lib" includes="zz.utils.jar"/>
+		</tar>
+	</target>
+	
+    <target name="deploy" depends="jar" >
+        <exec executable="${scripts.dir}/deploy.sh" failonerror="true" output="rsync.log">
+        	<arg value="${build.dir}"/>
+        	<arg value="${lib.dir}"/>
+        	<arg value="${scripts.dir}"/>
+        	<arg value="*.so"/>
+    	</exec>
+    </target>
+	
+	<target name="dep.zz.utils" depends="init" unless="skip.deps">
+		<ant 
+			antfile="${zz.utils.dir}/build.xml" 
+			dir="${zz.utils.dir}" 
+			target="jar"
+			inheritall="false"/>
+		<echo message="Finished building zz.utils"/>
+	</target>
+	
+	<target name="dep.tod-agent" depends="init" unless="skip.deps">
+		<ant 
+			antfile="${tod-agent.dir}/build.xml" 
+			dir="${tod-agent.dir}" 
+			target="jar"
+			inheritall="false"/>
+		<echo message="Finished building tod-agent"/>
+	</target>	
+	
+	<target name="dep.tod" depends="init" unless="skip.deps">
+		<echo message="Building TOD..."/>
+		<ant 
+			antfile="${tod.dir}/build.xml" 
+			dir="${tod.dir}" 
+			target="jar"
+			inheritall="false"/>
+		<echo message="Finished building TOD"/>
+	</target>
+	
+	
+	<target name="dep.all" depends="dep.zz.utils, dep.tod-agent, dep.tod"/>
+</project>

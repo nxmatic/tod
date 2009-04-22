@@ -1,0 +1,36 @@
+---
+title: Download
+---
+h1. Download & installation
+
+Although the core of TOD is IDE-agnostic, at the moment it has only been integrated into the Eclipse IDE. So to try TOD you must first install Eclipse, if you do not have it already: "Eclipse.org":http://www.eclipse.org/.
+
+h2. Requirements
+
+You need Eclipse 3.2 or later, and Java 1.5 or later.
+
+h2. Download
+
+Select the latest version (@tod.plugin_x.x.x.zip@) in the "Downloads page":http://pleiad.dcc.uchile.cl/files/tod/releases/.
+
+h2. Install
+
+Installation is not yet as straightforward as we would like. Follow carefully the following instructions, and in case of problems check the {link: documentation/troubleshooting.page} page or send a mail to the mailing list (see {link: contact.page}).
+
+h3. Unzip the plugin
+
+Unzip the contents of @tod.plugin_x.x.x.zip@ into your Eclipse installation directory. Ensure the files have been unzipped at the proper place: the @plugins@ directory of your Eclipse installation should now contain the @tod.plugin_x.x.x@, @tod.plugin.ajdt_x.x.x@ and @zz.eclipse.utils_1.0.0@ directories (in additions to the already installed plugins).
+
+h3. Install native library
+
+TOD uses a native agent to instrument the classes of the debugged program. Under Windows, the agent needs the @mingwm10.dll@ library, which must be copied from the plugin's lib directory to the system's libraries directory (usually c:\windows\system32).
+
+h3. Start debugging!
+
+If all went well, your Eclipse should now have a new debug button:
+
+!images/todLaunchButton.png!
+
+This new button is a launcher button, like the classic debug button. If you have a launch configuration ready, try launching your program with TOD. Your program should execute (almost) as usual, and you can explore its execution trace in the Trace Navigator view (Window/Show View/Other... then choose the Trace Navigator view under TOD). See the {link: {path: documentation/index.page, text: documentation}} for information on how to use TOD.
+
+If your program fails to start under TOD, refer to the {link: documentation/troubleshooting.page} page.

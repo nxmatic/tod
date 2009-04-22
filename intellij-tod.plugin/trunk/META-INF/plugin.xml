@@ -1,0 +1,20 @@
+<!DOCTYPE idea-plugin PUBLIC "Plugin/DTD" "http://plugins.intellij.net/plugin.dtd">
+<idea-plugin>
+    <name>TOD Plugin</name>
+    <description>IntelliJ IDEA Integration of TOD</description>
+    <version>1.0</version>
+    <vendor>PLEIAD Lab.</vendor>
+    <idea-version since-build="3000"/>
+
+    <application-components>
+        <component>
+            <implementation-class>tod.idea.plugin.TODApplicationComponent</implementation-class>
+        </component>
+    </application-components>
+
+    <actions>
+        <action id="TODGoTo" class="TODGoTo" text="Go to TOD">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+        </action>
+    </actions>
+</idea-plugin>

@@ -1,0 +1,284 @@
+\documentclass[10pt,a4paper]{article}
+\usepackage[utf8x]{inputenc}
+\usepackage{ucs}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{moreverb} 
+\usepackage{hyperref}
+\usepackage{colortbl}
+\pagestyle{headings}
+
+\begin{document}
+\renewcommand{\contentsname}{Indice} 
+\renewcommand\listfigurename{Lista de Figuras}
+\renewcommand\listtablename{Lista de Tablas}
+\newcommand\bibname{Bibliografía}
+\renewcommand{\refname}{Bibliografía}
+\renewcommand\indexname{Indice alfabético}
+\renewcommand\figurename{Figura}
+\renewcommand\tablename{Tabla}
+\renewcommand\partname{Parte}
+\newcommand\chaptername{Capítulo}
+\renewcommand\appendixname{Apéndice}
+\renewcommand\abstractname{Resumen}
+
+\title{Cuarta semana de trabajo [21 - 25 de abril]}
+\author{Milton Inostroza Aguilera}
+\date{27 Abril de 2008}
+\clearpage
+\maketitle
+
+\begin{abstract}
+Se propone un borrador del protocolo de comunicación que se utilizará para comunicar pyTOD \{Python\} con la base de datos TOD \{Java\}.
+
+\end{abstract}
+\newpage
+\tableofcontents
+\newpage
+\listoffigures
+\newpage
+\listoftables
+\newpage
+\section{Desarrollo}
+La semana comenzó por solucionar el problema que se tenía con settrace para los threads.\\
+
+Los threads en python implementados por la clase threading, no eran detectados por el capturador de huella, ya que utilizan su propio \textit{sys}.  Investigando un poco este módulo se logra plantear la siguiente solución:
+
+\begin{itemize}
+\item Utilizar el método settrace del módulo threading y enviar nuestro capturador de huella.
+\item Importar desde nuestro capturador de huella el módulo threading, en especial la funcion settrace.
+\item Al hacer lo anterior, al momento que el programador importe la librería threading desde su script, el sistema no lo importará debido a que ya existe una referencia de importanción a ese módulo.  Con lo anterior nos aseguramos que los threads implementados por el programador utilizarán nuestro capturador de huellas.  Para mas información: \cite{lista}\\
+Proceso de Importación:
+\begin{enumerate}
+\item Se comprueba si existe una clave en 'sys.modules' con el nombre del
+módulo. Si existe, se usa el valor de esa clave para evitar
+"reimportar" el módulo. Así terminaría el proceso de importación. (Es
+la razón por la que no debe dolernos reimportar un módulo tantas veces
+como queramos).\\
+\item Si no existe ninguna clave con el nombre del módulo, se crea en
+'sys.modules' una entrada nueva con el nombre del módulo como clave y
+se inicializa como módulo vacío (types.ModuleType).\\
+\item Este módulo vacío se utiliza como "espacio de nombres" y se irá
+"poblando" de referencias a medida que se ejecute el módulo.\\
+
+¿Qué pasa si durante la ejecución del módulo se importan otros módulos?\\
+
+\item Si durante la ejecución del código se importan nuevos módulos,
+éstos módulos van a ver al primogénito como ya importado, pero en
+realidad todavía estará sin inicializar del todo. Habrá referencias
+que todavía no habránn sido creadas ya que iban en orden por detrás de
+las importaciones.
+\end{enumerate}
+
+\end{itemize}
+
+
+\section{Protocolo de comunicación - Draft}
+
+Para poder enviar los datos a la bases de datos de TOD se utilizarán socket's.  Para codificar se utilizara la librería xdrlib que está basada en el estandar rfc1832 \cite{rfc1832}
+
+Se muestran las tablas bases para el registro de los objetos y para el envío de eventos:
+
+\subsection{Identificadores bases}
+
+La siguiente tabla muestra que cada suceso tiene un identificador en el sistema de capturación de huella.
+\begin{table}[h]
+\begin{center}
+\begin{tabular}{|l | c |}
+\hline
+Suceso & Identificador\\
+\hline
+Registro & 0\\
+\hline
+Llamada & 1\\
+\hline
+Retorno & 2\\
+\hline
+Asignacion & 3\\
+\hline
+\end{tabular}
+\caption{Identificadores de sucesos} 
+\end{center}
+\end{table}
+
+La siguiente tabla muestra que cada objeto tiene un identificador en el sistema de capturación de huella.
+\begin{table}[h]
+\begin{center}
+\begin{tabular}{|l | c |}
+\hline
+Id Objeto & Identificador\\
+\hline
+Clase & 0\\
+\hline
+método & 1\\
+\hline
+Atributo & 2\\
+\hline
+Funcion & 3\\
+\hline
+Variable local & 4\\
+\hline
+Probe & 5\\
+\hline
+Thread & 6\\
+\hline
+\end{tabular}
+\caption{Identificadores de objetos} 
+\end{center}
+\end{table}
+\\
+\pagebreak
+
+La siguiente tabla muestra que cada tipo de datos un identificador en el sistema de capturación de huella.
+\begin{table}[h]
+\begin{center}
+\begin{tabular}{|l | c |}
+\hline
+Type & Identificador\\
+\hline
+int & 0\\
+\hline
+str & 1\\
+\hline
+float & 2\\
+\hline
+long & 3\\
+\hline
+bool & 4\\
+\hline
+other & 5\\
+\hline
+\end{tabular}
+\caption{Identificadores de tipo de datos} 
+\end{center}
+\end{table}
+
+\subsection{Registro de objetos}
+
+A continuación se muestra el formato que tienen el registro de los diferentes objetos dentro del capturador de huellas:\\
+
+Se describe el registro del objeto función:\\
+
+\begin{boxedverbatim}
+eventId | objectId | Id | name | argsN | {argName1 | argId1}^n
+\end{boxedverbatim}
+\\
+
+Se describe el registro del objeto variable local:\\
+
+\begin{boxedverbatim}
+eventId | objectId | Id | parentId | name
+\end{boxedverbatim}
+\\
+
+Se describe el registro del objeto clases:\\
+
+\begin{boxedverbatim}
+eventId | objectId | Id | name | classBases
+\end{boxedverbatim}
+\\
+
+Se describe el registro del objeto método:\\
+
+\begin{boxedverbatim}
+eventId | objectId | Id | classId | name | argsN | {argName | argId}^n
+\end{boxedverbatim}
+\\
+
+Se describe el registro del objeto atributo:\\
+
+\begin{boxedverbatim}
+eventId | objectId | Id | parentId | name
+\end{boxedverbatim}
+\\
+
+Se describe el registro del objeto thread: \\
+
+\begin{boxedverbatim}
+eventId | objectId | Id | sysId
+\end{boxedverbatim}
+\\
+
+Se describe el registro del objeto probe: \\
+
+\begin{boxedverbatim}
+eventId | objectId | Id | currentLasti | parentId
+\end{boxedverbatim}
+
+\subsection{Llamada de objetos}
+
+A continuación se muestra el formato que tienen las llamadas de los objetos función y método dentro del capturador de huellas:\\
+
+Se describe la llamada al objeto función:\\
+
+\begin{boxedverbatim}
+eventId | objectId | Id | parentId | argsN | {argId | argValue}^n
+\end{boxedverbatim}
+\\
+
+Se describe la llamada al objeto método:\\
+
+\begin{boxedverbatim}
+eventId | objectId | Id | parentId | classId | argsN | {argId | argValue}^n
+\end{boxedverbatim}
+\\
+Es importante señalar que todas estas llamadas estan acompañadas de los siguientes datos que se describen a continuación:\\
+
+\begin{boxedverbatim}
+probeId | parentTimeStampFrame | depth | currentTimeStamp | threadId
+\end{boxedverbatim}
+\\
+
+\subsection{Asignación - Modificación de objetos}
+A continuación se muestra el formato que tienen las asignaciones | modificaciones de los objetos variable local y atributo dentro del capturador de huellas:\\
+
+Se describe la asignación - modificacion al objeto variable local:\\
+
+\begin{boxedverbatim}
+eventId | objectId | Id | parentId | value
+\end{boxedverbatim}
+\\
+
+Se describe la asignación - modificación al objeto atributo:\\
+
+\begin{boxedverbatim}
+eventId | objectId | Id | parentId | value
+\end{boxedverbatim}
+\\
+
+Es importante señalar que todas estas asignaciones - modificaciones estan acompañadas de los siguientes datos que se describen a continuación:\\
+
+\begin{boxedverbatim}
+probeId | parentTimeStampFrame | depth | currentTimeStamp | threadId
+\end{boxedverbatim}
+\\
+
+\subsection{Return}
+A continuación se muestra el formato que tiene el return dentro del capturador de huellas:\\
+
+Se describe return:\\
+
+\begin{boxedverbatim}
+eventId | probeId | hasThrown
+\end{boxedverbatim}
+\\
+
+\newpage
+\section{Lecturas recomendadas}
+Se recomienda leer y revizar los siguientes proyectos:
+\begin{itemize}
+\item PyChecker, analisis estatico
+\item PyLint, analiza si el codigo satisface la codificicion estandar
+\item Py\_Compile, compila archivos \*.py
+\item pdb, depurador break-point
+\end{itemize}
+
+\pagebreak
+
+\begin{thebibliography}{2}
+\bibitem{lista} \url{http://listas.aditel.org/archivos/python-es/2007-March/016605.html}
+\bibitem{rfc1832} \url{http://www.faqs.org/rfcs/rfc1832.html}
+\end{thebibliography}
+\end{document}

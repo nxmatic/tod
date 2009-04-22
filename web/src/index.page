@@ -1,0 +1,29 @@
+---
+title: Overview
+---
+h1. Omniscient debugging with TOD
+
+TOD is an omniscient debugger, or back-in-time debugger, for Java. Omniscient debuggers drastically reduce the time needed to debug software by giving the programmer complete freedom with respect to time: they permit to step forward _and backward_, and to immediately answer questions like _"when was this variable assigned that value?"_. This is made possible by the recording of the activity of the debugged program, so that its history, or execution trace, can be freely navigated. 
+
+Omniscient debuggers have been around for several years, however they have not made it into the mainstream. Indeed they suffer from inherent _scalability_ problems: execution traces are usually huge, and capturing, storing and presenting them to the programmer is challenging. TOD is the product of ongoing research on _practical omniscient debugging_ at the "Pleiad":http://pleiad.dcc.uchile.cl/ group of the University of Chile. Although currently in a beta stage, it already has several interesting features:
+
+h4. Scalable distributed event database
+
+TOD stores execution traces in an _event database_. The event database of TOD has a very high throughput and is distributed: it can run on a cluster and its throughput increases almost linearly with the number of machines.
+
+h4. Customizable trace scoping
+
+Capturing an execution trace incurs a significant _runtime overhead_ on the debugged program. TOD supports _scoped_ trace capture, allowing to exclude parts of the program (for instance trusted libraries, such as the JDK) and to disable and enable trace capture at some points in time. Careful scoping greatly reduces the size of execution traces, thus reducing both the runtime overhead and the storage requirements.
+
+h4. Efficient navigation
+
+As execution traces are very big, the programmer must be provided convenient navigational means so that they can quickly locate interesting events. TOD is seamlessly integrated into the Eclipse IDE and provides an easy-to-use interface that extends familiar debugging metaphors such as stepping actions with their reverse counterparts, and convenient "why?" links next to variables and fields that directly jump through causality links.
+
+h2. Sponsors
+
+We have been granted an open-source license of the YourKit Java Profiler:
+YourKit is kindly supporting open source projects with its full-featured Java Profiler.
+YourKit, LLC is the creator of innovative and intelligent tools for profiling
+Java and .NET applications. Take a look at YourKit's leading software products:
+<a href="http://www.yourkit.com/java/profiler/index.jsp">YourKit Java Profiler</a> and
+<a href="http://www.yourkit.com/.net/profiler/index.jsp">YourKit .NET Profiler</a>.

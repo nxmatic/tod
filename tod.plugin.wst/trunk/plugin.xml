@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.2"?>
+<plugin
+   id="tod.plugin.wst"
+   name="TOD Web Server Plugin"
+   version="1.0.0"
+   provider-name="dcc.uchile.cl"
+   class="tod.plugin.wst.TODPluginWst">
+   <runtime>
+      <library name="plugin.jar"/>
+
+      <!-- the DEV/DEPLOY in-out markers are used by a perl script, don't remove -->
+      <!-- DEV-in -->
+      <library name="../TOD/bin">
+         <export name="*"/>
+      </library>
+      <!-- DEV-out -->
+      
+      <!-- DEPLOY-in     
+      <library name="lib/tod-debugger.jar">
+         <export name="*"/>
+      </library>
+      DEPLOY-out --> 
+   </runtime>
+
+   <requires>
+      <import plugin="org.eclipse.ui"/>
+      <import plugin="org.eclipse.core.runtime"/>
+      <import plugin="org.eclipse.jdt.core"/>
+      <import plugin="org.eclipse.debug.core"/>
+      <import plugin="org.eclipse.debug.ui"/>
+      <import plugin="zz.eclipse.utils"/>
+      <import plugin="tod.plugin" export="true"/>
+      <import plugin="org.eclipse.wst.server.ui"/>
+      <import plugin="org.eclipse.wst.server.core"/>
+      <import plugin="org.eclipse.jst.server.tomcat.core" optional="true"/>
+      <import plugin="org.eclipse.jst.server.generic.core" optional="true"/>
+      <import plugin="org.eclipse.jst.server.generic.ui" optional="true"/>
+   </requires>
+   
+   <extension
+         point="org.eclipse.debug.core.launchDelegates">
+      <launchDelegate
+            delegate="tod.plugin.wst.launch.TODLaunchDelegate_GenericServer"
+            id="tod.plugin.wst.launchDelegate.GenericServer"
+            modes="tod"
+            type="org.eclipse.jst.server.generic.core.launchConfigurationType"/>
+      <launchDelegate
+            delegate="tod.plugin.wst.launch.TODLaunchDelegate_Tomcat"
+            id="tod.plugin.wst.launchDelegate.Tomcat"
+            modes="tod"
+            type="org.eclipse.jst.server.tomcat.core.launchConfigurationType"/>
+      <launchDelegate
+            delegate="tod.plugin.wst.launch.TODLaunchDelegate_RunOnServer"
+            id="tod.plugin.wst.launchDelegate.RunOnServer"
+            modes="tod"
+            type="org.eclipse.wst.server.ui.launchConfigurationType">
+      </launchDelegate>
+            
+   </extension>
+   <extension
+         point="org.eclipse.debug.ui.launchConfigurationTabGroups">
+      <launchConfigurationTabGroup
+            class="tod.plugin.wst.launch.TODLaunchTabGroup_GenericServer"
+            id="tod.plugin.wst.launchConfigurationTabGroup.GenericServer"
+            type="org.eclipse.jst.server.generic.core.launchConfigurationType"/>
+      <launchConfigurationTabGroup
+            class="tod.plugin.wst.launch.TODLaunchTabGroup_Tomcat"
+            id="tod.plugin.wst.launchConfigurationTabGroup.Tomcat"
+            type="org.eclipse.jst.server.tomcat.core.launchConfigurationType"/>
+   </extension>
+   <extension
+         point="tod.plugin.SourceRevealer">
+      <revealer class="tod.plugin.wst.JSPSourceRevealer"/>
+   </extension>
+   
+</plugin>

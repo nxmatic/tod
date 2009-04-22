@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="src" path="resources"/>
+	<classpathentry kind="src" path="src/debugger"/>
+	<classpathentry kind="src" path="src/test"/>
+	<classpathentry excluding="tod/experiments/bench/|tod/test/DBBench.java|tod/experiments/SootDriver.java" kind="src" path="src/experiments"/>
+	<classpathentry kind="src" path="src/testcase"/>
+	<classpathentry exported="true" kind="src" path="/zz.utils"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.junit.JUNIT_CONTAINER/4"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry combineaccessrules="false" exported="true" kind="src" path="/TOD-agent"/>
+	<classpathentry kind="lib" path="lib/jython-2.2.1.jar"/>
+	<classpathentry kind="lib" path="lib/infovis.jar" sourcepath="/infovis-0.9beta2"/>
+	<classpathentry kind="con" path="org.eclipse.ajdt.core.ASPECTJRT_CONTAINER"/>
+	<classpathentry kind="lib" path="lib/asm-all-3.2-svn.jar" sourcepath="/asm3-svn"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/zz.jinterp"/>
+	<classpathentry kind="output" path="bin"/>
+</classpath>

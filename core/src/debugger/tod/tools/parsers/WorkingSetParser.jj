@@ -1,0 +1,125 @@
+options 
+{
+  STATIC = true;
+}
+
+PARSER_BEGIN(WorkingSetParser)
+
+package tod.tools.parsers;
+
+import tod.tools.parsers.workingset.*;
+import java.util.*;
+import java.io.StringReader;
+
+public class WorkingSetParser 
+{
+}
+
+PARSER_END(WorkingSetParser)
+
+
+TOKEN : 
+{
+	<PLUS: "+">
+	| 
+	<MINUS: "-">
+	| 
+	<LBRACKET: "[">
+	| 
+	<RBRACKET: "]">
+	| 
+	<DOT: ".">
+	| 
+	<STAR: "*">
+	| 
+	<COLON: ":">
+	| 
+	<CLASSNAME: (<ID>) ((<DOT>) (<ID>))* ( (<DOT>) (<STAR>) (<STAR>)? )?>
+	|
+	<ID: (<IDCHAR>)+>
+	|
+	<IDCHAR: ["0"-"9", "a"-"z", "A"-"Z", "_", "$"]>
+}
+
+SKIP :
+{
+	" " | "," | "\t" | "\n" | "\r"
+}
+
+
+
+String className():
+{
+	Token t;
+}
+{
+	t = <CLASSNAME>
+	{
+		return t.image;
+	}
+}
+
+AbstractClassSet simpleClassSet():
+{
+	String name;
+}
+{
+	name = className()
+	{
+		return WorkingSetFactory.createClassSet(name);
+	}
+}
+
+AbstractClassSet compoundClassSet():
+{
+	SetOperation operation;
+	List operations = new ArrayList();
+}
+{
+	(
+		<LBRACKET> 
+		( 
+			operation = setOperation() {operations.add(operation);}
+		)+ 
+		<RBRACKET>
+	)
+	{
+		return new CompoundClassSet(operations);
+	}
+}
+
+AbstractClassSet classSet():
+{
+	AbstractClassSet s;
+}
+{
+	(
+		s = simpleClassSet()
+		|
+		s = compoundClassSet()
+	)
+	{
+		return s;
+	}
+}
+
+SetOperation setOperation():
+{
+	Token op;
+	AbstractClassSet set;
+	List sets = new ArrayList();
+}
+{
+	(
+		(op = <PLUS> | op = <MINUS>)
+		set = classSet() {sets.add (set);}
+		( 
+			<COLON> 
+			set = classSet() {sets.add (set);} 
+		)*
+	)
+	{
+		return new SetOperation(op.image, sets);
+	}
+}
+

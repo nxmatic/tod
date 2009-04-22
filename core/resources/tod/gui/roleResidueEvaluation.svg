@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   width="32"
+   height="32"
+   id="svg2245"
+   sodipodi:version="0.32"
+   inkscape:version="0.46"
+   version="1.0"
+   sodipodi:docbase="/home/gpothier/eclipse/workbench-3.1/TOD/resources/tod/gui"
+   sodipodi:docname="roleResidueEvaluation.svg"
+   inkscape:output_extension="org.inkscape.output.svg.inkscape"
+   inkscape:export-filename="/home/gpothier/eclipse/workbench-3.1/TOD/resources/tod/gui/roleResidueEvaluation.png"
+   inkscape:export-xdpi="90"
+   inkscape:export-ydpi="90">
+  <defs
+     id="defs2247">
+    <inkscape:perspective
+       sodipodi:type="inkscape:persp3d"
+       inkscape:vp_x="0 : 9.5630541 : 1"
+       inkscape:vp_y="0 : 1000 : 0"
+       inkscape:vp_z="19.126108 : 9.5630541 : 1"
+       inkscape:persp3d-origin="9.5630541 : 6.3753694 : 1"
+       id="perspective3437" />
+  </defs>
+  <sodipodi:namedview
+     id="base"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     gridtolerance="10000"
+     guidetolerance="10"
+     objecttolerance="10"
+     inkscape:pageopacity="0.0"
+     inkscape:pageshadow="2"
+     inkscape:zoom="14.5625"
+     inkscape:cx="16"
+     inkscape:cy="15.31597"
+     inkscape:document-units="px"
+     inkscape:current-layer="layer1"
+     inkscape:window-width="783"
+     inkscape:window-height="688"
+     inkscape:window-x="891"
+     inkscape:window-y="0"
+     showgrid="false" />
+  <metadata
+     id="metadata2250">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1"
+     transform="translate(-1296.1513,-31.370557)">
+    <g
+       transform="matrix(1.4176171,0,0,1.4176171,1598.0295,-5.6913685)"
+       style="fill:#1625ef;fill-opacity:1;stroke:none"
+       id="g3257">
+      <text
+         xml:space="preserve"
+         style="font-size:16px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:end;line-height:125%;writing-mode:lr-tb;text-anchor:end;fill:#1625ef;fill-opacity:1;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;font-family:Bitstream Vera Sans"
+         x="-197.43509"
+         y="43.379929"
+         id="text3237"
+         sodipodi:linespacing="125%"><tspan
+           sodipodi:role="line"
+           id="tspan3239"
+           x="-197.43509"
+           y="43.379929">?</tspan></text>
+      <path
+         style="opacity:1;fill:#1625ef;fill-opacity:1;stroke:none;stroke-width:1.39999998;stroke-linecap:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+         d="M -201.67669,26.44599 C -207.73373,26.44599 -212.64544,31.38895 -212.64544,37.44599 C -212.64544,43.50303 -207.73373,48.41474 -201.67669,48.41474 C -195.61965,48.41474 -190.67669,43.50303 -190.67669,37.44599 C -190.67669,31.38895 -195.61965,26.446 -201.67669,26.44599 z M -201.67669,27.85224 C -196.37713,27.85225 -192.08294,32.14643 -192.08294,37.44599 C -192.08294,42.74555 -196.37713,47.03974 -201.67669,47.03974 C -206.97625,47.03974 -211.27044,42.74555 -211.27044,37.44599 C -211.27044,32.14643 -206.97625,27.85224 -201.67669,27.85224 z"
+         id="path3241" />
+    </g>
+  </g>
+</svg>

@@ -1,0 +1,102 @@
+<project name="TOD-agng" default="jar" basedir=".">
+
+    <target name="init">
+		<property name="version" value="dev"/>
+    	
+        <property name="build.dir" value="${basedir}/build"/>
+    	<property name="TOD.dir" value="${basedir}/../TOD"/>
+    	<property name="zz.utils.dir" value="${basedir}/../zz.utils"/>
+    	<property name="TOD.src.dir" value="${TOD.dir}/src/debugger"/>
+    	<property name="TOD.lib.dir" value="${TOD.dir}/lib"/>
+    	<property name="zz.utils.src.dir" value="${zz.utils.dir}/src"/>
+        <property name="TOD-agent.src.dir" value="${basedir}/../TOD-agent/src/java"/>
+    	<property name="src.dir" value="${basedir}/src/java"/>
+    	<property name="lib.dir" value="${basedir}/lib"/>
+    	<property name="classes.dir" value="${basedir}/classes"/>	
+        <path id="agent.classpath">
+        <!--	<pathelement path="${lib.dir}/tod-debugger.jar"/>
+            <pathelement path="${lib.dir}/zz.utils.jar"/>
+        	--> 
+        	<!--   we also compile TOD in order to get a unique .jar for the agent to work                            
+        	-->
+        	<pathelement path="${TOD.lib.dir}/asm-all-3.1.jar"/>
+        	<pathelement path="${TOD.lib.dir}/jython-2.2.1.jar"/>
+        	<pathelement path="${TOD.lib.dir}/javassist.jar"/>
+        	<pathelement path="${TOD.lib.dir}/infovis.jar"/>               
+   		
+        </path>
+
+    </target>
+
+    <target name="clean" depends="init">
+        <delete includeemptydirs="true" failonerror="false">
+            <fileset dir="${build.dir}"/>
+            <fileset dir="${classes.dir}"/>
+        </delete>
+    </target>
+
+    <target name="compile" depends="init">
+        <mkdir dir="${classes.dir}"/>
+    	<!--   we also compile TOD and zz in order to get a unique .jar for the agent to work                            
+    	        	-->
+    	<javac compiler="javac1.5" source="1.5" target="1.5"
+        	debug="yes" nowarn="yes"
+            srcdir="${src.dir}:${TOD-agent.src.dir}:${TOD.src.dir}:${zz.utils.src.dir}"
+    		includes="tod/agent/TodAgent.java"
+        	destdir="${classes.dir}"
+            classpathref="agent.classpath"/>
+    </target>
+    <!-- 
+    src="${src.dir}:${TOD-agent.src.dir}:${TOD.src.dir}:${zz.utils.src.dir}"
+    	includes="tod/agent/**, tod/tools/parsers/**, tod/core/config/ClassSelector.java, zz/utils/Utils.java, zz/utils/IFilter.java"	-->
+	
+   	<target name="dep.tod" depends="init">
+   			<ant 
+   				antfile="${TOD.dir}/build.xml" 
+   				dir="${TOD.dir}" 
+   				target="jar"
+   				inheritall="false"/>
+   			<echo message="Finished building tod"/>
+   			<copy todir="lib">
+   				<fileset dir="${TOD.dir}/build" includes="tod-debugger.jar"/>
+   			</copy>
+   	</target>
+	
+	
+	<target name="dep.zz.utils" depends="init">
+			<ant 
+				antfile="${zz.utils.dir}/build.xml" 
+				dir="${zz.utils.dir}" 
+				target="jar"
+				inheritall="false"/>
+			<echo message="Finished building zz.utils"/>
+			<copy todir="lib">
+				<fileset dir="${zz.utils.dir}/build" includes="zz.utils.jar"/>
+			</copy>
+		</target>
+	
+	
+	<target name="jar" depends="compile">
+        <mkdir dir="${build.dir}"/>
+		<jar destfile="${build.dir}/tod-agent.jar">
+			<fileset dir="${classes.dir}" includes="tod/agent/**"/>
+			<fileset dir="${classes.dir}" includes="tod/core/**"/>
+			<fileset dir="${classes.dir}" includes="tod/tools/**"/>
+			<fileset dir="${classes.dir}" includes="zz/utils/**"/>
+		</jar>
+		<copy todir="${build.dir}" >
+			<fileset dir="${basedir}/src/native/linux" includes="libtod-agent.so"/>
+			<fileset dir="${basedir}/src/native/win32" includes="tod-agent.dll"/>
+			<!--	<fileset dir="${basedir}/src/native/macos" includes="libtod-agent.dylib"/>
+		-->
+		</copy>
+		<copy todir="${build.dir}/obf" >
+			<fileset dir="${basedir}/src/native/obf/linux" includes="libtod-agent.so"/>	
+			<fileset dir="${basedir}/src/native/obf/win32" includes="tod-agent.dll"/>
+			<!--	<fileset dir="${basedir}/src/native/obf/macos" includes="libtod-agent.dylib"/>
+		-->
+		</copy>
+
+	</target>
+
+</project>

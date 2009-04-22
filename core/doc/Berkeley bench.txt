@@ -1,0 +1,10 @@
+Berkeley DB Java Edition
+
+recSize: 40 
+Wrote 1000000 records in 28.187s, 35477.348rec/s
+133386kb
+
+recSize: 100
+Wrote 1000000 records in 32.109s, 31143.916rec/s
+191346kb
+

@@ -1,0 +1,29 @@
+---
+title: FAQ
+---
+h1. FAQ 
+
+{a: performance}
+h2. Performance
+
+{a: runtime_overhead}
+h4. What is the runtime overhead of running a program with TOD?
+
+It depends on the type of program, and the instrumentation "scoping rules":manual.page#scoping you have defined. The worst case is a CPU-intensive program with full instrumentation, which incurs an overhead of about 100x (ie. your program runs 100 times slower than whithout TOD). As such an overhead is really impractical in most cases, it is advised to define adequate scoping rules. By default the JDK is scoped out, so it is rather improbable that you experience the worst case overhead.
+
+As an example, we conducted a test where the user wanted to debug an Eclipse plugin, and we measured the runtime overhead on the Eclipse session. Scoping out only the JDK classes (ie. with Eclipse fully instrumented), the runtime overhead was about 20x, so Eclipse was still usable but the overhead was noticeable. 
+
+{a: generation_rate}
+h4. How many events does a program generate?
+
+It depends on the machine you are using, the type of program, and the instrumentation "scoping rules":manual.page#scoping you have defined. A CPU-intensive program running on a 2GHz machine with full instrumentation will generate about 500kEv/s (thousand events per second). With adequate scoping the generation rate can be much lower. An interactive program also generates much less events as it spends time waiting for user input.
+
+{a: event_storage}
+h4. How many events can the event database store?
+
+It depends on the machine(s) on which you run the database. Each event occupies around 140 bytes.
+
+{a: recording_rate}
+h4. How many events per second can the database handle?
+
+It depends on the machine(s) on which you run the database. On a single P4-class machine we observed a recording throughput of around 50kEv/s (throusand of events per second). Using a cluster of 10 similar machines, we reached 470kEv/s.

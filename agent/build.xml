@@ -1,0 +1,52 @@
+<project name="TOD-agent" default="jar" basedir=".">
+
+	<taskdef name="retroweaver" classname="net.sourceforge.retroweaver.ant.RetroWeaverTask">
+		<classpath>
+			<pathelement location="${basedir}/buildlibs/retroweaver-all-2.0.6.jar"/>
+		</classpath>
+	</taskdef>
+
+    <target name="init">
+   		<property file="../tod.plugin/ant.settings"/> <!-- This is optional, only for skip.deps-->
+    	
+		<property name="version" value="dev"/>
+    	
+        <property name="build.dir" value="${basedir}/build"/>
+        <property name="lib.dir" value="${basedir}/lib"/>
+        <property name="src.dir" value="${basedir}/src"/>
+        <property name="classes.dir" value="${basedir}/classes"/>
+    	
+        <path id="agent.classpath">
+            <pathelement path="${lib.dir}/asm-all-3.2-svn.jar"/>
+        </path>
+
+    </target>
+
+    <target name="clean" depends="init">
+        <delete includeemptydirs="true" failonerror="false">
+            <fileset dir="${build.dir}"/>
+            <fileset dir="${classes.dir}"/>
+        </delete>
+    </target>
+
+    <target name="compile" depends="init">
+        <mkdir dir="${classes.dir}"/>
+        <javac compiler="javac1.5" source="1.5" target="1.5"
+        	debug="yes" nowarn="yes"
+            srcdir="${src.dir}"
+            destdir="${classes.dir}"
+            classpathref="agent.classpath"/>
+    </target>
+
+
+	<target name="jar" depends="compile">
+        <mkdir dir="${build.dir}"/>
+		<jar destfile="${build.dir}/tod-agent15.jar" basedir="${classes.dir}"/>
+		
+		<retroweaver inputjar="${build.dir}/tod-agent15.jar" outputjar="${build.dir}/tod-agent14.jar"/>
+		<jar destfile="${build.dir}/tod-agent14.jar" update="yes">
+			<zipfileset src="${basedir}/buildlibs/retroweaver-rt-2.0.6.jar" includes="**/*.class"/>
+		</jar>
+	</target>
+
+</project>

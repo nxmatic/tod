@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="src" path="src/java"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/TOD"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/TOD-agent"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/zz.utils"/>
+	<classpathentry kind="output" path="bin"/>
+</classpath>

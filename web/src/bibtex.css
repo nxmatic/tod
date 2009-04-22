@@ -1,0 +1,18 @@
+#bibtex dt {
+   float: left;
+}
+
+#bibtex a, a:visited {
+   text-decoration: none;
+}
+
+#bibtex a:hover {
+   text-decoration: underline;
+}
+
+#bibtex h3 {
+   display: block;
+   margin: 1em -0.7em 0.15em;
+   padding: 0.2em 0.7em;
+}
+

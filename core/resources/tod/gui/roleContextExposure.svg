@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   width="32"
+   height="32"
+   id="svg2269"
+   sodipodi:version="0.32"
+   inkscape:version="0.46"
+   version="1.0"
+   sodipodi:docbase="/home/gpothier/eclipse/workbench-3.1/TOD/resources/tod/gui"
+   sodipodi:docname="roleContextExposure.svg"
+   inkscape:output_extension="org.inkscape.output.svg.inkscape"
+   inkscape:export-filename="/home/gpothier/eclipse/workbench-3.1/TOD/resources/tod/gui/roleContextExposure.png"
+   inkscape:export-xdpi="90"
+   inkscape:export-ydpi="90">
+  <defs
+     id="defs2271">
+    <inkscape:perspective
+       sodipodi:type="inkscape:persp3d"
+       inkscape:vp_x="0 : 7.5 : 1"
+       inkscape:vp_y="0 : 1000 : 0"
+       inkscape:vp_z="20.00001 : 7.5 : 1"
+       inkscape:persp3d-origin="10.000005 : 5 : 1"
+       id="perspective3378" />
+  </defs>
+  <sodipodi:namedview
+     id="base"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     gridtolerance="10000"
+     guidetolerance="10"
+     objecttolerance="10"
+     inkscape:pageopacity="0.0"
+     inkscape:pageshadow="2"
+     inkscape:zoom="14.5625"
+     inkscape:cx="16"
+     inkscape:cy="16"
+     inkscape:document-units="px"
+     inkscape:current-layer="layer1"
+     inkscape:window-width="783"
+     inkscape:window-height="688"
+     inkscape:window-x="633"
+     inkscape:window-y="108"
+     showgrid="false" />
+  <metadata
+     id="metadata2274">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1"
+     transform="translate(-365,-524.86218)">
+    <g
+       transform="matrix(1.2321161,0,0,1.2321161,582.89245,496.07959)"
+       id="g3325">
+      <path
+         id="path3179"
+         d="M -175.83078,32.565292 L -170.78974,27.524243 L -151.8858,27.524243 L -151.8858,40.126866 L -156.92685,45.167915 L -156.92685,32.565292"
+         style="fill:#e1cd8a;fill-opacity:1;fill-rule:evenodd;stroke:#000000;stroke-width:1.26026225;stroke-linecap:butt;stroke-linejoin:bevel;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" />
+      <rect
+         y="32.565292"
+         x="-175.8308"
+         height="12.602623"
+         width="18.903934"
+         id="rect3177"
+         style="opacity:1;fill:#e1cd8a;fill-opacity:1;stroke:#000000;stroke-width:1.26026225;stroke-linecap:round;stroke-linejoin:bevel;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1" />
+      <path
+         id="path3181"
+         d="M -156.92685,32.565292 L -151.8858,27.524243"
+         style="fill:none;fill-opacity:0.75;fill-rule:evenodd;stroke:#000000;stroke-width:1.26026225px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" />
+    </g>
+  </g>
+</svg>

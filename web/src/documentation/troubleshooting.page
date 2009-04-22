@@ -1,0 +1,14 @@
+---
+title: Troubleshooting
+---
+h1. Troubleshooting
+
+h2. Remote database
+
+h3. RMI error, tries to connect to 127.0.1.1
+
+Under some conditions, the client fails to connect to a remote database because because of network configuration issues. As a workaround, set the following variable before launching the database:
+
+export EXTRA_JVM_ARGS="-Djava.rmi.server.hostname=192.168.0.3"
+
+(replacing 192.168.0.3 with the ip of the machine).

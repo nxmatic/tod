@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.2"?>
+<plugin
+   id="tod.plugin.ajdt"
+   name="TOD AJDT Plugin"
+   version="1.0.0"
+   provider-name="dcc.uchile.cl"
+   class="tod.plugin.ajdt.TODPluginAjdt">
+   <runtime>
+      <library name="plugin.jar"/>
+
+      <!-- the DEV/DEPLOY in-out markers are used by a perl script, don't remove -->
+      <!-- DEV-in -->
+      <library name="../TOD/bin">
+         <export name="*"/>
+      </library>
+      <!-- DEV-out -->
+      
+      <!-- DEPLOY-in     
+      <library name="lib/tod-debugger.jar">
+         <export name="*"/>
+      </library>
+      DEPLOY-out --> 
+   </runtime>
+
+   <requires>
+      <import plugin="org.eclipse.ui"/>
+      <import plugin="org.eclipse.core.runtime"/>
+      <import plugin="org.eclipse.jdt.core"/>
+      <import plugin="org.eclipse.debug.core"/>
+      <import plugin="org.eclipse.debug.ui"/>
+      <import plugin="zz.eclipse.utils"/>
+      <import plugin="org.eclipse.ajdt.core"/>
+      <import plugin="org.eclipse.ajdt.ui"/>
+      <import plugin="tod.plugin" export="true"/>
+   </requires>
+   
+   <extension
+         point="org.eclipse.debug.core.launchDelegates">
+      <launchDelegate
+            delegate="tod.plugin.ajdt.launch.TODLaunchDelegate_AJDT"
+            id="tod.plugin.ajdt.launchDelegate.AJDT"
+            modes="tod"
+            type="org.eclipse.ajdt.launching.AspectJApplication"/>
+      <launchDelegate
+            delegate="tod.plugin.ajdt.launch.TODLaunchDelegate_AJDT_LoadTime"
+            id="tod.plugin.ajdt.launchDelegate.AJDT_LoadTime"
+            modes="tod"
+            type="org.eclipse.ajdt.launching.AspectJLTWApplication"/>
+            
+   </extension>
+   <extension
+         point="org.eclipse.debug.ui.launchConfigurationTabGroups">
+      <launchConfigurationTabGroup
+            class="tod.plugin.ajdt.launch.TODLaunchTabGroup_AJDT"
+            id="tod.plugin.ajdt.launchConfigurationTabGroup.AJDT"
+            type="org.eclipse.ajdt.launching.AspectJApplication"/>
+      <launchConfigurationTabGroup
+            class="tod.plugin.ajdt.launch.TODLaunchTabGroup_AJDT_LoadTime"
+            id="tod.plugin.ajdt.launchConfigurationTabGroup.AJDT_LoadTime"
+            type="org.eclipse.ajdt.launching.AspectJLTWApplication"/>
+   </extension>
+   <extension
+         point="tod.plugin.SourceRevealer">
+      <revealer class="tod.plugin.ajdt.AspectJSourceRevealer"/>
+   </extension>
+
+
+</plugin>

@@ -1,0 +1,47 @@
+index.page:
+  inMenu: true
+  orderInfo: 10
+
+documentation/:
+  inMenu: true
+  orderInfo: 20
+
+publications.page:
+  inMenu: true
+  orderInfo: 25
+
+download.page:
+  inMenu: true
+  orderInfo: 30
+
+screenshots.page:
+  inMenu: true
+  orderInfo: 50
+
+contact.page:
+  inMenu: true
+  orderInfo: 60
+
+documentation/internals.page:
+  inMenu: true
+  orderInfo: 100
+
+documentation/manual.page:
+  inMenu: true
+  orderInfo: 200
+
+documentation/source.page:
+  inMenu: true
+  orderInfo: 800
+
+documentation/developer.page:
+  inMenu: false
+  orderInto: 850
+
+documentation/faq.page:
+  inMenu: true
+  orderInfo: 900
+
+documentation/troubleshooting.page:
+  inMenu: true
+  orderInfo: 1000

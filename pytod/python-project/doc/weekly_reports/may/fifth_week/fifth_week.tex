@@ -1,0 +1,404 @@
+\documentclass[10pt,a4paper]{article}
+\usepackage[utf8x]{inputenc}
+\usepackage{ucs}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{moreverb} 
+\usepackage{hyperref}
+\usepackage{colortbl}
+\pagestyle{headings}
+
+\begin{document}
+\renewcommand{\contentsname}{Indice} 
+\renewcommand\listfigurename{Lista de Figuras}
+\renewcommand\listtablename{Lista de Tablas}
+\newcommand\bibname{Bibliografía}
+\renewcommand{\refname}{Bibliografía}
+\renewcommand\indexname{Indice alfabético}
+\renewcommand\figurename{Figura}
+\renewcommand\tablename{Tabla}
+\renewcommand\partname{Parte}
+\newcommand\chaptername{Capítulo}
+\renewcommand\appendixname{Apéndice}
+\renewcommand\abstractname{Resumen}
+
+\title{Quinta semana de trabajo [28 - 02 de Mayo]}
+\author{Milton Inostroza Aguilera}
+\date{5 Mayo de 2008}
+\clearpage
+\maketitle
+
+\begin{abstract}
+
+Se modifica borrador de protocolo para mejor adpatación entre pyTOD y TOD:
+\begin{itemize}
+\item parentId en el registro de probe cambia de posición.
+\item value en el registro de return es agregado.
+\end{itemize}
+\\
+Se plantea modificar la máquina virtual de Python para agregar un identificador único a cada objeto construido dentro del sistema.
+
+
+\end{abstract}
+\newpage
+\tableofcontents
+\newpage
+\listoffigures
+\newpage
+\listoftables
+\newpage
+\section{Desarrollo}
+
+Se hicieron pequeños cambios al borrador del protocolo de comunicación específicamente al registro de probe y al call de los funciones o métodos en lo referente a sus argumentos.\\
+
+Se comienza a construir el socket servidor desde Java para que pyTOD se pueda comunicar de forma exitosa con TOD.
+
+
+\section{Protocolo de comunicación - Draft}
+
+Se muestran las tablas bases para el registro de los objetos y para el envío de eventos:
+
+\subsection{Identificadores bases}
+
+La siguiente tabla muestra que cada suceso tiene un identificador en el sistema de capturación de huella.
+\begin{table}[!h]
+\begin{center}
+\begin{tabular}{|l | c |}
+\hline
+Suceso & Identificador\\
+\hline
+Registro & 0\\
+\hline
+Llamada & 1\\
+\hline
+Retorno & 2\\
+\hline
+Asignacion & 3\\
+\hline
+\end{tabular}
+\caption{Identificadores de sucesos} 
+\end{center}
+\end{table}
+
+La siguiente tabla muestra que cada objeto tiene un identificador en el sistema de capturación de huella.
+\begin{table}[!h]
+\begin{center}
+\begin{tabular}{|l | c |}
+\hline
+Id Objeto & Identificador\\
+\hline
+Clase & 0\\
+\hline
+método & 1\\
+\hline
+Atributo & 2\\
+\hline
+Funcion & 3\\
+\hline
+Variable local & 4\\
+\hline
+Probe & 5\\
+\hline
+Thread & 6\\
+\hline
+\end{tabular}
+\caption{Identificadores de objetos} 
+\end{center}
+\end{table}
+\\
+\pagebreak
+
+La siguiente tabla muestra que cada tipo de datos un identificador en el sistema de capturación de huella.
+\begin{table}[!h]
+\begin{center}
+\begin{tabular}{|l | c |}
+\hline
+Type & Identificador\\
+\hline
+int & 0\\
+\hline
+str & 1\\
+\hline
+float & 2\\
+\hline
+long & 3\\
+\hline
+bool & 4\\
+\hline
+other & 5\\
+\hline
+\end{tabular}
+\caption{Identificadores de tipo de datos} 
+\end{center}
+\end{table}
+
+\subsection{Registro de objetos}
+
+A continuación se muestra el formato que tienen el registro de los diferentes objetos dentro del capturador de huellas:\\
+
+Se describe el registro del objeto función:\\
+
+\begin{table}[!h]
+\begin{center}
+\begin{tabular}{| c | c | c | c | c | c | c |}
+\hline
+eventId & objectId & Id & name & argsN & \{argName_{i} & argId_{i}\}\\
+\hline
+int & int & int & str & int & str & int \\
+\hline
+\end{tabular}
+\caption{Registro del objeto función} 
+\end{center}
+\end{table}
+
+
+Se describe el registro del objeto variable local:\\
+
+\begin{table}[!h]
+\begin{center}
+\begin{tabular}{| c | c | c | c | c |}
+\hline
+eventId & objectId & Id & parentId & name\\
+\hline
+int & int & int & int & str\\
+\hline
+\end{tabular}
+\caption{Registro del objeto variable local} 
+\end{center}
+\end{table}
+
+
+Se describe el registro del objeto clase:\\
+
+\begin{table}[!h]
+\begin{center}
+\begin{tabular}{| c | c | c | c | c |}
+\hline
+eventId & objectId & Id & name & classBases\\
+\hline
+int & int & int & str & --\footnotemark[1]\\
+\hline
+\end{tabular}
+\caption{Registro del objeto clase} 
+\end{center}
+\end{table}
+
+
+\footnotetext[1]{Aún no se toma decisión para poder registrar las super clases que pueda tener la clase registrada.}
+\newpage
+Se describe el registro del objeto método:\\
+
+\begin{table}[!h]
+\begin{center}
+\begin{tabular}{| c | c | c | c | c | c | c | c |}
+\hline
+eventId & objectId & Id & classId & name & argsN & \{argName_{i} & argId_{i}\}\\
+\hline
+int & int & int & int & str & int & str & int \\
+\hline
+\end{tabular}
+\caption{Registro del objeto método} 
+\end{center}
+\end{table}
+
+
+Se describe el registro del objeto atributo:\\
+
+\begin{table}[!h]
+\begin{center}
+\begin{tabular}{| c | c | c | c | c |}
+\hline
+eventId & objectId & Id & parentId & name\\
+\hline
+int & int & int & int & str\\
+\hline
+\end{tabular}
+\caption{Registro del objeto atributo} 
+\end{center}
+\end{table}
+
+
+Se describe el registro del objeto thread: \\
+
+\begin{table}[!h]
+\begin{center}
+\begin{tabular}{| c | c | c | c |}
+\hline
+eventId & objectId & Id & sysId\\
+\hline
+int & int & int & int\\
+\hline
+\end{tabular}
+\caption{Registro del objeto thread} 
+\end{center}
+\end{table}
+
+
+Se describe el registro del objeto probe: \\
+
+\begin{table}[!h]
+\begin{center}
+\begin{tabular}{| c | c | c | c | c |}
+\hline
+eventId & objectId & Id & currentLasti & parentId\\
+\hline
+int & int & int & int & int\\
+\hline
+\end{tabular}
+\caption{Registro del objeto probe} 
+\end{center}
+\end{table}
+
+\newpage
+\subsection{Llamada de objetos}
+
+A continuación se muestra el formato que tienen las llamadas de los objetos función y método dentro del capturador de huellas:\\
+
+Se describe la llamada al objeto función:\\
+
+\begin{table}[!h]
+\begin{center}
+\begin{tabular}{| c | c | c | c | c | c |}
+\hline
+eventId & objectId & Id & parentId & argsN & argValue_{i}\\
+\hline
+int & int & int & int & int & --\footnotemark[1]\\
+\hline
+\end{tabular}
+\caption{Llamada al objeto función} 
+\end{center}
+\end{table}
+
+Se describe la llamada al objeto método:\\
+
+\begin{table}[!h]
+\begin{center}
+\begin{tabular}{| c | c | c | c | c | c | c |}
+\hline
+eventId & objectId & Id & parentId & classId & argsN & argValue_{i}\\
+\hline
+int & int & int & int & int & int & --\footnotemark[1]\\
+\hline
+\end{tabular}
+\caption{Llamada al objeto método} 
+\end{center}
+\end{table}
+
+Es importante señalar que todas estas llamadas estan acompañadas de los siguientes datos que se describen a continuación:\\
+
+\begin{table}[!h]
+\begin{center}
+\begin{tabular}{| c | c | c | c | c |}
+\hline
+probeId & parentTimeStampFrame & depth & currentTimeStamp & threadId\\
+\hline
+int & double & int & double & int \\
+\hline
+\end{tabular}
+\caption{Coordenadas} 
+\end{center}
+\end{table}
+
+
+\footnotetext[1]{Aún no se toma decisión para poder almacenar los valores de objetos primitivos de Python como son: listas, tuplas, diccionarios, enumeraciones.}
+\newpage
+
+\subsection{Asignación - Modificación de objetos}
+A continuación se muestra el formato que tienen las asignaciones | modificaciones de los objetos variable local y atributo dentro del capturador de huellas:\\
+
+Se describe la asignación - modificacion al objeto variable local:\\
+
+\begin{table}[!h]
+\begin{center}
+\begin{tabular}{| c | c | c | c | c |}
+\hline
+eventId & objectId & Id & parentId & value\\
+\hline
+int & int & int & int & --\footnotemark[1]\\
+\hline
+\end{tabular}
+\caption{Registro del objeto variable local} 
+\end{center}
+\end{table}
+
+Se describe la asignación - modificación al objeto atributo:\\
+
+\begin{table}[!h]
+\begin{center}
+\begin{tabular}{| c | c | c | c | c |}
+\hline
+eventId & objectId & Id & parentId & value\\
+\hline
+int & int & int & int & --\footnotemark[1]\\
+\hline
+\end{tabular}
+\caption{Registro del objeto atributo} 
+\end{center}
+\end{table}
+
+Es importante señalar que todas estas asignaciones - modificaciones estan acompañadas de los siguientes datos que se describen a continuación:\\
+
+\begin{table}[!h]
+\begin{center}
+\begin{tabular}{| c | c | c | c | c |}
+\hline
+probeId & parentTimeStampFrame & depth & currentTimeStamp & threadId\\
+\hline
+int & double & int & double & int \\
+\hline
+\end{tabular}
+\caption{Coordenadas} 
+\end{center}
+\end{table}
+
+\subsection{Return}
+
+A continuación se muestra el formato que tiene el return dentro del capturador de huellas:\\
+
+Se describe return:\\
+
+\begin{table}[!h]
+\begin{center}
+\begin{tabular}{| c | c | c | c |}
+\hline
+eventId & value & probeId & hasThrown \\
+\hline
+int & --\footnotemark[1] & int & bool\\
+\hline
+\end{tabular}
+\caption{Registro de return} 
+\end{center}
+\end{table}
+
+\footnotetext[1]{Aún no se toma decisión para poder almacenar los valores de objetos primitivos de Python como son: listas, tuplas, diccionarios, enumeraciones.}
+
+\newpage
+\section{Perspectiva}
+
+Para tener un registro total de los movimientos de todos los objetos dentro del depurador se necesita marcar a cada uno de los objetos dentro de este \{instancias de clases\} con un identificador único.  Esto se realiza de forma exitosa para clases construidas por el programador, pero como en Python todo es un \textit{objeto} no tenemos control de los objetos nativos de este, como lo son entre otros: listas, tuplas, enumeraciones, strings, iteradores.  Tampoco tenemos control de los métodos que puedan ser llamados desde esos objetos:
+\begin{verbatim}
+a = list(2,3,4)
+a.append(70)    #settrace no captura la llamada de append
+\end{verbatim}
+
+Para poder solucionar de primera instancia lo del identificador único se utilizó la funcion \textit{id()}\cite{id}de la librería estandar de Python, pero lamentablemente al momento de destruir un objeto es probable que esta función asigne el mismo identificador que tenía el objeto que ya no existe a un objeto nuevo.\\
+
+Consultando en el salón irc de Python-es y Python\{inglés\} y en las listas de correos respectivas se ha llegado a la conclusión que es necesario hacer un hack a la máquina virtual de Python y añadir la funcionalidad que se necesita.  Se plantea realizarlo de la siguiente manera:
+\begin{itemize}
+\item Estudiar la forma de construir extensiones en lenguaje C para Python\cite{howto}.
+\item Crear un tipo de dato especial para Python que implemente de forma nativa el identificador único.
+\item Lograr que pyTOD sea capaz de intervenir ese id y utilizarlo para realizar depuración.
+\item Si todo va bien y no se observan comportamientos extraños, modificar la clase \textit{object} que es la base de las clases nuevas de python, añadiendo el atribudo del identificador único.
+\end{itemize}
+
+¿Será necesario realizar todo esto para el desarrollo de la memoria?, ¿podemos quedarnos con sólo la depuración de objetos más simples como int, bool, double, float, los definidos por el usuario, etc?
+
+
+\newpage
+\begin{thebibliography}{2}
+\bibitem{id} \url{http://docs.python.org/lib/built-in-funcs.html}
+\bibitem{howto} \url{http://docs.python.org/ext/ext.html}
+\end{thebibliography}
+\end{document}

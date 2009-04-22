@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.0"?>
+<plugin
+   id="tod.plugin.pytod"
+   name="pyTOD Eclipse Plugin"
+   version="0.1"
+   provider-name="Milton Inostroza"
+   class="tod.plugin.pytod.PyTODPlugin">
+   <requires>
+      <import plugin="org.python.pydev"/>
+      <import plugin="org.python.pydev.core"/>
+      <import plugin="tod.plugin"/>
+      <import plugin="org.python.pydev.debug"/>
+   </requires>
+   
+   <runtime>
+      <library name="plugin.jar">
+         <export name="*"/>
+      </library>
+
+      <!-- the DEV/DEPLOY in-out markers are used by a perl script, don't remove -->
+      <!-- DEV-in -->
+      <library name="../TOD-pytod-db/bin">
+         <export name="*"/>
+      </library>
+     
+      <!-- DEV-out -->
+      
+      <!-- DEPLOY-in     
+      <library name="lib/tod-pytod-db.jar">
+         <export name="*"/>
+      </library>
+      DEPLOY-out -->
+   </runtime>
+
+   
+
+   <extension
+         point="org.eclipse.debug.core.launchDelegates">
+      <launchDelegate
+            delegate="tod.plugin.pytod.launch.PyTODLaunchDelegate_PythonRun"
+            id="tod.plugin.pytod.launchDelegate.PythonRun"
+            modes="tod"
+            type="org.python.pydev.debug.regularLaunchConfigurationType"/>
+   </extension>
+
+   <extension
+         point="org.eclipse.debug.ui.launchConfigurationTabGroups">
+      <launchConfigurationTabGroup
+            class="tod.plugin.pytod.launch.PyTODLaunchTabGroup_PythonRun"
+            id="tod.plugin.pytod.launchConfigurationTabGroup.PythonRun"
+            type="org.python.pydev.debug.regularLaunchConfigurationType"/>
+   </extension>
+   <extension
+         point="tod.plugin.SourceRevealer">
+      <revealer
+            class="tod.plugin.pytod.PythonSourceRevealer"
+            id="tod.plugin.pytod.revealer">
+      </revealer>
+   </extension>
+
+</plugin>

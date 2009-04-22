@@ -1,0 +1,4 @@
+Running InsertBench of RawStorageCollector with 10000000 events.
+Finished. Total time: 11.3s.
+ Event count: 10,002,200. Rate: 887,900ev/s.
+ Storage: 396.5MB. Rate: 35.201MB/s

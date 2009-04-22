@@ -1,0 +1,10 @@
+/**************** IE fixes ****************/
+
+html
+{overflow:hidden;}
+
+body
+{height:100%; width:100%; overflow:auto;}
+
+#content
+{height: 100%; }

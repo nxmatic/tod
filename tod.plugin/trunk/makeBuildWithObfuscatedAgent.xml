@@ -1,0 +1,76 @@
+<!-- obfuscate "agent" packages to "agentX" based on the build done in tod.plugin-->
+
+
+<project name="obfuscate Plugin build (please do build before)" default="yguard" basedir=".">
+
+<target name="yguard">
+      <property name="build.dir" value="${basedir}/../tod.plugin/build/tod.plugin"/>
+	  <property name="obf.dir" value="${basedir}/build_obf/tod.plugin"/>
+      
+      <mkdir dir="${obf.dir}/lib"/>
+       
+       
+       <!-- copy plugin release from tod.plugin/build -->
+      <copy todir="${obf.dir}">
+			<fileset dir="${build.dir}" includes="* lib/* icons/*" />
+	  </copy>
+      
+      
+      <!-- copy modified native agent from basedir -->
+     <!-- <copy todir="${obf.dir}/lib">
+			<fileset dir="${basedir}" includes="libbci-agent.so" />
+	  </copy>
+      -->
+      
+      <taskdef name="yguard"
+      classname="com.yworks.yguard.YGuardTask"
+      classpath="yguard.jar"/>
+      <yguard>
+      <inoutpair in="${build.dir}/lib/tod-agent.jar" out="${obf.dir}/lib/tod-agent.jar"/>    
+      <inoutpair in="${build.dir}/plugin.jar" out="${obf.dir}/plugin.jar"/>   
+      <inoutpair in="${build.dir}/lib/tod-dbgrid.jar" out="${obf.dir}/lib/tod-dbgrid.jar"/>   
+      <inoutpair in="${build.dir}/lib/tod-debugger.jar" out="${obf.dir}/lib/tod-debugger.jar"/>   
+     
+     <rename  logfile="renamelog.xml">
+      <keep sourcefile="true"
+            linenumbertable="true"
+            localvariabletable="true"
+            localvariabletypetable="true" 
+            runtimevisibleannotations="true" 
+            runtimevisibleparameterannotations="true" 
+            runtimeinvisibleannotations="true" 
+            runtimeinvisibleparameterannotations="true" >
+       <class classes="private" methods="private" fields="private">
+           <patternset>
+             <include name="**.*"/>
+             <include name="**.*$*"/>
+           </patternset>
+       </class>
+       <package>
+        <patternset>
+       	      <include name="**.*"/>
+       	      <exclude name="tod.agent"/>
+       	      <exclude name="tod.agent.transport"/>
+         </patternset>
+       </package>
+      </keep>
+       
+      
+      <map>
+      	 <package name="tod.agent" map="agentX"/>
+       </map>
+	 </rename>
+      </yguard>
+    </target>
+
+
+     <target name="clean" >
+        <delete includeemptydirs="true" failonerror="false">
+            <fileset dir="${obf.dir}"/>
+        </delete>
+    </target>
+
+
+
+</project>
+
