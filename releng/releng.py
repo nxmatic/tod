@@ -1,4 +1,5 @@
 #! /usr/bin/python
+# -*- coding: utf-8 -*-
 
 import pysvn
 import os
@@ -107,23 +108,19 @@ def useSVN(name, url, checkout):
 	modules[name] = module
 	return module
 	
-def setEclipsePluginVersion(moduleName, version):
-	module = getModule(moduleName)
-	dir = 'checkouts/'+module.name
-	f = open(dir + '/plugin.xml', 'r+')
+def setEclipsePluginVersion(path, version):
+	f = open(path + '/plugin.xml', 'r+')
 	text = f.read()
 	text = re.sub(r'(<plugin[^>]*version=")[^"]+"', '\g<1>' + version + '"', text, 1)
 	f.seek(0)
 	f.write(text)
 	f.truncate()
 	
-def antBuild(moduleName, buildFileName, targetName):
+def antBuild(path, buildFileName, targetName):
 	print '***********************************************************'
-	print 'Building ' + moduleName + ' (' + targetName + ')...'
-	module = getModule(moduleName)
+	print 'Building ' + path + ' (' + targetName + ')...'
 	cwd = os.getcwd()
-	dir = 'checkouts/'+module.name
-	os.chdir(dir)
+	os.chdir(path)
 	ret = os.system('ant -f '+buildFileName+' '+targetName)
 	os.chdir(cwd)
 	
