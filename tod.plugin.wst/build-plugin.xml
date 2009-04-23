@@ -17,7 +17,7 @@
 
 		<property name="tod.dir" value="${basedir}/../core"/>
 		<property name="zz.utils.dir" value="${basedir}/../../zz.utils"/>
-		<property name="zz.eclipse.utils.dir" value="${basedir}/../zz.eclipse.utils"/>
+		<property name="zz.eclipse.utils.dir" value="${basedir}/../../zz.eclipse.utils"/>
 		<property name="tod.plugin.dir" value="${basedir}/../tod.plugin"/>
 
 		<path id="default.classpath">
