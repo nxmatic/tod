@@ -16,9 +16,9 @@
         <property name="classes-test.dir" value="${basedir}/classes-test"/>
         <property name="classes-testcase.dir" value="${basedir}/classes-testcase"/>
     	
-        <property name="tod-agent.dir" value="${basedir}/../TOD-agent"/>
-        <property name="zz.utils.dir" value="${basedir}/../zz.utils"/>
-        <property name="zz.jinterp.dir" value="${basedir}/../zz.jinterp"/>
+        <property name="tod-agent.dir" value="${basedir}/../agent"/>
+        <property name="zz.utils.dir" value="${basedir}/../../zz.utils"/>
+        <property name="zz.jinterp.dir" value="${basedir}/../../zz.jinterp"/>
 
     	
         <path id="debugger.classpath">
@@ -107,6 +107,15 @@
 		<echo message="Finished building zz.utils"/>
 	</target>
 	
+	<target name="dep.zz.jinterp" depends="init" unless="skip.deps">
+		<ant 
+			antfile="${zz.jinterp.dir}/build.xml" 
+			dir="${zz.jinterp.dir}" 
+			target="jar"
+			inheritall="false"/>
+		<echo message="Finished building zz.jinterp"/>
+	</target>
+	
 	<target name="dep.tod-agent" depends="init" unless="skip.deps">
 		<ant 
 			antfile="${tod-agent.dir}/build.xml" 
@@ -116,5 +125,5 @@
 		<echo message="Finished building tod-agent"/>
 	</target>
 	
-	<target name="dep.all" depends="dep.zz.utils, dep.tod-agent"/>
+	<target name="dep.all" depends="dep.zz.utils, dep.zz.jinterp, dep.tod-agent"/>
 </project>

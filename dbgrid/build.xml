@@ -14,11 +14,11 @@
         <property name="classes-main.dir" value="${basedir}/classes-main"/>
         <property name="classes-test.dir" value="${basedir}/classes-test"/>
     	
-        <property name="zz.utils.dir" value="${basedir}/../zz.utils"/>
-        <property name="tod-agent.dir" value="${basedir}/../TOD-agent"/>
-        <property name="tod-evdb1.dir" value="${basedir}/../TOD-evdb1"/>
-        <property name="tod-evdbng.dir" value="${basedir}/../TOD-evdbng"/>
-        <property name="tod.dir" value="${basedir}/../TOD"/>
+        <property name="zz.utils.dir" value="${basedir}/../../zz.utils"/>
+        <property name="tod-agent.dir" value="${basedir}/../agent"/>
+        <property name="tod-evdb1.dir" value="${basedir}/../evdb1"/>
+        <property name="tod-evdbng.dir" value="${basedir}/../evdbng"/>
+        <property name="tod.dir" value="${basedir}/../core"/>
     	
         <path id="main.classpath">
         	<pathelement path="${tod-agent.dir}/build/tod-agent15.jar"/>

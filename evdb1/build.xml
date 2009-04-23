@@ -10,10 +10,10 @@
         <property name="src-main.dir" value="${basedir}/src"/>
         <property name="classes-main.dir" value="${basedir}/classes-main"/>
 
-        <property name="zz.utils.dir" value="${basedir}/../zz.utils"/>
-        <property name="tod.dir" value="${basedir}/../TOD"/>
-        <property name="tod-agent.dir" value="${basedir}/../TOD-agent"/>
-        <property name="tod-dbgrid.dir" value="${basedir}/../TOD-dbgrid"/>
+        <property name="zz.utils.dir" value="${basedir}/../../zz.utils"/>
+        <property name="tod.dir" value="${basedir}/../core"/>
+        <property name="tod-agent.dir" value="${basedir}/../agent"/>
+        <property name="tod-dbgrid.dir" value="${basedir}/../dbgrid"/>
 
         <property name="lib.dir" value="${tod-dbgrid.dir}/lib"/>
 

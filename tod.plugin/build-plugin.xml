@@ -15,14 +15,14 @@
 		<property name="classes.dir" value="${basedir}/classes"/>
 		<property name="src.dir" value="${basedir}/src"/>
 
-		<property name="tod.dir" value="${basedir}/../TOD"/>
-		<property name="tod-agent.dir" value="${basedir}/../TOD-agent"/>
-		<property name="tod-dbgrid.dir" value="${basedir}/../TOD-dbgrid"/>
-		<property name="tod-evdb1.dir" value="${basedir}/../TOD-evdb1"/>
-		<property name="tod-evdbng.dir" value="${basedir}/../TOD-evdbng"/>
-		<property name="zz.utils.dir" value="${basedir}/../zz.utils"/>
-		<property name="zz.eclipse.utils.dir" value="${basedir}/../zz.eclipse.utils"/>
-		<property name="zz.jinterp.dir" value="${basedir}/../zz.jinterp"/>
+		<property name="tod.dir" value="${basedir}/../core"/>
+		<property name="tod-agent.dir" value="${basedir}/../agent"/>
+		<property name="tod-dbgrid.dir" value="${basedir}/../dbgrid"/>
+		<property name="tod-evdb1.dir" value="${basedir}/../evdb1"/>
+		<property name="tod-evdbng.dir" value="${basedir}/../evdbng"/>
+		<property name="zz.utils.dir" value="${basedir}/../../zz.utils"/>
+		<property name="zz.eclipse.utils.dir" value="${basedir}/../../zz.eclipse.utils"/>
+		<property name="zz.jinterp.dir" value="${basedir}/../../zz.jinterp"/>
 
 		<path id="default.classpath">
 			<pathelement path="${zz.utils.dir}/build/zz.utils.jar"/>
