@@ -33,11 +33,11 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.tod.io._ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
 import tod.agent.Command;
-import tod.agent.io._ByteBuffer;
 import tod.core.DebugFlags;
 import tod.core.config.TODConfig;
 import tod.core.database.structure.IStructureDatabase;

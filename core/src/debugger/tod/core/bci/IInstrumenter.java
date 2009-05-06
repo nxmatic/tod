@@ -41,8 +41,8 @@ public interface IInstrumenter
 	public InstrumentedClass instrumentClass (String aClassName, byte[] aBytecode, boolean aUseJava14);
 	
 	/**
-	 * Returns all the classes that should be treated as special case
-	 * @see SpecialCases
+	 * Returns all the classes that should be treated as special case.
+	 * The set of classes is sent to the agent so that they are not excluded from instrumentation.
 	 */
 	public Iterable<String> getSpecialCaseClasses();
 	

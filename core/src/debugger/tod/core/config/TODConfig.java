@@ -34,7 +34,7 @@ import java.util.List;
 import java.util.Properties;
 
 import tod.agent.AgentConfig;
-import tod.core.server.JavaTODServerFactory;
+import tod.impl.server.JavaTODServerFactory;
 import tod.utils.ConfigUtils;
 import zz.utils.PublicCloneable;
 

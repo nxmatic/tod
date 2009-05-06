@@ -26,15 +26,16 @@ import java.nio.channels.ByteChannel;
 import java.tod.AgentReady;
 import java.tod.EventCollector;
 import java.tod.TOD;
+import java.tod.TracedMethods;
+import java.tod.io._ByteBuffer;
+import java.tod.io._EOFException;
 import java.tod.io._IO;
+import java.tod.io._IOException;
 import java.tod.io._SocketChannel;
+import java.tod.util._ArrayList;
 import java.tod.util._SyncRingBuffer;
 
 import tod.agent.Command;
-import tod.agent.io._ByteBuffer;
-import tod.agent.io._EOFException;
-import tod.agent.io._IOException;
-import tod.agent.util._ArrayList;
 
 /**
  * This class implements the thread that communicates with the TOD database.
@@ -247,6 +248,15 @@ public class IOThread extends Thread
 		return readByte() != 0;
 	}
 
+	private int readInt() throws _IOException
+	{
+		byte b0 = readByte();
+		byte b1 = readByte();
+		byte b2 = readByte();
+		byte b3 = readByte();
+		
+		return _ByteBuffer.makeInt(b3, b2, b1, b0);
+	}
 
 	
 	private void readCommands() throws _IOException
@@ -256,26 +266,51 @@ public class IOThread extends Thread
 			byte theMessage = readByte();
 			if (theMessage >= Command.BASE)
 			{
-				Command theCommand = Command.VALUES[theMessage-Command.BASE];
-				switch (theCommand)
+				switch (theMessage)
 				{
-				case AGCMD_ENABLECAPTURE:
-					boolean theEnable = readBoolean();
-					if (theEnable) 
-					{
-						_IO.out("[TOD] Enable capture request received.");
-						TOD.enableCapture();
-					}
-					else 
-					{
-						_IO.out("[TOD] Disable capture request received.");
-						TOD.disableCapture();
-					}
+				case Command.AGCMD_ENABLECAPTURE:
+					processEnableCapture();
 					break;
 					
-				default: throw new RuntimeException("Not handled: "+theCommand); 
+				case Command.AGCMD_SETMONITORINGMODE:
+					processSetMonitoringMode();
+					break;
+					
+				default: throw new RuntimeException("Not handled: "+theMessage); 
 				}
 			}
+		}
+	}
+	
+	/**
+	 * Processes the {@link Command#AGCMD_ENABLECAPTURE} command.
+	 */
+	private void processEnableCapture() throws _IOException
+	{
+		boolean theEnable = readBoolean();
+		if (theEnable) 
+		{
+			_IO.out("[TOD] Enable capture request received.");
+			TOD.enableCapture();
+		}
+		else 
+		{
+			_IO.out("[TOD] Disable capture request received.");
+			TOD.disableCapture();
+		}
+	}
+
+	/**
+	 * Processes the {@link Command#AGCMD_SETMONITORINGMODE} command
+	 */
+	private void processSetMonitoringMode() throws _IOException
+	{
+		int theCount = readInt();
+		for (int i=0;i<theCount;i++)
+		{
+			int theBehaviorId = readInt();
+			byte theMode = readByte();
+			TracedMethods.setMode(theBehaviorId, theMode);
 		}
 	}
 	

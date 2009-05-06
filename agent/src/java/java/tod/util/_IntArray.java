@@ -1,7 +1,7 @@
 /*
  * Created on Nov 19, 2007
  */
-package tod.agent.util;
+package java.tod.util;
 
 import java.util.ArrayList;
 import java.util.Collection;

@@ -12,5 +12,4 @@ public class Test
 	{
 		_IO.out("java.tod.Test loaded by: "+Test.class.getClassLoader());
 	}
-
 }

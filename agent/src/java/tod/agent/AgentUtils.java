@@ -22,7 +22,7 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 */
 package tod.agent;
 
-import tod.agent.util._ArrayList;
+import java.tod.util._ArrayList;
 
 public class AgentUtils
 {

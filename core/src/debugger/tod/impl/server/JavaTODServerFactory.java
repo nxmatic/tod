@@ -20,15 +20,28 @@ MA 02111-1307 USA
 Parts of this work rely on the MD5 algorithm "derived from the 
 RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 */
-package tod.core.database.event;
+package tod.impl.server;
 
-import tod.agent.Output;
+import tod.core.ILogCollector;
+import tod.core.config.TODConfig;
+import tod.core.database.structure.IMutableStructureDatabase;
+import tod.core.server.ITODServerFactory;
+import tod.core.server.TODServer;
+import tod.impl.bci.asm.ASMDebuggerConfig;
+import tod.impl.bci.asm.ASMInstrumenter;
 
 /**
+ * Implementation of {@link ITODServerFactory} for Java debuggees.
  * @author gpothier
  */
-public interface IOutputEvent extends ICallerSideEvent
+public class JavaTODServerFactory implements ITODServerFactory
 {
-	public String getData();
-	public Output getOutput();
+	public TODServer create(TODConfig aConfig, IMutableStructureDatabase aStructureDatabase, ILogCollector aLogCollector)
+	{
+		ASMDebuggerConfig theConfig = new ASMDebuggerConfig(aConfig);
+		ASMInstrumenter theInstrumenter = new ASMInstrumenter(aStructureDatabase, theConfig);
+		
+		return new JavaTODServer(aConfig, theInstrumenter, aStructureDatabase, aLogCollector);
+	}
+
 }

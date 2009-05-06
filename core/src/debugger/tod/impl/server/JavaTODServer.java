@@ -20,7 +20,7 @@ MA 02111-1307 USA
 Parts of this work rely on the MD5 algorithm "derived from the 
 RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 */
-package tod.core.server;
+package tod.impl.server;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -38,6 +38,7 @@ import tod.core.bci.IInstrumenter;
 import tod.core.bci.NativeAgentPeer;
 import tod.core.config.TODConfig;
 import tod.core.database.structure.IStructureDatabase;
+import tod.core.server.TODServer;
 import tod.core.transport.CollectorLogReceiver;
 import tod.core.transport.LogReceiver;
 import tod.impl.database.structure.standard.HostInfo;

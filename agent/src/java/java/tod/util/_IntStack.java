@@ -1,7 +1,7 @@
 /*
  * Created on Mar 20, 2008
  */
-package tod.agent.util;
+package java.tod.util;
 
 /**
  * Copied from zz.utils

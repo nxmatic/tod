@@ -22,6 +22,8 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 */
 package java.tod;
 
+import java.tod.util.WeakLongHashMap;
+
 import tod.agent.AgentConfig;
 
 

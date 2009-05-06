@@ -29,40 +29,25 @@ POSSIBILITY OF SUCH DAMAGE.
 Parts of this work rely on the MD5 algorithm "derived from the RSA Data Security, 
 Inc. MD5 Message-Digest Algorithm".
 */
-package tod.core.transport;
+package tod.impl.bci.asm2;
 
-import java.io.ByteArrayInputStream;
-import java.io.DataInputStream;
-import java.io.FileNotFoundException;
-import java.tod.ObjectValueFactory;
-import java.tod.io._ByteBuffer;
-import java.tod.transport.ObjectEncoder;
+import java.util.HashMap;
+import java.util.Map;
 
-import org.junit.Test;
+import org.objectweb.asm.Label;
 
-
-/**
- * Test object encoding/decoding
- * This test requires to have the agent in the bootstrap classpath. 
- * @author gpothier
- */
-public class TestObjectCodec
+public class LabelManager
 {
-	@Test public void testCodec()
+	private final Map<String, Label> itsLabelsMap = new HashMap<String, Label>();
+
+	public Label getLabel(String label)
 	{
-		doTest("Hola");
-		doTest(new FileNotFoundException("Hop"));
-	}
-	
-	void doTest(Object aObject)
-	{
-		aObject = ObjectValueFactory.convert(aObject);
-		_ByteBuffer theBuffer = _ByteBuffer.allocate(10000);
-		ObjectEncoder.encode(aObject, theBuffer);
-		byte[] theData = new byte[theBuffer.position()];
-		System.arraycopy(theBuffer.array(), 0, theData, 0, theBuffer.position());
-		
-		DataInputStream theIn = new DataInputStream(new ByteArrayInputStream(theData));
-		Object theObject = ObjectDecoder.decode(theIn);
+		Label theResult = itsLabelsMap.get(label);
+		if (theResult == null)
+		{
+			theResult = new Label();
+			itsLabelsMap.put(label, theResult);
+		}
+		return theResult;
 	}
 }

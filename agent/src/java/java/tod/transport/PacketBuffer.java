@@ -1,10 +1,10 @@
 package java.tod.transport;
 
+import java.tod.io._ByteBuffer;
 import java.tod.io._IO;
 
 import tod.agent.AgentConfig;
 import tod.agent.AgentDebugFlags;
-import tod.agent.io._ByteBuffer;
 
 /**
  * Emulates a {@link DataOutputStream} to which event packets can be sent.

@@ -99,7 +99,7 @@ CompoundClassSet* specialCaseWorkingSet = NULL;
 StaticVoidMethod* ExceptionGeneratedReceiver_exceptionGenerated;
 int isInitializingExceptionMethods = 0;
 
-StaticVoidMethod* TracedMethods_setTraced;
+// StaticVoidMethod* TracedMethods_setTraced;
 StaticVoidMethod* TOD_enable;
 StaticVoidMethod* TOD_start;
 
@@ -111,7 +111,7 @@ t_mutex loadMutex;
 
 // This vector holds traced methods ids for methods
 // that are registered prior to VM initialization.
-std::vector<int> tmpTracedMethods;
+// std::vector<int> tmpTracedMethods;
 
 /*
 Connects to the instrumenting host
@@ -230,49 +230,49 @@ void agentConfigure()
 	fflush(stdout);
 }
 
-void registerTracedMethod(JNIEnv* jni, int tracedMethod)
-{
-	TracedMethods_setTraced->invoke(jni, tracedMethod);
-	if (propVerbose>=3) printf("Registered traced method: %d\n", tracedMethod);
-}
+// void registerTracedMethod(JNIEnv* jni, int tracedMethod)
+// {
+// 	TracedMethods_setTraced->invoke(jni, tracedMethod);
+// 	if (propVerbose>=3) printf("Registered traced method: %d\n", tracedMethod);
+// }
 
 /**
 Registers the traced methods that were registered in tmpTracedMethods
 */ 
-void registerTmpTracedMethods(JNIEnv* jni)
-{
-	if (propVerbose>=1) printf("Registering %d buffered traced methods\n", tmpTracedMethods.size());
-	std::vector<int>::iterator iter = tmpTracedMethods.begin();
-	std::vector<int>::iterator end = tmpTracedMethods.end();
-	
-	while (iter != end)
-	{
-		registerTracedMethod(jni, *iter++);
-	}
-	
-	tmpTracedMethods.clear();
-}
-
-void registerTracedMethods(JNIEnv* jni, int nTracedMethods, int* tracedMethods)
-{
-	if (AGENT_STARTED)
-	{
-		if (propVerbose>=1 && nTracedMethods>0) printf("Registering %d traced methods\n", nTracedMethods);
-		for (int i=0;i<nTracedMethods;i++)
-		{
-			registerTracedMethod(jni, tracedMethods[i]);
-		}
-	}
-	else
-	{
-		if (propVerbose>=1 && nTracedMethods>0) printf("Buffering %d traced methods, will register later\n", nTracedMethods);
-		for (int i=0;i<nTracedMethods;i++)
-		{
-			tmpTracedMethods.push_back(tracedMethods[i]);
-		}
-	}
-	if (tracedMethods) delete tracedMethods;
-}
+// void registerTmpTracedMethods(JNIEnv* jni)
+// {
+// 	if (propVerbose>=1) printf("Registering %d buffered traced methods\n", tmpTracedMethods.size());
+// 	std::vector<int>::iterator iter = tmpTracedMethods.begin();
+// 	std::vector<int>::iterator end = tmpTracedMethods.end();
+// 	
+// 	while (iter != end)
+// 	{
+// 		registerTracedMethod(jni, *iter++);
+// 	}
+// 	
+// 	tmpTracedMethods.clear();
+// }
+// 
+// void registerTracedMethods(JNIEnv* jni, int nTracedMethods, int* tracedMethods)
+// {
+// 	if (AGENT_STARTED)
+// 	{
+// 		if (propVerbose>=1 && nTracedMethods>0) printf("Registering %d traced methods\n", nTracedMethods);
+// 		for (int i=0;i<nTracedMethods;i++)
+// 		{
+// 			registerTracedMethod(jni, tracedMethods[i]);
+// 		}
+// 	}
+// 	else
+// 	{
+// 		if (propVerbose>=1 && nTracedMethods>0) printf("Buffering %d traced methods, will register later\n", nTracedMethods);
+// 		for (int i=0;i<nTracedMethods;i++)
+// 		{
+// 			tmpTracedMethods.push_back(tracedMethods[i]);
+// 		}
+// 	}
+// 	if (tracedMethods) delete tracedMethods;
+// }
 
 void agentClassFileLoadHook(
 	JNIEnv* jni, const char* name, 
@@ -312,68 +312,68 @@ void agentClassFileLoadHook(
 		if (startsWith(name, "tod/agent/")) return;
 	}
 	
-	// Check scope
-	bool skip = false;
-	if (cfgSkipCoreClasses 
-		&& (
-			startsWith(name, "java/")
-			|| startsWith(name, "sun/")
-// 			|| startsWith(name, "javax/")
-			|| startsWith(name, "com/sun/")
-			|| startsWith(name, "net/sourceforge/retroweaver/")
-		)) skip = true;
+// 	// Check scope
+// 	bool skip = false;
+// 	if (cfgSkipCoreClasses 
+// 		&& (
+// 			startsWith(name, "java/")
+// 			|| startsWith(name, "sun/")
+// // 			|| startsWith(name, "javax/")
+// 			|| startsWith(name, "com/sun/")
+// 			|| startsWith(name, "net/sourceforge/retroweaver/")
+// 		)) skip = true;
+// 	
+// 	if (! workingSet->accept(name)) 
+// 	{
+// 		if (propVerbose>=2) 
+// 		{
+// 			printf("Rejected by working set: %s\n", name);
+// 			fflush(stdout);
+// 		}
+// 		skip = true;
+// 	}
+// 	
+// 	// Check special cases
+// 	if (specialCaseWorkingSet->accept(name))
+// 	{
+// 		if (propVerbose>=2) 
+// 		{
+// 			printf("Accepted as special case: %s\n", name);
+// 			fflush(stdout);
+// 		}
+// 		skip = false;
+// 	}
+// 	
+// 	if (skip)
+// 	{
+// 		if (!gSocket)
+// 		{
+// 			printf("[TOD] Unable to register %s\n", name);
+// 			fflush(stdout);
+// 			return;
+// 		}
+// 		
+// 		{
+// 			t_lock lock(loadMutex);
+// 		
+// 			if (propVerbose>=1) printf("Registering %s\n", name);
+// 			
+// 			// Send command
+// 			writeByte(gSocket, REGISTER_CLASS);
+// 			
+// 			// Send class name
+// 			writeUTF(gSocket, name);
+// 			
+// 			// Send bytecode
+// 			writeInt(gSocket, class_data_len);
+// 			gSocket->write((char*) class_data, class_data_len);
+// 		}
+// 		
+// 		return;
+// 	}
 	
-	if (! workingSet->accept(name)) 
-	{
-		if (propVerbose>=2) 
-		{
-			printf("Rejected by working set: %s\n", name);
-			fflush(stdout);
-		}
-		skip = true;
-	}
-	
-	// Check special cases
-	if (specialCaseWorkingSet->accept(name))
-	{
-		if (propVerbose>=2) 
-		{
-			printf("Accepted as special case: %s\n", name);
-			fflush(stdout);
-		}
-		skip = false;
-	}
-	
-	if (skip)
-	{
-		if (!gSocket)
-		{
-			printf("[TOD] Unable to register %s\n", name);
-			fflush(stdout);
-			return;
-		}
-		
-		{
-			t_lock lock(loadMutex);
-		
-			if (propVerbose>=1) printf("Registering %s\n", name);
-			
-			// Send command
-			writeByte(gSocket, REGISTER_CLASS);
-			
-			// Send class name
-			writeUTF(gSocket, name);
-			
-			// Send bytecode
-			writeInt(gSocket, class_data_len);
-			gSocket->write((char*) class_data, class_data_len);
-		}
-		
-		return;
-	}
-	
-	int* tracedMethods = NULL;
-	int nTracedMethods = 0;
+// 	int* tracedMethods = NULL;
+// 	int nTracedMethods = 0;
 	
 	// Compute MD5 sum
 	char md5Buffer[16];
@@ -384,14 +384,14 @@ void agentClassFileLoadHook(
 	
 	// Compute cache file paths	
 	fs::path cacheFilePath;
-	fs::path tracedCacheFilePath;
+// 	fs::path tracedCacheFilePath;
 	
 	if (propCachePath != NULL)
 	{
 		char cacheFileName[2000];
-		char tracedCacheFileName[2000];
+// 		char tracedCacheFileName[2000];
 		cacheFileName[0] = 0;
-		tracedCacheFileName[0] = 0;
+// 		tracedCacheFileName[0] = 0;
 		
 		// Escape the class name, as all characters allowed for class names are
 		// not necessarily allowed for files on all platforms.
@@ -403,11 +403,11 @@ void agentClassFileLoadHook(
 		snprintf(cacheFileName, sizeof(cacheFileName), "%s/%s/%s.%s.class", 
 			propCachePath, classCachePrefix, escapedName, md5String);
 			
-		snprintf(tracedCacheFileName, sizeof(tracedCacheFileName), "%s/%s/%s.%s.tm", 
-			propCachePath, classCachePrefix, escapedName, md5String);
+// 		snprintf(tracedCacheFileName, sizeof(tracedCacheFileName), "%s/%s/%s.%s.tm", 
+// 			propCachePath, classCachePrefix, escapedName, md5String);
 		
 		cacheFilePath = fs::path(cacheFileName);
-		tracedCacheFilePath = fs::path(tracedCacheFileName);
+// 		tracedCacheFilePath = fs::path(tracedCacheFileName);
 		fflush(stdout);
 	}
 
@@ -448,16 +448,16 @@ void agentClassFileLoadHook(
 				f.close();
 				
 				// Read traced methods array
-				f.open(tracedCacheFilePath.native_file_string().c_str(), std::ios_base::in | std::ios_base::binary);
-				if (f.fail()) fatal_error("Could not open traced methods file");
-				nTracedMethods = readInt(&f);
-				tracedMethods = new int[nTracedMethods];
-				for (int i=0;i<nTracedMethods;i++) tracedMethods[i] = readInt(&f);
-				f.close();
+// 				f.open(tracedCacheFilePath.native_file_string().c_str(), std::ios_base::in | std::ios_base::binary);
+// 				if (f.fail()) fatal_error("Could not open traced methods file");
+// 				nTracedMethods = readInt(&f);
+// 				tracedMethods = new int[nTracedMethods];
+// 				for (int i=0;i<nTracedMethods;i++) tracedMethods[i] = readInt(&f);
+// 				f.close();
 			}
 			
 			// Register traced methods
-			registerTracedMethods(jni, nTracedMethods, tracedMethods);
+// 			registerTracedMethods(jni, nTracedMethods, tracedMethods);
 			
 			fflush(stdout);
 			return;
@@ -499,9 +499,9 @@ void agentClassFileLoadHook(
 			if (gSocket->eof()) fatal_ioerror("fread");
 			if (propVerbose>=2) printf("Class definition uploaded.\n");
 			
-			nTracedMethods = readInt(gSocket);
-			tracedMethods = new int[nTracedMethods];
-			for (int i=0;i<nTracedMethods;i++) tracedMethods[i] = readInt(gSocket);
+// 			nTracedMethods = readInt(gSocket);
+// 			tracedMethods = new int[nTracedMethods];
+// 			for (int i=0;i<nTracedMethods;i++) tracedMethods[i] = readInt(gSocket);
 			
 			// Cache class
 			if (propCachePath != NULL)
@@ -521,12 +521,12 @@ void agentClassFileLoadHook(
 				f.close();
 				
 				// Cache traced methods
-				f.open(tracedCacheFilePath.native_file_string().c_str(), std::ios_base::out | std::ios_base::binary | std::ios_base::trunc);
-				if (f.fail()) fatal_ioerror("Opening cache traced methods file for output");
-				writeInt(&f, nTracedMethods);
-				for (int i=0;i<nTracedMethods;i++) writeInt(&f, tracedMethods[i]);
-				f.flush();
-				f.close();
+// 				f.open(tracedCacheFilePath.native_file_string().c_str(), std::ios_base::out | std::ios_base::binary | std::ios_base::trunc);
+// 				if (f.fail()) fatal_ioerror("Opening cache traced methods file for output");
+// 				writeInt(&f, nTracedMethods);
+// 				for (int i=0;i<nTracedMethods;i++) writeInt(&f, tracedMethods[i]);
+// 				f.flush();
+// 				f.close();
 				
 				if (propVerbose>=2) printf("Cached.\n");
 			}
@@ -551,7 +551,7 @@ void agentClassFileLoadHook(
 	}
 	
 	// Register traced methods
-	registerTracedMethods(jni, nTracedMethods, tracedMethods);
+// 	registerTracedMethods(jni, nTracedMethods, tracedMethods);
 	fflush(stdout);
 }
 
@@ -651,13 +651,13 @@ void agentStart(JNIEnv* jni)
 	
 	if (cfgObfuscation == 1)	
 	{
-		TracedMethods_setTraced = new StaticVoidMethod(jni, "java/todX/TracedMethods", "setTraced", "(I)V");
+// 		TracedMethods_setTraced = new StaticVoidMethod(jni, "java/todX/TracedMethods", "setTraced", "(I)V");
 		TOD_enable = new StaticVoidMethod(jni, "java/todX/AgentReady", "nativeAgentLoaded", "()V");
 		TOD_start = new StaticVoidMethod(jni, "java/todX/AgentReady", "start", "()V");
 	}
 	else 
 	{
-		TracedMethods_setTraced = new StaticVoidMethod(jni, "java/tod/TracedMethods", "setTraced", "(I)V");
+// 		TracedMethods_setTraced = new StaticVoidMethod(jni, "java/tod/TracedMethods", "setTraced", "(I)V");
 		TOD_enable = new StaticVoidMethod(jni, "java/tod/AgentReady", "nativeAgentLoaded", "()V");	
 		TOD_start = new StaticVoidMethod(jni, "java/tod/AgentReady", "start", "()V");	
 	}
@@ -669,7 +669,7 @@ void agentStart(JNIEnv* jni)
 	
 	AGENT_STARTED = 1;
 	
-	registerTmpTracedMethods(jni);
+// 	registerTmpTracedMethods(jni);
 }
 
 void agentInit(
@@ -699,7 +699,7 @@ void agentInit(
 	propHost = aPropHost;
 	if (propVerbose>=1) printf("Property: collector-host=%s\n", propHost);
 
-	propCachePath = aPropCachePath;
+// 	propCachePath = aPropCachePath;
 	if (propCachePath && propVerbose>=1) printf("Property: agent-cache-path=%s\n", propCachePath);
 
 	propClientName = aPropClientName;

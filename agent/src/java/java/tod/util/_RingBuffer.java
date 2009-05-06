@@ -3,6 +3,10 @@
  */
 package java.tod.util;
 
+/**
+ * Copied from zz.utils
+ * @author gpothier
+ */
 public class _RingBuffer<T>
 {
 	private T[] itsBuffer;

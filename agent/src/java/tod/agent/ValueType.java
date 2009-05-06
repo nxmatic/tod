@@ -26,16 +26,16 @@ package tod.agent;
  * Enumerates all possible value types.
  * @author gpothier
  */
-public enum ValueType 
+public class ValueType 
 {
-	// Primitives values
-	NULL, BOOLEAN, BYTE, CHAR, SHORT, INT, LONG, FLOAT, DOUBLE,
-	
-	// Objects
-	OBJECT_UID;
-	
-	/**
-	 * Cached values; call to values() is costly. 
-	 */
-	public static final ValueType[] VALUES = values();
+	public static final byte NULL = 1;
+	public static final byte BOOLEAN = 2; 
+	public static final byte BYTE = 3;
+	public static final byte CHAR = 4;
+	public static final byte SHORT = 5;
+	public static final byte INT = 6;
+	public static final byte LONG = 7;
+	public static final byte FLOAT = 8;
+	public static final byte DOUBLE = 9;
+	public static final byte OBJECT_ID = 10;
 }

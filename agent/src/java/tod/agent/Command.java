@@ -26,27 +26,29 @@ package tod.agent;
  * Commands that can be sent by the agent to the database and vice versa.
  * @author gpothier
  */
-public enum Command
+public class Command
 {
+	public static final byte BASE = 100;
+	
 	/**
 	 * This command flushes all buffered events and indexes.
 	 * args: none
 	 * return:
 	 *  number of flushed events: int
 	 */
-	DBCMD_FLUSH,
+	public static final byte DBCMD_FLUSH = BASE+1;
 	
 	/**
 	 * This command clears the database.
 	 * args: none
 	 * return: none
 	 */
-	DBCMD_CLEAR,
+	public static final byte DBCMD_CLEAR = BASE+2;
 	
 	/**
 	 * This command notifies the database that this VM is ending.
 	 */
-	DBCMD_END,
+	public static final byte DBCMD_END = BASE+3;
 	
 	
 	/**
@@ -54,23 +56,20 @@ public enum Command
 	 * This event is sent periodically.
 	 * args: isEnabled (boolean as byte).
 	 */
-	DBEV_CAPTURE_ENABLED,
+	public static final byte DBEV_CAPTURE_ENABLED = BASE+4;
 	
 	/**
 	 * Tells the agent to enable/disable trace capture.
 	 * args: boolean(byte) aEnable
 	 * return: none 
 	 */
-	AGCMD_ENABLECAPTURE;
+	public static final byte AGCMD_ENABLECAPTURE = BASE+5;
 	
 	/**
-	 * Base value for sending serialized commands
+	 * Tells the agent to set the monitoring mode for a set of methods.
+	 * args: count(int), [bid(int), mode(byte)]*
+	 * return: none
 	 */
-	public static final int BASE = 100;
+	public static final byte AGCMD_SETMONITORINGMODE = BASE+6;
 	
-	/**
-	 * Cached values; call to values() is costly. 
-	 */
-	public static final Command[] VALUES = values();
-
 }

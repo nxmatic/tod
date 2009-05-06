@@ -1,7 +1,7 @@
 /*
  * Created on Jan 12, 2009
  */
-package tod.agent.io;
+package java.tod.io;
 
 import java.io.DataInputStream;
 import java.io.IOException;
@@ -312,18 +312,18 @@ public class _ByteBuffer
     private static byte long1(long x) { return (byte)(x >>  8); }
     private static byte long0(long x) { return (byte)(x >>  0); }
     
-    private static long makeLong(byte b7, byte b6, byte b5, byte b4, byte b3, byte b2, byte b1, byte b0)
+    public static long makeLong(byte b7, byte b6, byte b5, byte b4, byte b3, byte b2, byte b1, byte b0)
 	{
 		return ((b7 & 0xff) << 56) | ((b6 & 0xff) << 48) | ((b5 & 0xff) << 40) | ((b4 & 0xff) << 32)
 			| ((b3 & 0xff) << 24) | ((b2 & 0xff) << 16) | ((b1 & 0xff) << 8) | ((b0 & 0xff) << 0);
 	}
 
-    private static int makeInt(byte b3, byte b2, byte b1, byte b0)
+    public static int makeInt(byte b3, byte b2, byte b1, byte b0)
     {
     	return ((b3 & 0xff) << 24) | ((b2 & 0xff) << 16) | ((b1 & 0xff) << 8) | ((b0 & 0xff) << 0);
     }
     
-    private static char makeChar(byte b1, byte b0)
+    public static char makeChar(byte b1, byte b0)
 	{
 		return (char) ((b1 << 8) | (b0 & 0xff));
 	}

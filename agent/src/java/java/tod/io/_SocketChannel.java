@@ -3,10 +3,6 @@
  */
 package java.tod.io;
 
-import tod.agent.io._ByteBuffer;
-import tod.agent.io._CannotConnectException;
-import tod.agent.io._EOFException;
-import tod.agent.io._IOException;
 
 /**
  * A socket channel similar to that of NIO

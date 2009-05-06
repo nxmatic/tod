@@ -46,7 +46,7 @@ public class AgentReady
 	 * @see TOD#enableCapture()
 	 * @see TOD#disableCapture()
 	 */
-	public static boolean CAPTURE_ENABLED = false;
+	public static transient boolean CAPTURE_ENABLED = false;
 	
 	/**
 	 * Called by the native agent.

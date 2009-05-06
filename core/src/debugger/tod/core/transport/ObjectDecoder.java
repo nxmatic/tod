@@ -33,13 +33,13 @@ package tod.core.transport;
 
 import java.io.DataInputStream;
 import java.io.IOException;
+import java.tod.io._ByteBuffer;
 import java.tod.transport.ObjectEncoder;
 import java.util.HashMap;
 import java.util.Map;
 
 import tod.agent.ObjectValue;
 import tod.agent.ObjectValue.FieldValue;
-import tod.agent.io._ByteBuffer;
 
 /**
  * Decodes objects encoded by {@link ObjectEncoder}

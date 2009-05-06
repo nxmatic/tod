@@ -93,7 +93,7 @@ public class ExceptionGeneratedReceiver
 			processingExceptions.set(true);
 			
 //			_IO.out(String.format("Exception generated: %s.%s, %d", aMethodDeclaringClassSignature, aMethodName, aOperationBytecodeIndex));
-			COLLECTOR.logExceptionGenerated(
+			COLLECTOR.getThreadData().sendExceptionGenerated(
 					aMethodName,
 					aMethodSignature, 
 					aMethodDeclaringClassSignature,
