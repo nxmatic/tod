@@ -103,11 +103,14 @@ public class MethodInstrumenter_OutOfScope extends MethodInstrumenter
 			s.INVOKEVIRTUAL(CLS_THREADDATA, "evOutOfScopeBehaviorExit_Normal", "()V");
 
 			// Send return value
-			s.ISTORE(getReturnType(), itsResultVar); // We can't use DUP in case of long or double, so we just store the value
-			s.ALOAD(getThreadDataVar());
-			sendValue(s, itsResultVar, getReturnType());
-			s.ILOAD(getReturnType(), itsResultVar);
-
+			Type theReturnType = getReturnType();
+			if (theReturnType.getSort() != Type.VOID) 
+			{
+				s.ISTORE(theReturnType, itsResultVar); // We can't use DUP in case of long or double, so we just store the value
+				sendValue(s, itsResultVar, theReturnType);
+				s.ILOAD(theReturnType, itsResultVar);
+			}
+			
 			s.label("return");
 			s.RETURN(Type.getReturnType(getNode().desc));
 		}

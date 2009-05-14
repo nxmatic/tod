@@ -47,6 +47,7 @@ import org.objectweb.asm.tree.VarInsnNode;
 import org.objectweb.asm.tree.analysis.Frame;
 import org.objectweb.asm.tree.analysis.SourceValue;
 
+import tod.Util;
 import tod.core.database.structure.IMutableBehaviorInfo;
 import tod.core.database.structure.IMutableClassInfo;
 
@@ -246,7 +247,8 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 				int sz = Type.getArgumentsAndReturnSizes(((MethodInsnNode) theNode).desc);
 				int theArgSize = sz >> 2;
 				
-				SourceValue theThis = (SourceValue) theFrame.getStack(theArgSize);
+				// Check if the target of the call is "this"
+				SourceValue theThis = (SourceValue) theFrame.getStack(theArgSize-1);
 				if (theThis.insns.contains(theAload0)) return (MethodInsnNode) theNode;
 			}
 			
@@ -330,7 +332,7 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 	 */
 	private int getBehaviorId(MethodInsnNode aNode)
 	{
-		IMutableClassInfo theClass = getDatabase().getNewClass(aNode.owner);
+		IMutableClassInfo theClass = getDatabase().getNewClass(Util.jvmToScreen(aNode.owner));
 		IMutableBehaviorInfo theBehavior = theClass.getNewBehavior(aNode.name, aNode.desc, aNode.getOpcode() == Opcodes.INVOKESTATIC);
 		return theBehavior.getId();
 	}

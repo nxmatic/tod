@@ -42,6 +42,7 @@ import tod.core.database.structure.SourceRange;
 import tod.core.database.structure.IBehaviorInfo.BytecodeRole;
 import tod.core.database.structure.IStructureDatabase.ProbeInfo;
 import tod.gui.IGUIManager;
+import zz.utils.Utils;
 
 /**
  * Utilities related to {@link IStructureDatabase}
@@ -296,5 +297,14 @@ public class LocationUtils
 			if (theBehavior.isConstructor()) theResult.add(theBehavior);
 		}
 		return theResult;
+	}
+	
+	public static String toString(IBehaviorInfo aBehavior)
+	{
+		return String.format(
+				"%s.%s%s",
+				aBehavior.getDeclaringType().getName(),
+				aBehavior.getName(),
+				aBehavior.getSignature());
 	}
 }

@@ -182,8 +182,9 @@ public abstract class MethodInstrumenter
 		case Type.FLOAT: sendValue_Float(s, aIndex); break;
 		case Type.INT: sendValue_Int(s, aIndex); break;
 		case Type.LONG: sendValue_Long(s, aIndex); break;
-		case Type.OBJECT: sendValue_Ref(s, aIndex); break;
 		case Type.SHORT: sendValue_Short(s, aIndex); break;
+		case Type.ARRAY:
+		case Type.OBJECT: sendValue_Ref(s, aIndex); break;
 		default: throw new Error("Unknown sort: "+aType);
 		}
 	}

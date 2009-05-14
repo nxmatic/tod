@@ -33,5 +33,16 @@ public class MonitoringMode
 	 */
 	public static final int SPECIAL = 3;
 	
+	public static String toString(int aMode)
+	{
+		switch(aMode)
+		{
+		case NONE: return "NONE";
+		case ENVELOPPE: return "ENVELOPPE";
+		case FULL: return "FULL";
+		case SPECIAL: return "SPECIAL";
+		default: return "bad mode: "+aMode;
+		}
+	}
 
 }

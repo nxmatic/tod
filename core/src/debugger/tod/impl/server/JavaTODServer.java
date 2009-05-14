@@ -32,10 +32,11 @@ import java.net.Socket;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.python.modules.synchronize;
+
 import tod.agent.AgentConfig;
 import tod.core.ILogCollector;
 import tod.core.bci.IInstrumenter;
-import tod.core.bci.NativeAgentPeer;
 import tod.core.config.TODConfig;
 import tod.core.database.structure.IStructureDatabase;
 import tod.core.server.TODServer;
@@ -95,8 +96,7 @@ public class JavaTODServer extends TODServer
 	public void setConfig(TODConfig aConfig)
 	{
 		super.setConfig(aConfig);
-		itsInstrumenter.setGlobalWorkingSet(aConfig.get(TODConfig.SCOPE_GLOBAL_FILTER));
-		itsInstrumenter.setTraceWorkingSet(aConfig.get(TODConfig.SCOPE_TRACE_FILTER));
+		itsInstrumenter.setConfig(aConfig);
 	}
 	
 	public IStructureDatabase getStructureDatabase()
@@ -329,15 +329,10 @@ public class JavaTODServer extends TODServer
 		{
 			return itsDelegate.instrumentClass(aClassName, aBytecode, aUseJava14);
 		}
-
-		public synchronized void setGlobalWorkingSet(String aWorkingSet)
+		
+		public synchronized void setConfig(TODConfig aConfig)
 		{
-			itsDelegate.setGlobalWorkingSet(aWorkingSet);
-		}
-
-		public synchronized void setTraceWorkingSet(String aWorkingSet)
-		{
-			itsDelegate.setTraceWorkingSet(aWorkingSet);
+			itsDelegate.setConfig(aConfig);
 		}
 		
 		public synchronized Iterable<String> getSpecialCaseClasses()

@@ -25,6 +25,7 @@ package tod.core.bci;
 import java.tod.TracedMethods;
 import java.util.List;
 
+import tod.agent.MonitoringMode;
 import tod.core.config.TODConfig;
 import tod.impl.bci.asm.SpecialCases;
 
@@ -45,18 +46,12 @@ public interface IInstrumenter
 	 * The set of classes is sent to the agent so that they are not excluded from instrumentation.
 	 */
 	public Iterable<String> getSpecialCaseClasses();
-	
-	/**
-	 * Changes the current trace working set.
-	 * @see TODConfig#SCOPE_TRACE_FILTER
-	 */
-	public void setTraceWorkingSet(String aWorkingSet);
 
 	/**
-	 * Sets the current global working set.
-	 * @see TODConfig#SCOPE_GLOBAL_FILTER
+	 * Sets a new config for this instrumenter.
+	 * In particular this alters the scope.
 	 */
-	public void setGlobalWorkingSet(String aWorkingSet);
+	public void setConfig(TODConfig aConfig);
 	
 	/**
 	 * Aggregates the results of class instrumentation
@@ -85,6 +80,10 @@ public interface IInstrumenter
 	public static class BehaviorMonitoringMode
 	{
 		public final int behaviorId;
+		
+		/**
+		 * One of the constants in {@link MonitoringMode}.
+		 */
 		public final int mode;
 		
 		public BehaviorMonitoringMode(int aBehaviorId, int aMode)

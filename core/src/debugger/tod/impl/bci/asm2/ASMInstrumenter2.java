@@ -7,9 +7,8 @@ import java.util.Collections;
 
 import tod.core.bci.IInstrumenter;
 import tod.core.config.ClassSelector;
+import tod.core.config.TODConfig;
 import tod.core.database.structure.IMutableStructureDatabase;
-import tod.impl.bci.asm.ASMInstrumenter;
-import tod.impl.bci.asm.BCIUtils;
 import tod.tools.parsers.ParseException;
 import tod.tools.parsers.workingset.WorkingSetFactory;
 
@@ -28,8 +27,9 @@ public class ASMInstrumenter2 implements IInstrumenter
 	
 	
 
-	public ASMInstrumenter2(IMutableStructureDatabase aDatabase)
+	public ASMInstrumenter2(TODConfig aConfig, IMutableStructureDatabase aDatabase)
 	{
+		setConfig(aConfig);
 		itsDatabase = aDatabase;
 		itsMethodGroupManager = new MethodGroupManager(this);
 	}
@@ -56,15 +56,10 @@ public class ASMInstrumenter2 implements IInstrumenter
 		}
 	}
 	
-
-	public void setTraceWorkingSet(String aWorkingSet)
+	public void setConfig(TODConfig aConfig)
 	{
-		itsTraceSelector = parseWorkingSet(aWorkingSet);
-	}
-	
-	public void setGlobalWorkingSet(String aWorkingSet)
-	{
-		itsGlobalSelector = parseWorkingSet(aWorkingSet);
+		itsTraceSelector = parseWorkingSet(aConfig.get(TODConfig.SCOPE_TRACE_FILTER));
+		itsGlobalSelector = parseWorkingSet(aConfig.get(TODConfig.SCOPE_GLOBAL_FILTER));
 	}
 	
 	public boolean isInScope(String aClassName)

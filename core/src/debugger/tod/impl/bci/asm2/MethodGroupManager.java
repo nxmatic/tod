@@ -39,15 +39,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.python.modules.newmodule;
-
 import tod.agent.MonitoringMode;
 import tod.core.bci.IInstrumenter;
+import tod.core.database.browser.LocationUtils;
 import tod.core.database.structure.IBehaviorInfo;
 import tod.core.database.structure.IClassInfo;
 import tod.core.database.structure.IFieldInfo;
-import tod.core.database.structure.IMutableStructureDatabase;
 import tod.core.database.structure.IStructureDatabase;
+import zz.utils.ListMap;
+import zz.utils.SetMap;
 
 /**
  * Manages method groups. 
@@ -69,6 +69,11 @@ public class MethodGroupManager implements IStructureDatabase.Listener
 	 * Maps signatures to signature groups. Each signature groups contains method groups.
 	 */
 	private final Map<String, MethodSignatureGroup> itsSignatureGroups = new HashMap<String, MethodSignatureGroup>();
+	
+	/**
+	 * Maps types to their direct subtypes.
+	 */
+	private final SetMap<IClassInfo, IClassInfo> itsChildrenMap = new SetMap<IClassInfo, IClassInfo>();
 
 	/**
 	 * Collects pending changes until {@link #getModeChangesAndReset()} is called.
@@ -97,6 +102,13 @@ public class MethodGroupManager implements IStructureDatabase.Listener
 		return itsInstrumenter.isInScope(aBehavior.getDeclaringType().getName());
 	}
 	
+	private String getSignature(IBehaviorInfo aBehavior)
+	{
+		String theSig = aBehavior.getName()+aBehavior.getSignature();
+		int i = theSig.indexOf(')');
+		return theSig.substring(0, i+1);
+	}
+	
 	private void markMonitored(IBehaviorInfo aBehavior)
 	{
 		itsChanges.add(new IInstrumenter.BehaviorMonitoringMode(
@@ -106,47 +118,119 @@ public class MethodGroupManager implements IStructureDatabase.Listener
 	
 	public void classAdded(IClassInfo aClass)
 	{
-		updateGroups(aClass);
+		classChanged(aClass);
 	}
 
+	/**
+	 * Updates groups knowing that inheritance information for the given
+	 * class may have changed.
+	 */
 	public void classChanged(IClassInfo aClass)
 	{
-		updateGroups(aClass);
+		if (aClass.getSupertype() != null) addEdge(aClass.getSupertype(), aClass);
+		
+		if (aClass.getInterfaces() != null) 
+			for(IClassInfo theInterface : aClass.getInterfaces()) addEdge(theInterface, aClass);
 	}
 
 	public void behaviorAdded(IBehaviorInfo aBehavior)
 	{
-		MethodSignatureGroup theSignatureGroup = getSignatureGroup(aBehavior.getSignature());
-		MethodGroup theMethodGroup = theSignatureGroup.addSingleton(aBehavior);
+//		System.out.println("    Behavior added: "+LocationUtils.toString(aBehavior));
+		MethodSignatureGroup theSignatureGroup = getSignatureGroup(getSignature(aBehavior));
 		
+		// Check if this method goes into an existing group
+		MethodGroup theMethodGroup = findGroup(theSignatureGroup, aBehavior.getDeclaringType());
+		if (theMethodGroup != null)
+		{
+			theMethodGroup.add(aBehavior);
+			if (theMethodGroup.isMonitored()) markMonitored(aBehavior);
+		}
+		else
+		{
+			theMethodGroup = theSignatureGroup.addSingleton(aBehavior);
+		}
+		
+		// Check if the behavior is in scope
 		if (isInScope(aBehavior)) theMethodGroup.markMonitored();
 	}
+	
+	/**
+	 * Finds an existing suitable group for the given type inside a signature group
+	 */
+	private MethodGroup findGroup(MethodSignatureGroup aSignatureGroup, IClassInfo aType)
+	{
+		MethodGroup theResult = null;
+		List<IClassInfo> theHierarchy = getTypeHierarchy(aType);
+		for (IClassInfo theType : theHierarchy)
+		{
+			MethodGroup theGroup = aSignatureGroup.getGroup(theType);
+			if (theGroup == null) continue;
+			else if (theResult == null) theResult = theGroup;
+			else if (theResult != theGroup) throw new RuntimeException("Inconsistency for "+aType);
+		}
+		
+		return theResult;
+	}
+	
+	/**
+	 * Returns all the ancestors and descendants of the given type.
+	 */
+	private List<IClassInfo> getTypeHierarchy(IClassInfo aType)
+	{
+		List<IClassInfo> theTypes = new ArrayList<IClassInfo>();
+		fillAncestors(theTypes, aType);
+		fillDescendants(theTypes, aType);
+		theTypes.add(aType);
+		return theTypes;
+	}
+	
+	private void fillAncestors(List<IClassInfo> aTypes, IClassInfo aType)
+	{
+		if (aType.getSupertype() != null)
+		{
+			aTypes.add(aType.getSupertype());
+			fillAncestors(aTypes, aType.getSupertype());
+		}
+		
+		if (aType.getInterfaces() != null) for(IClassInfo theInterface : aType.getInterfaces())
+		{
+			aTypes.add(theInterface);
+			fillAncestors(aTypes, theInterface);
+		}
+	}
 
+	private void fillDescendants(List<IClassInfo> aTypes, IClassInfo aType)
+	{
+		Set<IClassInfo> theChildren = itsChildrenMap.getSet(aType);
+		if (theChildren != null) for(IClassInfo theChild : theChildren)
+		{
+			aTypes.add(theChild);
+			fillDescendants(aTypes, theChild);
+		}
+	}
+	
 	public void fieldAdded(IFieldInfo aField)
 	{
 	}
 	
 	/**
-	 * Updates groups knowing that inheritance information for the given
-	 * class may have changed.
+	 * Calls {@link #merge(MethodSignatureGroup, IClassInfo, IClassInfo)} on each signature group
 	 */
-	private void updateGroups(IClassInfo aClass)
+	private void addEdge(IClassInfo aParent, IClassInfo aChild)
 	{
-		if (aClass.getSupertype() != null) addEdge(aClass, aClass.getSupertype());
-		
-		if (aClass.getInterfaces() != null) 
-			for(IClassInfo theInterface : aClass.getInterfaces()) addEdge(aClass, theInterface);
+		itsChildrenMap.add(aParent, aChild);
+		for(MethodSignatureGroup theSignatureGroup : itsSignatureGroups.values()) merge(theSignatureGroup, aParent, aChild);
 	}
-	
-	private void addEdge(IClassInfo n1, IClassInfo n2)
+
+	/**
+	 * Merges the method groups corresponding to n1 and n2 if they are distinct.
+	 */
+	private void merge(MethodSignatureGroup aSignatureGroup, IClassInfo n1, IClassInfo n2)
 	{
-		for(MethodSignatureGroup theSignatureGroup : itsSignatureGroups.values())
-		{
-			MethodGroup g1 = theSignatureGroup.getGroup(n1);
-			MethodGroup g2 = theSignatureGroup.getGroup(n2);
-			
-			if (g1 != g2) theSignatureGroup.merge(g1, g2);
-		}
+		MethodGroup g1 = aSignatureGroup.getGroup(n1);
+		MethodGroup g2 = aSignatureGroup.getGroup(n2);
+		
+		if (g1 != null && g2 != null && g1 != g2) aSignatureGroup.merge(g1, g2);
 	}
 	
 	private MethodSignatureGroup getSignatureGroup(String aSignature)

@@ -139,8 +139,6 @@ public class ClassInstrumenter
 		for(MethodNode theNode : (List<MethodNode>) itsNode.methods) processMethod(theNode);
 		
 		// Output the modified class
-		if (! itsModified) return null;
-		
 		ClassWriter theWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
 		itsNode.accept(theWriter);
 		
