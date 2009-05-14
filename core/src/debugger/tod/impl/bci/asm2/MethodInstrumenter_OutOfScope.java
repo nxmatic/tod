@@ -54,9 +54,9 @@ public class MethodInstrumenter_OutOfScope extends MethodInstrumenter
 	 */
 	private int itsResultVar;
 
-	public MethodInstrumenter_OutOfScope(MethodNode aNode, IMutableBehaviorInfo aBehavior)
+	public MethodInstrumenter_OutOfScope(ClassInstrumenter aClassInstrumenter, MethodNode aNode, IMutableBehaviorInfo aBehavior)
 	{
-		super(aNode, aBehavior);
+		super(aClassInstrumenter, aNode, aBehavior);
 		itsResultVar = nextFreeVar(2); //result might need two slots.
 	}
 
@@ -74,7 +74,7 @@ public class MethodInstrumenter_OutOfScope extends MethodInstrumenter
 			s.ISTORE(getTraceEnabledVar());
 			
 			// Check monitoring mode
-			s.IFEQ("start");
+			s.IFfalse("start");
 			
 			// Monitoring enabled
 			{
@@ -96,7 +96,7 @@ public class MethodInstrumenter_OutOfScope extends MethodInstrumenter
 			
 			// Check monitoring mode
 			s.ILOAD(getTraceEnabledVar());
-			s.IFEQ("return");
+			s.IFfalse("return");
 
 			// MOnitoring active, send event
 			s.ALOAD(getThreadDataVar());
@@ -118,7 +118,7 @@ public class MethodInstrumenter_OutOfScope extends MethodInstrumenter
 			
 			// Check monitoring mode
 			s.ILOAD(getTraceEnabledVar());
-			s.IFEQ("throw");
+			s.IFfalse("throw");
 			
 			s.ALOAD(getThreadDataVar());
 			s.INVOKEVIRTUAL(CLS_THREADDATA, "evOutOfScopeBehaviorExit_Exception", "()V");

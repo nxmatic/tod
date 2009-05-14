@@ -24,42 +24,24 @@ package java.tod;
 
 import java.tod.util._BitSet;
 
+import tod.agent.MonitoringMode;
+
 /**
  * This class keeps a registry of traced methods.
  * This is used by the instrumentation of method calls:
  * the events generated for a call to a traced method are
  * not the same as those of a non-traced method.
+ * The available monitoring modes are defined in {@link MonitoringMode}.
  * @author gpothier
  */
 public class TracedMethods
 {
-	/**
-	 * Monitoring mode constant meaning a method does not emit any event 
-	 */
-	public static final int NONE = 0;
-	
-	/**
-	 * Monitoring mode constant meaning a method emits entry and exit events
-	 */
-	public static final int ENVELOPPE = 1;
-	
-	/**
-	 * Monitoring mode constant meaning a method emits all events 
-	 */
-	public static final int FULL = 2;
-	
-	/**
-	 * Monitoring mode constant meaning the method has a special monitoring mode
-	 * specified separately (not used yet). 
-	 */
-	public static final int SPECIAL = 3;
-	
 	private static _BitSet traced = new _BitSet();
 	
 	/**
 	 * Sets the monitoring mode for a method  
 	 * @param aId The behavior id.
-	 * @param aMode One of {@link #FULL}, {@link #ENVELOPPE} or {@link #NONE}
+	 * @param aMode One of the constants in {@link MonitoringMode}.
 	 */
 	public static final void setMode(int aId, int aMode)
 	{
@@ -70,7 +52,7 @@ public class TracedMethods
 	/**
 	 * Returns the monitoring mode for the given method
 	 * @param aId A behavior id
-	 * @return One of the monitoring mode constants.
+	 * @return One of the constants in {@link MonitoringMode}.
 	 */
 	public static final int getMode(int aId)
 	{
@@ -86,27 +68,45 @@ public class TracedMethods
 		if (! AgentReady.CAPTURE_ENABLED) return false;
 		switch(getMode(aId))
 		{
-		case FULL: throw new Error("Mode cannot be FULL");
-		case SPECIAL: throw new Error("Mode cannot be SPCIAL");
-		case NONE: return false;
-		case ENVELOPPE: return true;
+		case MonitoringMode.FULL: throw new Error("Mode cannot be FULL");
+		case MonitoringMode.SPECIAL: throw new Error("Mode cannot be SPCIAL");
+		case MonitoringMode.NONE: return false;
+		case MonitoringMode.ENVELOPPE: return true;
 		default: throw new Error("Invalid mode");
 		}
 	}
 	
 	/**
 	 * Called by instrumented code.
-	 * Whether to trace the code of an in-of-scope method. Also checks dynamic activation 
+	 * Whether to trace the code of an in-of-scope method. 
+	 * Also checks dynamic activation 
 	 */
 	public static final boolean traceFull(int aId)
 	{
 		if (! AgentReady.CAPTURE_ENABLED) return false;
 		switch(getMode(aId))
 		{
-		case ENVELOPPE: throw new Error("Mode cannot be ENVELOPPE");
-		case SPECIAL: throw new Error("Mode cannot be SPCIAL");
-		case NONE: return false;
-		case FULL: return true;
+		case MonitoringMode.ENVELOPPE: throw new Error("Mode cannot be ENVELOPPE");
+		case MonitoringMode.SPECIAL: throw new Error("Mode cannot be SPCIAL");
+		case MonitoringMode.NONE: return false;
+		case MonitoringMode.FULL: return true;
+		default: throw new Error("Invalid mode");
+		}
+	}
+	
+	/**
+	 * Called by instrumented code.
+	 * Returns true if the given behavior is unmonitored.
+	 * Does not check dynamic activation (because this method is called inside a method body).
+	 */
+	public static final boolean traceUnmonitored(int aId)
+	{
+		switch(getMode(aId))
+		{
+		case MonitoringMode.FULL: 
+		case MonitoringMode.ENVELOPPE: 
+		case MonitoringMode.SPECIAL: return false;
+		case MonitoringMode.NONE: return true;
 		default: throw new Error("Invalid mode");
 		}
 	}

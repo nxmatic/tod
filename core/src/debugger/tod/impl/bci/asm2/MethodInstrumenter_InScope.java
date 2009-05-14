@@ -33,6 +33,7 @@ package tod.impl.bci.asm2;
 
 import java.util.ListIterator;
 
+import org.objectweb.asm.Label;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
@@ -42,8 +43,12 @@ import org.objectweb.asm.tree.InsnNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
 import org.objectweb.asm.tree.TypeInsnNode;
+import org.objectweb.asm.tree.VarInsnNode;
+import org.objectweb.asm.tree.analysis.Frame;
+import org.objectweb.asm.tree.analysis.SourceValue;
 
 import tod.core.database.structure.IMutableBehaviorInfo;
+import tod.core.database.structure.IMutableClassInfo;
 
 /**
  * Instruments in-scope methods.
@@ -59,12 +64,26 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 	 */
 	private int itsFromScopeVar;
 	
-	public MethodInstrumenter_InScope(MethodNode aNode, IMutableBehaviorInfo aBehavior)
+	/**
+	 * Temporarily holds the return value of called methods
+	 */
+	private int itsTmpValueVar;
+	
+	/**
+	 * For constructors, the invocation instructions that corresponds to constructor chaining.
+	 */
+	private MethodInsnNode itsChainingInvocation;
+	
+	public MethodInstrumenter_InScope(ClassInstrumenter aClassInstrumenter, MethodNode aNode, IMutableBehaviorInfo aBehavior)
 	{
-		super(aNode, aBehavior);
+		super(aClassInstrumenter, aNode, aBehavior);
 		itsFromScopeVar = nextFreeVar(1);
+		itsTmpValueVar = nextFreeVar(2);
 		
 		itsLocationsManager = new LocationsManager(getDatabase());
+		itsChainingInvocation = findChainingInvocation();
+		if (! CLS_OBJECT.equals(getClassNode().name) && isConstructor() && itsChainingInvocation == null) 
+			throw new RuntimeException("Should have constructor chaining: "+aNode);
 	}
 
 	@Override
@@ -81,7 +100,7 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 			s.ISTORE(getTraceEnabledVar());
 			
 			// Check monitoring mode
-			s.IFEQ("start");
+			s.IFfalse("start");
 			
 			// Monitoring enabled
 			{
@@ -100,7 +119,7 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 				s.DUP();
 				s.ISTORE(itsFromScopeVar);
 				
-				s.IFNE("afterSendArgs");
+				s.IFtrue("afterSendArgs");
 				sendEnterArgs(s);
 				s.label("afterSendArgs");
 				
@@ -114,7 +133,7 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 			
 			// Check monitoring mode
 			s.ILOAD(getTraceEnabledVar());
-			s.IFEQ("return");
+			s.IFfalse("return");
 			
 			s.ALOAD(getThreadDataVar());
 			s.INVOKEVIRTUAL(CLS_THREADDATA, "evInScopeBehaviorExit_Normal", "()V");
@@ -129,7 +148,7 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 			
 			// Check monitoring mode
 			s.ILOAD(getTraceEnabledVar());
-			s.IFEQ("throw");
+			s.IFfalse("throw");
 			
 			s.DUP();
 			s.ALOAD(getThreadDataVar());
@@ -174,6 +193,67 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 			sendValue(s, theArgIndex, theType);
 			theArgIndex += theType.getSize();
 		}
+	}
+	
+	private static boolean isALOAD0(AbstractInsnNode aNode)
+	{
+		if (aNode.getOpcode() == Opcodes.ALOAD)
+		{
+			VarInsnNode theVarNode = (VarInsnNode) aNode;
+			if (theVarNode.var == 0) return true;
+		}
+		return false;
+	}
+	
+	private static boolean isConstructorCall(AbstractInsnNode aNode)
+	{
+		if (aNode.getOpcode() == Opcodes.INVOKESPECIAL)
+		{
+			MethodInsnNode theMethodNode = (MethodInsnNode) aNode;
+			if ("<init>".equals(theMethodNode.name)) return true;
+		}
+		return false;
+	}
+	
+	/**
+	 * For constructors, looks for the invoke instruction that corresponds to constructor
+	 * chaining, if any (the only case there is none is for java.lang.Object);
+	 */
+	private MethodInsnNode findChainingInvocation()
+	{
+		if (! isConstructor()) return null;
+
+		VarInsnNode theAload0 = null;
+		
+		Frame[] theFrames = getFrames();
+		
+		ListIterator<AbstractInsnNode> theIterator = getNode().instructions.iterator();
+		int i = 0; // Instruction rank
+		while(theIterator.hasNext()) 
+		{
+			AbstractInsnNode theNode = theIterator.next();
+			
+			// Verify that "this" is not accessed before chaining
+			if (isALOAD0(theNode))
+			{
+				if (theAload0 == null) theAload0 = (VarInsnNode) theNode;
+				else throw new RuntimeException("This loaded more than once before chaining");
+			}
+			
+			if (isConstructorCall(theNode))
+			{
+				Frame theFrame = theFrames[i];
+				int sz = Type.getArgumentsAndReturnSizes(((MethodInsnNode) theNode).desc);
+				int theArgSize = sz >> 2;
+				
+				SourceValue theThis = (SourceValue) theFrame.getStack(theArgSize);
+				if (theThis.insns.contains(theAload0)) return (MethodInsnNode) theNode;
+			}
+			
+			i++;
+		}
+		
+		return null;
 	}
 	
 	private void processInstructions(InsnList aInsns)
@@ -236,22 +316,182 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		aInsns.insert(aNode, s);
 		aInsns.remove(aNode);
 	}
+
+	/**
+	 * Determines if the given node is an invocation that corresponds to constructor chaining.
+	 */
+	private boolean isChainingInvocation(MethodInsnNode aNode)
+	{
+		return aNode == itsChainingInvocation;
+	}
+	
+	/**
+	 * Returns the id of the behavior invoked by the given node.
+	 */
+	private int getBehaviorId(MethodInsnNode aNode)
+	{
+		IMutableClassInfo theClass = getDatabase().getNewClass(aNode.owner);
+		IMutableBehaviorInfo theBehavior = theClass.getNewBehavior(aNode.name, aNode.desc, aNode.getOpcode() == Opcodes.INVOKESTATIC);
+		return theBehavior.getId();
+	}
 	
 	private void processInvoke(InsnList aInsns, MethodInsnNode aNode)
 	{
+		Type theReturnType = Type.getReturnType(aNode.desc);
 		
+		// We are going to create three paths:
+		// - Trace disabled
+		// - Trace enabled, monitored call
+		// - Trace enabled, unmonitored call
+		// The original instruction is used for the trace disabled path
+		MethodInsnNode theMonitoredClone = (MethodInsnNode) aNode.clone(null);
+		MethodInsnNode theUnmonitoredClone = (MethodInsnNode) aNode.clone(null);
+		MethodInsnNode theTraceDisabledClone = (MethodInsnNode) aNode.clone(null);
+		
+		SyntaxInsnList s = new SyntaxInsnList(itsLabelManager);
+		Label lTrDisabled = new Label(); // Trace disabled path
+		Label lUnmonitored = new Label(); // Unmonitored path
+		Label lEnd = new Label(); 
+		
+		s.ALOAD(getTraceEnabledVar());
+		s.IFfalse(lTrDisabled);
+		{
+			// Trace enabled
+			Label lCheckChaining = new Label();
+			
+			// Check if called method is monitored
+			s.pushInt(getBehaviorId(aNode));
+			s.INVOKESTATIC(CLS_TRACEDMETHODS, "traceUnmonitored", "(I)Z");
+			s.IFtrue(lUnmonitored);
+			{
+				// Monitored call
+				s.add(theMonitoredClone);				
+				s.GOTO(lCheckChaining);
+			}
+			s.label(lUnmonitored);
+			{
+				// Unmonitored call
+				Label lHnStart = new Label();
+				Label lHnEnd = new Label();
+				Label lHandler = new Label(); // Exception handler
+				
+				// before call
+				s.ALOAD(getThreadDataVar());
+				s.INVOKEVIRTUAL(CLS_THREADDATA, "evUnmonitoredBehaviorCall", "()V");
+
+				// call
+				s.label(lHnStart);
+				s.add(theUnmonitoredClone);
+				s.label(lHnEnd);
+				
+				// after call
+				s.ALOAD(getThreadDataVar());
+				s.INVOKEVIRTUAL(CLS_THREADDATA, "evUnmonitoredBehaviorResult", "()V");
+		
+				if (theReturnType.getSort() != Type.VOID) 
+				{
+					s.ISTORE(theReturnType, itsTmpValueVar);
+					sendValue(s, itsTmpValueVar, theReturnType);
+					s.ILOAD(theReturnType, itsTmpValueVar);
+				}
+				
+				s.GOTO(lCheckChaining);
+				
+				// Exception handler
+				s.label(lHandler);
+				
+				s.ALOAD(getThreadDataVar());
+				s.INVOKEVIRTUAL(CLS_THREADDATA, "evUnmonitoredBehaviorException", "()V");
+				s.ATHROW();
+				
+				getNode().visitTryCatchBlock(lHnStart, lHnEnd, lHandler, null);
+			}
+			
+			s.label(lCheckChaining);
+			
+			// Check if deferred target send is needed
+			if (isChainingInvocation(aNode))
+			{
+				s.ALOAD(getThreadDataVar());
+				s.ALOAD(0);
+				s.INVOKEVIRTUAL(CLS_THREADDATA, "sendConstructorTarget", "("+DSC_OBJECT+")V");
+			}
+
+			s.GOTO(lEnd);
+		}
+		s.label(lTrDisabled);
+		{
+			// trace is disabled
+			s.add(theTraceDisabledClone);
+		}
+
+		s.label(lEnd);
+		
+		aInsns.insert(aNode, s);
+		aInsns.remove(aNode);
 	}
 
 	private void processNew(InsnList aInsns, TypeInsnNode aNode)
 	{
+		SyntaxInsnList s = new SyntaxInsnList(itsLabelManager);
+		Label l = new Label();
+
+		s.ALOAD(getTraceEnabledVar());
+		s.IFfalse(l);
+		{
+			s.DUP();
+			s.ALOAD(getThreadDataVar());
+			s.SWAP();
+			s.INVOKEVIRTUAL(CLS_THREADDATA, "evNew", "("+DSC_OBJECT+")V");
+		}
+		
+		s.label(l);
+		
+		aInsns.insert(aNode, s);
 	}
 
 	private void processGetField(InsnList aInsns, FieldInsnNode aNode)
 	{
+		SyntaxInsnList s = new SyntaxInsnList(itsLabelManager);
+		Label l = new Label();
+		Type theType = Type.getType(aNode.desc);
+
+		s.ALOAD(getTraceEnabledVar());
+		s.IFfalse(l);
+		{
+			s.ALOAD(getThreadDataVar()); 
+			s.INVOKEVIRTUAL(CLS_THREADDATA, "evFieldRead", "()V"); 
+			
+			s.ISTORE(theType, itsTmpValueVar);
+			sendValue(s, itsTmpValueVar, theType);
+			s.ILOAD(theType, itsTmpValueVar);
+		}
+		
+		s.label(l);
+		
+		aInsns.insert(aNode, s);
 	}
 
 	private void processGetArray(InsnList aInsns, InsnNode aNode)
 	{
+		SyntaxInsnList s = new SyntaxInsnList(itsLabelManager);
+		Label l = new Label();
+		Type theType = BCIUtils.getType(BCIUtils.getSort(aNode.getOpcode()));
+
+		s.ALOAD(getTraceEnabledVar());
+		s.IFfalse(l);
+		{
+			s.ALOAD(getThreadDataVar()); 
+			s.INVOKEVIRTUAL(CLS_THREADDATA, "evArrayRead", "()V"); 
+			
+			s.ISTORE(theType, itsTmpValueVar);
+			sendValue(s, itsTmpValueVar, theType);
+			s.ILOAD(theType, itsTmpValueVar);
+		}
+		
+		s.label(l);
+		
+		aInsns.insert(aNode, s);
 	}
 
 }

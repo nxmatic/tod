@@ -42,7 +42,7 @@ import org.objectweb.asm.tree.analysis.SourceInterpreter;
 
 public class Analysis
 {
-	public static Node[] analyze(String aClassName, MethodNode aNode)
+	public static Node[] analyze_cflow(String aClassName, MethodNode aNode)
 	{
 		SourceInterpreter theInterpreter = new SourceInterpreter();
 		Analyzer theAnalyzer = new Analyzer(theInterpreter)
@@ -77,6 +77,23 @@ public class Analysis
 		}
 		
 		return (Node[]) theAnalyzer.getFrames();
+	}
+	
+	public static Frame[] analyze_nocflow(String aClassName, MethodNode aNode)
+	{
+		SourceInterpreter theInterpreter = new SourceInterpreter();
+		Analyzer theAnalyzer = new Analyzer(theInterpreter);
+		
+		try
+		{
+			theAnalyzer.analyze(aClassName, aNode);
+		}
+		catch (AnalyzerException e)
+		{
+			throw new RuntimeException(e);
+		}
+		
+		return theAnalyzer.getFrames();
 	}
 	
 

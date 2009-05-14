@@ -152,7 +152,15 @@ implements IMutableClassInfo, ISerializableLocationInfo
 		}
 	}
  
-
+	protected void fireClassChanged()
+	{
+		IShareableStructureDatabase theDatabase = getDatabase();
+		if (theDatabase instanceof StructureDatabase)
+		{
+			StructureDatabase d = (StructureDatabase) theDatabase;
+			d.fireClassChanged(this);
+		}
+	}
 	
 	public String getJvmName()
 	{
@@ -171,6 +179,8 @@ implements IMutableClassInfo, ISerializableLocationInfo
 		itsChecksum = aChecksum;
 		setInterfaces(aInterfaces);
 		setSupertype(aSuperclass);
+		
+		fireClassChanged();
 	}
 	
 	byte[] _getBytecode()

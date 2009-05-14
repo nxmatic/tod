@@ -46,6 +46,7 @@ import tod.core.database.structure.SourceRange;
 import tod.core.database.structure.IBehaviorInfo.BytecodeRole;
 import tod.core.database.structure.ILocationInfo.ISerializableLocationInfo;
 import tod.core.database.structure.IStructureDatabase.LineNumberInfo;
+import tod.core.database.structure.IStructureDatabase.Listener;
 import tod.core.database.structure.IStructureDatabase.LocalVariableInfo;
 import tod.core.database.structure.IStructureDatabase.ProbeInfo;
 import tod.core.database.structure.IStructureDatabase.Stats;
@@ -728,6 +729,16 @@ public class RemoteStructureDatabase implements RIStructureDatabase
 		public IClassInfo _getFieldClass(int aFieldId, boolean aFailIfAbsent)
 		{
 			return itsDatabase._getFieldClass(aFieldId, aFailIfAbsent);
+		}
+
+		public void addListener(Listener aListener)
+		{
+			throw new UnsupportedOperationException();
+		}
+
+		public void removeListener(Listener aListener)
+		{
+			throw new UnsupportedOperationException();
 		}
 	}
 }

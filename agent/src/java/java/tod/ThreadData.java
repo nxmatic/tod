@@ -203,22 +203,20 @@ public class ThreadData
 		commitBuffer();
 	}
 	
-	public void evFieldRead(Object aValue)
+	/**
+	 * A field has just been read. Value expected next
+	 */
+	public void evFieldRead()
 	{
 		sendMessageType(itsBuffer, Message.FIELD_READ);
-		sendValue(itsBuffer, aValue, 0);
-		
-		commitBuffer();
-		sendRegisteredObjects();
 	}
 	
-	public void evArrayRead(Object aValue)
+	/**
+	 * An array slot has just been read. Value expected next.
+	 */
+	public void evArrayRead()
 	{
 		sendMessageType(itsBuffer, Message.ARRAY_READ);
-		sendValue(itsBuffer, aValue, 0);
-		
-		commitBuffer();
-		sendRegisteredObjects();
 	}
 	
 	public void evNew(Object aValue)
@@ -356,9 +354,6 @@ public class ThreadData
 	
 	public void evInScopeBehaviorExit_Normal()
 	{
-		sendMessageType(itsBuffer, Message.INSCOPE_BEHAVIOR_EXIT_NORMAL);
-		commitBuffer();
-		
 		popScope();
 	}
 	
@@ -406,8 +401,16 @@ public class ThreadData
 	
 
 	/**
+	 * Before an unmonitored behavior call.
+	 */
+	public void evUnmonitoredBehaviorCall()
+	{
+		pushOutOfScope();
+	}
+	
+	/**
 	 * After an unmonitored behavior call.
-	 * The result value should be sent immediately after.
+	 * The result value should be sent immediately after if not void.
 	 */
 	public void evUnmonitoredBehaviorResult()
 	{
@@ -415,6 +418,14 @@ public class ThreadData
 		sendMessageType(itsBuffer, Message.UNMONITORED_BEHAVIOR_CALL_RESULT);
 		commitBuffer();
 		
+		if (popScope()) throw new Error("Unexpected scope state");
+	}
+	
+	/**
+	 * An unmonitored behavior call threw an exception.
+	 */
+	public void evUnmonitoredBehaviorException()
+	{
 		if (popScope()) throw new Error("Unexpected scope state");
 	}
 	

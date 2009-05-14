@@ -23,12 +23,11 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 package tod.core.database.structure;
 
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 
 import tod.core.config.TODConfig;
 import tod.core.database.structure.IBehaviorInfo.BytecodeRole;
+import tod.impl.database.structure.standard.AspectInfo;
 
 /**
  * The structure database contains static information about the
@@ -186,6 +185,22 @@ public interface IStructureDatabase
 	 * Returns statistics about registered locations
 	 */
 	public Stats getStats();
+	
+	public void addListener(Listener aListener);
+	public void removeListener(Listener aListener);
+
+	/**
+	 * A listener that is notified of changes in the database.
+	 * @author gpothier
+	 */
+	public interface Listener
+	{
+		public void classAdded(IClassInfo aClass);
+		public void classChanged(IClassInfo aClass);
+		public void behaviorAdded(IBehaviorInfo aBehavior);
+		public void fieldAdded(IFieldInfo aField);
+	}
+
 	
 	public static class Stats implements Serializable
 	{

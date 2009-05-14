@@ -194,4 +194,14 @@ implements IMutableStructureDatabase
 	{
 	}
 
+	public void addListener(Listener aListener)
+	{
+	}
+
+	public void removeListener(Listener aListener)
+	{
+	}
+	
+	
+
 }

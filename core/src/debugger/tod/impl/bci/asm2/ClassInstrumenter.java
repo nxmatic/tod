@@ -95,11 +95,28 @@ public class ClassInstrumenter
 			String theInterface = (String) itsNode.interfaces.get(i);
 			theInterfaces[i] = getDatabase().getNewClass(Util.jvmToScreen(theInterface));
 		}
+		
+		itsClassInfo.setup(
+				itsInterface, 
+				itsInstrumenter.isInScope(itsName), 
+				Utils.md5String(aBytecode), 
+				theInterfaces, 
+				itsSuperclass);
+	}
+	
+	public ASMInstrumenter2 getInstrumenter()
+	{
+		return itsInstrumenter;
 	}
 	
 	private IMutableStructureDatabase getDatabase()
 	{
 		return itsInstrumenter.getStructureDatabase();
+	}
+	
+	public ClassNode getNode()
+	{
+		return itsNode;
 	}
 	
 	public InstrumentedClass proceed()
@@ -126,7 +143,10 @@ public class ClassInstrumenter
 		
 		ClassWriter theWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
 		itsNode.accept(theWriter);
-		return new InstrumentedClass(theWriter.toByteArray(), null);
+		
+		return new InstrumentedClass(
+				theWriter.toByteArray(), 
+				getInstrumenter().getMethodGroupManager().getModeChangesAndReset());
 	}
 	
 	private void processMethod(MethodNode aNode)
@@ -136,7 +156,7 @@ public class ClassInstrumenter
 				aNode.desc, 
 				BCIUtils.isStatic(aNode.access));
 		
-		if (itsInstrumenter.isInScope(itsName)) new MethodInstrumenter_InScope(aNode, theBehavior).proceed();
-		else new MethodInstrumenter_OutOfScope(aNode, theBehavior).proceed();
+		if (itsInstrumenter.isInScope(itsName)) new MethodInstrumenter_InScope(this, aNode, theBehavior).proceed();
+		else new MethodInstrumenter_OutOfScope(this, aNode, theBehavior).proceed();
 	}
 }

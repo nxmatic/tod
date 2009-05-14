@@ -34,7 +34,11 @@ package tod.impl.bci.asm2;
 import java.tod.ThreadData;
 
 import org.objectweb.asm.Type;
+import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
+import org.objectweb.asm.tree.analysis.Frame;
+import org.objectweb.asm.tree.analysis.SourceInterpreter;
+import org.objectweb.asm.tree.analysis.SourceValue;
 
 import tod.core.database.structure.IMutableBehaviorInfo;
 import tod.core.database.structure.IMutableStructureDatabase;
@@ -52,6 +56,7 @@ public abstract class MethodInstrumenter
 	protected static final String CLS_THROWABLE = "java/lang/Throwable";
 	protected static final String DSC_THROWABLE = "L"+CLS_THROWABLE+";";
 	
+	private final ClassInstrumenter itsClassInstrumenter;
 	private final MethodNode itsNode;
 	private final IMutableBehaviorInfo itsBehavior;
 	
@@ -74,8 +79,14 @@ public abstract class MethodInstrumenter
 	 */
 	private int itsTraceEnabledVar;
 	
-	public MethodInstrumenter(MethodNode aNode, IMutableBehaviorInfo aBehavior)
+	/**
+	 * The cached stack frames resulting from the analysis of the method
+	 */
+	private Frame[] itsFrames;
+	
+	public MethodInstrumenter(ClassInstrumenter aClassInstrumenter, MethodNode aNode, IMutableBehaviorInfo aBehavior)
 	{
+		itsClassInstrumenter = aClassInstrumenter;
 		itsNode = aNode;
 		itsBehavior = aBehavior;
 		
@@ -89,6 +100,16 @@ public abstract class MethodInstrumenter
 		itsNextFreeVar = getNode().maxLocals;
 		itsThreadDataVar = nextFreeVar(1);
 		itsTraceEnabledVar = nextFreeVar(1);
+	}
+	
+	public ClassInstrumenter getClassInstrumenter()
+	{
+		return itsClassInstrumenter;
+	}
+	
+	public ClassNode getClassNode()
+	{
+		return getClassInstrumenter().getNode();
 	}
 	
 	protected boolean isStatic()
@@ -230,6 +251,14 @@ public abstract class MethodInstrumenter
 		s.INVOKEVIRTUAL(CLS_THREADDATA, "sendValue_Ref", "("+DSC_OBJECT+")V");
 	}
 	
-
+	/**
+	 * Returns the stack frames resulting from the analysis of the method
+	 * using the {@link SourceInterpreter}.
+	 */
+	protected Frame[] getFrames()
+	{
+		if (itsFrames == null) itsFrames = Analysis.analyze_nocflow(getClassNode().name, getNode());
+		return itsFrames;
+	}
 
 }

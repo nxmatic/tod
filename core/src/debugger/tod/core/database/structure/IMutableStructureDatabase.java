@@ -98,5 +98,4 @@ public interface IMutableStructureDatabase extends IStructureDatabase
 	 * inconsistency.
 	 */
 	public void setAdviceSourceMap(Map<Integer, SourceRange> aMap);
-
 }

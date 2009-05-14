@@ -261,6 +261,16 @@ public class SyntaxInsnList extends InsnList
 		itsVisitor.visitInsn(Opcodes.DUP2_X2);
 	}
 	
+	public void DUP(Type type)
+	{
+		switch(type.getSize())
+		{
+		case 1: DUP(); break;
+		case 2: DUP2(); break;
+		default: throw new RuntimeException("Bad size");
+		}
+	}
+	
 	public void SWAP()
 	{
 		itsVisitor.visitInsn(Opcodes.SWAP);
@@ -378,16 +388,32 @@ public class SyntaxInsnList extends InsnList
 	 * Jump instructions
 	 */
 	
+	/**
+	 * Same as IFEQ
+	 */
+	public void IFfalse(String label)
+	{
+		IFEQ(label);
+	}
+	
 	public void IFEQ(String label) 
 	{
 		itsVisitor.visitJumpInsn(Opcodes.IFEQ, getLabel(label));
+	}
+	
+	/**
+	 * Same as IFNE
+	 */
+	public void IFtrue(String label)
+	{
+		IFNE(label);
 	}
 	
 	public void IFNE(String label) 
 	{
 		itsVisitor.visitJumpInsn(Opcodes.IFNE, getLabel(label));
 	}
-	
+		
 	public void IFLT(String label) 
 	{
 		itsVisitor.visitJumpInsn(Opcodes.IFLT, getLabel(label));
@@ -467,7 +493,45 @@ public class SyntaxInsnList extends InsnList
 	{
 		itsVisitor.visitJumpInsn(Opcodes.IFNONNULL, getLabel(label));
 	}
+
+	/*
+	 * Jump instructions with actual Labels
+	 */
 	
+	/**
+	 * Same as IFEQ
+	 */
+	public void IFfalse(Label label)
+	{
+		IFEQ(label);
+	}
+	
+	public void IFEQ(Label label) 
+	{
+		itsVisitor.visitJumpInsn(Opcodes.IFEQ, label);
+	}
+	
+	/**
+	 * Same as IFNE
+	 */
+	public void IFtrue(Label label)
+	{
+		IFNE(label);
+	}
+	
+	public void IFNE(Label label) 
+	{
+		itsVisitor.visitJumpInsn(Opcodes.IFNE, label);
+	}
+	
+	public void GOTO(Label label) 
+	{
+		itsVisitor.visitJumpInsn(Opcodes.GOTO, label);
+	}
+	
+
+		
+
 	/**
 	 * Inserts a label corresponding to the given name.
 	 * The {@link LabelManager} is used to retrieve the actual label.
@@ -475,7 +539,12 @@ public class SyntaxInsnList extends InsnList
 	public Label label(String label)
 	{
 		Label theLabel = getLabel(label);
-		itsVisitor.visitLabel(theLabel);
+		label(theLabel);
 		return theLabel;
+	}
+	
+	public void label(Label label)
+	{
+		itsVisitor.visitLabel(label);
 	}
 }

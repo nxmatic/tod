@@ -49,6 +49,7 @@ import tod.core.database.structure.IStructureDatabase;
 import tod.core.database.structure.ITypeInfo;
 import tod.core.database.structure.SourceRange;
 import tod.core.database.structure.IBehaviorInfo.BytecodeRole;
+import tod.core.database.structure.IStructureDatabase.Listener;
 import tod.utils.remote.RemoteStructureDatabase;
 import zz.utils.Utils;
 
@@ -102,6 +103,8 @@ implements Serializable, IShareableStructureDatabase
 		new HashMap<String, IAspectInfo>();
 	
 	private final IClassInfo itsUnknownClass = new ClassInfo(this, null, "Unknown", -1);
+	
+	private List<Listener> itsListeners = new ArrayList<Listener>();
 	
 	protected StructureDatabase(TODConfig aConfig, String aId, File aFile, Ids aIds)
 	{
@@ -258,6 +261,11 @@ implements Serializable, IShareableStructureDatabase
 		}
 		return theClassNameInfo.getAll();
 	}
+	
+	void fireClassChanged(IClassInfo aClass)
+	{
+		for (Listener theListener : itsListeners) theListener.classChanged(aClass);
+	}
 
 	protected void registerClass(IClassInfo aClass)
 	{
@@ -265,6 +273,8 @@ implements Serializable, IShareableStructureDatabase
 		Utils.listSet(itsClasses, aClass.getId(), (ClassInfo) aClass);
 		ClassNameInfo theClassNameInfo = getClassNameInfo(aClass.getName());
 		theClassNameInfo.addClass((ClassInfo) aClass);
+		
+		for (Listener theListener : itsListeners) theListener.classAdded(aClass);
 	}
 	
 	protected ClassNameInfo getClassNameInfo(String aClassName)
@@ -333,6 +343,8 @@ implements Serializable, IShareableStructureDatabase
 					aBehavior.getDeclaringType().getName(),
 					Util.getFullName(aBehavior)));
 		}
+		
+		for (Listener theListener : itsListeners) theListener.behaviorAdded(aBehavior);
 	}
 
 	public ClassInfo getClass(int aId, boolean aFailIfAbsent)
@@ -353,6 +365,7 @@ implements Serializable, IShareableStructureDatabase
 	{
 		itsIds.registerFieldId(aField.getId());
 		Utils.listSet(itsFields, aField.getId(), (FieldInfo) aField);
+		for (Listener theListener : itsListeners) theListener.fieldAdded(aField);
 	}
 
 	public ITypeInfo getNewType(String aName)
@@ -648,6 +661,18 @@ implements Serializable, IShareableStructureDatabase
 		FieldInfo theField = getField(aFieldId, aFailIfAbsent);
 		return theField != null ? theField.getDeclaringType() : null;
 	}
+	
+	public void addListener(Listener aListener)
+	{
+		itsListeners.add(aListener);
+	}
+
+	public void removeListener(Listener aListener)
+	{
+		itsListeners.remove(aListener);
+	}
+
+
 
 	private static class Ids implements Serializable
 	{

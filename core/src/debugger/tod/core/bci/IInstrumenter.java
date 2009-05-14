@@ -70,15 +70,27 @@ public interface IInstrumenter
 		public final byte[] bytecode;
 		
 		/**
-		 * List of ids of the methods that were instrumented.
+		 * List of behaviors whose monitoring mode changes as a result of processing the class.
 		 * @see TracedMethods
 		 */
-		public final List<Integer> tracedMethods;
+		public final List<BehaviorMonitoringMode> modeChanges;
 
-		public InstrumentedClass(byte[] aBytecode, List<Integer> aTracedMethods)
+		public InstrumentedClass(byte[] aBytecode, List<BehaviorMonitoringMode> aModeChanges)
 		{
 			bytecode = aBytecode;
-			tracedMethods = aTracedMethods;
+			modeChanges = aModeChanges;
+		}
+	}
+	
+	public static class BehaviorMonitoringMode
+	{
+		public final int behaviorId;
+		public final int mode;
+		
+		public BehaviorMonitoringMode(int aBehaviorId, int aMode)
+		{
+			behaviorId = aBehaviorId;
+			mode = aMode;
 		}
 	}
 }
