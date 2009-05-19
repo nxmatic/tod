@@ -66,6 +66,7 @@
     	
     	<copy todir="${classes-debugger.dir}">
     		<fileset dir="${resources.dir}"/>
+    		<fileset dir="${src-debugger.dir}" includes="**/*.py"/>
     	</copy>
     </target>
 	
