@@ -26,7 +26,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import tod.agent.Output;
 import tod.core.ILogCollector;
 import tod.core.transport.HighLevelEventWriter;
 import tod.impl.dbgrid.DebuggerGridConfig;
@@ -230,20 +229,6 @@ public class DispatcherCollector implements ILogCollector
 		try
 		{
 			itsWriter.sendNewArray(aThreadId, aParentTimestamp, aDepth, aTimestamp, aAdviceCFlow, aProbeId, aTarget, aBaseTypeId, aSize);
-		}
-		catch (IOException e)
-		{
-			throw new RuntimeException(e);
-		}
-	}
-
-	public void output(int aThreadId, long aParentTimestamp, short aDepth, long aTimestamp, int[] aAdviceCFlow,
-			Output aOutput, byte[] aData)
-	{
-		balance();
-		try
-		{
-			itsWriter.sendOutput(aThreadId, aParentTimestamp, aDepth, aTimestamp, aAdviceCFlow, aOutput, aData);
 		}
 		catch (IOException e)
 		{

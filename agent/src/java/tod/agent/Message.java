@@ -9,82 +9,45 @@ package tod.agent;
  */
 public class Message
 {
-	/**
-	 * Args: value
-	 */
 	public static final byte FIELD_READ = 1;
-	
-	/**
-	 * Args: value
-	 */
 	public static final byte ARRAY_READ = 2;
-	
-	/**
-	 * Args: value
-	 */
 	public static final byte NEW = 3;
-	
-	/**
-	 * Args: name, sig, type, bytecode index, value
-	 */
-	public static final byte EXCEPTION = 4;
-	
-	/**
-	 * Args: loc
-	 */
-	public static final byte HANDLER_REACHED = 5;
+	public static final byte OBJECT_INITIALIZED = 4;
+	public static final byte EXCEPTION = 5;
+	public static final byte HANDLER_REACHED = 6;
 	
 	/**
 	 * Entering into an in-scope behavior
-	 * Args: method id, [args] (if from out of scope, see {@link #BEHAVIOR_ENTER_ARGS})
 	 */
-	public static final byte INSCOPE_BEHAVIOR_ENTER = 6;
+	public static final byte INSCOPE_BEHAVIOR_ENTER = 7;
 	
 	/**
 	 * Behavior arguments, in the case the behavior was called from non-instrumented code.
-	 * Args: count, args
 	 * Must be sent right after {@link #BEHAVIOR_ENTER}
 	 */
-	public static final byte BEHAVIOR_ENTER_ARGS = 7;
+	public static final byte BEHAVIOR_ENTER_ARGS = 8;
 	
 	/**
 	 * Target of constructor call, in the case the behavior was called from non-instrumented code.
 	 * This is sent after the constructor chaining is finished.
-	 * Args: target
 	 */
-	public static final byte CONSTRUCTOR_TARGET = 8;
+	public static final byte CONSTRUCTOR_TARGET = 9;
 	
-	/**
-	 * Args: 
-	 */
-	public static final byte INSCOPE_BEHAVIOR_EXIT_NORMAL = 9;
-	
-	/**
-	 * Args: 
-	 */
-	public static final byte INSCOPE_BEHAVIOR_EXIT_EXCEPTION = 10;
+	public static final byte INSCOPE_BEHAVIOR_EXIT_NORMAL = 10;
+	public static final byte INSCOPE_BEHAVIOR_EXIT_EXCEPTION = 11;
 	
 	/**
 	 * Entering into an out-of-scope behavior
-	 * Args: 
 	 */
-	public static final byte OUTOFSCOPE_BEHAVIOR_ENTER = 11;
+	public static final byte OUTOFSCOPE_BEHAVIOR_ENTER = 12;
 	
-	/**
-	 * Args: result
-	 */
-	public static final byte OUTOFSCOPE_BEHAVIOR_EXIT_NORMAL = 12;
-	
-	/**
-	 * Args: 
-	 */
-	public static final byte OUTOFSCOPE_BEHAVIOR_EXIT_EXCEPTION = 13;
+	public static final byte OUTOFSCOPE_BEHAVIOR_EXIT_NORMAL = 13;
+	public static final byte OUTOFSCOPE_BEHAVIOR_EXIT_EXCEPTION = 14;
 	
 	/**
 	 * An unmonitored method call returned normally 
-	 * Args: 
 	 */
-	public static final byte UNMONITORED_BEHAVIOR_CALL_RESULT = 14;
+	public static final byte UNMONITORED_BEHAVIOR_CALL_RESULT = 15;
 	
 	public static final byte REGISTER_OBJECT = 20;
 	public static final byte REGISTER_REFOBJECT = 21;

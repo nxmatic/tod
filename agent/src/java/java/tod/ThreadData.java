@@ -3,8 +3,6 @@
  */
 package java.tod;
 
-import java.tod.io._ByteBuffer;
-import java.tod.io._GrowingByteBuffer;
 import java.tod.io._IO;
 import java.tod.transport.IOThread;
 import java.tod.transport.ObjectEncoder;
@@ -15,6 +13,8 @@ import java.tod.util._IntStack;
 import tod.agent.Command;
 import tod.agent.Message;
 import tod.agent.ValueType;
+import tod.agent.io._ByteBuffer;
+import tod.agent.io._GrowingByteBuffer;
 
 /**
  * Per-thread data managed by the {@link EventCollector}.
@@ -220,6 +220,19 @@ public class ThreadData
 	}
 	
 	public void evNew(Object aValue)
+	{
+		checkTimestamp();
+		sendMessageType(itsBuffer, Message.NEW);
+		sendValue(itsBuffer, aValue, 0);
+		
+		commitBuffer();
+		
+		// Objects that are sent by value must not be serialized now as they
+		// are not yet initialized
+		if (! shouldSendByValue(aValue)) sendRegisteredObjects();
+	}
+	
+	public void evObjectInitialized(Object aValue)
 	{
 		checkTimestamp();
 		sendMessageType(itsBuffer, Message.NEW);

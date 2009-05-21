@@ -27,7 +27,6 @@ import java.tod.AgentReady;
 import java.tod.EventCollector;
 import java.tod.TOD;
 import java.tod.TracedMethods;
-import java.tod.io._ByteBuffer;
 import java.tod.io._EOFException;
 import java.tod.io._IO;
 import java.tod.io._IOException;
@@ -36,6 +35,7 @@ import java.tod.util._ArrayList;
 import java.tod.util._SyncRingBuffer;
 
 import tod.agent.Command;
+import tod.agent.io._ByteBuffer;
 
 /**
  * This class implements the thread that communicates with the TOD database.

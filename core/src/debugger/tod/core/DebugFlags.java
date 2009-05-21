@@ -116,6 +116,11 @@ public class DebugFlags
 	public static final boolean INTERPRETER_LOG = ConfigUtils.readBoolean("interpreter-log", false);
 	
 	/**
+	 * Causes the {@link NativeAgentPeer} to log instrumentation events.
+	 */
+	public static final boolean INSTRUMENTER_LOG = ConfigUtils.readBoolean("instrumenter-log", false);
+	
+	/**
 	 * Stream to which the event collector sends debug info.
 	 * Default is System.out
 	 */

@@ -58,15 +58,36 @@ public class MethodInstrumenter_OutOfScope extends MethodInstrumenter
 	{
 		super(aClassInstrumenter, aNode, aBehavior);
 		itsResultVar = nextFreeVar(2); //result might need two slots.
+		getNode().maxStack += 3; // This is the max we add to the stack
 	}
 
 	@Override
 	public void proceed()
 	{
+		// Constructors are not overridable so if a constructor is out of scope it is never monitored
+		// Same for finals (obviously)
+		// And we don't instrument natives (obviously)
+		if (isConstructor() || isStaticInitializer() || isStatic() || isFinal() || isNative()) return;
+		
+		// Avoid bootstrapping issues
+//		if (CLS_OBJECT.equals(getClassNode().name)) return;
+		
+		if (CLS_OBJECT.equals(getClassNode().name)) 
+		{
+//			if ("equals".equals(getNode().name)) return;
+//			if ("toString".equals(getNode().name)) return;
+			if ("finalize".equals(getNode().name)) return;
+			System.out.println("Instrumenting: "+getClassNode().name+"."+getNode().name+getNode().desc);
+		}
+		
 		SyntaxInsnList s = new SyntaxInsnList(itsLabelManager);
 
 		// Insert entry instructions
 		{
+			// Set ThreadData var to null for verifier to work
+			s.ACONST_NULL();
+			s.ASTORE(getThreadDataVar());
+
 			// Store the monitoring mode for the behavior in a local
 			s.pushInt(getBehavior().getId()); 
 			s.INVOKESTATIC(CLS_TRACEDMETHODS, "traceEnveloppe", "(I)Z");

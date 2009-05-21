@@ -29,41 +29,26 @@ POSSIBILITY OF SUCH DAMAGE.
 Parts of this work rely on the MD5 algorithm "derived from the RSA Data Security, 
 Inc. MD5 Message-Digest Algorithm".
 */
-package tod.core.transport;
+package dummy;
 
-import java.io.ByteArrayInputStream;
-import java.io.DataInputStream;
-import java.io.FileNotFoundException;
-import java.tod.ObjectValueFactory;
-import java.tod.transport.ObjectEncoder;
-
-import org.junit.Test;
-
-import tod.agent.io._ByteBuffer;
-
-
-/**
- * Test object encoding/decoding
- * This test requires to have the agent in the bootstrap classpath. 
- * @author gpothier
- */
-public class TestObjectCodec
+public class BCITestCase
 {
-	@Test public void testCodec()
+	int x;
+	String y;
+	
+	public static void main(String[] args)
 	{
-		doTest("Hola");
-		doTest(new FileNotFoundException("Hop"));
+		Object b = new Object();
+		System.out.println(b);
+		new BCITestCase().foo();
 	}
 	
-	void doTest(Object aObject)
+	public void foo()
 	{
-		aObject = ObjectValueFactory.convert(aObject);
-		_ByteBuffer theBuffer = _ByteBuffer.allocate(10000);
-		ObjectEncoder.encode(aObject, theBuffer);
-		byte[] theData = new byte[theBuffer.position()];
-		System.arraycopy(theBuffer.array(), 0, theData, 0, theBuffer.position());
+		int[] i = new int[10];
+		String[] s = new String[10];
 		
-		DataInputStream theIn = new DataInputStream(new ByteArrayInputStream(theData));
-		Object theObject = ObjectDecoder.decode(theIn);
+		i[3] = x;
+		y = s[2];
 	}
 }

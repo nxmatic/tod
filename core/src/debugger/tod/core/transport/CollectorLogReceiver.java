@@ -27,7 +27,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
-import tod.agent.LowLevelEventType;
 import tod.core.ILogCollector;
 import tod.core.config.TODConfig;
 import tod.core.database.structure.IStructureDatabase;
@@ -55,7 +54,7 @@ public class CollectorLogReceiver extends LogReceiver
 	{
 		super(aConfig, aStructureDatabase, aHostInfo, aInStream, aOutStream, false);
 		itsCollector = aCollector;
-		itsInterpreter = new EventInterpreter(aStructureDatabase, itsCollector);
+		itsInterpreter = null;//new EventInterpreter(aStructureDatabase, itsCollector);
 		if (aStart) start();
 	}
 	
@@ -65,9 +64,9 @@ public class CollectorLogReceiver extends LogReceiver
 	}
 
 	@Override
-	protected void processEvent(int aThreadId, LowLevelEventType aType, DataInput aStream) throws IOException
+	protected void processEvent(int aThreadId, byte aMessage, DataInput aStream) throws IOException
 	{
-		LowLevelEventReader.readEvent(aThreadId, aType, aStream, itsInterpreter);
+//		LowLevelEventReader.readEvent(aThreadId, aType, aStream, itsInterpreter);
 	}
 	
 

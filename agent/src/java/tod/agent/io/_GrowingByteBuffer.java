@@ -1,7 +1,7 @@
 /*
  * Created on Jan 13, 2009
  */
-package java.tod.io;
+package tod.agent.io;
 
 /**
  * A byte buffer that grows as needed

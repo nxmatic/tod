@@ -35,7 +35,6 @@ import tod.core.database.event.IFieldWriteEvent;
 import tod.core.database.event.IInstantiationEvent;
 import tod.core.database.event.ILocalVariableWriteEvent;
 import tod.core.database.event.ILogEvent;
-import tod.core.database.event.IOutputEvent;
 import tod.core.database.structure.IBehaviorInfo;
 import tod.core.database.structure.ILocationInfo;
 import zz.utils.AbstractFormatter;
@@ -78,10 +77,6 @@ public class EventFormatter extends AbstractFormatter<ILogEvent>
 		{
 			return formatLocalWrite((ILocalVariableWriteEvent) aEvent);
 		}
-		else if (aEvent instanceof IOutputEvent)
-		{
-			return formatOutput((IOutputEvent) aEvent);
-		}
 		else if (aEvent instanceof IExceptionGeneratedEvent)
 		{
 			return formatException((IExceptionGeneratedEvent) aEvent);
@@ -123,11 +118,6 @@ public class EventFormatter extends AbstractFormatter<ILogEvent>
 		}
 		
 		return "Exception thrown in "+theBehaviorName+": "+theExceptionText;
-	}
-
-	private String formatOutput(IOutputEvent theEvent)
-	{
-		return "Output ("+theEvent.getOutput()+"): "+theEvent.getData();
 	}
 
 	private String formatLocalWrite(ILocalVariableWriteEvent theEvent)

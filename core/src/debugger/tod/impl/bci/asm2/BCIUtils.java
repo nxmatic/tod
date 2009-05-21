@@ -48,9 +48,19 @@ public class BCIUtils implements Opcodes
 		return (access & Opcodes.ACC_INTERFACE) != 0;
 	}
 	
-	public static boolean isStatic (int access)
+	public static boolean isStatic(int access)
 	{
 		return (access & Opcodes.ACC_STATIC) != 0;
+	}
+	
+	public static boolean isFinal(int access)
+	{
+		return (access & Opcodes.ACC_FINAL) != 0;
+	}
+	
+	public static boolean isNative(int access)
+	{
+		return (access & Opcodes.ACC_NATIVE) != 0;
 	}
 	
 	/**

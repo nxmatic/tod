@@ -77,16 +77,16 @@ public class TODPlugin extends AbstractUIPlugin
 		else
 		{
 			DBProcessManager.cp += File.pathSeparator
-				+theDevPath+"/TOD/bin"+File.pathSeparator
-				+theDevPath+"/TOD-agent/bin"+File.pathSeparator
-				+theDevPath+"/TOD-dbgrid/bin"+File.pathSeparator
-				+theDevPath+"/TOD-evdb1/bin"+File.pathSeparator
-				+theDevPath+"/TOD-evdbng/bin"+File.pathSeparator
+				+theDevPath+"/core/bin"+File.pathSeparator
+				+theDevPath+"/agent/bin"+File.pathSeparator
+				+theDevPath+"/dbgrid/bin"+File.pathSeparator
+				+theDevPath+"/evdb1/bin"+File.pathSeparator
+				+theDevPath+"/evdbng/bin"+File.pathSeparator
 				+theDevPath+"/zz.utils/bin";
 			
-			if (System.getProperty("agent14.path") == null) System.setProperty("agent14.path", theDevPath+"/TOD-agent/build/tod-agent14.jar");
-			if (System.getProperty("agent15.path") == null) System.setProperty("agent15.path", theDevPath+"/TOD-agent/bin");
-			if (System.getProperty("bcilib.path") == null) System.setProperty("bcilib.path", theDevPath+"/TOD-agent");
+			if (System.getProperty("agent14.path") == null) System.setProperty("agent14.path", theDevPath+"/agent/build/tod-agent14.jar");
+			if (System.getProperty("agent15.path") == null) System.setProperty("agent15.path", theDevPath+"/agent/bin");
+			if (System.getProperty("bcilib.path") == null) System.setProperty("bcilib.path", theDevPath+"/agent");
 
 		}
 

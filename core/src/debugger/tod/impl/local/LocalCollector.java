@@ -25,7 +25,6 @@ package tod.impl.local;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 
-import tod.agent.Output;
 import tod.core.DebugFlags;
 import tod.core.database.structure.IArrayTypeInfo;
 import tod.core.database.structure.IBehaviorInfo;
@@ -35,7 +34,6 @@ import tod.core.database.structure.ITypeInfo;
 import tod.core.database.structure.IStructureDatabase.LocalVariableInfo;
 import tod.core.database.structure.IStructureDatabase.ProbeInfo;
 import tod.core.transport.ObjectDecoder;
-import tod.core.transport.ValueReader;
 import tod.impl.common.EventCollector;
 import tod.impl.common.event.ArrayWriteEvent;
 import tod.impl.common.event.BehaviorExitEvent;
@@ -44,7 +42,6 @@ import tod.impl.common.event.ExceptionGeneratedEvent;
 import tod.impl.common.event.FieldWriteEvent;
 import tod.impl.common.event.InstanceOfEvent;
 import tod.impl.common.event.LocalVariableWriteEvent;
-import tod.impl.common.event.OutputEvent;
 import tod.impl.database.structure.standard.ThreadInfo;
 import tod.impl.local.event.BehaviorCallEvent;
 import tod.impl.local.event.ConstructorChainingEvent;
@@ -353,25 +350,6 @@ public class LocalCollector extends EventCollector
 		
 		addEvent(theEvent);
 		theThread.pushParent(theEvent);
-	}
-
-	public void output(
-			int aThreadId,
-			long aParentTimestamp, 
-			short aDepth, 
-			long aTimestamp,
-			int[] aAdviceCFlow,
-			Output aOutput, 
-			byte[] aData)
-	{
-		OutputEvent theEvent = new OutputEvent(itsBrowser);
-		LocalThreadInfo theThread = getThread(aThreadId);
-		initEvent(theEvent, theThread, aParentTimestamp, aDepth, aTimestamp, aAdviceCFlow, -1);
-		
-		theEvent.setOutput(aOutput);
-		theEvent.setData(null); //TODO: fix
-		
-		addEvent(theEvent);
 	}
 
 	public void superCall(

@@ -22,13 +22,17 @@ package tod.plugin;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.jdt.core.Flags;
+import org.eclipse.jdt.core.IClasspathEntry;
 import org.eclipse.jdt.core.IField;
 import org.eclipse.jdt.core.IInitializer;
 import org.eclipse.jdt.core.IJavaElement;
+import org.eclipse.jdt.core.IJavaModel;
 import org.eclipse.jdt.core.IJavaProject;
 import org.eclipse.jdt.core.IMember;
 import org.eclipse.jdt.core.IMethod;
@@ -58,7 +62,11 @@ import tod.core.session.ISession;
 import tod.plugin.views.main.MainView;
 import tod.utils.ConfigUtils;
 import tod.utils.TODUtils;
+import zz.utils.ArrayStack;
+import zz.utils.KeySorter;
+import zz.utils.Stack;
 import zz.utils.Utils;
+import zz.utils.KeySorter.KeyProvider;
 
 /**
  * Utilities for the TOD plugin
@@ -271,6 +279,25 @@ public class TODPluginUtils
 			String aName,
 			int aKind) throws CoreException
 	{
+		// Recursively add referenced projects (because Eclipse doesn't recursively include non-exported referenced projects) 
+		Set<IJavaProject> theProjects = new HashSet<IJavaProject>();
+		Stack<IJavaProject> theWorkingList = new ArrayStack<IJavaProject>();
+		for(IJavaProject theProject : aJavaProject) theWorkingList.push(theProject);
+		
+		while(!theWorkingList.isEmpty())
+		{
+			IJavaProject theProject = theWorkingList.pop();
+			theProjects.add(theProject);
+			
+			IJavaModel theJavaModel = theProject.getJavaModel();
+			IClasspathEntry[] theEntries = theProject.getResolvedClasspath(true);
+			for(IClasspathEntry theEntry : theEntries) if (theEntry.getEntryKind() == IClasspathEntry.CPE_PROJECT)
+			{
+				IJavaProject theReferencedProject = theJavaModel.getJavaProject(theEntry.getPath().lastSegment());
+				if (theReferencedProject.exists() && ! theProjects.contains(theReferencedProject)) theWorkingList.push(theReferencedProject);
+			}
+		}
+		
 		SearchPattern thePattern = SearchPattern.createPattern(
 				aName.replace('$', '.'), 
 				aKind,
@@ -278,7 +305,7 @@ public class TODPluginUtils
 				SearchPattern.R_EXACT_MATCH);
 
 		IJavaSearchScope theScope = SearchEngine.createJavaSearchScope(
-				aJavaProject.toArray(new IJavaElement[aJavaProject.size()]), 
+				theProjects.toArray(new IJavaElement[theProjects.size()]), 
 				true);
 		
 		SearchEngine theSearchEngine = new SearchEngine();
@@ -297,10 +324,18 @@ public class TODPluginUtils
 	public static IType getType (List<IJavaProject> aJavaProject, String aTypeName) throws CoreException
 	{
 		// Search Java type
-		List theList = searchDeclarations(aJavaProject, aTypeName, IJavaSearchConstants.TYPE);
+		List<IType> theList = searchDeclarations(aJavaProject, aTypeName, IJavaSearchConstants.TYPE);
 
-		if (theList.size() == 1) return (IType) theList.get(0);
-		else return null;
+		if (theList.isEmpty()) return null;
+		
+		theList = KeySorter.sort(theList, new KeySorter.KeyProvider<Integer, IType>() {
+			public Integer getKey(IType aType)
+			{
+				return aType.isBinary() ? 0 : 1;
+			}
+		});
+		
+		return theList.get(theList.size()-1);
 	}
 	
 	/**

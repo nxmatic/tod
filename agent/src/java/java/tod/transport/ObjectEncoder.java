@@ -4,11 +4,11 @@
 package java.tod.transport;
 
 
-import java.tod.io._ByteBuffer;
 import java.tod.util._IdentityHashMap;
 
 import tod.agent.ObjectValue;
 import tod.agent.ObjectValue.FieldValue;
+import tod.agent.io._ByteBuffer;
 
 /**
  * This class handles our custom serialization of objects.

@@ -20,28 +20,33 @@ MA 02111-1307 USA
 Parts of this work rely on the MD5 algorithm "derived from the 
 RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 */
-package tod.impl.server;
+package tod.agent.util;
 
-import tod.core.ILogCollector;
-import tod.core.config.TODConfig;
-import tod.core.database.structure.IMutableStructureDatabase;
-import tod.core.server.ITODServerFactory;
-import tod.core.server.TODServer;
-import tod.impl.bci.asm.ASMDebuggerConfig;
-import tod.impl.bci.asm.ASMInstrumenter;
-
-/**
- * Implementation of {@link ITODServerFactory} for Java debuggees.
- * @author gpothier
- */
-public class JavaTODServerFactory implements ITODServerFactory
+public class BitUtilsLite
 {
-	public TODServer create(TODConfig aConfig, IMutableStructureDatabase aStructureDatabase, ILogCollector aLogCollector)
+	/**
+	 * Copied from zz.utils.
+	 * Can't depend on it. 
+	 */
+	public static final long pow2(int aN)
 	{
-		ASMDebuggerConfig theConfig = new ASMDebuggerConfig(aConfig);
-		ASMInstrumenter theInstrumenter = new ASMInstrumenter(aStructureDatabase, theConfig);
-		
-		return new JavaTODServer(aConfig, theInstrumenter, aStructureDatabase, aLogCollector);
+		return 1L << aN;
 	}
 
+	/**
+	 * Returns the base-2 logarithm of the argument
+	 */
+	public static final double log2(int aN)
+	{
+		return Math.log(aN)/Math.log(2);
+	}
+	
+	/**
+	 * Returns the smallest integer that is greater than the 
+	 * log of the specified number.
+	 */
+	public static final int log2ceil(int aN)
+	{
+		return (int) Math.ceil(log2(aN));
+	}
 }

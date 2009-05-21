@@ -22,7 +22,6 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 */
 package tod.utils;
 
-import tod.agent.Output;
 import tod.core.ILogCollector;
 
 public class DummyCollector implements ILogCollector
@@ -78,11 +77,6 @@ public class DummyCollector implements ILogCollector
 	public void methodCall(int aThreadId, long aParentTimestamp, short aDepth, long aTimestamp,
 			int[] aAdviceCFlow, int aProbeId, boolean aDirectParent, int aCalledBehaviorId,
 			int aExecutedBehaviorId, Object aTarget, Object[] aArguments)
-	{
-	}
-
-	public void output(int aThreadId, long aParentTimestamp, short aDepth, long aTimestamp, int[] aAdviceCFlow,
-			Output aOutput, byte[] aData)
 	{
 	}
 

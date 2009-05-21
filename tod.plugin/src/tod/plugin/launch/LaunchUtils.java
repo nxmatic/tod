@@ -405,11 +405,10 @@ public class LaunchUtils
 			theVMArgs.add("-Xnoagent");
 			
 			String theAgentArgs = String.format(
-					"%d,%s,%d,%s,%s",
+					"%d,%s,%d,%s",
 					theConfig.get(TODConfig.AGENT_VERBOSE),
 					theConnectionInfo.getHostName(),
 					theConnectionInfo.getPort(),
-					theConfig.get(TODConfig.AGENT_CACHE_PATH),
 					theConfig.get(TODConfig.CLIENT_NAME));
 			
 			theVMArgs.add("-Xrun"+getLibraryName()+":"+theAgentArgs);
@@ -418,7 +417,6 @@ public class LaunchUtils
 			theVMArgs.add("-Dcollector-port="+theConnectionInfo.getPort());
 			
 			theVMArgs.add(TODConfig.CLIENT_NAME.javaOpt(theConfig));
-			theVMArgs.add(TODConfig.AGENT_CACHE_PATH.javaOpt(theConfig));
 			theVMArgs.add(TODConfig.AGENT_VERBOSE.javaOpt(theConfig));
 			theVMArgs.add(TODConfig.AGENT_CAPTURE_AT_START.javaOpt(theConfig));
 			
@@ -478,7 +476,6 @@ public class LaunchUtils
 			theVMArgs.add("-Dcollector-port="+theConnectionInfo.getPort());
 			
 			theVMArgs.add(TODConfig.CLIENT_NAME.javaOpt(theConfig));
-			theVMArgs.add(TODConfig.AGENT_CACHE_PATH.javaOpt(theConfig));
 			theVMArgs.add(TODConfig.AGENT_VERBOSE.javaOpt(theConfig));
 			theVMArgs.add(TODConfig.AGENT_CAPTURE_AT_START.javaOpt(theConfig));
 			

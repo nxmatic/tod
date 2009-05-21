@@ -31,12 +31,18 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.bci.asm2;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.List;
 
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
+import org.objectweb.asm.tree.analysis.Analyzer;
+import org.objectweb.asm.tree.analysis.AnalyzerException;
+import org.objectweb.asm.tree.analysis.BasicVerifier;
+import org.objectweb.asm.util.CheckClassAdapter;
 
 import tod.Util;
 import tod.core.bci.IInstrumenter.InstrumentedClass;
@@ -142,8 +148,12 @@ public class ClassInstrumenter
 		ClassWriter theWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
 		itsNode.accept(theWriter);
 		
+		byte[] theBytecode = theWriter.toByteArray();
+		
+		checkClass(theBytecode);
+		
 		return new InstrumentedClass(
-				theWriter.toByteArray(), 
+				theBytecode, 
 				getInstrumenter().getMethodGroupManager().getModeChangesAndReset());
 	}
 	
@@ -156,5 +166,33 @@ public class ClassInstrumenter
 		
 		if (itsInstrumenter.isInScope(itsName)) new MethodInstrumenter_InScope(this, aNode, theBehavior).proceed();
 		else new MethodInstrumenter_OutOfScope(this, aNode, theBehavior).proceed();
+		
+		checkMethod(aNode);
+	}
+	
+	private void checkMethod(MethodNode aNode)
+	{
+		Analyzer theAnalyzer = new Analyzer(new BasicVerifier());
+		try
+		{
+			theAnalyzer.analyze(aNode.name, aNode);
+		}
+		catch (AnalyzerException e)
+		{
+			Utils.rtex("Error in %s.%s%s: %s", getNode().name, aNode.name, aNode.desc, e.getMessage());
+		}
+	}
+	
+	private void checkClass(byte[] aBytecode)
+	{
+//		StringWriter sw = new StringWriter();
+//		PrintWriter pw = new PrintWriter(sw);
+//		CheckClassAdapter.verify(new ClassReader(aBytecode), false, pw);
+//		
+//		String theResult = sw.toString();
+//		if (theResult.length() != 0)
+//		{
+//			Utils.rtex(theResult);
+//		}
 	}
 }

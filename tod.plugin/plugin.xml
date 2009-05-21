@@ -48,22 +48,19 @@
       <library name="../zz.jinterp/bin">
          <export name="*"/>
       </library>
-      <library name="../TOD/bin">
+      <library name="../core/bin">
          <export name="*"/>
       </library>
-      <library name="../TOD-agent/bin">
+      <library name="../agent/bin">
          <export name="tod.agent.*"/>
       </library>
-      <library name="../TOD-dbgrid/bin">
+      <library name="../dbgrid/bin">
          <export name="*"/>
       </library>
-      <library name="../TOD-evdb1/bin">
+      <library name="../evdb1/bin">
          <export name="*"/>
       </library>
-      <library name="../TOD-evdbng/bin">
-         <export name="*"/>
-      </library>
-      <library name="../tod-fx/bin">
+      <library name="../evdbng/bin">
          <export name="*"/>
       </library>
      

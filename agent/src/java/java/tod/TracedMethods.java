@@ -22,6 +22,7 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 */
 package java.tod;
 
+import java.tod.io._IO;
 import java.tod.util._BitSet;
 
 import tod.agent.MonitoringMode;
@@ -36,7 +37,7 @@ import tod.agent.MonitoringMode;
  */
 public class TracedMethods
 {
-	private static _BitSet traced = new _BitSet();
+	private static _BitSet traced = null;//new _BitSet();
 	
 	/**
 	 * Sets the monitoring mode for a method  
@@ -45,6 +46,7 @@ public class TracedMethods
 	 */
 	public static final void setMode(int aId, int aMode)
 	{
+		if (traced == null) traced = new _BitSet();
 		traced.set(aId*2 + 0, (aMode & 0x1) != 0);
 		traced.set(aId*2 + 1, (aMode & 0x2) != 0);
 	}
@@ -56,6 +58,7 @@ public class TracedMethods
 	 */
 	public static final int getMode(int aId)
 	{
+		if (traced == null) return MonitoringMode.NONE;
 		return (traced.get(aId*2 + 0) ? 0x1 : 0x0) | (traced.get(aId*2 + 1) ? 0x2 : 0x0);
 	}
 	

@@ -35,7 +35,6 @@ import java.util.Map;
 import tod.agent.AgentConfig;
 import tod.agent.AgentDebugFlags;
 import tod.agent.Command;
-import tod.agent.LowLevelEventType;
 import tod.core.DebugFlags;
 import zz.utils.Utils;
 import zz.utils.notification.IEvent;
@@ -266,42 +265,40 @@ public abstract class PacketProcessor
 			
 			if (theMessage >= Command.BASE)
 			{
-				Command theCommand = Command.VALUES[theMessage-Command.BASE];
-				switch (theCommand)
+				switch (theMessage)
 				{
-				case DBCMD_FLUSH:
+				case Command.DBCMD_FLUSH:
 					System.out.println("[LogReceiver] Received flush request.");
 					processFlush();
 					break;
 					
-				case DBCMD_CLEAR:
+				case Command.DBCMD_CLEAR:
 					System.out.println("[LogReceiver] Received clear request.");
 					processFlush();
 					processClear();
 					break;
 					
-				case DBCMD_END:
+				case Command.DBCMD_END:
 					System.out.println("[LogReceiver] Received end request.");
 					processFlush();
 					processEnd();
 					break;
 					
-				case DBEV_CAPTURE_ENABLED:
+				case Command.DBEV_CAPTURE_ENABLED:
 					boolean theEnabled = aStream.readByte() != 0;
 					System.out.println("[LogReceiver] Received capture enabled event: "+theEnabled);
 					processEvCaptureEnabled(theEnabled);
 					break;
 					
-				default: throw new RuntimeException("Not handled: "+theCommand); 
+				default: throw new RuntimeException("Not handled: "+theMessage); 
 				}
 
 			}
 			else
 			{
-				LowLevelEventType theType = LowLevelEventType.VALUES[theMessage];
-				if (aLogPackets) System.out.println("[LogReceiver] Processing "+theType+" (remaining: "+aStream.remaining()+")");
-				processEvent(aThreadId, theType, aStream);
-				if (aLogPackets) System.out.println("[LogReceiver] Done processing "+theType+" (remaining: "+aStream.remaining()+")");
+				if (aLogPackets) System.out.println("[LogReceiver] Processing "+theMessage+" (remaining: "+aStream.remaining()+")");
+				processEvent(aThreadId, (byte) theMessage, aStream);
+				if (aLogPackets) System.out.println("[LogReceiver] Done processing "+theMessage+" (remaining: "+aStream.remaining()+")");
 			}
 			
 			if (itsMonitor != null 
@@ -316,7 +313,7 @@ public abstract class PacketProcessor
 	/**
 	 * Reads and processes an incoming event packet for the given thread.
 	 */
-	protected abstract void processEvent(int aThreadId, LowLevelEventType aType, DataInput aStream) throws IOException;
+	protected abstract void processEvent(int aThreadId, byte aMessage, DataInput aStream) throws IOException;
 	
 	/**
 	 * Flushes buffered events.

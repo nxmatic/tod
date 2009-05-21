@@ -33,7 +33,9 @@ import java.io.OutputStream;
 import java.net.Socket;
 
 import tod.agent.AgentConfig;
+import tod.core.DebugFlags;
 import tod.core.bci.IInstrumenter;
+import tod.core.bci.IInstrumenter.BehaviorMonitoringMode;
 import tod.core.bci.IInstrumenter.InstrumentedClass;
 import tod.core.config.TODConfig;
 import tod.core.server.TODServer;
@@ -53,12 +55,8 @@ public abstract class NativeAgentPeer extends SocketThread
 	public static final byte OBJECT_HASH = 1;
 	public static final byte OBJECT_UID = 2;
 	
-	public static final byte SET_SKIP_CORE_CLASSES = 81;
 	public static final byte SET_CAPTURE_EXCEPTIONS = 83;
 	public static final byte SET_HOST_BITS = 84;
-	public static final byte SET_WORKINGSET = 85;
-	public static final byte SET_STRUCTDB_ID = 86;
-	public static final byte SET_SPECIALCASE_WORKINGSET = 87;
 
 	public static final byte CONFIG_DONE = 99;
 	
@@ -91,11 +89,6 @@ public abstract class NativeAgentPeer extends SocketThread
 	private int itsHostId;
 	
 	/**
-	 * Id of the structure database.
-	 */
-	private String itsStructureDatabaseId;
-	
-	/**
 	 * Directory where instrumented classes are stored, or null if 
 	 * classes should not be stored.
 	 * Class storage is for debugging only.
@@ -109,25 +102,18 @@ public abstract class NativeAgentPeer extends SocketThread
 	public NativeAgentPeer(
 			TODConfig aConfig,
 			Socket aSocket,
-			String aStructureDatabaseId,
 			IInstrumenter aInstrumenter,
 			int aHostId)
 	{
 		super (aSocket, false);
 		assert aConfig != null;
 		itsConfig = aConfig;
-		itsStructureDatabaseId = aStructureDatabaseId;
 		itsInstrumenter = aInstrumenter;
 		itsHostId = aHostId;
 		
-		String theStoreClassesDir = itsConfig.get(TODConfig.INSTRUMENTER_CLASSES_DIR);
-		itsStoreClassesDir = theStoreClassesDir != null && theStoreClassesDir.length() > 0 ?
-				new File(theStoreClassesDir)
-				: null;
-		
-		// Check that the cache path we pass to the agent exists.
-		File theFile = new File(itsConfig.get(TODConfig.AGENT_CACHE_PATH));
-		theFile.mkdirs();
+		// Check that the class cache path exists.
+		itsStoreClassesDir = new File(itsConfig.get(TODConfig.CLASS_CACHE_PATH));
+		itsStoreClassesDir.mkdirs();
 		
 		start();
 	}
@@ -241,10 +227,6 @@ public abstract class NativeAgentPeer extends SocketThread
 		theOutStream.writeInt(itsHostId);
 
 		// Send remaining config
-		boolean theSkipCoreClasses = itsConfig.get(TODConfig.AGENT_SKIP_CORE_CLASSE);
-		theOutStream.writeByte(SET_SKIP_CORE_CLASSES);
-		theOutStream.writeByte(theSkipCoreClasses ? 1 : 0);
-		
 		boolean theCaptureExceptions = itsConfig.get(TODConfig.AGENT_CAPTURE_EXCEPTIONS);
 		theOutStream.writeByte(SET_CAPTURE_EXCEPTIONS);
 		theOutStream.writeByte(theCaptureExceptions ? 1 : 0);
@@ -252,24 +234,6 @@ public abstract class NativeAgentPeer extends SocketThread
 		int theHostBits = AgentConfig.HOST_BITS;
 		theOutStream.writeByte(SET_HOST_BITS);
 		theOutStream.writeByte(theHostBits);
-		
-		String theWorkingSet = itsConfig.get(TODConfig.SCOPE_TRACE_FILTER);
-		theOutStream.writeByte(SET_WORKINGSET);
-		theOutStream.writeUTF(theWorkingSet);
-		
-		theOutStream.writeByte(SET_STRUCTDB_ID);
-		theOutStream.writeUTF(itsStructureDatabaseId);
-		
-		// Special cases working set
-		StringBuilder theSCWS = new StringBuilder("[");
-		for (String theName : itsInstrumenter.getSpecialCaseClasses())
-		{
-			theSCWS.append(" +");
-			theSCWS.append(theName);
-		}
-		theSCWS.append(']');
-		theOutStream.writeByte(SET_SPECIALCASE_WORKINGSET);
-		theOutStream.writeUTF(theSCWS.toString());
 		
 		// Finish
 		theOutStream.writeByte(CONFIG_DONE);
@@ -298,7 +262,7 @@ public abstract class NativeAgentPeer extends SocketThread
 		byte[] theBytecode = new byte[theLength];
 		aInputStream.readFully(theBytecode);
 		
-		System.out.println("Instrumenting "+theClassName+"... ");
+		if (DebugFlags.INSTRUMENTER_LOG) System.out.println("Instrumenting "+theClassName+"... ");
 		InstrumentedClass theInstrumentedClass = null;
 		String theError = null;
 		try
@@ -314,7 +278,7 @@ public abstract class NativeAgentPeer extends SocketThread
 
 		if (theInstrumentedClass != null)
 		{
-			System.out.println("Instrumented (size: "+theInstrumentedClass.bytecode.length+")");
+			if (DebugFlags.INSTRUMENTER_LOG) System.out.println("Instrumented (size: "+theInstrumentedClass.bytecode.length+")");
 			
 			if (itsStoreClassesDir != null)
 			{
@@ -326,7 +290,7 @@ public abstract class NativeAgentPeer extends SocketThread
 				theFileOutputStream.flush();
 				theFileOutputStream.close();
 				
-				System.out.println("Written class to "+theFile);
+				if (DebugFlags.INSTRUMENTER_LOG) System.out.println("Written class to "+theFile);
 			}
 			
 			// Write out instrumented bytecode
@@ -334,11 +298,11 @@ public abstract class NativeAgentPeer extends SocketThread
 			aOutputStream.write(theInstrumentedClass.bytecode);
 			
 			// Write out traced method ids
-			System.out.println("Sending "+theInstrumentedClass.tracedMethods.size()+" traced methods.");
-			aOutputStream.writeInt(theInstrumentedClass.tracedMethods.size());
-			for(int theId : theInstrumentedClass.tracedMethods)
+			if (DebugFlags.INSTRUMENTER_LOG) System.out.println("Sending "+theInstrumentedClass.modeChanges.size()+" mode changes.");
+			aOutputStream.writeInt(theInstrumentedClass.modeChanges.size());
+			for(BehaviorMonitoringMode theMode : theInstrumentedClass.modeChanges)
 			{
-				aOutputStream.writeInt(theId);
+				aOutputStream.writeInt((theMode.behaviorId << 2) | (theMode.mode & 0x3));
 			}
 		}
 		else if (theError != null)

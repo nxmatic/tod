@@ -46,7 +46,8 @@ import zz.utils.srpc.SRPCServer;
  */
 public class Util
 {
-	public static final int TOD_SRPC_PORT = ConfigUtils.readInt("client-port", 8068);
+	public static final int TOD_SRPC_PORT = 
+		ConfigUtils.readInt("debug-server-port", ConfigUtils.readInt("client-port", 8068)-1)+1;
 	
 	private static SRPCRegistry SRPC_REGISTRY;
 	

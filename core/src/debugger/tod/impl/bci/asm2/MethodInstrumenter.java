@@ -51,6 +51,7 @@ public abstract class MethodInstrumenter
 	protected static final String CLS_EXCEPTIONGENERATEDRECEIVER = "java/tod/ExceptionGeneratedReceiver";
 	protected static final String CLS_TRACEDMETHODS = "java/tod/TracedMethods";
 	protected static final String CLS_THREADDATA = "java/tod/ThreadData";
+	protected static final String DSC_THREADDATA = "L"+CLS_THREADDATA+";";
 	protected static final String CLS_OBJECT = "java/lang/Object";
 	protected static final String DSC_OBJECT = "L"+CLS_OBJECT+";";
 	protected static final String CLS_THROWABLE = "java/lang/Throwable";
@@ -60,15 +61,11 @@ public abstract class MethodInstrumenter
 	private final MethodNode itsNode;
 	private final IMutableBehaviorInfo itsBehavior;
 	
-	private final boolean itsStatic;
 	private final boolean itsConstructor;
+	private final boolean itsStaticInitializer;
 	private final Type[] itsArgTypes;
 	private final Type itsReturnType;
 
-
-	
-	private int itsNextFreeVar;
-	
 	/**
 	 * The {@link ThreadData} of the current thread.
 	 */
@@ -90,14 +87,13 @@ public abstract class MethodInstrumenter
 		itsNode = aNode;
 		itsBehavior = aBehavior;
 		
-		itsStatic = BCIUtils.isStatic(getNode().access);
 		itsConstructor = "<init>".equals(getNode().name);
-		assert itsStatic != itsConstructor;
+		itsStaticInitializer = "<clinit>".equals(getNode().name);
+		assert !(isStatic() && itsConstructor);
 		
 		itsArgTypes = Type.getArgumentTypes(getNode().desc);
 		itsReturnType = Type.getReturnType(getNode().desc);
 		
-		itsNextFreeVar = getNode().maxLocals;
 		itsThreadDataVar = nextFreeVar(1);
 		itsTraceEnabledVar = nextFreeVar(1);
 	}
@@ -114,12 +110,27 @@ public abstract class MethodInstrumenter
 	
 	protected boolean isStatic()
 	{
-		return itsStatic;
+		return BCIUtils.isStatic(getNode().access);
+	}
+	
+	protected boolean isFinal()
+	{
+		return BCIUtils.isFinal(getNode().access);
+	}
+	
+	protected boolean isNative()
+	{
+		return BCIUtils.isNative(getNode().access);
 	}
 	
 	protected boolean isConstructor()
 	{
 		return itsConstructor;
+	}
+	
+	public boolean isStaticInitializer()
+	{
+		return itsStaticInitializer;
 	}
 	
 	protected Type[] getArgTypes()
@@ -134,8 +145,8 @@ public abstract class MethodInstrumenter
 
 	protected int nextFreeVar(int aSize)
 	{
-		int theVar = itsNextFreeVar;
-		itsNextFreeVar += aSize;
+		int theVar = getNode().maxLocals;
+		getNode().maxLocals += aSize;
 		return theVar;
 	}
 	

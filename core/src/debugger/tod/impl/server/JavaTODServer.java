@@ -294,7 +294,6 @@ public class JavaTODServer extends TODServer
 			super(
 					getConfig(), 
 					aSocket, 
-					itsStructureDatabase.getId(), 
 					new SynchronizedInstrumenter(itsInstrumenter),
 					aHostId);
 		}

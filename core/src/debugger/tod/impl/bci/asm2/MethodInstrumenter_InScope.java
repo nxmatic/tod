@@ -42,7 +42,6 @@ import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.InsnNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
-import org.objectweb.asm.tree.TypeInsnNode;
 import org.objectweb.asm.tree.VarInsnNode;
 import org.objectweb.asm.tree.analysis.Frame;
 import org.objectweb.asm.tree.analysis.SourceValue;
@@ -71,6 +70,11 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 	private int itsTmpValueVar;
 	
 	/**
+	 * Stores the target of out-of-scope constructor calls.
+	 */
+	private int itsCtorTargetVar;
+	
+	/**
 	 * For constructors, the invocation instructions that corresponds to constructor chaining.
 	 */
 	private MethodInsnNode itsChainingInvocation;
@@ -80,11 +84,16 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		super(aClassInstrumenter, aNode, aBehavior);
 		itsFromScopeVar = nextFreeVar(1);
 		itsTmpValueVar = nextFreeVar(2);
+		itsCtorTargetVar = nextFreeVar(1);
+		getNode().maxStack += 3; // This is the max we add to the stack
 		
 		itsLocationsManager = new LocationsManager(getDatabase());
 		itsChainingInvocation = findChainingInvocation();
 		if (! CLS_OBJECT.equals(getClassNode().name) && isConstructor() && itsChainingInvocation == null) 
 			throw new RuntimeException("Should have constructor chaining: "+aNode);
+		
+		// At least for now...
+		if (CLS_OBJECT.equals(getClassNode().name)) throw new RuntimeException("java.lang.Object cannot be in scope!");
 	}
 
 	@Override
@@ -94,6 +103,10 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 
 		// Insert entry instructions
 		{
+			// Set ThreadData var to null for verifier to work
+			s.ACONST_NULL();
+			s.ASTORE(getThreadDataVar());
+			
 			// Store the monitoring mode for the behavior in a local
 			s.pushInt(getBehavior().getId()); 
 			s.INVOKESTATIC(CLS_TRACEDMETHODS, "traceFull", "(I)Z");
@@ -106,13 +119,13 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 			// Monitoring enabled
 			{
 				// Store ThreadData object
-				s.INVOKESTATIC(CLS_EVENTCOLLECTOR, "_getThreadData", "()"+DSC_EVENTCOLLECTOR);
+				s.INVOKESTATIC(CLS_EVENTCOLLECTOR, "_getThreadData", "()"+DSC_THREADDATA);
 				s.DUP();
 				s.ASTORE(getThreadDataVar());
 				
 				// Send event
 				s.pushInt(getBehavior().getId()); 
-				s.INVOKEVIRTUAL(CLS_THREADDATA, "sendBehaviorEnter_InScope", "(I)V");
+				s.INVOKEVIRTUAL(CLS_THREADDATA, "evInScopeBehaviorEnter", "(I)V");
 				
 				//Check if we must send args
 				s.ALOAD(getThreadDataVar());
@@ -151,10 +164,8 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 			s.ILOAD(getTraceEnabledVar());
 			s.IFfalse("throw");
 			
-			s.DUP();
 			s.ALOAD(getThreadDataVar());
-			s.SWAP();
-			s.INVOKEVIRTUAL(CLS_THREADDATA, "sendBehaviorExit_Exception", "("+DSC_THROWABLE+")V");
+			s.INVOKEVIRTUAL(CLS_THREADDATA, "evInScopeBehaviorExit_Exception", "()V");
 
 			s.label("throw");
 			s.ATHROW();
@@ -285,8 +296,10 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 				processInvoke(aInsns, (MethodInsnNode) theNode);
 				break;
 
-			case Opcodes.NEW:
-				processNew(aInsns, (TypeInsnNode) theNode);
+			case Opcodes.NEWARRAY:
+			case Opcodes.ANEWARRAY:
+			case Opcodes.MULTIANEWARRAY:
+				processNewArray(aInsns, theNode);
 				break;
 				
 			case Opcodes.GETFIELD:
@@ -312,7 +325,6 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 	{
 		SyntaxInsnList s = new SyntaxInsnList(itsLabelManager);
 		
-		s.pushInt(itsLocationsManager.createLocation(aInsns, aNode));
 		s.GOTO("exit");
 		
 		aInsns.insert(aNode, s);
@@ -325,6 +337,21 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 	private boolean isChainingInvocation(MethodInsnNode aNode)
 	{
 		return aNode == itsChainingInvocation;
+	}
+	
+	/**
+	 * Determines if the given node corresponds to the initial constructor call
+	 * (vs. constructor chaining).
+	 */
+	private boolean isObjectInitialization(MethodInsnNode aNode)
+	{
+		if (! isConstructorCall(aNode)) return false;
+		else return !isChainingInvocation(aNode);
+	}
+	
+	private boolean isCalleeInScope(MethodInsnNode aNode)
+	{
+		return getClassInstrumenter().getInstrumenter().isInScope(aNode.owner);
 	}
 	
 	/**
@@ -355,22 +382,29 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		Label lUnmonitored = new Label(); // Unmonitored path
 		Label lEnd = new Label(); 
 		
-		s.ALOAD(getTraceEnabledVar());
+		s.ILOAD(getTraceEnabledVar());
 		s.IFfalse(lTrDisabled);
 		{
 			// Trace enabled
 			Label lCheckChaining = new Label();
 			
+			// For constructor calls scope is resolved statically
+			boolean theCtor = isConstructorCall(aNode); 
+			
 			// Check if called method is monitored
-			s.pushInt(getBehaviorId(aNode));
-			s.INVOKESTATIC(CLS_TRACEDMETHODS, "traceUnmonitored", "(I)Z");
-			s.IFtrue(lUnmonitored);
+			if (! theCtor)	s.pushInt(getBehaviorId(aNode));
+			if (! theCtor)	s.INVOKESTATIC(CLS_TRACEDMETHODS, "traceUnmonitored", "(I)Z");
+			if (! theCtor)	s.IFtrue(lUnmonitored);
+			if (! theCtor || isCalleeInScope(aNode))
 			{
 				// Monitored call
 				s.add(theMonitoredClone);				
 				s.GOTO(lCheckChaining);
 			}
-			s.label(lUnmonitored);
+			
+			if (! theCtor)	s.label(lUnmonitored);
+			
+			if (! theCtor || !isCalleeInScope(aNode))
 			{
 				// Unmonitored call
 				Label lHnStart = new Label();
@@ -380,6 +414,13 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 				// before call
 				s.ALOAD(getThreadDataVar());
 				s.INVOKEVIRTUAL(CLS_THREADDATA, "evUnmonitoredBehaviorCall", "()V");
+				
+				if (theCtor)
+				{
+					// Prepare for sending object initialized
+					s.DUP();
+					s.ASTORE(itsCtorTargetVar);
+				}
 
 				// call
 				s.label(lHnStart);
@@ -397,6 +438,14 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 					s.ILOAD(theReturnType, itsTmpValueVar);
 				}
 				
+				if (theCtor)
+				{
+					// Send object initialized
+					s.ALOAD(getThreadDataVar());
+					s.ALOAD(itsCtorTargetVar);
+					s.INVOKEVIRTUAL(CLS_THREADDATA, "evObjectInitialized", "("+DSC_OBJECT+")V");
+				}
+				
 				s.GOTO(lCheckChaining);
 				
 				// Exception handler
@@ -411,9 +460,9 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 			
 			s.label(lCheckChaining);
 			
-			// Check if deferred target send is needed
 			if (isChainingInvocation(aNode))
 			{
+				// Send deferred target
 				s.ALOAD(getThreadDataVar());
 				s.ALOAD(0);
 				s.INVOKEVIRTUAL(CLS_THREADDATA, "sendConstructorTarget", "("+DSC_OBJECT+")V");
@@ -433,12 +482,12 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		aInsns.remove(aNode);
 	}
 
-	private void processNew(InsnList aInsns, TypeInsnNode aNode)
+	private void processNewArray(InsnList aInsns, AbstractInsnNode aNode)
 	{
 		SyntaxInsnList s = new SyntaxInsnList(itsLabelManager);
 		Label l = new Label();
 
-		s.ALOAD(getTraceEnabledVar());
+		s.ILOAD(getTraceEnabledVar());
 		s.IFfalse(l);
 		{
 			s.DUP();
@@ -458,7 +507,7 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		Label l = new Label();
 		Type theType = Type.getType(aNode.desc);
 
-		s.ALOAD(getTraceEnabledVar());
+		s.ILOAD(getTraceEnabledVar());
 		s.IFfalse(l);
 		{
 			s.ALOAD(getThreadDataVar()); 
@@ -480,7 +529,7 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		Label l = new Label();
 		Type theType = BCIUtils.getType(BCIUtils.getSort(aNode.getOpcode()));
 
-		s.ALOAD(getTraceEnabledVar());
+		s.ILOAD(getTraceEnabledVar());
 		s.IFfalse(l);
 		{
 			s.ALOAD(getThreadDataVar()); 

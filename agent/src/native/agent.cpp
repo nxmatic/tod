@@ -205,6 +205,11 @@ void agentClassFileLoadHook(
 {
 	if (! name) return; // Don't understand why, but it happens.
 
+	// Unconditionally skip agent classes
+	if (startsWith(name, "java/tod/")) return;
+	if (startsWith(name, "tod/agent/")) return;
+	if (startsWith(name, "com/yourkit/")) return;
+	
 	if (! CAPTURE_STARTED)
 	{
 		if (! startsWith(name, "java/") && ! startsWith(name, "sun/") && ! startsWith(name, "tod/"))
@@ -223,10 +228,6 @@ void agentClassFileLoadHook(
 		fflush(stdout);
 	}
 
-	// Unconditionally skip agent classes
-	if (startsWith(name, "java/tod/")) return;
-	if (startsWith(name, "tod/agent/")) return;
-	
 	int* tracedMethods = NULL;
 	int nTracedMethods = 0;
 	

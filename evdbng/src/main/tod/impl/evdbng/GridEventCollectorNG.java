@@ -22,7 +22,6 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.evdbng;
 
-import tod.agent.Output;
 import tod.core.database.structure.IHostInfo;
 import tod.core.database.structure.IMutableStructureDatabase;
 import tod.core.database.structure.IStructureDatabase.ProbeInfo;
@@ -350,18 +349,6 @@ public class GridEventCollectorNG extends GridEventCollector
 				aTarget);
 		
 		dispatch(theEvent);
-	}
-
-
-	public void output(
-			int aThreadId,
-			long aParentTimestamp,
-			short aDepth,
-			long aTimestamp,
-			int[] aAdviceCFlow,
-			Output aOutput, byte[] aData)
-	{
-		throw new UnsupportedOperationException();
 	}
 
 

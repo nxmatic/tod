@@ -34,7 +34,7 @@ import java.util.List;
 import java.util.Properties;
 
 import tod.agent.AgentConfig;
-import tod.impl.server.JavaTODServerFactory;
+import tod.impl.server.JavaTODServerFactory2;
 import tod.utils.ConfigUtils;
 import zz.utils.PublicCloneable;
 
@@ -94,22 +94,13 @@ public class TODConfig extends PublicCloneable implements Serializable
 							+ "0 means minimal verbosity, greater values increase verbosity.",
 					0);
 
-	public static final BooleanItem AGENT_SKIP_CORE_CLASSE =
-			new BooleanItem(
-					ConfigLevel.DEBUG,
-					"agent-skipCoreClasses",
-					"Agent - skip core classes",
-					"If true, the agent will not instrument core classes, independently of "
-							+ "class filter settings.",
-					true);
-
-	public static final StringItem AGENT_CACHE_PATH =
+	public static final StringItem CLASS_CACHE_PATH =
 			new StringItem(
 					ConfigLevel.NORMAL,
-					"agent-cache-path",
-					"Agent - class cache path",
-					"Defines the path where the native agent stores instrumented classes.",
-					HOME + File.separatorChar + "tmp" + File.separatorChar + "tod");
+					"class-cache-path",
+					"Instrumenter - class cache path",
+					"Defines the path where the instrumenter stores instrumented classes.",
+					HOME + File.separatorChar + "tmp" + File.separatorChar + "tod" + File.separatorChar + "classCache");
 
 	public static final BooleanItem AGENT_CAPTURE_EXCEPTIONS =
 			new BooleanItem(
@@ -134,14 +125,6 @@ public class TODConfig extends PublicCloneable implements Serializable
 					"Structure database - location",
 					"Directory where the structure database is stored.",
 					HOME + "/tmp/tod/locations");
-
-	public static final StringItem INSTRUMENTER_CLASSES_DIR =
-			new StringItem(
-					ConfigLevel.DEBUG,
-					"instrumenter-classesDir",
-					"Instrumenter - classes directory",
-					"If defined, a directory where the instrumenter stores instrumented classes.",
-					"");
 
 	public static final StringItem SCOPE_GLOBAL_FILTER =
 			new StringItem(
@@ -283,7 +266,7 @@ public class TODConfig extends PublicCloneable implements Serializable
 					"server-type",
 					"Type of server interface",
 					"Class name of the TOD server factory.",
-					JavaTODServerFactory.class.getName());
+					JavaTODServerFactory2.class.getName());
 
 	public static final BooleanItem BCI_PRELOAD_CLASSES =
 			new BooleanItem(

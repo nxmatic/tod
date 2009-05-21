@@ -45,7 +45,11 @@ public class ObjectIdentity
 		return _AgentConfig.JAVA14 ? get14(aObject) : get15(aObject); 
 	}
 	
-	private static native long get15(Object aObject);
+//	private static native long get15(Object aObject);
+	private static long get15(Object aObject)
+	{
+		return 12;
+	}
 
 	private static final WeakLongHashMap MAP = _AgentConfig.JAVA14 ? new WeakLongHashMap() : null;
 	

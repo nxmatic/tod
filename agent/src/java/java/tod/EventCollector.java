@@ -23,8 +23,6 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 package java.tod;
 
 import java.io.PrintStream;
-import java.tod.io._ByteBuffer;
-import java.tod.io._GrowingByteBuffer;
 import java.tod.io._IO;
 import java.tod.io._IOException;
 import java.tod.io._SocketChannel;
@@ -34,6 +32,8 @@ import java.tod.util._ArrayList;
 import tod.agent.AgentConfig;
 import tod.agent.AgentDebugFlags;
 import tod.agent.Command;
+import tod.agent.io._ByteBuffer;
+import tod.agent.io._GrowingByteBuffer;
 
 
 /**

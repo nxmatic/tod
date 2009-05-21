@@ -104,7 +104,7 @@ implements Serializable, IShareableStructureDatabase
 	
 	private final IClassInfo itsUnknownClass = new ClassInfo(this, null, "Unknown", -1);
 	
-	private List<Listener> itsListeners = new ArrayList<Listener>();
+	private transient List<Listener> itsListeners = new ArrayList<Listener>();
 	
 	protected StructureDatabase(TODConfig aConfig, String aId, File aFile, Ids aIds)
 	{

@@ -1,8 +1,8 @@
 #! /bin/sh
 
 PATH=$JAVA_HOME/bin/:$PATH
-# AGENT=../TOD-agng/libtod-agent.so
-AGENT=../TOD-agent/libtod-agent15.so
+# AGENT=../agng/libtod-agent.so
+AGENT=../agent/libtod-agent15.so
 #CLASSPATH=./bin:../zz.utils/bin
 
 HOST=localhost
@@ -13,20 +13,22 @@ HOST=localhost
 
 VMARGS=''
 VMARGS="$VMARGS -agentpath:$AGENT"
-VMARGS="$VMARGS -noverify"
+#VMARGS="$VMARGS -noverify"
 VMARGS="$VMARGS -Dcollector-host=$HOST -Dcollector-port=8058 -Dclient-name=tod-1"
-VMARGS="$VMARGS -Dcollector-type=socket"
-VMARGS="$VMARGS -Xbootclasspath/p:../TOD-agent/bin" 
+#VMARGS="$VMARGS -Dcollector-type=socket"
+VMARGS="$VMARGS -Xbootclasspath/p:../agent/bin" 
 VMARGS="$VMARGS -ea" 
 VMARGS="$VMARGS -server" 
 VMARGS="$VMARGS -Xmx384m" 
 VMARGS="$VMARGS -XX:MaxPermSize=128m"
 VMARGS="$VMARGS -Dagent-verbose=0"
-VMARGS="$VMARGS -Dagent-cache-path=/home/gpothier/tmp/tod"
+#VMARGS="$VMARGS -Dagent-cache-path=/home/gpothier/tmp/tod"
 #VMARGS="$VMARGS -Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=8000"
-#VMARGS="$VMARGS -agentlib:hprof=cpu=samples,depth=8"
+VMARGS="$VMARGS -agentlib:hprof=cpu=samples,depth=8"
+#VMARGS="$VMARGS -Dcom.sun.management.jmxremote=true"
 
 java $VMARGS -cp ./bin dummy.BurnTest
+#java $VMARGS -cp ./bin dummy.BCITestCase
 #java $VMARGS -cp ../../ws-tod-daughter/Dummy/bin TestToString
 #java $VMARGS -cp ./lib/aspectjrt.jar:./lib/asm-all-3.2-svn.jar:./lib/junit-4.1.jar:./bin:../TOD-agent/bin:../TOD-dbgrid/bin:../TOD-evdb1/bin:../TOD-evdbng/bin:../zz.utils/bin -Ddbimpl=evdbng -Dtod-server-daemon=true tod.impl.dbgrid.bench.BurnMasterBench
 #java $VMARGS -cp ./bin dummy.ShortProg

@@ -3,6 +3,8 @@
  */
 package java.tod.io;
 
+import tod.agent.io._ByteBuffer;
+
 
 /**
  * A socket channel similar to that of NIO

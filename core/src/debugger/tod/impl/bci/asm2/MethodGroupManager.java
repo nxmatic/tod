@@ -104,7 +104,11 @@ public class MethodGroupManager implements IStructureDatabase.Listener
 	
 	private String getSignature(IBehaviorInfo aBehavior)
 	{
-		String theSig = aBehavior.getName()+aBehavior.getSignature();
+		String theName = aBehavior.getName();
+		if ("<init>".equals(theName)) theName = "<init_"+aBehavior.getDeclaringType().getName()+">";
+		if ("<clinit>".equals(theName)) theName = "<clinit_"+aBehavior.getDeclaringType().getName()+">";
+		
+		String theSig = theName+aBehavior.getSignature();
 		int i = theSig.indexOf(')');
 		return theSig.substring(0, i+1);
 	}
@@ -155,18 +159,27 @@ public class MethodGroupManager implements IStructureDatabase.Listener
 	}
 	
 	/**
-	 * Finds an existing suitable group for the given type inside a signature group
+	 * Finds an existing suitable group for the given type inside a signature group.
+	 * it is possible that hierarchy information present in the given type was not available
+	 * previously, and thus some groups might need to be merged as a result of executing
+	 * this method. 
 	 */
 	private MethodGroup findGroup(MethodSignatureGroup aSignatureGroup, IClassInfo aType)
 	{
-		MethodGroup theResult = null;
+		Set<MethodGroup> theGroups = new HashSet<MethodGroup>();
 		List<IClassInfo> theHierarchy = getTypeHierarchy(aType);
 		for (IClassInfo theType : theHierarchy)
 		{
 			MethodGroup theGroup = aSignatureGroup.getGroup(theType);
 			if (theGroup == null) continue;
-			else if (theResult == null) theResult = theGroup;
-			else if (theResult != theGroup) throw new RuntimeException("Inconsistency for "+aType);
+			else theGroups.add(theGroup);
+		}
+		
+		MethodGroup theResult = null;
+		for(MethodGroup theGroup : theGroups)
+		{
+			if (theResult == null) theResult = theGroup;
+			else theResult = aSignatureGroup.merge(theResult, theGroup);
 		}
 		
 		return theResult;
@@ -263,8 +276,6 @@ public class MethodGroupManager implements IStructureDatabase.Listener
 		{
 			itsTypes.add(aBehavior.getDeclaringType());
 			itsBehaviors.add(aBehavior);
-			
-			if (itsBehaviors.size() != itsTypes.size()) throw new RuntimeException("Inconsistency");
 		}
 		
 		public boolean hasType(IClassInfo aClass)
@@ -331,8 +342,10 @@ public class MethodGroupManager implements IStructureDatabase.Listener
 		/**
 		 * Merges two method groups. If one of the groups was monitored and the other wasn't,
 		 * the methods from the unmonitored group are marked as monitored.
+		 * @return The group that contains the result of the merge and that remains in the signature group
+		 * (the other group is discarded).
 		 */
-		public void merge(MethodGroup g1, MethodGroup g2)
+		public MethodGroup merge(MethodGroup g1, MethodGroup g2)
 		{
 			if (g1.isMonitored() != g2.isMonitored())
 			{
@@ -346,11 +359,13 @@ public class MethodGroupManager implements IStructureDatabase.Listener
 				}
 				
 				itsGroups.remove(theUnmonitored);
+				return theMonitored;
 			}
 			else
 			{
 				for(IBehaviorInfo theBehavior : g2.getBehaviors()) g1.add(theBehavior);
 				itsGroups.remove(g2);
+				return g1;
 			}
 		}
 	}

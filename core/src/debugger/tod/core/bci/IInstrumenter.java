@@ -27,7 +27,6 @@ import java.util.List;
 
 import tod.agent.MonitoringMode;
 import tod.core.config.TODConfig;
-import tod.impl.bci.asm.SpecialCases;
 
 public interface IInstrumenter
 {

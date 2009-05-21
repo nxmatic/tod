@@ -23,7 +23,6 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 package tod.core;
 
 
-import tod.agent.Output;
 import tod.core.transport.HighLevelEventType;
 
 /**
@@ -157,14 +156,6 @@ public interface ILogCollector
 			int[] aAdviceCFlow, 
 			int aProbeId,
 			Object aException);
-	
-	public void output(
-			int aThreadId, 
-			long aParentTimestamp,
-			short aDepth,
-			long aTimestamp,
-			int[] aAdviceCFlow,
-			Output aOutput, byte[] aData);
 	
 	public void thread(
 			int aThreadId, 

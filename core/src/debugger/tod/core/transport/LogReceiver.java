@@ -33,11 +33,11 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.tod.io._ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
 import tod.agent.Command;
+import tod.agent.io._ByteBuffer;
 import tod.core.DebugFlags;
 import tod.core.config.TODConfig;
 import tod.core.database.structure.IStructureDatabase;
@@ -232,9 +232,9 @@ public abstract class LogReceiver extends PacketProcessor
 		return process(itsDataIn);
 	}
 	
-	protected synchronized void sendCommand(Command aCommand) throws IOException
+	protected synchronized void sendCommand(byte aCommand) throws IOException
 	{
-		itsDataOut.writeByte(aCommand.ordinal() + Command.BASE);
+		itsDataOut.writeByte(aCommand);
 	}
 	
 	public synchronized void sendEnableCapture(boolean aEnable)

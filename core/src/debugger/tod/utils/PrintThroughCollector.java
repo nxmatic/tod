@@ -25,7 +25,6 @@ package tod.utils;
 import java.io.PrintStream;
 
 import tod.agent.AgentUtils;
-import tod.agent.Output;
 import tod.core.DebugFlags;
 import tod.core.ILogCollector;
 import tod.core.database.structure.IBehaviorInfo;
@@ -320,26 +319,6 @@ public class PrintThroughCollector implements ILogCollector
 				aArguments));
 
 		itsCollector.methodCall(aThreadId, aParentTimestamp, aDepth, aTimestamp, aAdviceCFlow, aProbeId, aDirectParent, aCalledBehaviorId, aExecutedBehaviorId, aTarget, aArguments);
-	}
-
-	public void output(
-			int aThreadId,
-			long aParentTimestamp, 
-			short aDepth, 
-			long aTimestamp,
-			int[] aAdviceCFlow,
-			Output aOutput, byte[] aData)
-	{
-		print(aDepth, String.format(
-				"output       (thread: %d, p.ts: %s, depth: %d, ts: %s, out: %s, data: %s",
-				aThreadId,
-				formatTimestamp(aParentTimestamp),
-				aDepth,
-				formatTimestamp(aTimestamp),
-				aOutput,
-				aData));
-
-		itsCollector.output(aThreadId, aParentTimestamp, aDepth, aTimestamp, aAdviceCFlow, aOutput, aData);
 	}
 
 	public void superCall(

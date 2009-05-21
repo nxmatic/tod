@@ -1,7 +1,7 @@
 /*
  * Created on Jan 12, 2009
  */
-package java.tod.io;
+package tod.agent.io;
 
 public class _BufferOverflowException extends RuntimeException
 {
