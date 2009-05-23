@@ -6,15 +6,15 @@ package java.tod;
 import java.tod.io._IO;
 import java.tod.transport.IOThread;
 import java.tod.transport.ObjectEncoder;
-import java.tod.transport.PacketBuffer;
+import java.tod.transport.ThreadPacket;
 import java.tod.util.BitStack;
-import java.tod.util._IntStack;
 
 import tod.agent.Command;
 import tod.agent.Message;
 import tod.agent.ValueType;
 import tod.agent.io._ByteBuffer;
 import tod.agent.io._GrowingByteBuffer;
+import tod.id.IdAccessor;
 
 /**
  * Per-thread data managed by the {@link EventCollector}.
@@ -61,38 +61,44 @@ public class ThreadData
 	private static final byte FALSE = (byte) 0;
 	
 	/**
-	 * The buffer to which packets must be sent. 
+	 * The IO thread that actually sends packets. 
 	 */
-	private final PacketBuffer itsStream;
+	private final IOThread itsIOThread;
 	
 	/**
-	 * Backing array for {@link #itsBuffer}
+	 * In-construction packet. Contains the backing array for {@link #itsBuffer}
 	 */
-	private final byte[] itsBufferStore;
+	private ThreadPacket itsPacket;
 	
 	/**
 	 * Buffer to prepare (small) packets
 	 */
-	private final _ByteBuffer itsBuffer;
+	private _ByteBuffer itsBuffer;
 	
 	private RegisteredObjectsStack itsRegisteredObjectsStack = new RegisteredObjectsStack();
 	private RegisteredRefObjectsStack itsRegisteredRefObjectsStack = new RegisteredRefObjectsStack();
 	
-	/**
-	 * A buffer used to send object values.
-	 */
-	private _GrowingByteBuffer itsObjectsBuffer = _GrowingByteBuffer.allocate(1024);
-	
-	private long itsLastSentTimestamp = 0;
+	private int itsLastSentLTimestamp = 0;
 	
 
 	
 	public ThreadData(int aId, IOThread aIOThread)
 	{
 		itsId = aId;
-		itsStream = aIOThread.createBuffer(itsId);
-		itsBufferStore = new byte[BUFFER_SIZE];
-		itsBuffer = _ByteBuffer.wrap(itsBufferStore);
+		itsIOThread = aIOThread;
+		resetBuffer();
+	}
+	
+	private void resetBuffer()
+	{
+		byte[] theData = new byte[BUFFER_SIZE]; 
+		
+		itsPacket = new ThreadPacket(
+				getId(), 
+				theData,
+				true);
+		
+		itsBuffer = _ByteBuffer.wrap(theData);
 	}
 	
 	public int getId()
@@ -176,8 +182,20 @@ public class ThreadData
 	 */
 	public void flushBuffer()
 	{
-		itsStream.write(itsBufferStore, itsBuffer.position(), false);
-		itsBuffer.clear();
+		ThreadPacket thePacket = itsPacket;
+		thePacket.offset = 0;
+		thePacket.length = itsBuffer.position();
+		
+		itsIOThread.pushPacket(thePacket);
+		
+		thePacket = itsIOThread.getFreePacket();
+		if (thePacket != null)
+		{
+			thePacket.threadId = getId();
+			itsBuffer.clear(thePacket.data);
+			itsPacket = thePacket;
+		}
+		else resetBuffer();
 	}
 	
 	/**
@@ -185,11 +203,11 @@ public class ThreadData
 	 */
 	private void checkTimestamp()
 	{
-		long theTimestamp = Timestamper.t;
-		if (theTimestamp != itsLastSentTimestamp)
+		int theLTimestamp = Timestamper.lt;
+		if (theLTimestamp != itsLastSentLTimestamp)
 		{
-			sendSync(theTimestamp);
-			itsLastSentTimestamp = theTimestamp;
+			sendSync(Timestamper.t);
+			itsLastSentLTimestamp = theLTimestamp;
 		}
 	}
 	
@@ -208,6 +226,7 @@ public class ThreadData
 	 */
 	public void evFieldRead()
 	{
+		sendRegisteredObjects();
 		sendMessageType(itsBuffer, Message.FIELD_READ);
 	}
 	
@@ -216,11 +235,13 @@ public class ThreadData
 	 */
 	public void evArrayRead()
 	{
+		sendRegisteredObjects();
 		sendMessageType(itsBuffer, Message.ARRAY_READ);
 	}
 	
 	public void evNew(Object aValue)
 	{
+		sendRegisteredObjects();
 		checkTimestamp();
 		sendMessageType(itsBuffer, Message.NEW);
 		sendValue(itsBuffer, aValue, 0);
@@ -234,15 +255,12 @@ public class ThreadData
 	
 	public void evObjectInitialized(Object aValue)
 	{
+		sendRegisteredObjects();
 		checkTimestamp();
 		sendMessageType(itsBuffer, Message.NEW);
 		sendValue(itsBuffer, aValue, 0);
 		
 		commitBuffer();
-		
-		// Objects that are sent by value must not be serialized now as they
-		// are not yet initialized
-		if (! shouldSendByValue(aValue)) sendRegisteredObjects();
 	}
 	
 	public void evExceptionGenerated(
@@ -272,6 +290,7 @@ public class ThreadData
 	
 	public void evHandlerReached(int aLocation)
 	{
+		sendRegisteredObjects();
 		checkTimestamp();
 		sendMessageType(itsBuffer, Message.HANDLER_REACHED);
 		itsBuffer.putInt(aLocation);
@@ -280,6 +299,7 @@ public class ThreadData
 	
 	public void evInScopeBehaviorEnter(int aBehaviorId)
 	{
+		sendRegisteredObjects();
 		checkTimestamp();
 		sendMessageType(itsBuffer, Message.INSCOPE_BEHAVIOR_ENTER);
 		itsBuffer.putInt(aBehaviorId);
@@ -299,70 +319,59 @@ public class ThreadData
 	{
 		sendMessageType(itsBuffer, Message.BEHAVIOR_ENTER_ARGS);
 		itsBuffer.putInt(aCount);
-		commitBuffer();
 	}
 	
 	public void sendValue_Boolean(boolean aValue)
 	{
 		itsBuffer.put(aValue ? TRUE : FALSE);
-		commitBuffer();
 	}
 	
 	public void sendValue_Byte(byte aValue)
 	{
 		itsBuffer.put(aValue);
-		commitBuffer();
 	}
 	
 	public void sendValue_Char(char aValue)
 	{
 		itsBuffer.putChar(aValue);
-		commitBuffer();
 	}
 	
 	public void sendValue_Short(short aValue)
 	{
 		itsBuffer.putShort(aValue);
-		commitBuffer();
 	}
 	
 	public void sendValue_Int(int aValue)
 	{
 		itsBuffer.putInt(aValue);
-		commitBuffer();
 	}
 	
 	public void sendValue_Long(long aValue)
 	{
 		itsBuffer.putLong(aValue);
-		commitBuffer();
 	}
 	
 	public void sendValue_Float(float aValue)
 	{
 		itsBuffer.putFloat(aValue);
-		commitBuffer();
 	}
 	
 	public void sendValue_Double(double aValue)
 	{
 		itsBuffer.putDouble(aValue);
-		commitBuffer();
 	}
 	
 	public void sendValue_Ref(Object aValue)
 	{
 		sendValue(itsBuffer, aValue, 0);
-		commitBuffer();
-		sendRegisteredObjects();
 	}
 	
 	public void sendConstructorTarget(Object aTarget)
 	{
+		sendRegisteredObjects();
 		sendMessageType(itsBuffer, Message.CONSTRUCTOR_TARGET);
 		sendValue(itsBuffer, aTarget, 0);
 		commitBuffer();
-		sendRegisteredObjects();
 	}
 	
 	public void evInScopeBehaviorExit_Normal()
@@ -372,6 +381,7 @@ public class ThreadData
 	
 	public void evInScopeBehaviorExit_Exception()
 	{
+		sendRegisteredObjects();
 		sendMessageType(itsBuffer, Message.INSCOPE_BEHAVIOR_EXIT_EXCEPTION);
 		commitBuffer();
 		
@@ -383,6 +393,7 @@ public class ThreadData
 	 */
 	public void evOutOfScopeBehaviorEnter()
 	{
+		sendRegisteredObjects();
 		sendMessageType(itsBuffer, Message.OUTOFSCOPE_BEHAVIOR_ENTER);
 		commitBuffer();
 		
@@ -395,6 +406,7 @@ public class ThreadData
 	 */
 	public void evOutOfScopeBehaviorExit_Normal()
 	{
+		sendRegisteredObjects();
 		sendMessageType(itsBuffer, Message.OUTOFSCOPE_BEHAVIOR_EXIT_NORMAL);
 		commitBuffer();
 
@@ -406,6 +418,7 @@ public class ThreadData
 	 */
 	public void evOutOfScopeBehaviorExit_Exception()
 	{
+		sendRegisteredObjects();
 		sendMessageType(itsBuffer, Message.OUTOFSCOPE_BEHAVIOR_EXIT_EXCEPTION);
 		commitBuffer();
 		
@@ -427,6 +440,7 @@ public class ThreadData
 	 */
 	public void evUnmonitoredBehaviorResult()
 	{
+		sendRegisteredObjects();
 		checkTimestamp();
 		sendMessageType(itsBuffer, Message.UNMONITORED_BEHAVIOR_CALL_RESULT);
 		commitBuffer();
@@ -563,7 +577,7 @@ public class ThreadData
 	 */
 	private void sendObjectByValue(_ByteBuffer aBuffer, Object aObject, long aTimestamp) 
 	{
-		long theObjectId = ObjectIdentity.get(aObject);
+		long theObjectId = IdAccessor.getId(aObject);
 		assert theObjectId != 0;
 		
 		if (theObjectId < 0)
@@ -588,7 +602,7 @@ public class ThreadData
 	 */
 	private void sendObjectByRef(_ByteBuffer aBuffer, Object aObject, long aTimestamp) 
 	{
-		long theObjectId = ObjectIdentity.get(aObject);
+		long theObjectId = IdAccessor.getId(aObject);
 		assert theObjectId != 0;
 		
 		if (theObjectId < 0)
@@ -628,22 +642,22 @@ public class ThreadData
 	private void sendRegisteredObject(long aId, Object aObject, long aTimestamp) 
 	{
 		// We use a different buffer here because the packet might be huge.
-		itsObjectsBuffer.clear();
-		itsObjectsBuffer.position(22); // Header placeholder
+		_GrowingByteBuffer theBuffer = _GrowingByteBuffer.allocate(1024);
+		theBuffer.position(22); // Header placeholder
 		
-		ObjectEncoder.encode(ObjectValueFactory.convert(aObject), itsObjectsBuffer);
+		ObjectEncoder.encode(ObjectValueFactory.convert(aObject), theBuffer);
 		
-		int theSize = itsObjectsBuffer.position()-5; // 5: event type + size 
+		int theSize = theBuffer.position()-5; // 5: event type + size 
 	
-		itsObjectsBuffer.position(0);
-		sendMessageType(itsObjectsBuffer, Message.REGISTER_OBJECT);
-		itsObjectsBuffer.putInt(theSize); 
+		theBuffer.position(0);
+		sendMessageType(theBuffer, Message.REGISTER_OBJECT);
+		theBuffer.putInt(theSize); 
 		
-		itsObjectsBuffer.putLong(aId);
-		itsObjectsBuffer.putLong(aTimestamp);
-		itsObjectsBuffer.put(isIndexable(aObject) ? (byte) 1 : (byte) 0);
+		theBuffer.putLong(aId);
+		theBuffer.putLong(aTimestamp);
+		theBuffer.put(isIndexable(aObject) ? (byte) 1 : (byte) 0);
 		
-		itsStream.write(itsObjectsBuffer.array(), theSize+5, true);
+		itsIOThread.pushPacket(new ThreadPacket(getId(), theBuffer.array(), theBuffer.array().length == BUFFER_SIZE));
 	}
 	
 	private void sendRegisteredRefObject(Object aObject, long aId, Class<?> aClass, long aTimestamp) 
@@ -668,7 +682,7 @@ public class ThreadData
 	
 	private long getClassId(Class<?> aClass) 
 	{
-		long theId = ObjectIdentity.get(aClass);
+		long theId = IdAccessor.getId(aClass);
 		assert theId != 0;
 		
 		if (theId < 0)
@@ -701,7 +715,7 @@ public class ThreadData
 	{
 		if (aLoader == null) return 0;
 		
-		long theId = ObjectIdentity.get(aLoader);
+		long theId = IdAccessor.getId(aLoader);
 		assert theId != 0;
 		
 		if (theId < 0)

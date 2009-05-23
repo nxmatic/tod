@@ -100,7 +100,7 @@ public class MethodInstrumenter_OutOfScope extends MethodInstrumenter
 			// Monitoring enabled
 			{
 				// Store ThreadData object
-				s.INVOKESTATIC(CLS_EVENTCOLLECTOR, "_getThreadData", "()"+DSC_EVENTCOLLECTOR);
+				s.INVOKESTATIC(CLS_EVENTCOLLECTOR, "_getThreadData", "()"+DSC_THREADDATA);
 				s.DUP();
 				s.ASTORE(getThreadDataVar());
 				

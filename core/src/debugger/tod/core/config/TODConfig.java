@@ -148,6 +148,15 @@ public class TODConfig extends PublicCloneable implements Serializable
 							+ "but are registered in the structure database.",
 					ConfigUtils.readString("trace-filter", "[-java.** -javax.** -sun.** -com.sun.** -org.ietf.jgss.** -org.omg.** -org.w3c.** -org.xml.**]"));
 
+	public static final StringItem SCOPE_ID_FILTER =
+		new StringItem(
+				ConfigLevel.ADVANCED,
+				"id-filter",
+				"Scope - object id filter",
+				"Filter for classes to which TOD can add an Object Id field. "
+				+ "Classes that do no pass this filter are not structurally modified.",
+				ConfigUtils.readString("id-filter", "[-java.lang.Object -java.lang.String]"));
+	
 	public static final StringItem CLIENT_NAME =
 			new StringItem(
 					ConfigLevel.NORMAL,

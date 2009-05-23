@@ -45,6 +45,28 @@ public class _SocketChannel
 		return n;
 	}
 	
+	public int write(byte[] aData, int aOffset, int aLength) throws _IOException
+	{
+		checkFD();
+		int n = write0(itsFD, aData, aOffset, aLength);
+		
+		if (n == -1) throw new _IOException("Could not write");
+		else if (n == -2) throw new _IOException("Write failed");
+		else if (n < 0) throw new RuntimeException("Bad return value: "+n);
+		
+		return n;
+	}
+	
+	public void writeAll(byte[] aData, int aOffset, int aLength) throws _IOException
+	{
+		int theCount = 0;
+		while(theCount < aLength)
+		{
+			int n = write(aData, aOffset+theCount, aLength-theCount);
+			theCount += n;
+		}
+	}
+	
 	public int read(_ByteBuffer aBuffer) throws _IOException
 	{
 		checkFD();

@@ -52,6 +52,13 @@ public class _ArrayList<T>
 		add(size(), aValue);
 	}
 	
+	public T removeLast()
+	{
+		if (itsSize == 0) throw new IndexOutOfBoundsException("Empty");
+		itsSize--;
+		return itsData[itsSize];
+	}
+	
 	public void clear()
 	{
 		itsSize = 0;

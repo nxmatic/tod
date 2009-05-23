@@ -26,6 +26,7 @@ import java.nio.channels.ByteChannel;
 import java.tod.AgentReady;
 import java.tod.EventCollector;
 import java.tod.TOD;
+import java.tod.ThreadData;
 import java.tod.TracedMethods;
 import java.tod.io._EOFException;
 import java.tod.io._IO;
@@ -64,13 +65,16 @@ public class IOThread extends Thread
 	/**
 	 * Buffers that are waiting to be sent.
 	 */
-	private final _SyncRingBuffer<PacketBuffer> itsPendingBuffers = new _SyncRingBuffer<PacketBuffer>(1000);
+	private final _SyncRingBuffer<ThreadPacket> itsPendingBuffers = new _SyncRingBuffer<ThreadPacket>(1000);
 	
 	/**
-	 * This list contains all the packet buffers created by this sender.
+	 * A set of {@link ThreadData} objects registered with this {@link IOThread}.
+	 * They are periodically requested to write all pending data.
 	 */
-	private final _ArrayList<PacketBuffer> itsBuffers = new _ArrayList<PacketBuffer>();
-
+	private final _ArrayList<ThreadData> itsThreadDatas = new _ArrayList<ThreadData>();
+	
+	private final _ArrayList<ThreadPacket> itsFreePackets = new _ArrayList<ThreadPacket>();
+	
 	private final MyShutdownHook itsShutdownHook;
 	
 	private volatile boolean itsShutdownStarted = false;
@@ -138,15 +142,15 @@ public class IOThread extends Thread
 			while(true)
 			{
 //				_IO.out("PacketBufferSender.run() - sentBuffers: "+sentBuffers);
-				PacketBuffer thePendingBuffer = popBuffer();
+				ThreadPacket thepacket = popPacket();
 				
-				if (thePendingBuffer != null)
+				if (thepacket != null)
 				{
 					itsSentBuffers++;
-					sendBuffer(thePendingBuffer);
+					sendPacket(thepacket);
 				}
 				
-				if (thePendingBuffer == null || itsSentBuffers > 100)
+				if (thepacket == null || itsSentBuffers > 100)
 				{
 					// Check stale buffers at a regular interval
 					checkStaleBuffers();
@@ -172,67 +176,44 @@ public class IOThread extends Thread
 		}
 	}
 	
-	private void sendBuffer(PacketBuffer aBuffer) throws _IOException
+	private void sendPacket(ThreadPacket aPacket) throws _IOException
 	{
-		_ByteBuffer theByteBuffer = aBuffer.getPendingBuffer();
-		_assert (theByteBuffer != null);
-		
-		int theSize = theByteBuffer.position();
-		int theId = aBuffer.getThreadId();
-
 		itsHeaderBuffer.clear();
-		itsHeaderBuffer.putInt(theId);
-		itsHeaderBuffer.putInt(theSize);
-		
-		int theFlags = 
-			(aBuffer.hasCleanStart() ? 2 : 0) 
-			| (aBuffer.hasCleanEnd() ? 1 : 0);
-		
-//		_IO.out(String.format(
-//				"[TOD-IOThread] Sending packet (th: %d, sz: %d, cs: %s, ce: %s)",
-//				theId,
-//				theSize,
-//				aBuffer.hasCleanStart(),
-//				aBuffer.hasCleanEnd()));
-		
-		itsHeaderBuffer.put((byte) theFlags);
+		itsHeaderBuffer.putInt(aPacket.threadId);
+		itsHeaderBuffer.putInt(aPacket.length);
 		
 		itsHeaderBuffer.flip();
 		itsChannel.write(itsHeaderBuffer);
 		
-		theByteBuffer.flip();
-		itsChannel.write(theByteBuffer);
-		
-		theByteBuffer.clear();
-		
-		aBuffer.sent();
+		itsChannel.writeAll(aPacket.data, aPacket.offset, aPacket.length);
+		freePacket(aPacket);
 	}
 	
 	private void checkStaleBuffers()
 	{
-		long t = System.currentTimeMillis();
-		long delta = t - itsCheckTime;
-		
-		if (delta > 100)
-		{
-			itsCheckTime = t;
-			
-			PacketBuffer[] theArray;
-			synchronized(this)
-			{
-				// Might deadlock if we synchronize the pleaseSwaps, so copy the list
-				theArray = itsBuffers.toArray(new PacketBuffer[itsBuffers.size()]);
-			}
-			
-			for (PacketBuffer theBuffer : theArray) theBuffer.pleaseSwap();
-			
-			// Notify of capture enabled state
-			if (itsLastEnabled != AgentReady.CAPTURE_ENABLED)
-			{
-				itsEventCollector.evCaptureEnabled(AgentReady.CAPTURE_ENABLED);
-				itsLastEnabled = AgentReady.CAPTURE_ENABLED;
-			}
-		}
+//		long t = System.currentTimeMillis();
+//		long delta = t - itsCheckTime;
+//		
+//		if (delta > 100)
+//		{
+//			itsCheckTime = t;
+//			
+//			PacketBuffer[] theArray;
+//			synchronized(this)
+//			{
+//				// Might deadlock if we synchronize the pleaseSwaps, so copy the list
+//				theArray = itsBuffers.toArray(new PacketBuffer[itsBuffers.size()]);
+//			}
+//			
+//			for (PacketBuffer theBuffer : theArray) theBuffer.pleaseSwap();
+//			
+//			// Notify of capture enabled state
+//			if (itsLastEnabled != AgentReady.CAPTURE_ENABLED)
+//			{
+//				itsEventCollector.evCaptureEnabled(AgentReady.CAPTURE_ENABLED);
+//				itsLastEnabled = AgentReady.CAPTURE_ENABLED;
+//			}
+//		}
 	}
 	
 	private byte readByte() throws _IOException
@@ -316,27 +297,39 @@ public class IOThread extends Thread
 	
 	/**
 	 * Pushes the given packet buffer to the pending queue.
+	 * @param aRecycle If true, the buffer in the given {@link ThreadPacket}
+	 * will be recycled and a free recycled buffer will be returned if available 
 	 */
-	synchronized void pushBuffer(PacketBuffer aBuffer) 
+	public void pushPacket(ThreadPacket aPacket) 
 	{
-		itsPendingBuffers.add(aBuffer);
-		notifyAll();
+		itsPendingBuffers.add(aPacket);
+	}
+	
+	private void freePacket(ThreadPacket aPacket)
+	{
+		if (! aPacket.recyclable) return;
+		synchronized (itsFreePackets)
+		{
+			itsFreePackets.add(aPacket);
+		}
+	}
+	
+	public ThreadPacket getFreePacket()
+	{
+		if (itsFreePackets.isEmpty()) return null;
+		synchronized (itsFreePackets)
+		{
+			return itsFreePackets.removeLast();
+		}
 	}
 	
 	/**
 	 * Pops a buffer from the stack, waiting for up to 100ms if none is available.
 	 */
-	synchronized PacketBuffer popBuffer() throws InterruptedException
+	private ThreadPacket popPacket() throws InterruptedException
 	{
-		if (itsPendingBuffers.isEmpty()) wait(100);
+		if (itsPendingBuffers.isEmpty()) Thread.sleep(100);
 		return itsPendingBuffers.poll();
-	}
-	
-	public synchronized PacketBuffer createBuffer(int aThreadId)
-	{
-		PacketBuffer thePacketBuffer = new PacketBuffer(this, aThreadId);
-		itsBuffers.add(thePacketBuffer);
-		return thePacketBuffer;
 	}
 	
 	private class MyShutdownHook extends Thread
@@ -349,39 +342,39 @@ public class IOThread extends Thread
 		@Override
 		public void run()
 		{
-			itsShutdownStarted = true;
-			_IO.out("[TOD] Flushing buffers...");
-			
-			EventCollector.INSTANCE.end();
-			
-			for (int i=0;i<itsBuffers.size();i++) itsBuffers.get(i).swapBuffers();
-			
-			try
-			{
-				int thePrevSize = itsPendingBuffers.size();
-				while(thePrevSize > 0)
-				{
-					Thread.sleep(200);
-					int theNewSize = itsPendingBuffers.size();
-					if (theNewSize == thePrevSize)
-					{
-						_IO.err("[TOD] Buffers are not being sent, shutting down anyway ("+theNewSize+" buffers remaining).");
-						break;
-					}
-					thePrevSize = theNewSize;
-				}
-				
-				// Give some more time to allow for the buffers to be sent
-				Thread.sleep(3000);
-				
-				itsChannel.close();
-			}
-			catch (Exception e)
-			{
-				throw new RuntimeException(e);
-			}
-			
-			_IO.out("[TOD] Shutting down.");
+//			itsShutdownStarted = true;
+//			_IO.out("[TOD] Flushing buffers...");
+//			
+//			EventCollector.INSTANCE.end();
+//			
+//			for (int i=0;i<itsBuffers.size();i++) itsBuffers.get(i).swapBuffers();
+//			
+//			try
+//			{
+//				int thePrevSize = itsPendingBuffers.size();
+//				while(thePrevSize > 0)
+//				{
+//					Thread.sleep(200);
+//					int theNewSize = itsPendingBuffers.size();
+//					if (theNewSize == thePrevSize)
+//					{
+//						_IO.err("[TOD] Buffers are not being sent, shutting down anyway ("+theNewSize+" buffers remaining).");
+//						break;
+//					}
+//					thePrevSize = theNewSize;
+//				}
+//				
+//				// Give some more time to allow for the buffers to be sent
+//				Thread.sleep(3000);
+//				
+//				itsChannel.close();
+//			}
+//			catch (Exception e)
+//			{
+//				throw new RuntimeException(e);
+//			}
+//			
+//			_IO.out("[TOD] Shutting down.");
 		}
 	}
 	

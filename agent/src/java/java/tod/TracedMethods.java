@@ -22,8 +22,8 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 */
 package java.tod;
 
-import java.tod.io._IO;
 import java.tod.util._BitSet;
+import java.tod.util._IntArray;
 
 import tod.agent.MonitoringMode;
 
@@ -37,7 +37,9 @@ import tod.agent.MonitoringMode;
  */
 public class TracedMethods
 {
-	private static _BitSet traced = null;//new _BitSet();
+	private static final boolean USE_BITSET = true;
+	private static _BitSet tracedB = null;
+	private static _IntArray tracedA = null;
 	
 	/**
 	 * Sets the monitoring mode for a method  
@@ -46,9 +48,17 @@ public class TracedMethods
 	 */
 	public static final void setMode(int aId, int aMode)
 	{
-		if (traced == null) traced = new _BitSet();
-		traced.set(aId*2 + 0, (aMode & 0x1) != 0);
-		traced.set(aId*2 + 1, (aMode & 0x2) != 0);
+		if (USE_BITSET)
+		{
+			if (tracedB == null) tracedB = new _BitSet();
+			tracedB.set(aId*2 + 0, (aMode & 0x1) != 0);
+			tracedB.set(aId*2 + 1, (aMode & 0x2) != 0);
+		}
+		else
+		{
+			if (tracedA == null) tracedA = new _IntArray(1024);
+			tracedA.set(aId, aMode);
+		}
 	}
 	
 	/**
@@ -58,8 +68,16 @@ public class TracedMethods
 	 */
 	public static final int getMode(int aId)
 	{
-		if (traced == null) return MonitoringMode.NONE;
-		return (traced.get(aId*2 + 0) ? 0x1 : 0x0) | (traced.get(aId*2 + 1) ? 0x2 : 0x0);
+		if (USE_BITSET)
+		{
+			if (tracedB == null) return MonitoringMode.NONE;
+			return (tracedB.get(aId*2 + 0) ? 0x1 : 0x0) | (tracedB.get(aId*2 + 1) ? 0x2 : 0x0);
+		}
+		else
+		{
+			if (tracedA == null) return MonitoringMode.NONE;
+			return tracedA.get(aId);
+		}
 	}
 	
 	/**

@@ -276,9 +276,34 @@ public class SyntaxInsnList extends InsnList
 		itsVisitor.visitInsn(Opcodes.SWAP);
 	}
 	
-	public void ATHROW()
+	public void LCMP()
 	{
-		itsVisitor.visitInsn(Opcodes.ATHROW);
+		itsVisitor.visitInsn(Opcodes.LCMP);
+	}
+	
+	public void IRETURN()
+	{
+		itsVisitor.visitInsn(Opcodes.IRETURN);
+	}
+	
+	public void LRETURN()
+	{
+		itsVisitor.visitInsn(Opcodes.LRETURN);
+	}
+	
+	public void FRETURN()
+	{
+		itsVisitor.visitInsn(Opcodes.FRETURN);
+	}
+	
+	public void DRETURN()
+	{
+		itsVisitor.visitInsn(Opcodes.DRETURN);
+	}
+	
+	public void ARETURN()
+	{
+		itsVisitor.visitInsn(Opcodes.ARETURN);
 	}
 	
 	public void RETURN()
@@ -291,6 +316,21 @@ public class SyntaxInsnList extends InsnList
 		itsVisitor.visitInsn(type.getOpcode(Opcodes.IRETURN));
 	}
 	
+	public void ATHROW()
+	{
+		itsVisitor.visitInsn(Opcodes.ATHROW);
+	}
+	
+	public void MONITORENTER()
+	{
+		itsVisitor.visitInsn(Opcodes.MONITORENTER);
+	}
+
+	public void MONITOREXIT()
+	{
+		itsVisitor.visitInsn(Opcodes.MONITOREXIT);
+	}
+
 	/*
 	 * Var instructions
 	 */
@@ -530,7 +570,29 @@ public class SyntaxInsnList extends InsnList
 	}
 	
 
-		
+	/*
+	 * Field instructions
+	 */
+	public void GETSTATIC(String owner, String name, String desc) 
+	{
+		itsVisitor.visitFieldInsn(Opcodes.GETSTATIC, owner, name, desc);
+	}
+	
+	public void PUTSTATIC(String owner, String name, String desc) 
+	{
+		itsVisitor.visitFieldInsn(Opcodes.PUTSTATIC, owner, name, desc);
+	}
+	
+	public void GETFIELD(String owner, String name, String desc) 
+	{
+		itsVisitor.visitFieldInsn(Opcodes.GETFIELD, owner, name, desc);
+	}
+	
+	public void PUTFIELD(String owner, String name, String desc) 
+	{
+		itsVisitor.visitFieldInsn(Opcodes.PUTFIELD, owner, name, desc);
+	}
+	
 
 	/**
 	 * Inserts a label corresponding to the given name.

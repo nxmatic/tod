@@ -24,6 +24,7 @@ public class ASMInstrumenter2 implements IInstrumenter
 
 	private ClassSelector itsGlobalSelector;
 	private ClassSelector itsTraceSelector;
+	private ClassSelector itsIdSelector;
 	
 	
 
@@ -60,12 +61,18 @@ public class ASMInstrumenter2 implements IInstrumenter
 	{
 		itsTraceSelector = parseWorkingSet(aConfig.get(TODConfig.SCOPE_TRACE_FILTER));
 		itsGlobalSelector = parseWorkingSet(aConfig.get(TODConfig.SCOPE_GLOBAL_FILTER));
+		itsIdSelector = parseWorkingSet(aConfig.get(TODConfig.SCOPE_ID_FILTER));
 	}
 	
 	public boolean isInScope(String aClassName)
 	{
 		return BCIUtils.acceptClass(aClassName, itsGlobalSelector)
 			&& BCIUtils.acceptClass(aClassName, itsTraceSelector);
+	}
+	
+	public boolean isInIdScope(String aClassName)
+	{
+		return BCIUtils.acceptClass(aClassName, itsIdSelector);
 	}
 	
 	public IMutableStructureDatabase getStructureDatabase()

@@ -309,6 +309,7 @@ public abstract class LogReceiver extends PacketProcessor
 	
 	private void storePackets(DataInputStream aDataIn) throws IOException
 	{
+		int theCount = 0;
 		byte[] theBuffer = new byte[4096];
 		while(true)
 		{
@@ -322,7 +323,11 @@ public abstract class LogReceiver extends PacketProcessor
 				System.err.println(e.getMessage());
 				theRead = -1;
 			}
+			
+			theCount += theRead;
 
+			if (theRead >= 0) continue;
+			
 			if (theRead == 0) continue;
 			else if (theRead > 0) itsFileOut.write(theBuffer, 0, theRead);
 			else
@@ -331,6 +336,8 @@ public abstract class LogReceiver extends PacketProcessor
 				break;
 			}
 		}
+		
+		System.out.println("Received "+theCount+" bytes");
 	}
 	
 	@Override

@@ -22,15 +22,18 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 */
 package tod.test;
 
-import java.tod.ObjectIdentity;
 import java.util.ArrayList;
 
 import javax.swing.JPanel;
 
+import tod.id.IdAccessor;
+
 
 
 public class BCITest
-{
+{	
+	long l;
+	
 	public static void main(String[] args)
 	{
 		new JPanel();
@@ -78,7 +81,7 @@ public class BCITest
 	
 	public static void print (Object aObject)
 	{
-		System.out.println("Object: "+ObjectIdentity.get(aObject));
+		System.out.println("Object: "+IdAccessor.getId(aObject));
 	}
 	
 	private void foo (int i, long l, float f, double d, String s)
@@ -89,5 +92,11 @@ public class BCITest
 	private int ex(int n)
 	{
 		return 100/n;
+	}
+	
+	public long fuu()
+	{
+		if (l != 0) return l;
+		else return 12;
 	}
 }

@@ -297,6 +297,12 @@ public class _ByteBuffer
 		itsMark = -1;
 		return this;
 	}
+    
+    public final void clear(byte[] aNewData)
+    {
+    	itsBytes = aNewData;
+    	clear();
+    }
 
     private static byte int3(int x) { return (byte)(x >> 24); }
     private static byte int2(int x) { return (byte)(x >> 16); }

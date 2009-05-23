@@ -22,6 +22,7 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 */
 package java.tod;
 
+import java.tod.io._IO;
 import java.tod.util.WeakLongHashMap;
 
 import tod.agent.AgentConfig;
@@ -35,6 +36,14 @@ import tod.agent.AgentConfig;
 public class ObjectIdentity
 {
 	/**
+	 * Used as a monitor within generated $tod$getId code.
+	 */
+	public static final Object MON = new Object();
+	
+	private static final boolean USE_JAVA = true;//_AgentConfig.JAVA14;
+	private static final WeakLongHashMap MAP = USE_JAVA ? new WeakLongHashMap() : null;
+	
+	/**
 	 * Retrieves the identifier of an object.
 	 * Returns a positive value if the object was already tagged.
 	 * If this call causes the object to be tagged, the opposite of 
@@ -42,25 +51,19 @@ public class ObjectIdentity
 	 */
 	public static long get (Object aObject)
 	{
-		return _AgentConfig.JAVA14 ? get14(aObject) : get15(aObject); 
+		return USE_JAVA ? get14(aObject) : get15(aObject); 
 	}
 	
-//	private static native long get15(Object aObject);
-	private static long get15(Object aObject)
-	{
-		return 12;
-	}
+	private static native long get15(Object aObject);
 
-	private static final WeakLongHashMap MAP = _AgentConfig.JAVA14 ? new WeakLongHashMap() : null;
-	
 	private static long itsNextId = 1;
 	
-	private static synchronized long nextId()
+	public static synchronized long nextId()
 	{
 		return itsNextId++;
 	}
 	
-	private static long get14(Object aObject)
+	private static synchronized long get14(Object aObject)
 	{
 		long theId = MAP.get(aObject);
 		if (theId != 0) return theId;

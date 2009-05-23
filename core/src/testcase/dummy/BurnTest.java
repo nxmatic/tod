@@ -22,6 +22,9 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 */
 package dummy;
 
+import tod.BenchBase;
+import tod.BenchBase.BenchResults;
+
 /**
  * A fully instrumented, CPU-intensive program.
  * @author gpothier
@@ -30,10 +33,17 @@ public class BurnTest
 {
 	private static int rndSeed = 1234598;
 	private static final int N = 50000;
+	private static Node root;
 	
 	public static void main(String[] args)
 	{
 		System.out.println("Burn test");
+		byte[] b = new byte[100000000];
+		b = null;
+		System.gc();
+		
+		System.out.println(BurnTest.class);
+		
 //		StringBuilder b = new StringBuilder("ho");
 //		while(true)
 //		{
@@ -41,21 +51,37 @@ public class BurnTest
 //		}
 		
 		// Warm up
-		Node root = createTree(null, 10000);
-		System.out.println("BurnTest.main()");
-		for (int i=0;i<10;i++) root.visit();
+		System.out.println("BurnTest: warmup");
+		BenchResults b0 = BenchBase.benchmark(new Runnable()
+		{
+			public void run()
+			{
+				root = createTree(null, N);
+				for (int i=0;i<10;i++) root.visit();
+			}
+		});
+		System.out.println(b0);
 		
 		// Real thing
-		long t0 = System.currentTimeMillis();
-		root = createTree(null, N);
-		long t1 = System.currentTimeMillis();
-		for (int i=0;i<100;i++) root.visit();
-		long t2 = System.currentTimeMillis();
+		System.out.println("BurnTest: create");
+		BenchResults b1 = BenchBase.benchmark(new Runnable()
+		{
+			public void run()
+			{
+				root = createTree(null, N);
+			}
+		});
+
+		System.out.println("BurnTest: visit");
+		BenchResults b2 = BenchBase.benchmark(new Runnable()
+		{
+			public void run()
+			{
+				for (int i=0;i<100;i++) root.visit();
+			}
+		});
 		
-		float dt1 = 1f*(t1-t0)/1000;
-		float dt2 = 1f*(t2-t1)/1000;
-		
-		System.out.println(String.format("Create: %.2fs, visit: %.2fds", dt1, dt2));
+		System.out.println("create: "+b1+", visit: "+b2);
 	}
 	
 	public static int random(int max)
