@@ -38,6 +38,8 @@ import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.MethodNode;
 
+import com.sun.org.apache.bcel.internal.generic.ICONST;
+
 /**
  * Helper class that permits to write prettier code.
  * Label handling: a separate {@link LabelManager} provides the {@link Label}s
@@ -111,6 +113,32 @@ public class SyntaxInsnList extends InsnList
 	/**
 	 * Generates the bytecode that pushes the given value onto the stack
 	 */
+	public void pushFloat(float aValue)
+	{
+		if (aValue == 0)
+		{
+			itsVisitor.visitInsn(Opcodes.FCONST_0);
+			return;
+		}
+		else if (aValue == 1)
+		{
+			itsVisitor.visitInsn(Opcodes.FCONST_1);
+			return;
+		}
+		else if (aValue == 2)
+		{
+			itsVisitor.visitInsn(Opcodes.FCONST_2);
+			return;
+		}
+		
+		itsVisitor.visitLdcInsn(new Float(aValue));
+	}
+	
+
+	
+	/**
+	 * Generates the bytecode that pushes the given value onto the stack
+	 */
 	public void pushLong (long aValue)
 	{
 		if (aValue == 0)
@@ -125,6 +153,63 @@ public class SyntaxInsnList extends InsnList
 		}
 		
 		itsVisitor.visitLdcInsn(new Long(aValue));
+	}
+	
+	/**
+	 * Generates the bytecode that pushes the given value onto the stack
+	 */
+	public void pushDouble (double aValue)
+	{
+		if (aValue == 0)
+		{
+			itsVisitor.visitInsn(Opcodes.DCONST_0);
+			return;
+		}
+		else if (aValue == 1)
+		{
+			itsVisitor.visitInsn(Opcodes.DCONST_1);
+			return;
+		}
+		
+		itsVisitor.visitLdcInsn(new Double(aValue));
+	}
+	
+	/**
+	 * Pushes the default value for the given type onto the stack
+	 * (ie. 0 for scalars, null for refs).
+	 */
+	public void pushDefaultValue(Type aType)
+	{
+		switch(aType.getSort())
+		{
+        case Type.BOOLEAN:
+        case Type.BYTE:
+        case Type.CHAR:
+        case Type.SHORT:
+        case Type.INT:
+        	pushInt(0);
+        	break;
+        	
+        case Type.FLOAT:
+        	pushFloat(0);
+        	break;
+        	
+        case Type.LONG:
+        	pushLong(0);
+        	break;
+        	
+        case Type.DOUBLE:
+        	pushDouble(0);
+        	break;
+
+        case Type.OBJECT:
+        case Type.ARRAY:
+        	ACONST_NULL();
+        	break;
+        	
+        default:
+            throw new RuntimeException("Not handled: "+aType);
+		}
 	}
 
 	/*
@@ -276,9 +361,284 @@ public class SyntaxInsnList extends InsnList
 		itsVisitor.visitInsn(Opcodes.SWAP);
 	}
 	
+	public void IADD()
+	{
+		itsVisitor.visitInsn(Opcodes.IADD);
+	}
+	
+	public void LADD()
+	{
+		itsVisitor.visitInsn(Opcodes.LADD);
+	}
+	
+	public void FADD()
+	{
+		itsVisitor.visitInsn(Opcodes.FADD);
+	}
+	
+	public void DADD()
+	{
+		itsVisitor.visitInsn(Opcodes.DADD);
+	}
+	
+	public void ISUB()
+	{
+		itsVisitor.visitInsn(Opcodes.ISUB);
+	}
+	
+	public void LSUB()
+	{
+		itsVisitor.visitInsn(Opcodes.LSUB);
+	}
+	
+	public void FSUB()
+	{
+		itsVisitor.visitInsn(Opcodes.FSUB);
+	}
+	
+	public void DSUB()
+	{
+		itsVisitor.visitInsn(Opcodes.DSUB);
+	}
+	
+	public void IMUL()
+	{
+		itsVisitor.visitInsn(Opcodes.IMUL);
+	}
+	
+	public void LMUL()
+	{
+		itsVisitor.visitInsn(Opcodes.LMUL);
+	}
+	
+	public void FMUL()
+	{
+		itsVisitor.visitInsn(Opcodes.FMUL);
+	}
+	
+	public void DMUL()
+	{
+		itsVisitor.visitInsn(Opcodes.DMUL);
+	}
+	
+	public void IDIV()
+	{
+		itsVisitor.visitInsn(Opcodes.IDIV);
+	}
+	
+	public void LDIV()
+	{
+		itsVisitor.visitInsn(Opcodes.LDIV);
+	}
+	
+	public void FDIV()
+	{
+		itsVisitor.visitInsn(Opcodes.FDIV);
+	}
+	
+	public void DDIV()
+	{
+		itsVisitor.visitInsn(Opcodes.DDIV);
+	}
+	
+	public void IREM()
+	{
+		itsVisitor.visitInsn(Opcodes.IREM);
+	}
+	
+	public void LREM()
+	{
+		itsVisitor.visitInsn(Opcodes.LREM);
+	}
+	
+	public void FREM()
+	{
+		itsVisitor.visitInsn(Opcodes.FREM);
+	}
+	
+	public void DREM()
+	{
+		itsVisitor.visitInsn(Opcodes.DREM);
+	}
+	
+	public void INEG()
+	{
+		itsVisitor.visitInsn(Opcodes.INEG);
+	}
+	
+	public void LNEG()
+	{
+		itsVisitor.visitInsn(Opcodes.LNEG);
+	}
+	
+	public void FNEG()
+	{
+		itsVisitor.visitInsn(Opcodes.FNEG);
+	}
+	
+	public void DNEG()
+	{
+		itsVisitor.visitInsn(Opcodes.DNEG);
+	}
+	
+	public void ISHL()
+	{
+		itsVisitor.visitInsn(Opcodes.ISHL);
+	}
+	
+	public void LSHL()
+	{
+		itsVisitor.visitInsn(Opcodes.LSHL);
+	}
+	
+	public void ISHR()
+	{
+		itsVisitor.visitInsn(Opcodes.ISHR);
+	}
+	
+	public void LSHR()
+	{
+		itsVisitor.visitInsn(Opcodes.LSHR);
+	}
+	
+	public void IUSHR()
+	{
+		itsVisitor.visitInsn(Opcodes.IUSHR);
+	}
+	
+	public void LUSHR()
+	{
+		itsVisitor.visitInsn(Opcodes.LUSHR);
+	}
+	
+	public void IAND()
+	{
+		itsVisitor.visitInsn(Opcodes.IAND);
+	}
+	
+	public void LAND()
+	{
+		itsVisitor.visitInsn(Opcodes.LAND);
+	}
+	
+	public void IOR()
+	{
+		itsVisitor.visitInsn(Opcodes.IOR);
+	}
+	
+	public void LOR()
+	{
+		itsVisitor.visitInsn(Opcodes.LOR);
+	}
+	
+	public void IXOR()
+	{
+		itsVisitor.visitInsn(Opcodes.IXOR);
+	}
+	
+	public void LXOR()
+	{
+		itsVisitor.visitInsn(Opcodes.LXOR);
+	}
+	
+	public void I2L()
+	{
+		itsVisitor.visitInsn(Opcodes.I2L);
+	}
+	
+	public void I2F()
+	{
+		itsVisitor.visitInsn(Opcodes.I2F);
+	}
+	
+	public void I2D()
+	{
+		itsVisitor.visitInsn(Opcodes.I2D);
+	}
+	
+	public void L2I()
+	{
+		itsVisitor.visitInsn(Opcodes.L2I);
+	}
+	
+	public void L2F()
+	{
+		itsVisitor.visitInsn(Opcodes.L2F);
+	}
+	
+	public void L2D()
+	{
+		itsVisitor.visitInsn(Opcodes.L2D);
+	}
+	
+	public void F2I()
+	{
+		itsVisitor.visitInsn(Opcodes.F2I);
+	}
+	
+	public void F2L()
+	{
+		itsVisitor.visitInsn(Opcodes.F2L);
+	}
+	
+	public void F2D()
+	{
+		itsVisitor.visitInsn(Opcodes.F2D);
+	}
+	
+	public void D2I()
+	{
+		itsVisitor.visitInsn(Opcodes.D2I);
+	}
+	
+	public void D2L()
+	{
+		itsVisitor.visitInsn(Opcodes.D2L);
+	}
+	
+	public void D2F()
+	{
+		itsVisitor.visitInsn(Opcodes.D2F);
+	}
+	
+	public void I2B()
+	{
+		itsVisitor.visitInsn(Opcodes.I2B);
+	}
+	
+	public void I2C()
+	{
+		itsVisitor.visitInsn(Opcodes.I2C);
+	}
+	
+	public void I2S()
+	{
+		itsVisitor.visitInsn(Opcodes.I2S);
+	}
+	
 	public void LCMP()
 	{
 		itsVisitor.visitInsn(Opcodes.LCMP);
+	}
+	
+	public void FCMPL()
+	{
+		itsVisitor.visitInsn(Opcodes.FCMPL);
+	}
+	
+	public void FCMPG()
+	{
+		itsVisitor.visitInsn(Opcodes.FCMPG);
+	}
+	
+	public void DCMPL()
+	{
+		itsVisitor.visitInsn(Opcodes.DCMPL);
+	}
+	
+	public void DCMPG()
+	{
+		itsVisitor.visitInsn(Opcodes.DCMPG);
 	}
 	
 	public void IRETURN()
@@ -436,9 +796,22 @@ public class SyntaxInsnList extends InsnList
 		IFEQ(label);
 	}
 	
+	/**
+	 * Same as IFEQ
+	 */
+	public void IFfalse(Label label)
+	{
+		IFEQ(label);
+	}
+	
 	public void IFEQ(String label) 
 	{
 		itsVisitor.visitJumpInsn(Opcodes.IFEQ, getLabel(label));
+	}
+	
+	public void IFEQ(Label label) 
+	{
+		itsVisitor.visitJumpInsn(Opcodes.IFEQ, label);
 	}
 	
 	/**
@@ -449,11 +822,24 @@ public class SyntaxInsnList extends InsnList
 		IFNE(label);
 	}
 	
+	/**
+	 * Same as IFNE
+	 */
+	public void IFtrue(Label label)
+	{
+		IFNE(label);
+	}
+	
 	public void IFNE(String label) 
 	{
 		itsVisitor.visitJumpInsn(Opcodes.IFNE, getLabel(label));
 	}
 		
+	public void IFNE(Label label) 
+	{
+		itsVisitor.visitJumpInsn(Opcodes.IFNE, label);
+	}
+	
 	public void IFLT(String label) 
 	{
 		itsVisitor.visitJumpInsn(Opcodes.IFLT, getLabel(label));
@@ -477,6 +863,11 @@ public class SyntaxInsnList extends InsnList
 	public void IF_ICMPEQ(String label) 
 	{
 		itsVisitor.visitJumpInsn(Opcodes.IF_ICMPEQ, getLabel(label));
+	}
+	
+	public void IF_ICMPEQ(Label label) 
+	{
+		itsVisitor.visitJumpInsn(Opcodes.IF_ICMPEQ, label);
 	}
 	
 	public void IF_ICMPNE(String label) 
@@ -509,6 +900,11 @@ public class SyntaxInsnList extends InsnList
 		itsVisitor.visitJumpInsn(Opcodes.IF_ACMPEQ, getLabel(label));
 	}
 	
+	public void IF_ACMPEQ(Label label) 
+	{
+		itsVisitor.visitJumpInsn(Opcodes.IF_ACMPEQ, label);
+	}
+	
 	public void IF_ACMPNE(String label) 
 	{
 		itsVisitor.visitJumpInsn(Opcodes.IF_ACMPNE, getLabel(label));
@@ -517,6 +913,11 @@ public class SyntaxInsnList extends InsnList
 	public void GOTO(String label) 
 	{
 		itsVisitor.visitJumpInsn(Opcodes.GOTO, getLabel(label));
+	}
+	
+	public void GOTO(Label label) 
+	{
+		itsVisitor.visitJumpInsn(Opcodes.GOTO, label);
 	}
 	
 	public void JSR(String label) 
@@ -534,41 +935,6 @@ public class SyntaxInsnList extends InsnList
 		itsVisitor.visitJumpInsn(Opcodes.IFNONNULL, getLabel(label));
 	}
 
-	/*
-	 * Jump instructions with actual Labels
-	 */
-	
-	/**
-	 * Same as IFEQ
-	 */
-	public void IFfalse(Label label)
-	{
-		IFEQ(label);
-	}
-	
-	public void IFEQ(Label label) 
-	{
-		itsVisitor.visitJumpInsn(Opcodes.IFEQ, label);
-	}
-	
-	/**
-	 * Same as IFNE
-	 */
-	public void IFtrue(Label label)
-	{
-		IFNE(label);
-	}
-	
-	public void IFNE(Label label) 
-	{
-		itsVisitor.visitJumpInsn(Opcodes.IFNE, label);
-	}
-	
-	public void GOTO(Label label) 
-	{
-		itsVisitor.visitJumpInsn(Opcodes.GOTO, label);
-	}
-	
 
 	/*
 	 * Field instructions

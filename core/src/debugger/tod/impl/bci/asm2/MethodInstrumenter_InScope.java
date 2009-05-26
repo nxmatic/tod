@@ -31,7 +31,14 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.bci.asm2;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
 import java.util.ListIterator;
+import java.util.Map;
+import java.util.Set;
 
 import org.objectweb.asm.Label;
 import org.objectweb.asm.Opcodes;
@@ -40,15 +47,24 @@ import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.FieldInsnNode;
 import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.InsnNode;
+import org.objectweb.asm.tree.JumpInsnNode;
+import org.objectweb.asm.tree.LabelNode;
+import org.objectweb.asm.tree.LookupSwitchInsnNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
+import org.objectweb.asm.tree.TableSwitchInsnNode;
 import org.objectweb.asm.tree.VarInsnNode;
 import org.objectweb.asm.tree.analysis.Frame;
 import org.objectweb.asm.tree.analysis.SourceValue;
 
 import tod.Util;
+import tod.core.database.structure.IFieldInfo;
 import tod.core.database.structure.IMutableBehaviorInfo;
 import tod.core.database.structure.IMutableClassInfo;
+import tod.core.database.structure.ITypeInfo;
+import zz.utils.ArrayStack;
+import zz.utils.ListMap;
+import zz.utils.Stack;
 
 /**
  * Instruments in-scope methods.
@@ -78,10 +94,25 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 	 * For constructors, the invocation instructions that corresponds to constructor chaining.
 	 */
 	private MethodInsnNode itsChainingInvocation;
+
+	/**
+	 * Maps field access instructions to the local variable slot that holds the cached value.
+	 */
+	private Map<FieldInsnNode, Integer> itsCachedFieldAccesses = new HashMap<FieldInsnNode, Integer>();
+	
+	/**
+	 * Instructions that initializes each slot of the field cache.
+	 */
+	private InsnList itsFieldCacheInit;
+
 	
 	public MethodInstrumenter_InScope(ClassInstrumenter aClassInstrumenter, MethodNode aNode, IMutableBehaviorInfo aBehavior)
 	{
 		super(aClassInstrumenter, aNode, aBehavior);
+
+		// At least for now...
+		if (CLS_OBJECT.equals(getClassNode().name)) throw new RuntimeException("java.lang.Object cannot be in scope!");
+		
 		itsFromScopeVar = nextFreeVar(1);
 		itsTmpValueVar = nextFreeVar(2);
 		itsCtorTargetVar = nextFreeVar(1);
@@ -92,8 +123,7 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		if (! CLS_OBJECT.equals(getClassNode().name) && isConstructor() && itsChainingInvocation == null) 
 			throw new RuntimeException("Should have constructor chaining: "+aNode);
 		
-		// At least for now...
-		if (CLS_OBJECT.equals(getClassNode().name)) throw new RuntimeException("java.lang.Object cannot be in scope!");
+		setupFieldCaches();
 	}
 
 	@Override
@@ -106,6 +136,8 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 			// Set ThreadData var to null for verifier to work
 			s.ACONST_NULL();
 			s.ASTORE(getThreadDataVar());
+			
+			s.add(itsFieldCacheInit);
 			
 			// Store the monitoring mode for the behavior in a local
 			s.pushInt(getBehavior().getId()); 
@@ -269,6 +301,157 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		return null;
 	}
 	
+	/**
+	 * Returns the TOD field referred to by the given instruction.
+	 */
+	private IFieldInfo getField(FieldInsnNode aNode)
+	{
+		IMutableClassInfo theOwner = getDatabase().getNewClass(aNode.owner);
+		ITypeInfo theType = getDatabase().getNewType(aNode.desc);
+
+		return theOwner.getNewField(aNode.name, theType, aNode.getOpcode() == Opcodes.GETSTATIC);
+	}
+	
+	/**
+	 * Whether the given field access instructions accesses a field on self (this).
+	 */
+	private boolean isSelfFieldAccess(FieldInsnNode aNode)
+	{
+		if (isStatic()) throw new RuntimeException("Not applicable in static methods");
+		
+		Frame theFrame = getFrames()[getNode().instructions.indexOf(aNode)];
+		SourceValue theTarget = (SourceValue) theFrame.getStack(0);
+
+		for(AbstractInsnNode theNode : (Set<AbstractInsnNode>) theTarget.insns)
+		{
+			if (theNode instanceof VarInsnNode)
+			{
+				VarInsnNode theVarInsnNode = (VarInsnNode) theNode;
+				if (theVarInsnNode.var == 0) return true;
+			}
+		}
+		
+		return false;
+	}
+	
+	/**
+	 * For each field access on the current object or static field access,
+	 * check if the access might execute more than once (because of several
+	 * access locations or of loops). If so, reserve a local variable to hold the
+	 * last observed value of the field so that we can optimize the Get Field event.  
+	 */
+	private void setupFieldCaches()
+	{
+		if ("visit".equals(getNode().name))
+		{
+			System.out.println("MethodInstrumenter_InScope.setupFieldCaches()");
+		}
+		
+		Set<AbstractInsnNode> theVisitedJumps = new HashSet<AbstractInsnNode>();
+		
+		// Maps each field to the instructions that read that field on self.
+		// Note: the same instruction can appear twice, which is actually what ultimately
+		// triggers the field to be cached.
+		ListMap<IFieldInfo, FieldInsnNode> theAccessMap = new ListMap<IFieldInfo, FieldInsnNode>();
+
+		// A list of paths to process (denoted by the first instruction of the path) 
+		Stack<AbstractInsnNode> theWorkList = new ArrayStack<AbstractInsnNode>();
+		theWorkList.push(getNode().instructions.getFirst());
+		
+		// Build the acces maps
+		while(! theWorkList.isEmpty()) 
+		{
+			AbstractInsnNode theNode = theWorkList.pop();
+			
+			// If this flag is true the next instruction is pushed onto
+			// the working list at the end of the iteration
+			boolean theContinue = false;
+			
+			if (theNode instanceof FieldInsnNode)
+			{
+				FieldInsnNode theFieldInsnNode = (FieldInsnNode) theNode;
+				
+				if (theNode.getOpcode() == Opcodes.GETFIELD)
+				{
+					if (isSelfFieldAccess(theFieldInsnNode))
+					{
+						IFieldInfo theField = getField(theFieldInsnNode);
+						theAccessMap.add(theField, theFieldInsnNode);
+					}
+				}
+				else if (theNode.getOpcode() == Opcodes.GETSTATIC)
+				{
+					IFieldInfo theField = getField(theFieldInsnNode);
+					theAccessMap.add(theField, theFieldInsnNode);
+				}
+				
+				theContinue = true;
+			}
+			else if (theNode instanceof JumpInsnNode)
+			{
+				JumpInsnNode theJumpInsnNode = (JumpInsnNode) theNode;
+				if (theVisitedJumps.add(theNode)) 
+				{
+					theWorkList.push(theJumpInsnNode.label);
+					if (theNode.getOpcode() != Opcodes.GOTO) theContinue = true;
+				}
+			}
+			else if (theNode instanceof TableSwitchInsnNode)
+			{
+				TableSwitchInsnNode theTableSwitchInsnNode = (TableSwitchInsnNode) theNode;
+				if (theVisitedJumps.add(theNode))
+				{
+					theWorkList.push(theTableSwitchInsnNode.dflt);
+					theWorkList.pushAll(theTableSwitchInsnNode.labels);
+				}
+			}
+			else if (theNode instanceof LookupSwitchInsnNode)
+			{
+				LookupSwitchInsnNode theLookupSwitchInsnNode = (LookupSwitchInsnNode) theNode;
+				if (theVisitedJumps.add(theNode))
+				{
+					theWorkList.push(theLookupSwitchInsnNode.dflt);
+					theWorkList.pushAll(theLookupSwitchInsnNode.labels);
+				}
+			}
+			else if ((theNode.getOpcode() >= Opcodes.IRETURN && theNode.getOpcode() <= Opcodes.RETURN)
+				|| theNode.getOpcode() == Opcodes.RET)
+			{
+				// Don't continue
+			}
+			else
+			{
+				theContinue = true;
+			}
+			
+			if (theContinue && theNode.getNext() != null) theWorkList.push(theNode.getNext()); 
+		}
+
+		// Set up the final structure
+		SyntaxInsnList s = new SyntaxInsnList(null);
+		Iterator<Map.Entry<IFieldInfo, List<FieldInsnNode>>> theIterator = theAccessMap.entrySet().iterator();
+		while(theIterator.hasNext())
+		{
+			Map.Entry<IFieldInfo, List<FieldInsnNode>> theEntry = theIterator.next();
+			if (theEntry.getValue().size() >= 2)
+			{
+				String theDesc = theEntry.getValue().get(0).desc;
+				Type theType = Type.getType(theDesc);
+				int theSlot = nextFreeVar(theType.getSize());
+				
+				// Register instruction in the map
+				for(FieldInsnNode theNode : theEntry.getValue()) 
+					itsCachedFieldAccesses.put(theNode, theSlot);
+				
+				// Create initializing instruction.
+				s.pushDefaultValue(theType);
+				s.ISTORE(theType, theSlot);
+			}
+		}
+		
+		itsFieldCacheInit = s;
+	}
+	
 	private void processInstructions(InsnList aInsns)
 	{
 		ListIterator<AbstractInsnNode> theIterator = aInsns.iterator();
@@ -429,13 +612,17 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 				
 				// after call
 				s.ALOAD(getThreadDataVar());
-				s.INVOKEVIRTUAL(CLS_THREADDATA, "evUnmonitoredBehaviorResult", "()V");
 		
 				if (theReturnType.getSort() != Type.VOID) 
 				{
+					s.INVOKEVIRTUAL(CLS_THREADDATA, "evUnmonitoredBehaviorResultNonVoid", "()V");
 					s.ISTORE(theReturnType, itsTmpValueVar);
 					sendValue(s, itsTmpValueVar, theReturnType);
 					s.ILOAD(theReturnType, itsTmpValueVar);
+				}
+				else
+				{
+					s.INVOKEVIRTUAL(CLS_THREADDATA, "evUnmonitoredBehaviorResultVoid", "()V");
 				}
 				
 				if (theCtor)
@@ -505,16 +692,86 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 	{
 		SyntaxInsnList s = new SyntaxInsnList(itsLabelManager);
 		Label l = new Label();
+		Label lSameValue = new Label();
+		Label lEndIf = new Label();
+		
 		Type theType = Type.getType(aNode.desc);
 
 		s.ILOAD(getTraceEnabledVar());
 		s.IFfalse(l);
 		{
-			s.ALOAD(getThreadDataVar()); 
-			s.INVOKEVIRTUAL(CLS_THREADDATA, "evFieldRead", "()V"); 
-			
 			s.ISTORE(theType, itsTmpValueVar);
-			sendValue(s, itsTmpValueVar, theType);
+			
+			s.ALOAD(getThreadDataVar()); 
+
+			
+			Integer theCacheSlot = itsCachedFieldAccesses.get(aNode);
+			if (theCacheSlot != null)
+			{
+				// Check if value is the same as before
+				s.ILOAD(theType, itsTmpValueVar);
+				s.ILOAD(theType, theCacheSlot);
+				
+				switch(theType.getSort())
+				{
+		        case Type.BOOLEAN:
+		        case Type.BYTE:
+		        case Type.CHAR:
+		        case Type.SHORT:
+		        case Type.INT:
+		        	s.IF_ICMPEQ(lSameValue);
+		        	break;
+		        	
+		        case Type.FLOAT:
+		        	s.FCMPL();
+		        	s.IFEQ(lSameValue);
+		        	break;
+		        	
+		        case Type.LONG:
+		        	s.LCMP();
+		        	s.IFEQ(lSameValue);
+		        	break;
+		        	
+		        case Type.DOUBLE:
+		        	s.DCMPL();
+		        	s.IFEQ(lSameValue);
+		        	break;
+
+		        case Type.OBJECT:
+		        case Type.ARRAY:
+		        	s.IF_ACMPEQ(lSameValue);
+		        	break;
+		        	
+		        default:
+		            throw new RuntimeException("Not handled: "+theType);
+				}
+
+			}
+			
+			// Value not equal to cached value
+			{
+				s.INVOKEVIRTUAL(CLS_THREADDATA, "evFieldRead", "()V"); 
+				sendValue(s, itsTmpValueVar, theType);
+			}
+			
+			if (theCacheSlot != null)
+			{
+				// Update cache
+				s.ILOAD(theType, itsTmpValueVar);
+				s.ISTORE(theType, theCacheSlot);
+
+				s.GOTO(lEndIf);
+				
+				s.label(lSameValue);
+				
+				// Same value as cached
+				{
+					s.INVOKEVIRTUAL(CLS_THREADDATA, "evFieldRead_Same", "()V");
+				}
+				
+				s.label(lEndIf);
+			}
+			
 			s.ILOAD(theType, itsTmpValueVar);
 		}
 		

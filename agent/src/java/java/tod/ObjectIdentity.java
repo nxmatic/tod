@@ -22,10 +22,10 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 */
 package java.tod;
 
-import java.tod.io._IO;
 import java.tod.util.WeakLongHashMap;
 
 import tod.agent.AgentConfig;
+import tod.agent.util.BitUtilsLite;
 
 
 /**
@@ -35,13 +35,25 @@ import tod.agent.AgentConfig;
  */
 public class ObjectIdentity
 {
+    private static final boolean USE_CACHE = false;
+    
 	/**
 	 * Used as a monitor within generated $tod$getId code.
 	 */
 	public static final Object MON = new Object();
 	
-	private static final boolean USE_JAVA = true;//_AgentConfig.JAVA14;
+	private static final boolean USE_JAVA = true;// _AgentConfig.JAVA14;
 	private static final WeakLongHashMap MAP = USE_JAVA ? new WeakLongHashMap() : null;
+
+	private static final int OBJID_CACHE_SIZE = BitUtilsLite.pow2i(3);
+	private static final int OBJID_CACHE_MASK = OBJID_CACHE_SIZE - 1;
+	private static Object[] itsObjIdCacheKey = new Object[OBJID_CACHE_SIZE];
+	private static long[] itsObjIdCacheValue = new long[OBJID_CACHE_SIZE];
+	private static int itsObjIdCacheIndex = 0;
+	
+	public static int itsObjIdCacheAccess = 0;
+	public static int itsObjIdCacheHit = 0;
+
 	
 	/**
 	 * Retrieves the identifier of an object.
@@ -51,7 +63,24 @@ public class ObjectIdentity
 	 */
 	public static long get (Object aObject)
 	{
-		return USE_JAVA ? get14(aObject) : get15(aObject); 
+	    if (! USE_CACHE) return USE_JAVA ? get14(aObject) : get15(aObject);
+	    
+        if (ThreadData.CAPTURE_DATA) itsObjIdCacheAccess++;
+        
+        for (int i = 0; i < OBJID_CACHE_SIZE; i++) if (itsObjIdCacheKey[i] == aObject)
+        {
+            if (ThreadData.CAPTURE_DATA) itsObjIdCacheHit++;
+            return itsObjIdCacheValue[i];
+        }
+
+        long theId = USE_JAVA ? get14(aObject) : get15(aObject);
+
+        int theIndex = itsObjIdCacheIndex;
+        itsObjIdCacheKey[theIndex] = aObject;
+        itsObjIdCacheValue[theIndex] = theId;
+        itsObjIdCacheIndex = (theIndex + 1) & OBJID_CACHE_MASK;
+
+        return theId;
 	}
 	
 	private static native long get15(Object aObject);

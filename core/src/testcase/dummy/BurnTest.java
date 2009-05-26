@@ -38,9 +38,6 @@ public class BurnTest
 	public static void main(String[] args)
 	{
 		System.out.println("Burn test");
-		byte[] b = new byte[100000000];
-		b = null;
-		System.gc();
 		
 		System.out.println(BurnTest.class);
 		
@@ -61,6 +58,8 @@ public class BurnTest
 			}
 		});
 		System.out.println(b0);
+//		System.out.println("BurnTest: bye!");
+//		System.exit(0);
 		
 		// Real thing
 		System.out.println("BurnTest: create");

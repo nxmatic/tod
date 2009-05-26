@@ -24,7 +24,7 @@ VMARGS="$VMARGS -XX:MaxPermSize=128m"
 VMARGS="$VMARGS -Dagent-verbose=0"
 #VMARGS="$VMARGS -Dagent-cache-path=/home/gpothier/tmp/tod"
 #VMARGS="$VMARGS -Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=8000"
-#VMARGS="$VMARGS -agentlib:hprof=cpu=samples,depth=8"
+#VMARGS="$VMARGS -agentlib:hprof=cpu=samples,depth=3"
 #VMARGS="$VMARGS -Dcom.sun.management.jmxremote=true"
 
 java $VMARGS -cp ./bin dummy.BurnTest

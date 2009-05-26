@@ -12,6 +12,6 @@ public class IdAccessor
 {
 	public static long getId(Object aObject)
 	{
-		return 0;
+		throw new Error("This code is supposed to be replaced by the instrumenter.");
 	}
 }

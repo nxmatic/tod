@@ -22,6 +22,7 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 */
 package java.tod.transport;
 
+import java.lang.ref.WeakReference;
 import java.nio.channels.ByteChannel;
 import java.tod.AgentReady;
 import java.tod.EventCollector;
@@ -71,7 +72,7 @@ public class IOThread extends Thread
 	 * A set of {@link ThreadData} objects registered with this {@link IOThread}.
 	 * They are periodically requested to write all pending data.
 	 */
-	private final _ArrayList<ThreadData> itsThreadDatas = new _ArrayList<ThreadData>();
+	private final _ArrayList<WeakReference<ThreadData>> itsThreadDatas = new _ArrayList<WeakReference<ThreadData>>();
 	
 	private final _ArrayList<ThreadPacket> itsFreePackets = new _ArrayList<ThreadPacket>();
 	
@@ -115,6 +116,11 @@ public class IOThread extends Thread
 		Runtime.getRuntime().addShutdownHook(itsShutdownHook);
 		
 		start();
+	}
+	
+	public void registerThreadData(ThreadData aThreadData)
+	{
+		itsThreadDatas.add(new WeakReference<ThreadData>(aThreadData));
 	}
 	
 	public boolean hasShutdownStarted()
@@ -342,7 +348,16 @@ public class IOThread extends Thread
 		@Override
 		public void run()
 		{
-//			itsShutdownStarted = true;
+			_IO.out("[TOD] Shutting down...");
+			itsShutdownStarted = true;
+			for(int i=0;i<itsThreadDatas.size();i++)
+			{
+				WeakReference<ThreadData> theRef = itsThreadDatas.get(i); 
+				ThreadData theThreadData = theRef.get();
+				if (theThreadData == null) continue;
+				
+				theThreadData.printStats();
+			}
 //			_IO.out("[TOD] Flushing buffers...");
 //			
 //			EventCollector.INSTANCE.end();

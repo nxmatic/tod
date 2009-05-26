@@ -38,4 +38,5 @@ public class ValueType
 	public static final byte FLOAT = 8;
 	public static final byte DOUBLE = 9;
 	public static final byte OBJECT_ID = 10;
+	public static final byte OBJECT_ID_DELTA = 11;
 }

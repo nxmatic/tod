@@ -32,6 +32,11 @@ public class BitUtilsLite
 	{
 		return 1L << aN;
 	}
+	
+	public static final int pow2i(int aN)
+	{
+		return aN < 32 ? 1 << aN : 0;
+	}
 
 	/**
 	 * Returns the base-2 logarithm of the argument

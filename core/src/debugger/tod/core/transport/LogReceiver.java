@@ -326,6 +326,7 @@ public abstract class LogReceiver extends PacketProcessor
 			
 			theCount += theRead;
 
+			// TEMP: the following prevents actual storage of the trace
 			if (theRead >= 0) continue;
 			
 			if (theRead == 0) continue;
