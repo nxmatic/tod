@@ -65,18 +65,23 @@ public class MethodInstrumenter_OutOfScope extends MethodInstrumenter
 	public void proceed()
 	{
 		// Constructors are not overridable so if a constructor is out of scope it is never monitored
-		// Same for finals (obviously)
+		// Same for statics and privates
 		// And we don't instrument natives (obviously)
-		if (isConstructor() || isStaticInitializer() || isStatic() || isFinal() || isNative()) return;
+		// NOT for finals (they can override something)
+		if (isConstructor() || isStaticInitializer() || isStatic() || isNative() || isPrivate()) return;
 		
 		// Avoid bootstrapping issues
 //		if (CLS_OBJECT.equals(getClassNode().name)) return;
+		
+		// Temp optimization (ObjectIdentity uses a WeakHashMap which uses refs)
+		if (getClassNode().name.startsWith("java/lang/ref/")) return;
 		
 		if (CLS_OBJECT.equals(getClassNode().name)) 
 		{
 //			if ("equals".equals(getNode().name)) return;
 //			if ("toString".equals(getNode().name)) return;
 			if ("finalize".equals(getNode().name)) return;
+			if ("wait".equals(getNode().name)) return;
 			System.out.println("Instrumenting: "+getClassNode().name+"."+getNode().name+getNode().desc);
 		}
 		
@@ -121,12 +126,18 @@ public class MethodInstrumenter_OutOfScope extends MethodInstrumenter
 
 			// MOnitoring active, send event
 			s.ALOAD(getThreadDataVar());
-			s.INVOKEVIRTUAL(CLS_THREADDATA, "evOutOfScopeBehaviorExit_Normal", "()V");
+			s.INVOKEVIRTUAL(CLS_THREADDATA, "evOutOfScopeBehaviorExit_Normal", "()V");				
 
-			// Send return value
+			// Send return value if needed
 			Type theReturnType = getReturnType();
 			if (theReturnType.getSort() != Type.VOID) 
 			{
+				s.ALOAD(getThreadDataVar());
+				s.INVOKEVIRTUAL(CLS_THREADDATA, "isInScope", "()Z");
+				s.IFfalse("return");
+
+				s.ALOAD(getThreadDataVar());
+				s.INVOKEVIRTUAL(CLS_THREADDATA, "sendOutOfScopeBehaviorResult", "()V");
 				s.ISTORE(theReturnType, itsResultVar); // We can't use DUP in case of long or double, so we just store the value
 				sendValue(s, itsResultVar, theReturnType);
 				s.ILOAD(theReturnType, itsResultVar);

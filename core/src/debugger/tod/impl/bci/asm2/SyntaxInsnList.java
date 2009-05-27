@@ -646,6 +646,11 @@ public class SyntaxInsnList extends InsnList
 		itsVisitor.visitInsn(Opcodes.IRETURN);
 	}
 	
+	public void IRETURN(Type type)
+	{
+		itsVisitor.visitInsn(type.getOpcode(Opcodes.IRETURN));
+	}
+	
 	public void LRETURN()
 	{
 		itsVisitor.visitInsn(Opcodes.LRETURN);

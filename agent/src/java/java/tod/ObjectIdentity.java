@@ -25,6 +25,7 @@ package java.tod;
 import java.tod.util.WeakLongHashMap;
 
 import tod.agent.AgentConfig;
+import tod.agent.AgentDebugFlags;
 import tod.agent.util.BitUtilsLite;
 
 
@@ -42,7 +43,7 @@ public class ObjectIdentity
 	 */
 	public static final Object MON = new Object();
 	
-	private static final boolean USE_JAVA = true;// _AgentConfig.JAVA14;
+	private static final boolean USE_JAVA = true;//_AgentConfig.JAVA14;
 	private static final WeakLongHashMap MAP = USE_JAVA ? new WeakLongHashMap() : null;
 
 	private static final int OBJID_CACHE_SIZE = BitUtilsLite.pow2i(3);
@@ -65,11 +66,11 @@ public class ObjectIdentity
 	{
 	    if (! USE_CACHE) return USE_JAVA ? get14(aObject) : get15(aObject);
 	    
-        if (ThreadData.CAPTURE_DATA) itsObjIdCacheAccess++;
+        if (AgentDebugFlags.COLLECT_PROFILE) itsObjIdCacheAccess++;
         
         for (int i = 0; i < OBJID_CACHE_SIZE; i++) if (itsObjIdCacheKey[i] == aObject)
         {
-            if (ThreadData.CAPTURE_DATA) itsObjIdCacheHit++;
+            if (AgentDebugFlags.COLLECT_PROFILE) itsObjIdCacheHit++;
             return itsObjIdCacheValue[i];
         }
 
@@ -90,6 +91,13 @@ public class ObjectIdentity
 	public static synchronized long nextId()
 	{
 		return itsNextId++;
+	}
+	
+	private static int itsNextClassId = 1;
+	
+	public static synchronized int nextClassId()
+	{
+		return itsNextClassId++;
 	}
 	
 	private static synchronized long get14(Object aObject)

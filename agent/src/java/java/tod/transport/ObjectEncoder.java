@@ -6,6 +6,7 @@ package java.tod.transport;
 
 import java.tod.util._IdentityHashMap;
 
+import tod.access.TODAccessor;
 import tod.agent.ObjectValue;
 import tod.agent.ObjectValue.FieldValue;
 import tod.agent.io._ByteBuffer;
@@ -30,61 +31,65 @@ public class ObjectEncoder
 		if (aObject == null)
 		{
 			aBuffer.put(ObjectValue.TYPE_NULL);
+			return;
 		}
-		else if (aObject instanceof String)
+		
+		Class theClass = aObject.getClass();
+		
+		if (theClass == String.class)
 		{
 			String v = (String) aObject;
 			writeString(v, aBuffer);
 		}
-		else if (aObject instanceof Integer)
+		else if (theClass == Integer.class)
 		{
 			Integer v = (Integer) aObject;
 			aBuffer.put(ObjectValue.TYPE_INT);
 			aBuffer.putInt(v.intValue());
 		}
-		else if (aObject instanceof Long)
+		else if (theClass == Long.class)
 		{
 			Long v = (Long) aObject;
 			aBuffer.put(ObjectValue.TYPE_LONG);
 			aBuffer.putLong(v.longValue());
 		}
-		else if (aObject instanceof Byte)
+		else if (theClass == Byte.class)
 		{
 			Byte v = (Byte) aObject;
 			aBuffer.put(ObjectValue.TYPE_BYTE);
 			aBuffer.put(v.byteValue());
 		}
-		else if (aObject instanceof Short)
+		else if (theClass == Short.class)
 		{
 			Short v = (Short) aObject;
 			aBuffer.put(ObjectValue.TYPE_SHORT);
 			aBuffer.putShort(v.shortValue());
 		}
-		else if (aObject instanceof Character)
+		else if (theClass == Character.class)
 		{
 			Character v = (Character) aObject;
 			aBuffer.put(ObjectValue.TYPE_CHAR);
 			aBuffer.putChar(v.charValue());
 		}
-		else if (aObject instanceof Float)
+		else if (theClass == Float.class)
 		{
 			Float v = (Float) aObject;
 			aBuffer.put(ObjectValue.TYPE_FLOAT);
 			aBuffer.putFloat(v.floatValue());
 		}
-		else if (aObject instanceof Double)
+		else if (theClass == Double.class)
 		{
 			Double v = (Double) aObject;
 			aBuffer.put(ObjectValue.TYPE_DOUBLE);
 			aBuffer.putDouble(v.doubleValue());
 		}
-		else if (aObject instanceof Boolean)
+		else if (theClass == Boolean.class)
 		{
 			Boolean v = (Boolean) aObject;
 			aBuffer.put(ObjectValue.TYPE_BOOLEAN);
 			aBuffer.put(v.booleanValue() ? (byte) 1 : (byte) 0);
 		}
-		else if (aObject instanceof ObjectValue)
+		else if (theClass == ObjectValue.class)
 		{
 			ObjectValue v = (ObjectValue) aObject;
 			
@@ -107,8 +112,7 @@ public class ObjectEncoder
 	private static void writeString(String v, _ByteBuffer aBuffer)
 	{
 		aBuffer.put(ObjectValue.TYPE_STRING);
-		aBuffer.putInt(v.length());
-		for(int i=0;i<v.length();i++) aBuffer.putChar(v.charAt(i));
+		aBuffer.putString(v);
 	}
 
 	private static void writeObjectValue(ObjectValue aObjectValue, _ByteBuffer aBuffer, _IdentityHashMap<ObjectValue, Integer> aMapping)

@@ -15,25 +15,40 @@ import java.tod.ThreadData;
  */
 public class ThreadPacket
 {
+	/**
+	 * Recycle queue for standard packets (all have the same length).
+	 */
+	public static final int RECYCLE_QUEUE_STANDARD = 0;
+	
+	/**
+	 * Recycle queue for other packets.
+	 */
+	public static final int RECYCLE_QUEUE_OTHER = 1;
+	public static final int RECYCLE_QUEUE_COUNT = 2;
+	
 	public int threadId;
 	public byte[] data;
-	public boolean recyclable;
+	
+	/**
+	 * When the packet has been sent, it will be placed on this recycle queue.
+	 */
+	public int recycleQueue;
 	
 	public int offset;
 	public int length;
 	
 	
-	public ThreadPacket(int aThreadId, byte[] aData, boolean aRecyclable, int aOffset, int aLength)
+	public void set(int aThreadId, byte[] aData, int aRecycleQueue, int aOffset, int aLength)
 	{
 		threadId = aThreadId;
 		data = aData;
-		recyclable = aRecyclable;
+		recycleQueue = aRecycleQueue;
 		offset = aOffset;
 		length = aLength;
 	}
 
-	public ThreadPacket(int aThreadId, byte[] aData, boolean aRecyclable)
+	public void set(int aThreadId, byte[] aData, int aRecycleQueue)
 	{
-		this(aThreadId, aData, aRecyclable, 0, aData.length);
+		set(aThreadId, aData, aRecycleQueue, 0, aData.length);
 	}
 }

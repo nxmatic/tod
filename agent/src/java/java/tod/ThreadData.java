@@ -8,15 +8,17 @@ import java.tod.transport.IOThread;
 import java.tod.transport.ObjectEncoder;
 import java.tod.transport.ThreadPacket;
 import java.tod.util.BitStack;
+import java.tod.util.IntDeltaSender;
+import java.tod.util.LongDeltaSender;
 import java.tod.util._StringBuilder;
 
+import tod.access.TODAccessor;
+import tod.agent.AgentDebugFlags;
 import tod.agent.Command;
 import tod.agent.Message;
 import tod.agent.ValueType;
 import tod.agent.io._ByteBuffer;
 import tod.agent.io._GrowingByteBuffer;
-import tod.agent.util.BitUtilsLite;
-import tod.id.IdAccessor;
 
 /**
  * Per-thread data managed by the {@link EventCollector}.
@@ -25,10 +27,8 @@ import tod.id.IdAccessor;
  * and methods to build the packets to be sent to the database.
  * @author gpothier
  */
-public class ThreadData 
+public final class ThreadData 
 {
-    public static final boolean CAPTURE_DATA = true;
-    
 	/**
 	 * Internal thread id.
 	 * These are different than JVM thread ids, which can potentially
@@ -91,11 +91,8 @@ public class ThreadData
 	private int itsExpectedArgsCount = -1;
 	private int itsAccountToCharge = -1;
 	
-	private long itsLastObjIdSent;
-	private int itsObjIdSent = 0;
-	private int itsObjIdDeltaByte = 0;
-	private int itsObjIdDeltaShort = 0;
-	private int itsObjIdDeltaInt = 0;
+	private LongDeltaSender itsObjIdSender = new LongDeltaSender();
+	private IntDeltaSender itsBehIdSender = new IntDeltaSender();
 	
 	public ThreadData(int aId, IOThread aIOThread)
 	{
@@ -109,10 +106,8 @@ public class ThreadData
 	{
 		byte[] theData = new byte[BUFFER_SIZE]; 
 		
-		itsPacket = new ThreadPacket(
-				getId(), 
-				theData,
-				true);
+		itsPacket = new ThreadPacket();
+		itsPacket.set(getId(), theData, ThreadPacket.RECYCLE_QUEUE_STANDARD);
 		
 		itsBuffer = _ByteBuffer.wrap(theData);
 	}
@@ -124,7 +119,7 @@ public class ThreadData
 	
 	private long getObjectId(Object aObject)
 	{
-		return IdAccessor.getId(aObject);
+		return TODAccessor.getObjectId(aObject);
 	}
 	
 	/**
@@ -192,17 +187,23 @@ public class ThreadData
 	
 	private void msgStart(int aAccount, int aExpectedArgsCount)
 	{
-	    if (!CAPTURE_DATA) return;
-        if (itsExpectedArgsCount != -1) throw new IllegalStateException();
-	    itsLastBufferPos = itsBuffer.position();
-	    itsAccountToCharge = aAccount;
-	    itsExpectedArgsCount = aExpectedArgsCount;
+	    if (!AgentDebugFlags.COLLECT_PROFILE) return;
+	    if (itsExpectedArgsCount != -1) 
+	    {
+	    	_IO.err("Illegal state in msgStart");
+	    }
+		itsLastBufferPos = itsBuffer.position();
+		itsAccountToCharge = aAccount;
+		itsExpectedArgsCount = aExpectedArgsCount;
 	}
 	
 	private void msgStop()
 	{
-        if (!CAPTURE_DATA) return;
-        if (itsExpectedArgsCount == -1) throw new IllegalStateException();
+        if (!AgentDebugFlags.COLLECT_PROFILE) return;
+        if (itsExpectedArgsCount == -1) 
+        {
+	    	_IO.err("Illegal state in msgStop");
+        }
         if (itsExpectedArgsCount-- == 0)
         {
             itsEvData[itsAccountToCharge] += itsBuffer.position() - itsLastBufferPos;
@@ -213,7 +214,7 @@ public class ThreadData
 	
 	public void printStats()
 	{
-	    if (! CAPTURE_DATA) return;
+	    if (! AgentDebugFlags.COLLECT_PROFILE) return;
 	    _StringBuilder b = new _StringBuilder();
 	    
 	    long theTotalData = 0;
@@ -221,6 +222,7 @@ public class ThreadData
 	    for(int i = Message.FIELD_READ;i<Message.SYNC;i++)
 	    {
 	        if (i >= 20 && itsEvCount[i] == 0 && itsEvData[i] == 0) continue;
+	        b.append("[ThreadData] ");
 	        b.append(Message._NAMES[i]);
 	        b.append(": ");
 	        b.append(itsEvCount[i]);
@@ -231,28 +233,30 @@ public class ThreadData
 	        theTotalData += itsEvData[i];
 	    }
 	    
-	    b.append("Total: ");
+	    b.append("[ThreadData] Total: ");
 	    b.append(theTotalData);
         b.append("\n");
         
-        b.append("Object ids: ");
-        b.append(itsObjIdSent);
-        b.append(" - b: ");
-        b.append(itsObjIdDeltaByte);
-        b.append(" - s: ");
-        b.append(itsObjIdDeltaShort);
-        b.append(" - i: ");
-        b.append(itsObjIdDeltaInt);
+        b.append("[ThreadData] Object ids: ");
+        b.append(itsObjIdSender.toString());
         b.append("\n");
 	    
-        b.append("Object ids cache access: ");
+        b.append("[ThreadData] Object ids cache access: ");
         b.append(ObjectIdentity.itsObjIdCacheAccess);
         b.append(" - hits: ");
         b.append(ObjectIdentity.itsObjIdCacheHit);
-        b.append(" - ");
-        b.append(ObjectIdentity.itsObjIdCacheHit*100/ObjectIdentity.itsObjIdCacheAccess);
-        b.append("%\n");
+        if (ObjectIdentity.itsObjIdCacheAccess != 0)
+        {
+            b.append(" - ");
+            b.append(ObjectIdentity.itsObjIdCacheHit*100/ObjectIdentity.itsObjIdCacheAccess);
+            b.append("%");
+        }
+        b.append("\n");
         
+        b.append("[ThreadData] Behavior ids: ");
+        b.append(itsBehIdSender.toString());
+        b.append("\n");
+
 	    _IO.out(b.toString());
 	}
 	
@@ -276,7 +280,7 @@ public class ThreadData
 		
 		itsIOThread.pushPacket(thePacket);
 		
-		thePacket = itsIOThread.getFreePacket();
+		thePacket = itsIOThread.getFreePacket(ThreadPacket.RECYCLE_QUEUE_STANDARD);
 		if (thePacket != null)
 		{
 			thePacket.threadId = getId();
@@ -355,7 +359,7 @@ public class ThreadData
 	    
 		checkTimestamp();
 		sendMessageType(itsBuffer, Message.NEW);
-		sendValue(itsBuffer, aValue, 0);
+		sendValue(itsBuffer, aValue);
 		
 		msgStop();
 		
@@ -374,7 +378,7 @@ public class ThreadData
 
 		checkTimestamp();
 		sendMessageType(itsBuffer, Message.NEW);
-		sendValue(itsBuffer, aValue, 0);
+		sendValue(itsBuffer, aValue);
 
 		msgStop();
 		
@@ -397,7 +401,7 @@ public class ThreadData
 		sendString(itsBuffer, aMethodSignature);
 		sendString(itsBuffer, aMethodDeclaringClassSignature);
 		itsBuffer.putShort((short) aBytecodeIndex);
-		sendValue(itsBuffer, aException, 0);
+		sendValue(itsBuffer, aException);
 
 		msgStop();
 		
@@ -432,9 +436,8 @@ public class ThreadData
 		msgStart(Message.INSCOPE_BEHAVIOR_ENTER, 0);
 
 		checkTimestamp();
-		sendMessageType(itsBuffer, Message.INSCOPE_BEHAVIOR_ENTER);
-		itsBuffer.putInt(aBehaviorId);
-		
+		itsBehIdSender.send(itsBuffer, aBehaviorId, Message.INSCOPE_BEHAVIOR_ENTER_DELTA, Message.INSCOPE_BEHAVIOR_ENTER);
+
 		msgStop();
 		
 		commitBuffer();
@@ -509,7 +512,7 @@ public class ThreadData
 	
 	public void sendValue_Ref(Object aValue)
 	{
-		sendValue(itsBuffer, aValue, 0);
+		sendValue(itsBuffer, aValue);
         msgStop();
 	}
 	
@@ -520,7 +523,7 @@ public class ThreadData
 		msgStart(Message.CONSTRUCTOR_TARGET, 0);
 		
 		sendMessageType(itsBuffer, Message.CONSTRUCTOR_TARGET);
-		sendValue(itsBuffer, aTarget, 0);
+		sendValue(itsBuffer, aTarget);
 		
 		msgStop();
 		
@@ -529,6 +532,9 @@ public class ThreadData
 	
 	public void evInScopeBehaviorExit_Normal()
 	{
+	    msgStart(Message.INSCOPE_BEHAVIOR_EXIT_NORMAL, 0);
+		msgStop();
+		
 		popScope();
 	}
 	
@@ -562,8 +568,7 @@ public class ThreadData
 	}
 	
 	/**
-	 * Exiting normally from an out-of-scope behavior (which has enveloppe only instrumentation).
-	 * Return value expected next
+	 * Exiting normally from an out-of-scope non-void behavior (which has enveloppe only instrumentation).
 	 */
 	public void evOutOfScopeBehaviorExit_Normal()
 	{
@@ -576,6 +581,16 @@ public class ThreadData
 		commitBuffer();
 
 		popScope();
+	}
+	
+	/**
+	 * Indicates that a behavior return value is going to be sent next.
+	 */
+	public void sendOutOfScopeBehaviorResult()
+	{
+	    msgStart(Message.BEHAVIOR_ENTER_ARGS, 1);
+		sendMessageType(itsBuffer, Message.OUTOFSCOPE_BEHAVIOR_EXIT_RESULT);
+		msgStop();
 	}
 	
 	/**
@@ -600,6 +615,8 @@ public class ThreadData
 	 */
 	public void evUnmonitoredBehaviorCall()
 	{
+	    msgStart(Message.UNMONITORED_BEHAVIOR_CALL, 0);
+		msgStop();
 		pushOutOfScope();
 	}
 	
@@ -643,6 +660,8 @@ public class ThreadData
 	 */
 	public void evUnmonitoredBehaviorException()
 	{
+	    msgStart(Message.UNMONITORED_BEHAVIOR_CALL_EXCEPTION, 0);
+		msgStop();
 		if (popScope()) throw new Error("Unexpected scope state");
 	}
 	
@@ -701,7 +720,7 @@ public class ThreadData
 		commitBuffer();
 	}
 	
-	private void sendValue(_ByteBuffer aBuffer, Object aValue, long aTimestamp) 
+	private void sendValue(_ByteBuffer aBuffer, Object aValue) 
 	{
 		if (aValue == null)
 		{
@@ -751,48 +770,21 @@ public class ThreadData
 		}
 		else if (shouldSendByValue(aValue))
 		{
-			sendObjectByValue(aBuffer, aValue, aTimestamp);
+			sendObjectByValue(aBuffer, aValue);
 		}
 		else
 		{
-			sendObjectByRef(aBuffer, aValue, aTimestamp);
+			sendObjectByRef(aBuffer, aValue);
 		}
 	}
 	
-	private void sendObjectId(_ByteBuffer aBuffer, long aId)
-	{
-		long theDelta = aId - itsLastObjIdSent;
-	    itsLastObjIdSent = aId;
-	    
-	    if (theDelta >= Byte.MIN_VALUE && theDelta <= Byte.MAX_VALUE)
-	    {
-            sendValueType(aBuffer, ValueType.OBJECT_ID_DELTA);
-            aBuffer.put((byte) aId);
-	    }
-	    else
-	    {
-	        sendValueType(aBuffer, ValueType.OBJECT_ID);
-	        aBuffer.putLong(aId);
-	    }
-        
-        if (CAPTURE_DATA)
-        {
-            if (theDelta >= Byte.MIN_VALUE && theDelta <= Byte.MAX_VALUE) itsObjIdDeltaByte++;
-            else if (theDelta >= Short.MIN_VALUE && theDelta <= Short.MAX_VALUE) itsObjIdDeltaShort++;
-            else if (theDelta >= Integer.MIN_VALUE && theDelta <= Integer.MAX_VALUE) itsObjIdDeltaInt++;
-            
-            itsObjIdSent++;
-        }
-
-	}
-
 	/**
 	 * Sends an object by value. This method checks if the object already had an
 	 * id. If it didn't, it is placed on the registered objects stack so that
 	 * its value is sent when {@link #sendRegisteredObjects()} is called. In any
 	 * case, the id of the object is sent.
 	 */
-	private void sendObjectByValue(_ByteBuffer aBuffer, Object aObject, long aTimestamp) 
+	private void sendObjectByValue(_ByteBuffer aBuffer, Object aObject) 
 	{
 		long theObjectId = getObjectId(aObject);
 		assert theObjectId != 0;
@@ -803,11 +795,11 @@ public class ThreadData
 			theObjectId = -theObjectId;
 			
 			// add the time stamp for flushing purpose in ObjectDatabase
-			itsRegisteredObjectsStack.push(theObjectId, aObject, aTimestamp);
+			itsRegisteredObjectsStack.push(theObjectId, aObject);
 			// _IO.out("Registering: "+aObject+", id: "+theObjectId);
 		}
 
-		sendObjectId(aBuffer, theObjectId);
+		itsObjIdSender.send(aBuffer, theObjectId, ValueType.OBJECT_ID_DELTA, ValueType.OBJECT_ID);
 	}
 
 	/**
@@ -816,7 +808,7 @@ public class ThreadData
 	 * its type is sent when {@link #sendRegisteredObjects()} is called. In any
 	 * case, the id of the object is sent.
 	 */
-	private void sendObjectByRef(_ByteBuffer aBuffer, Object aObject, long aTimestamp) 
+	private void sendObjectByRef(_ByteBuffer aBuffer, Object aObject) 
 	{
 		long theObjectId = getObjectId(aObject);
 		assert theObjectId != 0;
@@ -825,11 +817,10 @@ public class ThreadData
 		{
 			// First time this object appears, register its type
 			theObjectId = -theObjectId;
-			Class<?> theClass = aObject.getClass();
-			itsRegisteredRefObjectsStack.push(aObject, theObjectId, theClass, aTimestamp);
+			itsRegisteredRefObjectsStack.push(aObject, theObjectId);
 		}
 
-        sendObjectId(aBuffer, theObjectId);
+		itsObjIdSender.send(aBuffer, theObjectId, ValueType.OBJECT_ID_DELTA, ValueType.OBJECT_ID);
 	}
 
 	/**
@@ -840,69 +831,84 @@ public class ThreadData
 		while (!itsRegisteredObjectsStack.isEmpty())
 		{
 			ObjectEntry theEntry = itsRegisteredObjectsStack.pop();
-			sendRegisteredObject(theEntry.id, theEntry.object, theEntry.timestamp);
+			sendRegisteredObject(theEntry.id, theEntry.object);
 		}
 		
 		while (!itsRegisteredRefObjectsStack.isEmpty())
 		{
 			RefObjectEntry theEntry = itsRegisteredRefObjectsStack.pop();
-			sendRegisteredRefObject(theEntry.object, theEntry.id, theEntry.cls, theEntry.timestamp);
+			sendRegisteredRefObject(theEntry.object, theEntry.id);
 		}
 
 	}
 
-	private void sendRegisteredObject(long aId, Object aObject, long aTimestamp) 
+	private void sendRegisteredObject(long aId, Object aObject) 
 	{
+		ThreadPacket thePacket = itsIOThread.getFreePacket(ThreadPacket.RECYCLE_QUEUE_OTHER);
+		if (thePacket == null) 
+		{
+			thePacket = new ThreadPacket();
+			thePacket.data = new byte[128];
+			thePacket.recycleQueue = ThreadPacket.RECYCLE_QUEUE_OTHER;
+		}
+		
+		thePacket.threadId = getId();
+		
 		// We use a different buffer here because the packet might be huge.
-		_GrowingByteBuffer theBuffer = _GrowingByteBuffer.allocate(1024);
-		theBuffer.position(22); // Header placeholder
+		_GrowingByteBuffer theBuffer = _GrowingByteBuffer.wrap(thePacket.data);
+		theBuffer.position(14); // Header placeholder
 		
 		ObjectEncoder.encode(ObjectValueFactory.convert(aObject), theBuffer);
 		
-		int theSize = theBuffer.position()-5; // 5: event type + size 
+		int thePacketSize = theBuffer.position(); 
+		int theSize = thePacketSize-5; // 5: event type + size 
 	
 		theBuffer.position(0);
 		sendMessageType(theBuffer, Message.REGISTER_OBJECT);
 		theBuffer.putInt(theSize); 
 		
 		theBuffer.putLong(aId);
-		theBuffer.putLong(aTimestamp);
 		theBuffer.put(isIndexable(aObject) ? (byte) 1 : (byte) 0);
 		
-		itsIOThread.pushPacket(new ThreadPacket(
-		        getId(), 
-		        theBuffer.array(), 
-		        theBuffer.array().length == BUFFER_SIZE,
-		        0,
-		        theBuffer.position()));
+		thePacket.offset = 0;
+		thePacket.length = thePacketSize;
+		itsIOThread.pushPacket(thePacket);
 		
-		itsEvCount[Message.REGISTER_OBJECT]++;
-		itsEvData[Message.REGISTER_OBJECT] += theBuffer.position();
+		if (AgentDebugFlags.COLLECT_PROFILE)
+		{
+			itsEvCount[Message.REGISTER_OBJECT]++;
+			itsEvData[Message.REGISTER_OBJECT] += thePacketSize;
+		}
 	}
 	
-	private void sendRegisteredRefObject(Object aObject, long aId, Class<?> aClass, long aTimestamp) 
+	private void sendRegisteredRefObject(Object aObject, long aId) 
 	{
+		Class theClass = aObject.getClass();
+		
 		// That must stay before we start using the buffer
-		if (aClass == Class.class)
+		if (theClass == Class.class)
 		{
 			// We have to register it explicitly now otherwise the system thinks it
 			// is already registered because it has an id.
-			sendRegisterClass(aId, (Class<?>) aObject);
+			Class<?> theClassValue = (Class<?>) aObject;
+			sendRegisterClass(TODAccessor.getClassId(theClassValue), theClassValue);
 		}
-		long theClassId = getClassId(aClass); 
+		int theClassId = getClassId(theClass); 
 		
-		sendMessageType(itsBuffer, Message.REGISTER_REFOBJECT);
+		msgStart(Message.REGISTER_REFOBJECT, 0);
 		
-		itsBuffer.putLong(aId);
-		itsBuffer.putLong(aTimestamp);
-		itsBuffer.putLong(theClassId);
+		itsObjIdSender.send(itsBuffer, aId, Message.REGISTER_REFOBJECT_DELTA, Message.REGISTER_REFOBJECT);
+		itsBuffer.putInt(theClassId);
+		
+		msgStop();
 		
 		commitBuffer();
+
 	}
 	
-	private long getClassId(Class<?> aClass) 
+	private int getClassId(Class<?> aClass) 
 	{
-		long theId = getObjectId(aClass);
+		int theId = TODAccessor.getClassId(aClass);
 		assert theId != 0;
 		
 		if (theId < 0)
@@ -914,20 +920,21 @@ public class ThreadData
 		return theId;
 	}
 	
-	private void sendRegisterClass(long aClassId, Class<?> aClass) 
+	private void sendRegisterClass(int aClassId, Class<?> aClass) 
 	{
 		// That must stay before we start using the buffer
 		long theLoaderId = getClassLoaderId(aClass.getClassLoader());
 		
+		msgStart(Message.REGISTER_CLASS, 0);
 		sendMessageType(itsBuffer, Message.REGISTER_CLASS);
 		
-		itsBuffer.putLong(aClassId);
+		itsBuffer.putInt(aClassId);
 		itsBuffer.putLong(theLoaderId);
 		
 		String theName = aClass.getName();
-		itsBuffer.putShort((short) theName.length());
-		for(int i=0;i<theName.length();i++) itsBuffer.putChar(theName.charAt(i));
+		itsBuffer.putString(theName);
 		
+		msgStop();
 		commitBuffer();
 	}
 	
@@ -952,10 +959,13 @@ public class ThreadData
 		// That must stay before we start using the buffer
 		long theLoaderClassId = getClassId(aLoader.getClass());
 		
+		msgStart(Message.REGISTER_CLASSLOADER, 0);
 		sendMessageType(itsBuffer, Message.REGISTER_CLASSLOADER);
 		
 		itsBuffer.putLong(aLoaderId);
 		itsBuffer.putLong(theLoaderClassId);
+		
+		msgStop();
 		
 		commitBuffer();
 	}
@@ -987,7 +997,7 @@ public class ThreadData
 			}
 		}
 
-		public void push(long aId, Object aObject, long aTimestamp)
+		public void push(long aId, Object aObject)
 		{
 			//TODO remove this 
 			if (itsSize>= itsObjects.length) {
@@ -996,7 +1006,7 @@ public class ThreadData
 					_IO.out(itsObjects[theI].object.getClass() +" ");
 			}
 			
-			itsObjects[itsSize++].set(aId, aObject, aTimestamp);
+			itsObjects[itsSize++].set(aId, aObject);
 		}
 
 		public boolean isEmpty()
@@ -1014,13 +1024,11 @@ public class ThreadData
 	{
 		public long id;
 		public Object object;
-		public long timestamp;
 
-		public void set(long aId, Object aObject, long aTimestamp)
+		public void set(long aId, Object aObject)
 		{
 			id = aId;
 			object = aObject;
-			timestamp = aTimestamp;
 		}
 	}
 
@@ -1048,9 +1056,9 @@ public class ThreadData
 			}
 		}
 
-		public void push(Object aObject, long aId, Class<?> aClass, long aTimestamp)
+		public void push(Object aObject, long aId)
 		{
-			itsObjects[itsSize++].set(aObject, aId, aClass, aTimestamp);
+			itsObjects[itsSize++].set(aObject, aId);
 		}
 
 		public boolean isEmpty()
@@ -1068,15 +1076,11 @@ public class ThreadData
 	{
 		public Object object;
 		public long id;
-		public Class<?> cls;
-		public long timestamp;
 
-		public void set(Object aObject, long aId, Class<?> aClass, long aTimestamp)
+		public void set(Object aObject, long aId)
 		{
 			object = aObject;
 			id = aId;
-			cls = aClass;
-			timestamp = aTimestamp;
 		}
 	}
 

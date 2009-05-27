@@ -9,7 +9,7 @@ package tod.agent.io;
  */
 public class _GrowingByteBuffer extends _ByteBuffer
 {
-	public _GrowingByteBuffer(byte[] aBytes)
+	protected _GrowingByteBuffer(byte[] aBytes)
 	{
 		super(aBytes);
 	}
@@ -19,6 +19,11 @@ public class _GrowingByteBuffer extends _ByteBuffer
 		return new _GrowingByteBuffer(new byte[aSize]);
 	}
 
+	public static _GrowingByteBuffer wrap(byte[] aBytes)
+	{
+		return new _GrowingByteBuffer(aBytes);
+	}
+	
 	@Override
 	protected void checkRemaining(int aRequested)
 	{

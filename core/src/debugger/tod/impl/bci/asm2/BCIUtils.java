@@ -63,6 +63,11 @@ public class BCIUtils implements Opcodes
 		return (access & Opcodes.ACC_NATIVE) != 0;
 	}
 	
+	public static boolean isPrivate(int access)
+	{
+		return (access & Opcodes.ACC_PRIVATE) != 0;
+	}
+	
 	/**
 	 * Generates the bytecode that pushes the given value onto the stack
 	 */

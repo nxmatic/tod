@@ -26,6 +26,7 @@ import java.lang.ref.WeakReference;
 import java.nio.channels.ByteChannel;
 import java.tod.AgentReady;
 import java.tod.EventCollector;
+import java.tod.ObjectIdentity;
 import java.tod.TOD;
 import java.tod.ThreadData;
 import java.tod.TracedMethods;
@@ -34,9 +35,12 @@ import java.tod.io._IO;
 import java.tod.io._IOException;
 import java.tod.io._SocketChannel;
 import java.tod.util._ArrayList;
+import java.tod.util._StringBuilder;
 import java.tod.util._SyncRingBuffer;
 
+import tod.agent.AgentDebugFlags;
 import tod.agent.Command;
+import tod.agent.Message;
 import tod.agent.io._ByteBuffer;
 
 /**
@@ -74,11 +78,14 @@ public class IOThread extends Thread
 	 */
 	private final _ArrayList<WeakReference<ThreadData>> itsThreadDatas = new _ArrayList<WeakReference<ThreadData>>();
 	
-	private final _ArrayList<ThreadPacket> itsFreePackets = new _ArrayList<ThreadPacket>();
+	private final _ArrayList<ThreadPacket>[] itsFreePackets;
 	
 	private final MyShutdownHook itsShutdownHook;
 	
 	private volatile boolean itsShutdownStarted = false;
+	
+	private long itsBytesSent = 0;
+	private long itsPacketsSent = 0;
 	
 	/**
 	 *  Time at which last stale buffer check was performed
@@ -110,12 +117,30 @@ public class IOThread extends Thread
 		itsEventCollector = aEventCollector;
 		itsChannel = aChannel;
 		
-		itsHeaderBuffer = _ByteBuffer.allocate(9);
+		itsHeaderBuffer = _ByteBuffer.allocate(8);
 		
 		itsShutdownHook = new MyShutdownHook();
 		Runtime.getRuntime().addShutdownHook(itsShutdownHook);
 		
+		itsFreePackets = new _ArrayList[ThreadPacket.RECYCLE_QUEUE_COUNT];
+		for(int i=0;i<itsFreePackets.length;i++) itsFreePackets[i] = new _ArrayList<ThreadPacket>();
+		
 		start();
+	}
+	
+	public void printStats()
+	{
+	    if (! AgentDebugFlags.COLLECT_PROFILE) return;
+	    _StringBuilder b = new _StringBuilder();
+	    
+        
+        b.append("[IOThread] Bytes sent: ");
+        b.append(itsBytesSent);
+        b.append(" - packets: ");
+        b.append(itsPacketsSent);
+        b.append("\n");
+
+        _IO.out(b.toString());
 	}
 	
 	public void registerThreadData(ThreadData aThreadData)
@@ -192,6 +217,13 @@ public class IOThread extends Thread
 		itsChannel.write(itsHeaderBuffer);
 		
 		itsChannel.writeAll(aPacket.data, aPacket.offset, aPacket.length);
+		
+		if (AgentDebugFlags.COLLECT_PROFILE) 
+		{
+			itsBytesSent += itsHeaderBuffer.capacity()+aPacket.length;
+			itsPacketsSent++;
+		}
+		
 		freePacket(aPacket);
 	}
 	
@@ -313,19 +345,18 @@ public class IOThread extends Thread
 	
 	private void freePacket(ThreadPacket aPacket)
 	{
-		if (! aPacket.recyclable) return;
 		synchronized (itsFreePackets)
 		{
-			itsFreePackets.add(aPacket);
+			itsFreePackets[aPacket.recycleQueue].add(aPacket);
 		}
 	}
 	
-	public ThreadPacket getFreePacket()
+	public ThreadPacket getFreePacket(int aRecycleQueue)
 	{
-		if (itsFreePackets.isEmpty()) return null;
+		if (itsFreePackets[aRecycleQueue].isEmpty()) return null;
 		synchronized (itsFreePackets)
 		{
-			return itsFreePackets.removeLast();
+			return itsFreePackets[aRecycleQueue].removeLast();
 		}
 	}
 	
@@ -358,6 +389,9 @@ public class IOThread extends Thread
 				
 				theThreadData.printStats();
 			}
+			
+			printStats();
+			
 //			_IO.out("[TOD] Flushing buffers...");
 //			
 //			EventCollector.INSTANCE.end();

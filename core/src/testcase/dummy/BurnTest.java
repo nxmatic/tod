@@ -32,7 +32,7 @@ import tod.BenchBase.BenchResults;
 public class BurnTest
 {
 	private static int rndSeed = 1234598;
-	private static final int N = 50000;
+	private static final int N = 100000;//50000;
 	private static Node root;
 	
 	public static void main(String[] args)
@@ -54,12 +54,15 @@ public class BurnTest
 			public void run()
 			{
 				root = createTree(null, N);
-				for (int i=0;i<10;i++) root.visit();
+//				for (int i=0;i<10;i++) root.visit();
 			}
 		});
 		System.out.println(b0);
 //		System.out.println("BurnTest: bye!");
 //		System.exit(0);
+		
+		root = null;
+		System.gc();
 		
 		// Real thing
 		System.out.println("BurnTest: create");
@@ -76,7 +79,7 @@ public class BurnTest
 		{
 			public void run()
 			{
-				for (int i=0;i<100;i++) root.visit();
+//				for (int i=0;i<100;i++) root.visit();
 			}
 		});
 		

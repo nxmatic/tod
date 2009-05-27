@@ -28,6 +28,7 @@ import java.tod.io._IOException;
 import java.tod.io._SocketChannel;
 import java.tod.transport.IOThread;
 import java.tod.util._ArrayList;
+import java.tod.util._StringBuilder;
 
 import tod.agent.AgentConfig;
 import tod.agent.AgentDebugFlags;
@@ -176,6 +177,11 @@ public final class EventCollector
 		itsThreadData.set(theThreadData);
 		
 		theThreadData.sendThread(theJvmId, theCurrentThread.getName());
+		
+		_StringBuilder b = new _StringBuilder();
+		b.append("[TOD] New thread: ");
+		b.append(theCurrentThread.getName());
+		_IO.out(b.toString());
         
 		return theThreadData;
 	}

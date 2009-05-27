@@ -26,7 +26,7 @@ import java.util.ArrayList;
 
 import javax.swing.JPanel;
 
-import tod.id.IdAccessor;
+import tod.access.TODAccessor;
 
 
 
@@ -81,7 +81,7 @@ public class BCITest
 	
 	public static void print (Object aObject)
 	{
-		System.out.println("Object: "+IdAccessor.getId(aObject));
+		System.out.println("Object: "+TODAccessor.getId(aObject));
 	}
 	
 	private void foo (int i, long l, float f, double d, String s)

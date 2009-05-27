@@ -51,13 +51,13 @@ import org.objectweb.asm.tree.analysis.BasicVerifier;
 import org.objectweb.asm.util.CheckClassAdapter;
 
 import tod.Util;
+import tod.access.TODAccessor;
 import tod.core.bci.IInstrumenter.InstrumentedClass;
 import tod.core.config.TODConfig;
 import tod.core.database.structure.IClassInfo;
 import tod.core.database.structure.IMutableBehaviorInfo;
 import tod.core.database.structure.IMutableClassInfo;
 import tod.core.database.structure.IMutableStructureDatabase;
-import tod.id.IdAccessor;
 import zz.utils.Utils;
 
 /**
@@ -71,8 +71,17 @@ public class ClassInstrumenter
 	 */
 	private static final boolean ENABLE_CHECKS = true;
 	
+	private static final String TODACCESSOR_CLASSNAME = TODAccessor.class.getName().replace('.', '/');
+	
 	private static final String OBJID_FIELD = "$tod$id";
 	private static final String OBJID_GETTER = "$tod$getId";
+	
+	private static final String CLSID_FIELD = "$tod$clsId";
+	private static final String CLSID_GETTER = "$tod$getClsId";
+	
+	private static final String STRING_GETCHARS = "$tod$getChars";
+	private static final String STRING_GETOFFSET = "$tod$getOffset";
+	private static final String STRING_GETCOUNT = "$tod$getCount";
 	
 	
 	private final ASMInstrumenter2 itsInstrumenter;
@@ -138,8 +147,12 @@ public class ClassInstrumenter
 	
 	public InstrumentedClass proceed()
 	{
-		if ("tod/id/IdAccessor".equals(getNode().name)) processIdAccessor();
+		if (TODACCESSOR_CLASSNAME.equals(getNode().name)) processTODAccessor();
 		else processNormalClass();
+		
+		if (MethodInstrumenter.CLS_OBJECT.equals(getNode().name)) addGetIdMethod_Root();
+		if (MethodInstrumenter.CLS_CLASS.equals(getNode().name)) addGetClsIdMethod();
+		if (MethodInstrumenter.CLS_STRING.equals(getNode().name)) addStringRawAccess();
 		
 		for(MethodNode theNode : (List<MethodNode>) itsNode.methods) checkMethod(theNode);
 
@@ -177,11 +190,7 @@ public class ClassInstrumenter
 		for(MethodNode theNode : (List<MethodNode>) itsNode.methods) processMethod(theNode);
 
 		// Add infrastructure
-		if (MethodInstrumenter.CLS_OBJECT.equals(getNode().name)) 
-		{
-			addGetIdMethod_Root();
-		}
-		else if (! itsInterface
+		if (! itsInterface
 				&& MethodInstrumenter.CLS_OBJECT.equals(getNode().superName) 
 				&& getInstrumenter().isInIdScope(getNode().name)) 
 		{
@@ -197,7 +206,7 @@ public class ClassInstrumenter
 				BCIUtils.isStatic(aNode.access));
 		
 		if (itsInstrumenter.isInScope(itsName)) new MethodInstrumenter_InScope(this, aNode, theBehavior).proceed();
-//		else new MethodInstrumenter_OutOfScope(this, aNode, theBehavior).proceed();
+		else new MethodInstrumenter_OutOfScope(this, aNode, theBehavior).proceed();
 	}
 	
 	private void checkMethod(MethodNode aNode)
@@ -227,21 +236,41 @@ public class ClassInstrumenter
 	}
 	
 	/**
-	 * Replaces the body of {@link IdAccessor#getId(Object)} so that
+	 * Replaces the body of {@link TODAccessor#getId(Object)} so that
 	 * it calls the generated Object.$tod$getId method
 	 */
-	private void processIdAccessor()
+	private void processTODAccessor()
 	{
-		for(MethodNode theNode : (List<MethodNode>) itsNode.methods) if ("getId".equals(theNode.name))
+		for(MethodNode theNode : (List<MethodNode>) itsNode.methods) 
 		{
-			SyntaxInsnList s = new SyntaxInsnList(null);
-			s.ALOAD(0);
-			s.INVOKEVIRTUAL(MethodInstrumenter.CLS_OBJECT, OBJID_GETTER, "()J");
-			s.LRETURN();
-			
-			theNode.instructions = s;
-			theNode.maxStack = 2;
+			if ("getObjectId".equals(theNode.name))
+				makeAccessor(theNode, MethodInstrumenter.CLS_OBJECT, OBJID_GETTER, "J");
+			else if ("getStringChars".equals(theNode.name))
+				makeAccessor(theNode, MethodInstrumenter.CLS_STRING, STRING_GETCHARS, "[C");
+			else if ("getStringOffset".equals(theNode.name))
+				makeAccessor(theNode, MethodInstrumenter.CLS_STRING, STRING_GETOFFSET, "I");
+			else if ("getStringCount".equals(theNode.name))
+				makeAccessor(theNode, MethodInstrumenter.CLS_STRING, STRING_GETCOUNT, "I");
+			else if ("getClassId".equals(theNode.name))
+				makeAccessor(theNode, MethodInstrumenter.CLS_CLASS, CLSID_GETTER, "I");
 		}
+	}
+	
+	/**
+	 * Transforms the given method into a delegate accessor that calls the given
+	 * method on the object passed as a parameter.
+	 */
+	private void makeAccessor(MethodNode aNode, String aOwner, String aName, String aDescriptor)
+	{
+		Type theType = Type.getType(aDescriptor);
+		
+		SyntaxInsnList s = new SyntaxInsnList(null);
+		s.ALOAD(0);
+		s.INVOKEVIRTUAL(aOwner, aName, "()"+theType.getDescriptor());
+		s.IRETURN(theType);
+		
+		aNode.instructions = s;
+		aNode.maxStack = theType.getSize();
 	}
 
 	/**
@@ -287,6 +316,7 @@ public class ClassInstrumenter
 		
 		SyntaxInsnList s = new SyntaxInsnList(null);
 		Label lReturn = new Label();
+		Label lUnlock = new Label();
 		
 		s.ALOAD(0);
 		s.GETFIELD(getNode().name, OBJID_FIELD, "J");
@@ -307,7 +337,7 @@ public class ClassInstrumenter
 		s.DUP2();
 		s.pushLong(0);
 		s.LCMP();
-		s.IFNE(lReturn);
+		s.IFNE(lUnlock);
 		
 		// Still doesn't have an id
 		s.POP2();
@@ -317,6 +347,10 @@ public class ClassInstrumenter
 		s.DUP2_X1();
 		s.PUTFIELD(getNode().name, OBJID_FIELD, "J");
 		
+		s.LNEG();
+		
+		s.label(lUnlock);
+		
 		s.GETSTATIC("java/tod/ObjectIdentity", "MON", MethodInstrumenter.DSC_OBJECT);
 		s.MONITOREXIT();
 		
@@ -325,6 +359,100 @@ public class ClassInstrumenter
 
 		theGetter.instructions = s;
 	}
+	
+	/**
+	 * Creates the $tod$getClsId method. 
+	 */
+	private void addGetClsIdMethod()
+	{
+		// Add field
+		getNode().fields.add(new FieldNode(
+				Opcodes.ACC_PRIVATE | Opcodes.ACC_TRANSIENT | Opcodes.ACC_VOLATILE, 
+				CLSID_FIELD, 
+				"I", 
+				null, 
+				null));
+		
+		// Add getter
+		MethodNode theGetter = createMethod(
+				CLSID_GETTER, 
+				"()I", 
+				Opcodes.ACC_PUBLIC);
+		
+		theGetter.maxStack = 6;
+		theGetter.maxLocals = 1;
+		
+		SyntaxInsnList s = new SyntaxInsnList(null);
+		Label lReturn = new Label();
+		Label lUnlock = new Label();
+		
+		s.ALOAD(0);
+		s.GETFIELD(getNode().name, CLSID_FIELD, "I");
+		s.DUP();
+		s.IFfalse(lReturn);
+		
+		// Doesn't have an id
+		s.POP();
+		
+		// Double-checked locking (this works under Java5 if the field is volatile)
+		s.GETSTATIC("java/tod/ObjectIdentity", "MON", MethodInstrumenter.DSC_OBJECT);
+		s.MONITORENTER();
+		
+		s.ALOAD(0);
+		s.GETFIELD(getNode().name, CLSID_FIELD, "I");
+		s.DUP();
+		s.IFfalse(lUnlock);
+		
+		// Still doesn't have an id
+		s.POP();
+		
+		s.ALOAD(0);
+		s.INVOKESTATIC("java/tod/ObjectIdentity", "nextClassId", "()I");
+		s.DUP_X1();
+		s.PUTFIELD(getNode().name, CLSID_FIELD, "I");
+		
+		s.INEG();
+		
+		s.label(lUnlock);
+		
+		s.GETSTATIC("java/tod/ObjectIdentity", "MON", MethodInstrumenter.DSC_OBJECT);
+		s.MONITOREXIT();
+		
+		s.label(lReturn);
+		s.IRETURN();
+		
+		theGetter.instructions = s;
+	}
+	
+	/**
+	 * Adds the raw access methods to java.lang.String
+	 */
+	private void addStringRawAccess()
+	{
+		createGetter(MethodInstrumenter.CLS_STRING, STRING_GETCHARS, "value", "[C");
+		createGetter(MethodInstrumenter.CLS_STRING, STRING_GETOFFSET, "offset", "I");
+		createGetter(MethodInstrumenter.CLS_STRING, STRING_GETCOUNT, "count", "I");
+	}
+	
+	private void createGetter(String aOwner, String aGetterName, String aFieldName, String aValueDesc)
+	{
+		Type theType = Type.getType(aValueDesc);
+		
+		MethodNode theGetter = createMethod(aGetterName, "()"+aValueDesc, Opcodes.ACC_PUBLIC);
+		theGetter.maxStack = theType.getSize();
+		theGetter.maxLocals = 1;
+		
+		SyntaxInsnList s = new SyntaxInsnList(null);
+		
+		s.ALOAD(0);
+		s.GETFIELD(aOwner, aFieldName, aValueDesc);
+		s.IRETURN(theType);
+		
+		theGetter.instructions = s;
+	}
+	
+
+
 	
 	private MethodNode createMethod(String aName, String aDesc, int aAccess)
 	{

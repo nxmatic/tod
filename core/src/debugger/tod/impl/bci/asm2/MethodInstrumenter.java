@@ -38,7 +38,6 @@ import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
 import org.objectweb.asm.tree.analysis.Frame;
 import org.objectweb.asm.tree.analysis.SourceInterpreter;
-import org.objectweb.asm.tree.analysis.SourceValue;
 
 import tod.core.database.structure.IMutableBehaviorInfo;
 import tod.core.database.structure.IMutableStructureDatabase;
@@ -56,6 +55,8 @@ public abstract class MethodInstrumenter
 	protected static final String DSC_OBJECT = "L"+CLS_OBJECT+";";
 	protected static final String CLS_THROWABLE = "java/lang/Throwable";
 	protected static final String DSC_THROWABLE = "L"+CLS_THROWABLE+";";
+	protected static final String CLS_STRING = "java/lang/String";
+	protected static final String CLS_CLASS = "java/lang/Class";
 	
 	private final ClassInstrumenter itsClassInstrumenter;
 	private final MethodNode itsNode;
@@ -121,6 +122,11 @@ public abstract class MethodInstrumenter
 	protected boolean isNative()
 	{
 		return BCIUtils.isNative(getNode().access);
+	}
+	
+	protected boolean isPrivate()
+	{
+		return BCIUtils.isPrivate(getNode().access);
 	}
 	
 	protected boolean isConstructor()

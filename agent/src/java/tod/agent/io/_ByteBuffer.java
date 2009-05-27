@@ -6,6 +6,8 @@ package tod.agent.io;
 import java.io.DataInputStream;
 import java.io.IOException;
 
+import tod.access.TODAccessor;
+
 
 
 /**
@@ -76,6 +78,20 @@ public class _ByteBuffer
 		itsBytes[thePos + 0] = int0(v);
 		itsBytes[thePos + 1] = int1(v);
 		itsPos += 2;
+	}
+	
+	public final void putChars(char[] v, int aOffset, int aCount)
+	{
+		checkRemaining(2*aCount);
+		int thePos = itsPos;
+		for(int i=aOffset;i<aOffset+aCount;i++)
+		{
+			char c = v[i];
+			itsBytes[thePos + 0] = int0(c);
+			itsBytes[thePos + 1] = int1(c);
+			thePos += 2;
+		}
+		itsPos = thePos;
 	}
 	
 	public final char getChar()
@@ -165,8 +181,12 @@ public class _ByteBuffer
 	 */
 	public final void putString(String aString)
 	{
-		putInt(aString.length());
-		for(int i=0;i<aString.length();i++) putChar(aString.charAt(i));
+		char[] c = TODAccessor.getStringChars(aString);
+		int o = TODAccessor.getStringOffset(aString);
+		int l = TODAccessor.getStringCount(aString);
+		
+		putInt(l);
+		putChars(c, o, l);
 	}
 
 	/**
