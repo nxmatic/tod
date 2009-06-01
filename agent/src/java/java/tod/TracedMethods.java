@@ -24,7 +24,6 @@ package java.tod;
 
 import java.tod.util._BitSet;
 import java.tod.util._ByteArray;
-import java.tod.util._IntArray;
 
 import tod.agent.MonitoringMode;
 

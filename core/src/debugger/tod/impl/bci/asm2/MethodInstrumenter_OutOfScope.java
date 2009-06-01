@@ -56,7 +56,7 @@ public class MethodInstrumenter_OutOfScope extends MethodInstrumenter
 
 	public MethodInstrumenter_OutOfScope(ClassInstrumenter aClassInstrumenter, MethodNode aNode, IMutableBehaviorInfo aBehavior)
 	{
-		super(aClassInstrumenter, aNode, aBehavior);
+		super(aClassInstrumenter, aNode, aBehavior, false);
 		itsResultVar = nextFreeVar(2); //result might need two slots.
 		getNode().maxStack += 3; // This is the max we add to the stack
 	}
@@ -64,17 +64,18 @@ public class MethodInstrumenter_OutOfScope extends MethodInstrumenter
 	@Override
 	public void proceed()
 	{
+		// Abstracts and natives have no body.
+		if (isAbstract() || isNative()) return;
+		
 		// Constructors are not overridable so if a constructor is out of scope it is never monitored
 		// Same for statics and privates
-		// And we don't instrument natives (obviously)
 		// NOT for finals (they can override something)
-		if (isConstructor() || isStaticInitializer() || isStatic() || isNative() || isPrivate()) return;
+		if (isConstructor() || isStaticInitializer() || isStatic() || isPrivate()) return;
 		
-		// Avoid bootstrapping issues
-//		if (CLS_OBJECT.equals(getClassNode().name)) return;
-		
-		// Temp optimization (ObjectIdentity uses a WeakHashMap which uses refs)
+		// Temp optimizations (ObjectIdentity uses a WeakHashMap which uses refs)
 		if (getClassNode().name.startsWith("java/lang/ref/")) return;
+		if (getClassNode().name.startsWith("java/lang/ThreadLocal")) return;
+		if (getClassNode().name.indexOf("ClassLoader") >= 0) return;
 		
 		if (CLS_OBJECT.equals(getClassNode().name)) 
 		{
@@ -124,7 +125,7 @@ public class MethodInstrumenter_OutOfScope extends MethodInstrumenter
 			s.ILOAD(getTraceEnabledVar());
 			s.IFfalse("return");
 
-			// MOnitoring active, send event
+			// Monitoring active, send event
 			s.ALOAD(getThreadDataVar());
 			s.INVOKEVIRTUAL(CLS_THREADDATA, "evOutOfScopeBehaviorExit_Normal", "()V");				
 

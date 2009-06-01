@@ -32,15 +32,19 @@ Inc. MD5 Message-Digest Algorithm".
 package tod.impl.bci.asm2;
 
 import java.tod.ThreadData;
+import java.util.HashMap;
+import java.util.ListIterator;
+import java.util.Map;
 
 import org.objectweb.asm.Type;
+import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
-import org.objectweb.asm.tree.analysis.Frame;
 import org.objectweb.asm.tree.analysis.SourceInterpreter;
 
 import tod.core.database.structure.IMutableBehaviorInfo;
 import tod.core.database.structure.IMutableStructureDatabase;
+import tod.impl.bci.asm2.Analysis.SourceFrame;
 
 public abstract class MethodInstrumenter
 {
@@ -78,11 +82,15 @@ public abstract class MethodInstrumenter
 	private int itsTraceEnabledVar;
 	
 	/**
-	 * The cached stack frames resulting from the analysis of the method
+	 * Maps instructions to frames.
 	 */
-	private Frame[] itsFrames;
+	private Map<AbstractInsnNode, SourceFrame> itsFramesMap;
 	
-	public MethodInstrumenter(ClassInstrumenter aClassInstrumenter, MethodNode aNode, IMutableBehaviorInfo aBehavior)
+	public MethodInstrumenter(
+			ClassInstrumenter aClassInstrumenter, 
+			MethodNode aNode, 
+			IMutableBehaviorInfo aBehavior,
+			boolean aAnalyze)
 	{
 		itsClassInstrumenter = aClassInstrumenter;
 		itsNode = aNode;
@@ -97,6 +105,8 @@ public abstract class MethodInstrumenter
 		
 		itsThreadDataVar = nextFreeVar(1);
 		itsTraceEnabledVar = nextFreeVar(1);
+		
+		if (aAnalyze) setupFrames();
 	}
 	
 	public ClassInstrumenter getClassInstrumenter()
@@ -127,6 +137,11 @@ public abstract class MethodInstrumenter
 	protected boolean isPrivate()
 	{
 		return BCIUtils.isPrivate(getNode().access);
+	}
+	
+	protected boolean isAbstract()
+	{
+		return BCIUtils.isAbstract(getNode().access);
 	}
 	
 	protected boolean isConstructor()
@@ -273,10 +288,23 @@ public abstract class MethodInstrumenter
 	 * Returns the stack frames resulting from the analysis of the method
 	 * using the {@link SourceInterpreter}.
 	 */
-	protected Frame[] getFrames()
+	private void setupFrames()
 	{
-		if (itsFrames == null) itsFrames = Analysis.analyze_nocflow(getClassNode().name, getNode());
-		return itsFrames;
+		itsFramesMap = new HashMap<AbstractInsnNode, SourceFrame>();
+		SourceFrame[] theFrames = Analysis.analyze_nocflow(getClassNode().name, getNode());
+		
+		int i = 0; // Instruction rank
+		ListIterator<AbstractInsnNode> theIterator = getNode().instructions.iterator();
+		while(theIterator.hasNext()) itsFramesMap.put(theIterator.next(), theFrames[i++]);
+	}
+	
+	/**
+	 * Gets the frame corresponding to the specified node.
+	 * @param aNode A node that is part of the original method body.
+	 */
+	protected SourceFrame getFrame(AbstractInsnNode aNode)
+	{
+		return itsFramesMap.get(aNode);
 	}
 
 }

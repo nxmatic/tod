@@ -26,6 +26,8 @@ public class ASMInstrumenter2 implements IInstrumenter
 	private ClassSelector itsTraceSelector;
 	private ClassSelector itsIdSelector;
 	
+	private TODConfig itsConfig;
+	
 	
 
 	public ASMInstrumenter2(TODConfig aConfig, IMutableStructureDatabase aDatabase)
@@ -57,8 +59,14 @@ public class ASMInstrumenter2 implements IInstrumenter
 		}
 	}
 	
+	public TODConfig getConfig()
+	{
+		return itsConfig;
+	}
+	
 	public void setConfig(TODConfig aConfig)
 	{
+		itsConfig = aConfig;
 		itsTraceSelector = parseWorkingSet(aConfig.get(TODConfig.SCOPE_TRACE_FILTER));
 		itsGlobalSelector = parseWorkingSet(aConfig.get(TODConfig.SCOPE_GLOBAL_FILTER));
 		itsIdSelector = parseWorkingSet(aConfig.get(TODConfig.SCOPE_ID_FILTER));

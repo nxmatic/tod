@@ -64,13 +64,14 @@ JNIEXPORT jint JNICALL Java_java_tod_io__1SocketChannel_open0
 
 	free(host);
 	jni->ReleaseStringUTFChars(jHost, bHost);
-	
+
 	return fd;
 }
 
 JNIEXPORT jint JNICALL Java_java_tod_io__1SocketChannel_flush0
   (JNIEnv *, jclass, jint fd)
 {
+	if (fd >= fds.size()) return -10;
 	STREAM* s = fds[fd];
 	if (! s->good()) return -1;
 	s->flush();
@@ -87,6 +88,7 @@ JNIEXPORT jint JNICALL Java_java_tod_io__1SocketChannel_close0
 JNIEXPORT jint JNICALL Java_java_tod_io__1SocketChannel_write0
   (JNIEnv* jni, jclass, jint fd, jbyteArray bytes, jint pos, jint len)
 {
+	if (fd >= fds.size()) return -10;
 	STREAM* s = fds[fd];
 	int result;
 	char* carray = (char*) jni->GetPrimitiveArrayCritical(bytes, NULL);
@@ -104,9 +106,36 @@ JNIEXPORT jint JNICALL Java_java_tod_io__1SocketChannel_write0
 	return result;
 }
 
+JNIEXPORT jint JNICALL Java_java_tod_io__1SocketChannel_writeStringPacket0
+  (JNIEnv* jni, jclass, jint fd, jlong id, jstring str)
+{
+	if (fd >= fds.size()) return -10;
+	STREAM* s = fds[fd];
+	int result;
+	jboolean isCopy;
+	
+	jsize len = jni->GetStringLength(str);
+	const jchar* chars = jni->GetStringChars(str, &isCopy);
+	
+	if (! s->good()) result = -1;
+	else
+	{
+		s->write((char*) &id, 8);
+		s->write((char*) &len, 4);
+		s->write((char*) chars, len*2);
+		if (! s->good()) result = -1;
+		else result = 0;
+	}
+	
+	jni->ReleaseStringChars(str, chars);
+	
+	return result;
+}
+
 JNIEXPORT jint JNICALL Java_java_tod_io__1SocketChannel_read0
   (JNIEnv* jni, jclass, jint fd, jbyteArray bytes, jint pos, jint len)
 {
+	if (fd >= fds.size()) return -10;
 	STREAM* s = fds[fd];
 	int result;
 	char* carray = (char*) jni->GetPrimitiveArrayCritical(bytes, NULL);
@@ -131,6 +160,7 @@ JNIEXPORT jint JNICALL Java_java_tod_io__1SocketChannel_read0
 JNIEXPORT jint JNICALL Java_java_tod_io__1SocketChannel_in_1avail0
   (JNIEnv* jni, jclass, jint fd)
 {
+	if (fd >= fds.size()) return -10;
 	STREAM* s = fds[fd];
 	return s->rdbuf()->in_avail();
 }

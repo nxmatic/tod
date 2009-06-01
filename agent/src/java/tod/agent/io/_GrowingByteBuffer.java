@@ -30,7 +30,7 @@ public class _GrowingByteBuffer extends _ByteBuffer
 		if (aRequested > remaining())
 		{
 			if (limit() != capacity()) throw new _BufferOverflowException();
-			byte[] theNewBuffer = new byte[capacity()*2];
+			byte[] theNewBuffer = new byte[Math.max(capacity()*2, remaining()+aRequested+capacity())];
 			System.arraycopy(array(), 0, theNewBuffer, 0, capacity());
 			_array(theNewBuffer);
 			limit(theNewBuffer.length);

@@ -39,7 +39,7 @@ public class AgentDebugFlags
 	/**
 	 * Whether profile data should be collected.
 	 */
-	public static final boolean COLLECT_PROFILE = false;
+	public static final boolean COLLECT_PROFILE = true;
 	
 	/**
 	 * If true, the {@link EventInterpreter} prints all the events it receives

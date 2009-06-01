@@ -23,10 +23,8 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 package java.tod.transport;
 
 import java.lang.ref.WeakReference;
-import java.nio.channels.ByteChannel;
 import java.tod.AgentReady;
 import java.tod.EventCollector;
-import java.tod.ObjectIdentity;
 import java.tod.TOD;
 import java.tod.ThreadData;
 import java.tod.TracedMethods;
@@ -40,7 +38,6 @@ import java.tod.util._SyncRingBuffer;
 
 import tod.agent.AgentDebugFlags;
 import tod.agent.Command;
-import tod.agent.Message;
 import tod.agent.io._ByteBuffer;
 
 /**
@@ -63,14 +60,16 @@ public class IOThread extends Thread
 	private final _SocketChannel itsChannel;
 	
 	/**
-	 * Used to send the header of each meta-packet.
+	 * Used to send the header of each packet.
 	 */
 	private final _ByteBuffer itsHeaderBuffer;
 	
 	/**
-	 * Buffers that are waiting to be sent.
+	 * Packets that are waiting to be sent.
 	 */
-	private final _SyncRingBuffer<ThreadPacket> itsPendingBuffers = new _SyncRingBuffer<ThreadPacket>(1000);
+	private final _SyncRingBuffer<Packet> itsPendingPackets = new _SyncRingBuffer<Packet>(1000);
+	
+	private final _ArrayList<ThreadPacket>[] itsFreeThreadPackets;
 	
 	/**
 	 * A set of {@link ThreadData} objects registered with this {@link IOThread}.
@@ -78,7 +77,6 @@ public class IOThread extends Thread
 	 */
 	private final _ArrayList<WeakReference<ThreadData>> itsThreadDatas = new _ArrayList<WeakReference<ThreadData>>();
 	
-	private final _ArrayList<ThreadPacket>[] itsFreePackets;
 	
 	private final MyShutdownHook itsShutdownHook;
 	
@@ -100,7 +98,7 @@ public class IOThread extends Thread
 	/**
 	 *  Number of buffers that were sent since last timestamp was taken (taking timestamps is costly)
 	 */
-	private int itsSentBuffers;
+	private int itsSentPackets;
 	
 	/**
 	 * A buffer for the command reader
@@ -111,19 +109,19 @@ public class IOThread extends Thread
 
 	public IOThread(EventCollector aEventCollector, _SocketChannel aChannel)
 	{
-		super("[TOD] Packet buffer sender");
+		super("[TOD] IOThread");
 		setDaemon(true);
 		assert aChannel != null;
 		itsEventCollector = aEventCollector;
 		itsChannel = aChannel;
 		
-		itsHeaderBuffer = _ByteBuffer.allocate(8);
+		itsHeaderBuffer = _ByteBuffer.allocate(9);
 		
 		itsShutdownHook = new MyShutdownHook();
 		Runtime.getRuntime().addShutdownHook(itsShutdownHook);
 		
-		itsFreePackets = new _ArrayList[ThreadPacket.RECYCLE_QUEUE_COUNT];
-		for(int i=0;i<itsFreePackets.length;i++) itsFreePackets[i] = new _ArrayList<ThreadPacket>();
+		itsFreeThreadPackets = new _ArrayList[ThreadPacket.RECYCLE_QUEUE_COUNT];
+		for(int i=0;i<itsFreeThreadPackets.length;i++) itsFreeThreadPackets[i] = new _ArrayList<ThreadPacket>();
 		
 		start();
 	}
@@ -132,7 +130,6 @@ public class IOThread extends Thread
 	{
 	    if (! AgentDebugFlags.COLLECT_PROFILE) return;
 	    _StringBuilder b = new _StringBuilder();
-	    
         
         b.append("[IOThread] Bytes sent: ");
         b.append(itsBytesSent);
@@ -168,24 +165,24 @@ public class IOThread extends Thread
 		{
 			itsCheckTime = System.currentTimeMillis();
 			itsLastEnabled = ! AgentReady.CAPTURE_ENABLED; 
-			itsSentBuffers = 0;
+			itsSentPackets = 0;
 			
 			while(true)
 			{
 //				_IO.out("PacketBufferSender.run() - sentBuffers: "+sentBuffers);
-				ThreadPacket thepacket = popPacket();
+				Packet thePacket = popPacket();
 				
-				if (thepacket != null)
+				if (thePacket != null)
 				{
-					itsSentBuffers++;
-					sendPacket(thepacket);
+					itsSentPackets++;
+					thePacket.send(this);
 				}
 				
-				if (thepacket == null || itsSentBuffers > 100)
+				if (thePacket == null || itsSentPackets > 100)
 				{
 					// Check stale buffers at a regular interval
 					checkStaleBuffers();
-					itsSentBuffers = 0;
+					itsSentPackets = 0;
 				}
 				
 				readCommands();
@@ -207,9 +204,10 @@ public class IOThread extends Thread
 		}
 	}
 	
-	private void sendPacket(ThreadPacket aPacket) throws _IOException
+	private void sendThreadPacket(ThreadPacket aPacket) throws _IOException
 	{
 		itsHeaderBuffer.clear();
+		itsHeaderBuffer.put(ThreadPacket.PACKET_TYPE);
 		itsHeaderBuffer.putInt(aPacket.threadId);
 		itsHeaderBuffer.putInt(aPacket.length);
 		
@@ -220,11 +218,40 @@ public class IOThread extends Thread
 		
 		if (AgentDebugFlags.COLLECT_PROFILE) 
 		{
-			itsBytesSent += itsHeaderBuffer.capacity()+aPacket.length;
+			itsBytesSent += 9+aPacket.length;
 			itsPacketsSent++;
 		}
 		
-		freePacket(aPacket);
+		synchronized (itsFreeThreadPackets)
+		{
+			itsFreeThreadPackets[aPacket.recycleQueue].add(aPacket);
+		}
+	}
+	
+	public ThreadPacket getFreeThreadPacket(int aRecycleQueue)
+	{
+		if (itsFreeThreadPackets[aRecycleQueue].isEmpty()) return null;
+		synchronized (itsFreeThreadPackets)
+		{
+			return itsFreeThreadPackets[aRecycleQueue].removeLast();
+		}
+	}
+	
+	private void sendStringPacket(StringPacket aPacket) throws _IOException
+	{
+		itsHeaderBuffer.clear();
+		itsHeaderBuffer.put(StringPacket.PACKET_TYPE);
+		
+		itsHeaderBuffer.flip();
+		itsChannel.write(itsHeaderBuffer);
+		
+		itsChannel.writeStringPacket(aPacket.id, aPacket.string);
+		
+		if (AgentDebugFlags.COLLECT_PROFILE) 
+		{
+			itsBytesSent += 1+8+4+aPacket.string.length()*2;
+			itsPacketsSent++;
+		}
 	}
 	
 	private void checkStaleBuffers()
@@ -338,36 +365,109 @@ public class IOThread extends Thread
 	 * @param aRecycle If true, the buffer in the given {@link ThreadPacket}
 	 * will be recycled and a free recycled buffer will be returned if available 
 	 */
-	public void pushPacket(ThreadPacket aPacket) 
+	public void pushPacket(Packet aPacket) 
 	{
-		itsPendingBuffers.add(aPacket);
-	}
-	
-	private void freePacket(ThreadPacket aPacket)
-	{
-		synchronized (itsFreePackets)
-		{
-			itsFreePackets[aPacket.recycleQueue].add(aPacket);
-		}
-	}
-	
-	public ThreadPacket getFreePacket(int aRecycleQueue)
-	{
-		if (itsFreePackets[aRecycleQueue].isEmpty()) return null;
-		synchronized (itsFreePackets)
-		{
-			return itsFreePackets[aRecycleQueue].removeLast();
-		}
+		itsPendingPackets.add(aPacket);
 	}
 	
 	/**
 	 * Pops a buffer from the stack, waiting for up to 100ms if none is available.
 	 */
-	private ThreadPacket popPacket() throws InterruptedException
+	private Packet popPacket() throws InterruptedException
 	{
-		if (itsPendingBuffers.isEmpty()) Thread.sleep(100);
-		return itsPendingBuffers.poll();
+		if (itsPendingPackets.isEmpty()) Thread.sleep(100);
+		return itsPendingPackets.poll();
 	}
+	
+	/**
+	 * Base class for the packets that can be sent by this {@link IOThread}.
+	 * @author gpothier
+	 */
+	public abstract static class Packet
+	{
+		protected abstract void send(IOThread aIOThread) throws _IOException;
+	}
+	
+	/**
+	 * A data packet that was created by a thread.
+	 * The range of valid data is indicated by {@link #offset}
+	 * and {@link #length}. By default, the whole data is valid,
+	 * but sometimes the {@link IOThread} can request {@link ThreadData} to
+	 * send all available data. In that case, partial packets are sent. 
+	 * @author gpothier
+	 */
+	public static final class ThreadPacket extends Packet
+	{
+		public static final byte PACKET_TYPE = 1;
+		
+		/**
+		 * Recycle queue for standard packets (all have the same length).
+		 */
+		public static final int RECYCLE_QUEUE_STANDARD = 0;
+		
+		/**
+		 * Recycle queue for other packets.
+		 */
+		public static final int RECYCLE_QUEUE_OTHER = 1;
+		public static final int RECYCLE_QUEUE_COUNT = 2;
+		
+		public int threadId;
+		public byte[] data;
+		
+		/**
+		 * When the packet has been sent, it will be placed on this recycle queue.
+		 */
+		public int recycleQueue;
+		
+		public int offset;
+		public int length;
+		
+		
+		public void set(int aThreadId, byte[] aData, int aRecycleQueue, int aOffset, int aLength)
+		{
+			threadId = aThreadId;
+			data = aData;
+			recycleQueue = aRecycleQueue;
+			offset = aOffset;
+			length = aLength;
+		}
+
+		public void set(int aThreadId, byte[] aData, int aRecycleQueue)
+		{
+			set(aThreadId, aData, aRecycleQueue, 0, aData.length);
+		}
+
+		@Override
+		protected void send(IOThread aIOThread) throws _IOException
+		{
+			aIOThread.sendThreadPacket(this);
+		}
+	}
+	
+	/**
+	 * A packet that represents a {@link String} whose value must be sent.
+	 * @author gpothier
+	 */
+	public static final class StringPacket extends Packet
+	{
+		public static final byte PACKET_TYPE = 2;
+		
+		public final long id;
+		public final String string;
+		
+		public StringPacket(long aId, String aString)
+		{
+			id = aId;
+			string = aString;
+		}
+
+		@Override
+		protected void send(IOThread aIOThread) throws _IOException
+		{
+			aIOThread.sendStringPacket(this);
+		}
+	}
+
 	
 	private class MyShutdownHook extends Thread
 	{

@@ -182,6 +182,11 @@ public final class EventCollector
 		b.append("[TOD] New thread: ");
 		b.append(theCurrentThread.getName());
 		_IO.out(b.toString());
+		
+		if (theCurrentThread.getName().startsWith("[TOD]"))
+		{
+			throw new Error("POlop");
+		}
         
 		return theThreadData;
 	}

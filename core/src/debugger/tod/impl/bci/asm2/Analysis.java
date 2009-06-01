@@ -39,6 +39,7 @@ import org.objectweb.asm.tree.analysis.Analyzer;
 import org.objectweb.asm.tree.analysis.AnalyzerException;
 import org.objectweb.asm.tree.analysis.Frame;
 import org.objectweb.asm.tree.analysis.SourceInterpreter;
+import org.objectweb.asm.tree.analysis.SourceValue;
 
 public class Analysis
 {
@@ -47,11 +48,13 @@ public class Analysis
 		SourceInterpreter theInterpreter = new SourceInterpreter();
 		Analyzer theAnalyzer = new Analyzer(theInterpreter)
 		{
+			@Override
 			protected Frame newFrame(int nLocals, int nStack)
 			{
 				return new Node(nLocals, nStack);
 			}
 
+			@Override
 			protected Frame newFrame(Frame src)
 			{
 				return new Node(src);
@@ -79,10 +82,23 @@ public class Analysis
 		return (Node[]) theAnalyzer.getFrames();
 	}
 	
-	public static Frame[] analyze_nocflow(String aClassName, MethodNode aNode)
+	public static SourceFrame[] analyze_nocflow(String aClassName, MethodNode aNode)
 	{
 		SourceInterpreter theInterpreter = new SourceInterpreter();
-		Analyzer theAnalyzer = new Analyzer(theInterpreter);
+		Analyzer theAnalyzer = new Analyzer(theInterpreter)
+		{
+			@Override
+			protected Frame newFrame(int nLocals, int nStack)
+			{
+				return new SourceFrame(nLocals, nStack);
+			}
+
+			@Override
+			protected Frame newFrame(Frame src)
+			{
+				return new SourceFrame(src);
+			}
+		};
 		
 		try
 		{
@@ -93,10 +109,41 @@ public class Analysis
 			throw new RuntimeException(e);
 		}
 		
-		return theAnalyzer.getFrames();
+		Frame[] theFrames = theAnalyzer.getFrames();
+		SourceFrame[] theResult = new SourceFrame[theFrames.length];
+		for(int i=0;i<theFrames.length;i++) theResult[i] = (SourceFrame) theFrames[i];
+		return theResult;
 	}
 	
 
+	/**
+	 * A {@link Frame} that contains {@link SourceValue}s.
+	 * @author gpothier
+	 */
+	public static class SourceFrame extends Frame
+	{
+		public SourceFrame(Frame aSrc)
+		{
+			super(aSrc);
+		}
+
+		public SourceFrame(int aLocals, int aStack)
+		{
+			super(aLocals, aStack);
+		}
+
+		@Override
+		public SourceValue getLocal(int aI) throws IndexOutOfBoundsException
+		{
+			return (SourceValue) super.getLocal(aI);
+		}
+
+		@Override
+		public SourceValue getStack(int aI) throws IndexOutOfBoundsException
+		{
+			return (SourceValue) super.getStack(aI);
+		}
+	}
 	
 	public static class Node extends Frame 
 	{

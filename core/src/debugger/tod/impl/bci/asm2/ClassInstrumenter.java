@@ -31,24 +31,25 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.bci.asm2;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
-import java.util.ArrayList;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
+import java.util.ListIterator;
 
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
+import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.MethodNode;
 import org.objectweb.asm.tree.analysis.Analyzer;
 import org.objectweb.asm.tree.analysis.AnalyzerException;
 import org.objectweb.asm.tree.analysis.BasicVerifier;
-import org.objectweb.asm.util.CheckClassAdapter;
 
 import tod.Util;
 import tod.access.TODAccessor;
@@ -154,20 +155,49 @@ public class ClassInstrumenter
 		if (MethodInstrumenter.CLS_CLASS.equals(getNode().name)) addGetClsIdMethod();
 		if (MethodInstrumenter.CLS_STRING.equals(getNode().name)) addStringRawAccess();
 		
-		for(MethodNode theNode : (List<MethodNode>) itsNode.methods) checkMethod(theNode);
-
-		
 		// Output the modified class
 		ClassWriter theWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
 		itsNode.accept(theWriter);
 		
 		byte[] theBytecode = theWriter.toByteArray();
-		
-		checkClass(theBytecode);
+
+		try
+		{
+			checkClass(theBytecode);
+			for(MethodNode theNode : (List<MethodNode>) itsNode.methods) checkMethod(theNode);
+		}
+		catch(Exception e)
+		{
+			writeClass(theBytecode);
+			System.err.println("Class "+getNode().name+" failed check. Writing out bytecode.");
+			e.printStackTrace();
+		}
 		
 		return new InstrumentedClass(
 				theBytecode, 
 				getInstrumenter().getMethodGroupManager().getModeChangesAndReset());
+	}
+	
+	private void writeClass(byte[] aData) 
+	{
+		try
+		{
+			File theDir = new File(getInstrumenter().getConfig().get(TODConfig.CLASS_CACHE_PATH));
+			theDir = new File(theDir, "err");
+			theDir.mkdirs();
+
+			File theFile = new File (theDir, getNode().name.replace('/', '.')+".class");
+			theFile.getParentFile().mkdirs();
+			theFile.createNewFile();
+			FileOutputStream theFileOutputStream = new FileOutputStream(theFile);
+			theFileOutputStream.write(aData);
+			theFileOutputStream.flush();
+			theFileOutputStream.close();
+		}
+		catch (IOException e)
+		{
+			throw new RuntimeException(e);
+		}
 	}
 	
 	private void processNormalClass()
@@ -216,10 +246,34 @@ public class ClassInstrumenter
 		{
 			theAnalyzer.analyze(aNode.name, aNode);
 		}
-		catch (Exception e)
+		catch (AnalyzerException e)
 		{
-			Utils.rtex("Error in %s.%s%s: %s", getNode().name, aNode.name, aNode.desc, e.getMessage());
+			Utils.rtex(
+					e,
+					"Error in %s.%s%s at instruction #%d: %s", 
+					getNode().name, 
+					aNode.name, 
+					aNode.desc,
+					getBytecodeRank(aNode, e.node),
+					e.getMessage());
 		}
+	}
+	
+	private int getBytecodeRank(MethodNode aNode, AbstractInsnNode aInstruction)
+	{
+		if (aInstruction == null) return -1;
+		int theRank = 1;
+		ListIterator<AbstractInsnNode> theIterator = aNode.instructions.iterator();
+		while(theIterator.hasNext()) 
+		{
+			AbstractInsnNode theNode = theIterator.next();
+			if (theNode == aInstruction) return theRank;
+			
+			int theOpcode = theNode.getOpcode();
+			if (theOpcode >= 0) theRank++;
+		}
+		
+		return -1;
 	}
 	
 	private void checkClass(byte[] aBytecode)

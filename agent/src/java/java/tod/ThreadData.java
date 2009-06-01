@@ -6,7 +6,8 @@ package java.tod;
 import java.tod.io._IO;
 import java.tod.transport.IOThread;
 import java.tod.transport.ObjectEncoder;
-import java.tod.transport.ThreadPacket;
+import java.tod.transport.IOThread.StringPacket;
+import java.tod.transport.IOThread.ThreadPacket;
 import java.tod.util.BitStack;
 import java.tod.util.IntDeltaSender;
 import java.tod.util.LongDeltaSender;
@@ -42,6 +43,11 @@ public final class ThreadData
 	 * are caused by the instrumentation.
 	 */
 	private boolean itsIgnoreNextException = false;
+	
+	/**
+	 * This flag permits to avoid reentrancy.
+	 */
+	private boolean itsInCflow = false;
 
 	/**
 	 * The top of this stack indicates if the thread is executing in-scope or
@@ -100,6 +106,22 @@ public final class ThreadData
 		itsIOThread = aIOThread;
 		resetBuffer();
 		itsIOThread.registerThreadData(this);
+		pushOutOfScope(); // Always start out of scope.
+	}
+	
+	/**
+	 * Reentrancy control.
+	 */
+	private boolean enter()
+	{
+		if (itsInCflow) return true;
+		itsInCflow = true;
+		return false;
+	}
+	
+	private void exit()
+	{
+		itsInCflow = false;
 	}
 	
 	private void resetBuffer()
@@ -119,7 +141,20 @@ public final class ThreadData
 	
 	private long getObjectId(Object aObject)
 	{
-		return TODAccessor.getObjectId(aObject);
+		try
+		{
+			return TODAccessor.getObjectId(aObject);
+		}
+		catch (Throwable t)
+		{
+			_StringBuilder b = new _StringBuilder();
+			b.append("Cannot get id of instance of ");
+			b.append(aObject.getClass().getName());
+			b.append(": ");
+			b.append(t.getMessage());
+			_IO.err(b.toString());
+			return 0;
+		}
 	}
 	
 	/**
@@ -280,7 +315,7 @@ public final class ThreadData
 		
 		itsIOThread.pushPacket(thePacket);
 		
-		thePacket = itsIOThread.getFreePacket(ThreadPacket.RECYCLE_QUEUE_STANDARD);
+		thePacket = itsIOThread.getFreeThreadPacket(ThreadPacket.RECYCLE_QUEUE_STANDARD);
 		if (thePacket != null)
 		{
 			thePacket.threadId = getId();
@@ -306,7 +341,7 @@ public final class ThreadData
 	/**
 	 * Sends a synchronization message.
 	 */
-	public void sendSync(long aTimestamp)
+	private void sendSync(long aTimestamp)
 	{
 		sendMessageType(itsBuffer, Message.SYNC);
 		itsBuffer.putLong(aTimestamp);
@@ -318,11 +353,17 @@ public final class ThreadData
 	 */
 	public void evFieldRead()
 	{
+		if (enter()) return;
+		
 		sendRegisteredObjects();
 		
 		msgStart(Message.FIELD_READ, 1);
 		sendMessageType(itsBuffer, Message.FIELD_READ);
 		msgStop();
+		
+        commitBuffer();
+        
+        exit();
 	}
 	
 	/**
@@ -330,6 +371,8 @@ public final class ThreadData
 	 */
 	public void evFieldRead_Same()
 	{
+		if (enter()) return;
+		
 		sendRegisteredObjects();
 		
 	    msgStart(Message.FIELD_READ_SAME, 0);
@@ -337,6 +380,8 @@ public final class ThreadData
 		msgStop();
 		
         commitBuffer();
+
+        exit();
 	}
 	
 	/**
@@ -344,15 +389,23 @@ public final class ThreadData
 	 */
 	public void evArrayRead()
 	{
+		if (enter()) return;
+		
 		sendRegisteredObjects();
 		
 	    msgStart(Message.ARRAY_READ, 1);
 		sendMessageType(itsBuffer, Message.ARRAY_READ);
 		msgStop();
+		
+        commitBuffer();
+        
+        exit();
 	}
 	
 	public void evNew(Object aValue)
 	{
+		if (enter()) return;
+		
 		sendRegisteredObjects();
 		
 		msgStart(Message.NEW, 0);
@@ -368,10 +421,14 @@ public final class ThreadData
 		// Objects that are sent by value must not be serialized now as they
 		// are not yet initialized
 		if (! shouldSendByValue(aValue)) sendRegisteredObjects();
+		
+		exit();
 	}
 	
 	public void evObjectInitialized(Object aValue)
 	{
+		if (enter()) return;
+				
 		sendRegisteredObjects();
 
 		msgStart(Message.OBJECT_INITIALIZED, 0);
@@ -383,6 +440,8 @@ public final class ThreadData
 		msgStop();
 		
 		commitBuffer();
+		
+		exit();
 	}
 	
 	public void evExceptionGenerated(
@@ -392,6 +451,16 @@ public final class ThreadData
 			int aBytecodeIndex,
 			Throwable aException) 
 	{
+		if (enter()) return;
+		
+		// Exception messages can be larger than other messages so check we have enough room
+		int theMsgLen = aMethodName.length()*2 
+				+ aMethodSignature.length()*2
+				+ aMethodDeclaringClassSignature.length()*2
+				+ 256;
+		
+		if (itsBuffer.remaining() <= theMsgLen) flushBuffer();
+		
 		msgStart(Message.EXCEPTION, 0);
 
 		checkTimestamp();
@@ -412,10 +481,14 @@ public final class ThreadData
 		ExceptionGeneratedReceiver.setIgnoreExceptions(true);
 		sendRegisteredObjects();
 		ExceptionGeneratedReceiver.setIgnoreExceptions(false);
+		
+		exit();
 	}
 	
 	public void evHandlerReached(int aLocation)
 	{
+		if (enter()) return;
+		
 		sendRegisteredObjects();
 		
 	    msgStart(Message.HANDLER_REACHED, 0);
@@ -427,10 +500,14 @@ public final class ThreadData
 		msgStop();
 		
 		commitBuffer();
+		
+		exit();
 	}
 	
 	public void evInScopeBehaviorEnter(int aBehaviorId)
 	{
+		if (enter()) return;
+		
 		sendRegisteredObjects();
 		
 		msgStart(Message.INSCOPE_BEHAVIOR_ENTER, 0);
@@ -443,6 +520,8 @@ public final class ThreadData
 		commitBuffer();
 		
 		pushInScope();
+		
+		exit();
 	}
 
 	/**
@@ -454,70 +533,112 @@ public final class ThreadData
 	 */
 	public void sendBehaviorEnterArgs(int aCount)
 	{
+		if (enter()) return;
+		
 	    msgStart(Message.BEHAVIOR_ENTER_ARGS, aCount);
 	    
 		sendMessageType(itsBuffer, Message.BEHAVIOR_ENTER_ARGS);
 		itsBuffer.putInt(aCount);
 		
 		msgStop();
+		
+		exit();
 	}
 	
 	public void sendValue_Boolean(boolean aValue)
 	{
+		if (enter()) return;
+		
 		itsBuffer.put(aValue ? TRUE : FALSE);
 		msgStop();
+		
+		exit();
 	}
 	
 	public void sendValue_Byte(byte aValue)
 	{
+		if (enter()) return;
+		
 		itsBuffer.put(aValue);
         msgStop();
+        
+        exit();
 	}
 	
 	public void sendValue_Char(char aValue)
 	{
+		if (enter()) return;
+		
 		itsBuffer.putChar(aValue);
         msgStop();
+        
+        exit();
 	}
 	
 	public void sendValue_Short(short aValue)
 	{
+		if (enter()) return;
+		
 		itsBuffer.putShort(aValue);
         msgStop();
+        
+        exit();
 	}
 	
 	public void sendValue_Int(int aValue)
 	{
+		if (enter()) return;
+		
 		itsBuffer.putInt(aValue);
         msgStop();
+        
+        exit();
 	}
 	
 	public void sendValue_Long(long aValue)
 	{
+		if (enter()) return;
+		
 		itsBuffer.putLong(aValue);
         msgStop();
+        
+        exit();
 	}
 	
 	public void sendValue_Float(float aValue)
 	{
+		if (enter()) return;
+		
 		itsBuffer.putFloat(aValue);
         msgStop();
+        
+        exit();
 	}
 	
 	public void sendValue_Double(double aValue)
 	{
+		if (enter()) return;
+		
 		itsBuffer.putDouble(aValue);
         msgStop();
+        
+        exit();
 	}
 	
 	public void sendValue_Ref(Object aValue)
 	{
+		if (enter()) return;
+		
 		sendValue(itsBuffer, aValue);
         msgStop();
+        
+        exit();
 	}
 	
 	public void sendConstructorTarget(Object aTarget)
 	{
+		if (enter()) return;
+		
 		sendRegisteredObjects();
 
 		msgStart(Message.CONSTRUCTOR_TARGET, 0);
@@ -528,18 +649,26 @@ public final class ThreadData
 		msgStop();
 		
 		commitBuffer();
+		
+		exit();
 	}
 	
 	public void evInScopeBehaviorExit_Normal()
 	{
+		if (enter()) return;
+		
 	    msgStart(Message.INSCOPE_BEHAVIOR_EXIT_NORMAL, 0);
 		msgStop();
 		
-		popScope();
+		if (! popScope()) throw new Error("Unexpected scope state");
+		
+		exit();
 	}
 	
 	public void evInScopeBehaviorExit_Exception()
 	{
+		if (enter()) return;
+		
 		sendRegisteredObjects();
 		
 	    msgStart(Message.INSCOPE_BEHAVIOR_EXIT_EXCEPTION, 0);
@@ -548,14 +677,18 @@ public final class ThreadData
 		
 		commitBuffer();
 		
-		popScope();
+		if (! popScope()) throw new Error("Unexpected scope state");
+		
+		exit();
 	}
 	
 	/**
-	 * Entering into an out-of-scope behavior (which has enveloppe only instrumentation).
+	 * Entering into an out-of-scope behavior (which has envelope only instrumentation).
 	 */
 	public void evOutOfScopeBehaviorEnter()
 	{
+		if (enter()) return;
+		
 		sendRegisteredObjects();
 		
 	    msgStart(Message.OUTOFSCOPE_BEHAVIOR_ENTER, 0);
@@ -565,13 +698,17 @@ public final class ThreadData
 		commitBuffer();
 		
 		pushOutOfScope();
+		
+		exit();
 	}
 	
 	/**
-	 * Exiting normally from an out-of-scope non-void behavior (which has enveloppe only instrumentation).
+	 * Exiting normally from an out-of-scope non-void behavior (which has envelope only instrumentation).
 	 */
 	public void evOutOfScopeBehaviorExit_Normal()
 	{
+		if (enter()) return;
+		
 		sendRegisteredObjects();
 		
 	    msgStart(Message.OUTOFSCOPE_BEHAVIOR_EXIT_NORMAL, 0);
@@ -580,7 +717,9 @@ public final class ThreadData
 		
 		commitBuffer();
 
-		popScope();
+		if (popScope()) throw new Error("Unexpected scope state");
+		
+		exit();
 	}
 	
 	/**
@@ -588,9 +727,13 @@ public final class ThreadData
 	 */
 	public void sendOutOfScopeBehaviorResult()
 	{
+		if (enter()) return;
+		
 	    msgStart(Message.BEHAVIOR_ENTER_ARGS, 1);
 		sendMessageType(itsBuffer, Message.OUTOFSCOPE_BEHAVIOR_EXIT_RESULT);
 		msgStop();
+		
+		exit();
 	}
 	
 	/**
@@ -598,6 +741,8 @@ public final class ThreadData
 	 */
 	public void evOutOfScopeBehaviorExit_Exception()
 	{
+		if (enter()) return;
+		
 		sendRegisteredObjects();
 		
 	    msgStart(Message.OUTOFSCOPE_BEHAVIOR_EXIT_EXCEPTION, 0);
@@ -606,7 +751,9 @@ public final class ThreadData
 		
 		commitBuffer();
 		
-		popScope();
+		if (popScope()) throw new Error("Unexpected scope state");
+		
+		exit();
 	}
 	
 
@@ -615,9 +762,13 @@ public final class ThreadData
 	 */
 	public void evUnmonitoredBehaviorCall()
 	{
+		if (enter()) return;
+		
 	    msgStart(Message.UNMONITORED_BEHAVIOR_CALL, 0);
 		msgStop();
 		pushOutOfScope();
+		
+		exit();
 	}
 	
 	/**
@@ -626,6 +777,8 @@ public final class ThreadData
 	 */
 	public void evUnmonitoredBehaviorResultNonVoid()
 	{
+		if (enter()) return;
+		
 		sendRegisteredObjects();
 		
 		msgStart(Message.UNMONITORED_BEHAVIOR_CALL_RESULT, 1);
@@ -636,6 +789,8 @@ public final class ThreadData
 		commitBuffer();
 		
 		if (popScope()) throw new Error("Unexpected scope state");
+		
+		exit();
 	}
 	
 	/**
@@ -643,6 +798,8 @@ public final class ThreadData
 	 */
 	public void evUnmonitoredBehaviorResultVoid()
 	{
+		if (enter()) return;
+		
 		sendRegisteredObjects();
 		
 		msgStart(Message.UNMONITORED_BEHAVIOR_CALL_RESULT, 0);
@@ -653,6 +810,8 @@ public final class ThreadData
 		commitBuffer();
 		
 		if (popScope()) throw new Error("Unexpected scope state");
+		
+		exit();
 	}
 	
 	/**
@@ -660,9 +819,13 @@ public final class ThreadData
 	 */
 	public void evUnmonitoredBehaviorException()
 	{
+		if (enter()) return;
+		
 	    msgStart(Message.UNMONITORED_BEHAVIOR_CALL_EXCEPTION, 0);
 		msgStop();
 		if (popScope()) throw new Error("Unexpected scope state");
+		
+		exit();
 	}
 	
 	/**
@@ -685,6 +848,8 @@ public final class ThreadData
 			long aJVMThreadId,
 			String aName) 
 	{
+		if (enter()) return;
+		
 		sendMessageType(itsBuffer, Message.REGISTER_THREAD);
 
 		itsBuffer.putLong(aJVMThreadId);
@@ -693,31 +858,49 @@ public final class ThreadData
 		commitBuffer();
 
 		sendRegisteredObjects();
+		
+		exit();
 	}
 
 	public void sendClear() 
 	{
+		if (enter()) return;
+		
 		sendCommand(itsBuffer, Command.DBCMD_CLEAR);
 		commitBuffer();
+		
+		exit();
 	}
 
 	public void sendFlush() 
 	{
+		if (enter()) return;
+		
 		sendCommand(itsBuffer, Command.DBCMD_FLUSH);
 		commitBuffer();
+		
+		exit();
 	}
 	
 	public void sendEnd() 
 	{
+		if (enter()) return;		
+		
 		sendCommand(itsBuffer, Command.DBCMD_END);
 		commitBuffer();
+		
+		exit();
 	}
 	
 	public void sendEvCaptureEnabled(boolean aValue)
 	{
+		if (enter()) return;
+		
 		sendCommand(itsBuffer, Command.DBEV_CAPTURE_ENABLED);
 		itsBuffer.put(aValue ? (byte) 1 : (byte) 0);
 		commitBuffer();
+		
+		exit();
 	}
 	
 	private void sendValue(_ByteBuffer aBuffer, Object aValue) 
@@ -793,12 +976,10 @@ public final class ThreadData
 		{
 			// First time this object appears, register it.
 			theObjectId = -theObjectId;
-			
-			// add the time stamp for flushing purpose in ObjectDatabase
 			itsRegisteredObjectsStack.push(theObjectId, aObject);
-			// _IO.out("Registering: "+aObject+", id: "+theObjectId);
 		}
 
+		// Send object id
 		itsObjIdSender.send(aBuffer, theObjectId, ValueType.OBJECT_ID_DELTA, ValueType.OBJECT_ID);
 	}
 
@@ -844,7 +1025,14 @@ public final class ThreadData
 
 	private void sendRegisteredObject(long aId, Object aObject) 
 	{
-		ThreadPacket thePacket = itsIOThread.getFreePacket(ThreadPacket.RECYCLE_QUEUE_OTHER);
+		if (aObject.getClass() == String.class)
+		{
+			// Special case for strings, for speed
+			itsIOThread.pushPacket(new StringPacket(aId, (String) aObject));
+			return;
+		}
+		
+		ThreadPacket thePacket = itsIOThread.getFreeThreadPacket(ThreadPacket.RECYCLE_QUEUE_OTHER);
 		if (thePacket == null) 
 		{
 			thePacket = new ThreadPacket();

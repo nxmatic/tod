@@ -68,6 +68,11 @@ public class BCIUtils implements Opcodes
 		return (access & Opcodes.ACC_PRIVATE) != 0;
 	}
 	
+	public static boolean isAbstract(int access)
+	{
+		return (access & Opcodes.ACC_ABSTRACT) != 0;
+	}
+	
 	/**
 	 * Generates the bytecode that pushes the given value onto the stack
 	 */

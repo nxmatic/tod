@@ -19,7 +19,7 @@ VMARGS="$VMARGS -Dcollector-host=$HOST -Dcollector-port=8058 -Dclient-name=tod-1
 VMARGS="$VMARGS -Xbootclasspath/p:../agent/bin" 
 VMARGS="$VMARGS -ea" 
 VMARGS="$VMARGS -server" 
-VMARGS="$VMARGS -Xmx384m" 
+VMARGS="$VMARGS -Xmx256m" 
 VMARGS="$VMARGS -XX:MaxPermSize=128m"
 VMARGS="$VMARGS -Dagent-verbose=0"
 #VMARGS="$VMARGS -Dagent-cache-path=/home/gpothier/tmp/tod"
@@ -27,7 +27,8 @@ VMARGS="$VMARGS -Dagent-verbose=0"
 #VMARGS="$VMARGS -agentlib:hprof=cpu=samples,depth=3"
 #VMARGS="$VMARGS -Dcom.sun.management.jmxremote=true"
 
-java $VMARGS -cp ./bin dummy.BurnTest
+#java $VMARGS -cp ./bin dummy.BurnTest
+java $VMARGS -cp /home/gpothier/ws/TOD-TestCases/bin:/home/gpothier/ws/zz.utils/bin MainJavac 
 #java $VMARGS -cp ./bin dummy.BCITestCase
 #java $VMARGS -cp ../../ws-tod-daughter/Dummy/bin TestToString
 #java $VMARGS -cp ./lib/aspectjrt.jar:./lib/asm-all-3.2-svn.jar:./lib/junit-4.1.jar:./bin:../TOD-agent/bin:../TOD-dbgrid/bin:../TOD-evdb1/bin:../TOD-evdbng/bin:../zz.utils/bin -Ddbimpl=evdbng -Dtod-server-daemon=true tod.impl.dbgrid.bench.BurnMasterBench

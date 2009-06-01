@@ -23,6 +23,7 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 package java.tod;
 
 import java.tod.io._IO;
+import java.tod.io._SocketChannel;
 
 
 /**
@@ -69,8 +70,12 @@ public class AgentReady
 	/**
 	 * Called by the native agent when the system is ready to start capturing
 	 */
-	private static void start()
+	public static void start()
 	{
+		// Force loading of native methods.
+		_IO.initNatives();
+		_SocketChannel.initNatives();
+		
 		EventCollector.INSTANCE.init();
 		TOD.loadInitialCaptureState();
 	}

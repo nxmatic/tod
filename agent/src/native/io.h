@@ -40,6 +40,9 @@ JNIEXPORT jint JNICALL Java_java_tod_io__1SocketChannel_close0
 JNIEXPORT jint JNICALL Java_java_tod_io__1SocketChannel_write0
   (JNIEnv* jni, jclass, jint fd, jbyteArray bytes, jint pos, jint len);
 
+JNIEXPORT jint JNICALL Java_java_tod_io__1SocketChannel_writeStringPacket0
+  (JNIEnv *, jclass, jint, jlong, jstring);
+
 JNIEXPORT jint JNICALL Java_java_tod_io__1SocketChannel_read0
   (JNIEnv* jni, jclass, jint fd, jbyteArray bytes, jint pos, jint len);
 

@@ -271,7 +271,7 @@ public abstract class NativeAgentPeer extends SocketThread
 		}
 		catch (Exception e)
 		{
-			System.err.println("Error during instrumentation, reporting to client: ");
+			System.err.println("Error during instrumentation of "+theClassName+", reporting to client: ");
 			e.printStackTrace();
 			theError = e.getMessage();
 		}

@@ -34,6 +34,10 @@ package tod.impl.bci.asm2;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
+
+import javax.tools.JavaCompiler;
+import javax.tools.ToolProvider;
 
 import org.junit.Test;
 import org.objectweb.asm.ClassReader;
@@ -52,36 +56,72 @@ import zz.utils.Utils;
 
 public class ASM2Test
 {
+//	@Test
+//	public void testFun() throws Exception
+//	{
+//		TODConfig theConfig = new TODConfig();
+//		theConfig.set(TODConfig.SCOPE_TRACE_FILTER, "[+tod.test.bci.asm2.*]");
+//		StructureDatabase theDatabase = StructureDatabase.create(theConfig);
+//		ASMInstrumenter2 theInstrumenter = new ASMInstrumenter2(theConfig, theDatabase);
+//		
+//		instrument(theDatabase, theInstrumenter, "bin/tod/test/bci/asm2/Fun1.class");
+//		instrument(theDatabase, theInstrumenter, "bin/tod/test/bci/asm2/FunNumber.class");
+//		instrument(theDatabase, theInstrumenter, "bin/tod/test/bci/asm2/IFunStupid.class");
+//		instrument(theDatabase, theInstrumenter, "bin/tod/test/bci/asm2/outofscope/IFunStupid2.class");
+//		instrument(theDatabase, theInstrumenter, "bin/tod/test/bci/asm2/Fun2.class");
+//		instrument(theDatabase, theInstrumenter, "bin/tod/test/bci/asm2/outofscope/FunList.class");
+//		instrument(theDatabase, theInstrumenter, "bin/tod/test/bci/asm2/outofscope/Fun3.class");
+//	}
+	
 	@Test
-	public void test() throws FileNotFoundException, IOException
+	public void testJavac() throws Exception
 	{
 		TODConfig theConfig = new TODConfig();
-		theConfig.set(TODConfig.SCOPE_TRACE_FILTER, "[+tod.test.bci.asm2.*]");
+		theConfig.set(TODConfig.SCOPE_TRACE_FILTER, "[+com.sun.tools.**]");
 		StructureDatabase theDatabase = StructureDatabase.create(theConfig);
 		ASMInstrumenter2 theInstrumenter = new ASMInstrumenter2(theConfig, theDatabase);
 		
-		instrument(theDatabase, theInstrumenter, "bin/tod/test/bci/asm2/Fun1.class");
-		instrument(theDatabase, theInstrumenter, "bin/tod/test/bci/asm2/FunNumber.class");
-		instrument(theDatabase, theInstrumenter, "bin/tod/test/bci/asm2/IFunStupid.class");
-		instrument(theDatabase, theInstrumenter, "bin/tod/test/bci/asm2/outofscope/IFunStupid2.class");
-		instrument(theDatabase, theInstrumenter, "bin/tod/test/bci/asm2/Fun2.class");
-		instrument(theDatabase, theInstrumenter, "bin/tod/test/bci/asm2/outofscope/FunList.class");
-		instrument(theDatabase, theInstrumenter, "bin/tod/test/bci/asm2/outofscope/Fun3.class");
+		JavaCompiler theCompiler = ToolProvider.getSystemJavaCompiler();
+		Class<?> theClass = theCompiler.getClass();
+		
+		instrumentResource(theDatabase, theInstrumenter, theClass.getClassLoader(), "com/sun/tools/javac/main/Main.class");
+		instrumentResource(theDatabase, theInstrumenter, theClass.getClassLoader(), "com/sun/tools/javac/api/JavacTool$1.class");
+		instrumentResource(theDatabase, theInstrumenter, theClass.getClassLoader(), "com/sun/tools/javac/api/JavacTaskImpl.class");
+		instrumentResource(theDatabase, theInstrumenter, theClass.getClassLoader(), "com/sun/tools/javac/main/RecognizedOptions$OptionHelper.class");
+		instrumentResource(theDatabase, theInstrumenter, theClass, "JavacTool.class");
+	}
+	
+	private void instrumentResource(IStructureDatabase aDatabase, IInstrumenter aInstrumenter, ClassLoader aRef, String aName) throws FileNotFoundException, IOException
+	{
+		InputStream theStream = aRef.getResourceAsStream(aName);
+		byte[] theClassData = Utils.readInputStream_byte(theStream);
+		instrument(aDatabase, aInstrumenter, theClassData);
+	}
+	
+	private void instrumentResource(IStructureDatabase aDatabase, IInstrumenter aInstrumenter, Class aRef, String aName) throws FileNotFoundException, IOException
+	{
+		InputStream theStream = aRef.getResourceAsStream(aName);
+		byte[] theClassData = Utils.readInputStream_byte(theStream);
+		instrument(aDatabase, aInstrumenter, theClassData);
 	}
 	
 	private void instrument(IStructureDatabase aDatabase, IInstrumenter aInstrumenter, String aName) throws FileNotFoundException, IOException
 	{
 		System.out.println("Trying: "+aName);
 		byte[] theClassData = Utils.readInputStream_byte(new FileInputStream(aName));
-		
-		ClassReader cr = new ClassReader(theClassData);
+		instrument(aDatabase, aInstrumenter, theClassData);
+	}
+	
+	private void instrument(IStructureDatabase aDatabase, IInstrumenter aInstrumenter, byte[] aData) throws FileNotFoundException, IOException
+	{
+		ClassReader cr = new ClassReader(aData);
 		ClassNode theClassNode = new ClassNode();
 		cr.accept(theClassNode, 0);
 		
 		String theName = theClassNode.name;
 		System.out.println("  Found class: "+theName);
 		
-		InstrumentedClass theInstrumentedClass = aInstrumenter.instrumentClass(theName, theClassData, false);
+		InstrumentedClass theInstrumentedClass = aInstrumenter.instrumentClass(theName, aData, false);
 		
 		for(BehaviorMonitoringMode theMode : theInstrumentedClass.modeChanges)
 		{

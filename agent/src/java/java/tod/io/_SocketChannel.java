@@ -22,8 +22,8 @@ public class _SocketChannel
 	public static _SocketChannel open(String aHostname, int aPort) throws _CannotConnectException
 	{
 		int theFD = open0(aHostname, aPort);
-		_IO.out("Connected: "+theFD);
 		if (theFD == -1) throw new _CannotConnectException();
+		_IO.out("Connected: "+theFD);
 		return new _SocketChannel(theFD);
 	}
 	
@@ -39,6 +39,7 @@ public class _SocketChannel
 
 		if (n == -1) throw new _IOException("Could not write");
 		else if (n == -2) throw new _IOException("Write failed");
+		else if (n == -10) throw new _IOException("Bad FD");
 		else if (n < 0) throw new RuntimeException("Bad return value: "+n);
 		
 		aBuffer.position(aBuffer.position()+n);
@@ -52,6 +53,7 @@ public class _SocketChannel
 		
 		if (n == -1) throw new _IOException("Could not write");
 		else if (n == -2) throw new _IOException("Write failed");
+		else if (n == -10) throw new _IOException("Bad FD");
 		else if (n < 0) throw new RuntimeException("Bad return value: "+n);
 		
 		return n;
@@ -67,6 +69,17 @@ public class _SocketChannel
 		}
 	}
 	
+	public void writeStringPacket(long aId, String aString) throws _IOException
+	{
+		checkFD();
+		int n = writeStringPacket0(itsFD, aId, aString);
+		
+		if (n == -1) throw new _IOException("Could not write");
+		else if (n == -2) throw new _IOException("Write failed");
+		else if (n == -10) throw new _IOException("Bad FD");
+		else if (n < 0) throw new RuntimeException("Bad return value: "+n);
+	}
+	
 	public int read(_ByteBuffer aBuffer) throws _IOException
 	{
 		checkFD();
@@ -75,6 +88,7 @@ public class _SocketChannel
 		if (n == -1) return -1;
 		else if (n == -2) throw new _IOException("Could not read");
 		else if (n == -3) throw new _IOException("Read failed");
+		else if (n == -10) throw new _IOException("Bad FD");
 		else if (n < 0) throw new RuntimeException("Bad return value: "+n);
 		
 		aBuffer.position(aBuffer.position()+n);
@@ -107,6 +121,7 @@ public class _SocketChannel
 		int r = flush0(itsFD);
 		if (r == -1) throw new _IOException("Cannot flush");
 		else if (r == -2) throw new _IOException("Flush failed");
+		else if (r == -10) throw new _IOException("Bad FD");
 		else if (r != 0) throw new RuntimeException("Bad return value: "+r);
 	}
 	
@@ -118,10 +133,22 @@ public class _SocketChannel
 		itsFD = -1;
 	}
 	
+	public static void initNatives()
+	{
+//		open0("", 0);
+		flush0(0);
+		close0(0);
+		write0(0, new byte[0], 0, 0);
+		writeStringPacket0(0, 0, "");
+		read0(0, new byte[0], 0, 0);
+		in_avail0(0);
+	}
+	
 	private native static int open0(String aHostname, int aPort);
 	private native static int flush0(int aFD);
 	private native static int close0(int aFD);
 	private native static int write0(int aFD, byte[] aBuffer, int aPos, int aLength);
+	private native static int writeStringPacket0(int aFD, long aId, String aString);
 	private native static int read0(int aFD, byte[] aBuffer, int aPos, int aLength);
 	private native static int in_avail0(int aFD);
 }

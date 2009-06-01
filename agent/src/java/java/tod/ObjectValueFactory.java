@@ -19,9 +19,18 @@ import tod.agent.ObjectValue.FieldValue;
 public class ObjectValueFactory
 {
 	/**
+	 * Ensures that the specified object graph is portable, converting nodes to {@link ObjectValue}
+	 * as needed.
+	 */
+	public static Object convert(Object aObject)
+	{
+		return convert(aObject, new _IdentityHashMap<Object, ObjectValue>(), 2);
+	}
+	
+	/**
 	 * Converts an object to an {@link ObjectValue}, using reflection to obtain field values.
 	 */
-	private static ObjectValue toObjectValue(Object aObject, _IdentityHashMap<Object, ObjectValue> aMapping)
+	private static ObjectValue toObjectValue(Object aObject, _IdentityHashMap<Object, ObjectValue> aMapping, int aDepth)
 	{
 		Class<?> theClass = aObject.getClass();
 		ObjectValue theResult = new ObjectValue(theClass.getName(), aObject instanceof Throwable);
@@ -52,7 +61,7 @@ public class ObjectValueFactory
 				Object theMapped = aMapping.get(theValue);
 				if (theMapped == null)
 				{
-					theMapped = convert(theValue, aMapping);
+					theMapped = convert(theValue, aMapping, aDepth-1);
 					if (theMapped instanceof ObjectValue)
 					{
 						ObjectValue theObjectValue = (ObjectValue) theMapped;
@@ -70,17 +79,10 @@ public class ObjectValueFactory
 		return theResult;
 	}
 	
-	/**
-	 * Ensures that the specified object graph is portable, converting nodes to {@link ObjectValue}
-	 * as needed.
-	 */
-	public static Object convert(Object aObject)
+	private static Object convert(Object aObject, _IdentityHashMap<Object, ObjectValue> aMapping, int aDepth)
 	{
-		return convert(aObject, new _IdentityHashMap<Object, ObjectValue>());
-	}
-	
-	private static Object convert(Object aObject, _IdentityHashMap<Object, ObjectValue> aMapping)
-	{
+		if (aDepth == 0) return null;
+		
 		assert ! aMapping.containsKey(aObject);
 		Object theResult;
 		
@@ -88,7 +90,7 @@ public class ObjectValueFactory
 		else if (isPortable(aObject)) theResult = aObject;
 		else 
 		{
-			ObjectValue theObjectValue = toObjectValue(aObject, aMapping);
+			ObjectValue theObjectValue = toObjectValue(aObject, aMapping, aDepth);
 			aMapping.put(aObject, theObjectValue);
 			theResult = theObjectValue;
 		}

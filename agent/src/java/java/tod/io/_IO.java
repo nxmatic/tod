@@ -27,5 +27,10 @@ public class _IO
 		err(theStringWriter.toString());
 	}
 	
+	public static void initNatives()
+	{
+		out("[TOD]");
+		err("[TOD]");
+	}
 	
 }
