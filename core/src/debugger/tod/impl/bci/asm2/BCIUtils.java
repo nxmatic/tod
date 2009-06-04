@@ -22,19 +22,45 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.bci.asm2;
 
-import org.objectweb.asm.MethodVisitor;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.util.ListIterator;
+
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
+import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.InsnNode;
 import org.objectweb.asm.tree.IntInsnNode;
 import org.objectweb.asm.tree.LdcInsnNode;
+import org.objectweb.asm.tree.MethodNode;
+import org.objectweb.asm.tree.analysis.Analyzer;
+import org.objectweb.asm.tree.analysis.AnalyzerException;
+import org.objectweb.asm.tree.analysis.BasicVerifier;
 
 import tod.core.config.ClassSelector;
 import tod.impl.database.structure.standard.PrimitiveTypeInfo;
+import zz.utils.Utils;
 
 public class BCIUtils implements Opcodes
 {
+	private static final Type[] TYPE_FOR_SORT = new Type[11];
+	static
+	{
+		TYPE_FOR_SORT[Type.OBJECT] = Type.getType(Object.class);
+		TYPE_FOR_SORT[Type.BOOLEAN] = Type.BOOLEAN_TYPE;
+		TYPE_FOR_SORT[Type.BYTE] = Type.BYTE_TYPE;
+		TYPE_FOR_SORT[Type.CHAR] = Type.CHAR_TYPE;
+		TYPE_FOR_SORT[Type.DOUBLE] = Type.DOUBLE_TYPE;
+		TYPE_FOR_SORT[Type.FLOAT] = Type.FLOAT_TYPE;
+		TYPE_FOR_SORT[Type.INT] = Type.INT_TYPE;
+		TYPE_FOR_SORT[Type.LONG] = Type.LONG_TYPE;
+		TYPE_FOR_SORT[Type.SHORT] = Type.SHORT_TYPE;
+		TYPE_FOR_SORT[Type.VOID] = Type.VOID_TYPE;
+	}
+
+	
 	/**
 	 * Return the normal Java class name corresponding to the given internal name
 	 */
@@ -238,19 +264,7 @@ public class BCIUtils implements Opcodes
 	
 	public static Type getType (int aSort)
 	{
-		switch (aSort) 
-		{
-		case Type.OBJECT: return Type.getType(Object.class);
-		case Type.BOOLEAN: return Type.getType(boolean.class);
-		case Type.BYTE: return Type.getType(byte.class);
-		case Type.CHAR: return Type.getType(char.class);
-		case Type.DOUBLE: return Type.getType(double.class);
-		case Type.FLOAT: return Type.getType(float.class);
-		case Type.INT: return Type.getType(int.class);
-		case Type.LONG: return Type.getType(long.class);
-		case Type.SHORT: return Type.getType(short.class);
-		default: return null;
-		}
+		return TYPE_FOR_SORT[aSort];
 	}
 	
 	/**
@@ -277,5 +291,83 @@ public class BCIUtils implements Opcodes
 	{
 		return aSelector.accept(getClassName(aClassName));
 	}
+	
+	/**
+	 * Checks that a method is correct (ie. likely to pass the JVM verifier).
+	 */
+	public static void checkMethod(ClassNode aClassNode, MethodNode aNode)
+	{
+		Analyzer theAnalyzer = new Analyzer(new BasicVerifier());
+		try
+		{
+			theAnalyzer.analyze(aNode.name, aNode);
+		}
+		catch (AnalyzerException e)
+		{
+			Utils.rtex(
+					e,
+					"Error in %s.%s%s at instruction #%d: %s", 
+					aClassNode.name, 
+					aNode.name, 
+					aNode.desc,
+					getBytecodeRank(aNode, e.node),
+					e.getMessage());
+		}
+	}
+	
+	public static int getBytecodeRank(MethodNode aNode, AbstractInsnNode aInstruction)
+	{
+		if (aInstruction == null) return -1;
+		int theRank = 1;
+		ListIterator<AbstractInsnNode> theIterator = aNode.instructions.iterator();
+		while(theIterator.hasNext()) 
+		{
+			AbstractInsnNode theNode = theIterator.next();
+			if (theNode == aInstruction) return theRank;
+			
+			int theOpcode = theNode.getOpcode();
+			if (theOpcode >= 0) theRank++;
+		}
+		
+		return -1;
+	}
+	
+	public static void checkClass(byte[] aBytecode)
+	{
+//		StringWriter sw = new StringWriter();
+//		PrintWriter pw = new PrintWriter(sw);
+//		CheckClassAdapter.verify(new ClassReader(aBytecode), false, pw);
+//		
+//		String theResult = sw.toString();
+//		if (theResult.length() != 0)
+//		{
+//			Utils.rtex(theResult);
+//		}
+	}
+	
+	public static void writeClass(String aRoot, ClassNode aNode, byte[] aData) 
+	{
+		try
+		{
+			File theDir = new File(aRoot);
+			theDir = new File(theDir, "err");
+			theDir.mkdirs();
+
+			File theFile = new File (theDir, aNode.name.replace('/', '.')+".class");
+			theFile.getParentFile().mkdirs();
+			theFile.createNewFile();
+			FileOutputStream theFileOutputStream = new FileOutputStream(theFile);
+			theFileOutputStream.write(aData);
+			theFileOutputStream.flush();
+			theFileOutputStream.close();
+		}
+		catch (IOException e)
+		{
+			throw new RuntimeException(e);
+		}
+	}
+	
+
+
 	
 }

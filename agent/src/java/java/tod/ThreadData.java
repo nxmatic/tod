@@ -833,7 +833,8 @@ public final class ThreadData
 	 */
 	private boolean shouldSendByValue(Object aObject)
 	{
-		return (aObject instanceof String) || (aObject instanceof Throwable);
+		return (aObject instanceof String) || (aObject instanceof Throwable) 
+			|| (aObject instanceof Number) || (aObject instanceof Boolean);
 	}
 
 	/**
@@ -905,60 +906,9 @@ public final class ThreadData
 	
 	private void sendValue(_ByteBuffer aBuffer, Object aValue) 
 	{
-		if (aValue == null)
-		{
-			sendValueType(aBuffer, ValueType.NULL);
-		}
-		else if (aValue instanceof Boolean)
-		{
-			Boolean theBoolean = (Boolean) aValue;
-			sendValueType(aBuffer, ValueType.BOOLEAN);
-			aBuffer.put(theBoolean.booleanValue() ? TRUE : FALSE);
-		}
-		else if (aValue instanceof Byte)
-		{
-			Byte theByte = (Byte) aValue;
-			sendValueType(aBuffer, ValueType.BYTE);
-			aBuffer.put(theByte.byteValue());
-		}
-		else if (aValue instanceof Character)
-		{
-			Character theCharacter = (Character) aValue;
-			sendValueType(aBuffer, ValueType.CHAR);
-			aBuffer.putChar(theCharacter.charValue());
-		}
-		else if (aValue instanceof Integer)
-		{
-			Integer theInteger = (Integer) aValue;
-			sendValueType(aBuffer, ValueType.INT);
-			aBuffer.putInt(theInteger.intValue());
-		}
-		else if (aValue instanceof Long)
-		{
-			Long theLong = (Long) aValue;
-			sendValueType(aBuffer, ValueType.LONG);
-			aBuffer.putLong(theLong.longValue());
-		}
-		else if (aValue instanceof Float)
-		{
-			Float theFloat = (Float) aValue;
-			sendValueType(aBuffer, ValueType.FLOAT);
-			aBuffer.putFloat(theFloat.floatValue());
-		}
-		else if (aValue instanceof Double)
-		{
-			Double theDouble = (Double) aValue;
-			sendValueType(aBuffer, ValueType.DOUBLE);
-			aBuffer.putDouble(theDouble.doubleValue());
-		}
-		else if (shouldSendByValue(aValue))
-		{
-			sendObjectByValue(aBuffer, aValue);
-		}
-		else
-		{
-			sendObjectByRef(aBuffer, aValue);
-		}
+		if (aValue == null) sendValueType(aBuffer, ValueType.NULL);
+		else if (shouldSendByValue(aValue)) sendObjectByValue(aBuffer, aValue);
+		else sendObjectByRef(aBuffer, aValue);
 	}
 	
 	/**

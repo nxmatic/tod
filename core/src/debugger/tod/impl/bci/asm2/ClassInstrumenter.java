@@ -36,20 +36,15 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
-import java.util.ListIterator;
 
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
-import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.MethodNode;
-import org.objectweb.asm.tree.analysis.Analyzer;
-import org.objectweb.asm.tree.analysis.AnalyzerException;
-import org.objectweb.asm.tree.analysis.BasicVerifier;
 
 import tod.Util;
 import tod.access.TODAccessor;
@@ -163,12 +158,12 @@ public class ClassInstrumenter
 
 		try
 		{
-			checkClass(theBytecode);
-			for(MethodNode theNode : (List<MethodNode>) itsNode.methods) checkMethod(theNode);
+			BCIUtils.checkClass(theBytecode);
+			for(MethodNode theNode : (List<MethodNode>) itsNode.methods) BCIUtils.checkMethod(getNode(), theNode);
 		}
 		catch(Exception e)
 		{
-			writeClass(theBytecode);
+			BCIUtils.writeClass(getInstrumenter().getConfig().get(TODConfig.CLASS_CACHE_PATH), getNode(), theBytecode);
 			System.err.println("Class "+getNode().name+" failed check. Writing out bytecode.");
 			e.printStackTrace();
 		}
@@ -176,28 +171,6 @@ public class ClassInstrumenter
 		return new InstrumentedClass(
 				theBytecode, 
 				getInstrumenter().getMethodGroupManager().getModeChangesAndReset());
-	}
-	
-	private void writeClass(byte[] aData) 
-	{
-		try
-		{
-			File theDir = new File(getInstrumenter().getConfig().get(TODConfig.CLASS_CACHE_PATH));
-			theDir = new File(theDir, "err");
-			theDir.mkdirs();
-
-			File theFile = new File (theDir, getNode().name.replace('/', '.')+".class");
-			theFile.getParentFile().mkdirs();
-			theFile.createNewFile();
-			FileOutputStream theFileOutputStream = new FileOutputStream(theFile);
-			theFileOutputStream.write(aData);
-			theFileOutputStream.flush();
-			theFileOutputStream.close();
-		}
-		catch (IOException e)
-		{
-			throw new RuntimeException(e);
-		}
 	}
 	
 	private void processNormalClass()
@@ -239,55 +212,6 @@ public class ClassInstrumenter
 		else new MethodInstrumenter_OutOfScope(this, aNode, theBehavior).proceed();
 	}
 	
-	private void checkMethod(MethodNode aNode)
-	{
-		Analyzer theAnalyzer = new Analyzer(new BasicVerifier());
-		try
-		{
-			theAnalyzer.analyze(aNode.name, aNode);
-		}
-		catch (AnalyzerException e)
-		{
-			Utils.rtex(
-					e,
-					"Error in %s.%s%s at instruction #%d: %s", 
-					getNode().name, 
-					aNode.name, 
-					aNode.desc,
-					getBytecodeRank(aNode, e.node),
-					e.getMessage());
-		}
-	}
-	
-	private int getBytecodeRank(MethodNode aNode, AbstractInsnNode aInstruction)
-	{
-		if (aInstruction == null) return -1;
-		int theRank = 1;
-		ListIterator<AbstractInsnNode> theIterator = aNode.instructions.iterator();
-		while(theIterator.hasNext()) 
-		{
-			AbstractInsnNode theNode = theIterator.next();
-			if (theNode == aInstruction) return theRank;
-			
-			int theOpcode = theNode.getOpcode();
-			if (theOpcode >= 0) theRank++;
-		}
-		
-		return -1;
-	}
-	
-	private void checkClass(byte[] aBytecode)
-	{
-//		StringWriter sw = new StringWriter();
-//		PrintWriter pw = new PrintWriter(sw);
-//		CheckClassAdapter.verify(new ClassReader(aBytecode), false, pw);
-//		
-//		String theResult = sw.toString();
-//		if (theResult.length() != 0)
-//		{
-//			Utils.rtex(theResult);
-//		}
-	}
 	
 	/**
 	 * Replaces the body of {@link TODAccessor#getId(Object)} so that

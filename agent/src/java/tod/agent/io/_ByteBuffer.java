@@ -115,6 +115,18 @@ public class _ByteBuffer
 		itsPos += 2;
 	}
 	
+	public final short getShort()
+	{
+		checkRemaining(2);
+		int thePos = itsPos;
+		short theResult = makeShort(
+				itsBytes[thePos + 1],
+				itsBytes[thePos + 0]);
+		itsPos += 2;
+		
+		return theResult;
+	}
+	
 	public final void putInt(int v)
 	{
 		checkRemaining(4);
@@ -166,14 +178,42 @@ public class _ByteBuffer
 		itsPos += 8;
 	}
 	
+	public final long getLong()
+	{
+		checkRemaining(8);
+		int thePos = itsPos;
+		long theResult = makeLong(
+				itsBytes[thePos + 7],
+				itsBytes[thePos + 6],
+				itsBytes[thePos + 5],
+				itsBytes[thePos + 4],
+				itsBytes[thePos + 3],
+				itsBytes[thePos + 2],
+				itsBytes[thePos + 1],
+				itsBytes[thePos + 0]);
+		itsPos += 8;
+		
+		return theResult;
+	}
+	
 	public final void putFloat(float v)
 	{
 		putInt(Float.floatToRawIntBits(v));
 	}
 	
+	public final float getFloat()
+	{
+		return Float.intBitsToFloat(getInt());
+	}
+	
 	public final void putDouble(double v)
 	{
 		putLong(Double.doubleToRawLongBits(v));
+	}
+	
+	public final double getDouble()
+	{
+		return Double.longBitsToDouble(getLong());
 	}
 	
 	/**
@@ -354,5 +394,10 @@ public class _ByteBuffer
 		return (char) ((b1 << 8) | (b0 & 0xff));
 	}
 
+    public static short makeShort(byte b1, byte b0)
+    {
+    	return (short) ((b1 << 8) | (b0 & 0xff));
+    }
+    
 
 }

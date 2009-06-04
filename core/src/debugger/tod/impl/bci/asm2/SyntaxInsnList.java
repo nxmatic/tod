@@ -964,7 +964,15 @@ public class SyntaxInsnList extends InsnList
 		itsVisitor.visitFieldInsn(Opcodes.PUTFIELD, owner, name, desc);
 	}
 	
-
+	/*
+	 * Table switch
+	 */
+	
+	public void TABLESWITCH(int min, int max, Label dflt, Label[] labels)
+	{
+		itsVisitor.visitTableSwitchInsn(min, max, dflt, labels);
+	}
+	
 	/**
 	 * Inserts a label corresponding to the given name.
 	 * The {@link LabelManager} is used to retrieve the actual label.

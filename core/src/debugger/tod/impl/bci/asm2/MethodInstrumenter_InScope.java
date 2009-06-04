@@ -475,6 +475,11 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 				processGetField(aInsns, (FieldInsnNode) theNode);
 				break;
 				
+//			case Opcodes.PUTFIELD:
+//			case Opcodes.PUTSTATIC:
+//				processPutField(aInsns, (FieldInsnNode) theNode);
+//				break;
+				
 			case Opcodes.IALOAD:
 			case Opcodes.LALOAD:
 			case Opcodes.FALOAD:
@@ -814,6 +819,22 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		aInsns.insert(aNode, s);
 	}
 
+	private void processPutField(InsnList aInsns, FieldInsnNode aNode)
+	{
+		SyntaxInsnList s = new SyntaxInsnList(itsLabelManager);
+		Type theType = Type.getType(aNode.desc);
+		
+		Integer theCacheSlot = itsCachedFieldAccesses.get(aNode);
+		if (theCacheSlot != null)
+		{
+			// Store the value in the cache
+			s.DUP(theType);
+			s.ISTORE(theType, theCacheSlot);
+		}
+			
+		aInsns.insertBefore(aNode, s);
+	}
+	
 	private void processGetArray(InsnList aInsns, InsnNode aNode)
 	{
 		SyntaxInsnList s = new SyntaxInsnList(itsLabelManager);

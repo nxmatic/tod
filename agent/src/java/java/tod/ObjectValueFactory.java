@@ -24,7 +24,8 @@ public class ObjectValueFactory
 	 */
 	public static Object convert(Object aObject)
 	{
-		return convert(aObject, new _IdentityHashMap<Object, ObjectValue>(), 2);
+		if (isPortable(aObject)) return aObject;
+		else return convert(aObject, new _IdentityHashMap<Object, ObjectValue>(), 2);
 	}
 	
 	/**
