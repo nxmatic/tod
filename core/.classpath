@@ -11,6 +11,7 @@
 	<classpathentry combineaccessrules="false" exported="true" kind="src" path="/TOD-agent"/>
 	<classpathentry kind="lib" path="lib/jython-2.2.1.jar"/>
 	<classpathentry kind="lib" path="lib/infovis.jar" sourcepath="/infovis-0.9beta2"/>
+	<classpathentry kind="lib" path="lib/trove-2.0.4.jar"/>
 	<classpathentry kind="con" path="org.eclipse.ajdt.core.ASPECTJRT_CONTAINER"/>
 	<classpathentry combineaccessrules="false" kind="src" path="/asm3-svn"/>
 	<classpathentry combineaccessrules="false" kind="src" path="/zz.jinterp"/>

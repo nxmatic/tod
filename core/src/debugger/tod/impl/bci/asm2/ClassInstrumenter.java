@@ -146,9 +146,9 @@ public class ClassInstrumenter
 		if (TODACCESSOR_CLASSNAME.equals(getNode().name)) processTODAccessor();
 		else processNormalClass();
 		
-		if (MethodInstrumenter.CLS_OBJECT.equals(getNode().name)) addGetIdMethod_Root();
-		if (MethodInstrumenter.CLS_CLASS.equals(getNode().name)) addGetClsIdMethod();
-		if (MethodInstrumenter.CLS_STRING.equals(getNode().name)) addStringRawAccess();
+		if (BCIUtils.CLS_OBJECT.equals(getNode().name)) addGetIdMethod_Root();
+		if (BCIUtils.CLS_CLASS.equals(getNode().name)) addGetClsIdMethod();
+		if (BCIUtils.CLS_STRING.equals(getNode().name)) addStringRawAccess();
 		
 		// Output the modified class
 		ClassWriter theWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
@@ -194,7 +194,7 @@ public class ClassInstrumenter
 
 		// Add infrastructure
 		if (! itsInterface
-				&& MethodInstrumenter.CLS_OBJECT.equals(getNode().superName) 
+				&& BCIUtils.CLS_OBJECT.equals(getNode().superName) 
 				&& getInstrumenter().isInIdScope(getNode().name)) 
 		{
 			addGetIdMethod_InScope();
@@ -222,15 +222,15 @@ public class ClassInstrumenter
 		for(MethodNode theNode : (List<MethodNode>) itsNode.methods) 
 		{
 			if ("getObjectId".equals(theNode.name))
-				makeAccessor(theNode, MethodInstrumenter.CLS_OBJECT, OBJID_GETTER, "J");
+				makeAccessor(theNode, BCIUtils.CLS_OBJECT, OBJID_GETTER, "J");
 			else if ("getStringChars".equals(theNode.name))
-				makeAccessor(theNode, MethodInstrumenter.CLS_STRING, STRING_GETCHARS, "[C");
+				makeAccessor(theNode, BCIUtils.CLS_STRING, STRING_GETCHARS, "[C");
 			else if ("getStringOffset".equals(theNode.name))
-				makeAccessor(theNode, MethodInstrumenter.CLS_STRING, STRING_GETOFFSET, "I");
+				makeAccessor(theNode, BCIUtils.CLS_STRING, STRING_GETOFFSET, "I");
 			else if ("getStringCount".equals(theNode.name))
-				makeAccessor(theNode, MethodInstrumenter.CLS_STRING, STRING_GETCOUNT, "I");
+				makeAccessor(theNode, BCIUtils.CLS_STRING, STRING_GETCOUNT, "I");
 			else if ("getClassId".equals(theNode.name))
-				makeAccessor(theNode, MethodInstrumenter.CLS_CLASS, CLSID_GETTER, "I");
+				makeAccessor(theNode, BCIUtils.CLS_CLASS, CLSID_GETTER, "I");
 		}
 	}
 	
@@ -263,7 +263,7 @@ public class ClassInstrumenter
 		SyntaxInsnList s = new SyntaxInsnList(null);
 		
 		s.ALOAD(0);
-		s.INVOKESTATIC("java/tod/ObjectIdentity", "get", "("+MethodInstrumenter.DSC_OBJECT+")J");
+		s.INVOKESTATIC("java/tod/ObjectIdentity", "get", "("+BCIUtils.DSC_OBJECT+")J");
 		s.LRETURN();
 		
 		theGetter.instructions = s;
@@ -307,7 +307,7 @@ public class ClassInstrumenter
 		s.POP2();
 		
 		// Double-checked locking (this works under Java5 if the field is volatile)
-		s.GETSTATIC("java/tod/ObjectIdentity", "MON", MethodInstrumenter.DSC_OBJECT);
+		s.GETSTATIC("java/tod/ObjectIdentity", "MON", BCIUtils.DSC_OBJECT);
 		s.MONITORENTER();
 		
 		s.ALOAD(0);
@@ -329,7 +329,7 @@ public class ClassInstrumenter
 		
 		s.label(lUnlock);
 		
-		s.GETSTATIC("java/tod/ObjectIdentity", "MON", MethodInstrumenter.DSC_OBJECT);
+		s.GETSTATIC("java/tod/ObjectIdentity", "MON", BCIUtils.DSC_OBJECT);
 		s.MONITOREXIT();
 		
 		s.label(lReturn);
@@ -373,7 +373,7 @@ public class ClassInstrumenter
 		s.POP();
 		
 		// Double-checked locking (this works under Java5 if the field is volatile)
-		s.GETSTATIC("java/tod/ObjectIdentity", "MON", MethodInstrumenter.DSC_OBJECT);
+		s.GETSTATIC("java/tod/ObjectIdentity", "MON", BCIUtils.DSC_OBJECT);
 		s.MONITORENTER();
 		
 		s.ALOAD(0);
@@ -393,7 +393,7 @@ public class ClassInstrumenter
 		
 		s.label(lUnlock);
 		
-		s.GETSTATIC("java/tod/ObjectIdentity", "MON", MethodInstrumenter.DSC_OBJECT);
+		s.GETSTATIC("java/tod/ObjectIdentity", "MON", BCIUtils.DSC_OBJECT);
 		s.MONITOREXIT();
 		
 		s.label(lReturn);
@@ -407,9 +407,9 @@ public class ClassInstrumenter
 	 */
 	private void addStringRawAccess()
 	{
-		createGetter(MethodInstrumenter.CLS_STRING, STRING_GETCHARS, "value", "[C");
-		createGetter(MethodInstrumenter.CLS_STRING, STRING_GETOFFSET, "offset", "I");
-		createGetter(MethodInstrumenter.CLS_STRING, STRING_GETCOUNT, "count", "I");
+		createGetter(BCIUtils.CLS_STRING, STRING_GETCHARS, "value", "[C");
+		createGetter(BCIUtils.CLS_STRING, STRING_GETOFFSET, "offset", "I");
+		createGetter(BCIUtils.CLS_STRING, STRING_GETCOUNT, "count", "I");
 	}
 	
 	private void createGetter(String aOwner, String aGetterName, String aFieldName, String aValueDesc)

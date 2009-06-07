@@ -211,6 +211,15 @@ public class SyntaxInsnList extends InsnList
             throw new RuntimeException("Not handled: "+aType);
 		}
 	}
+	
+	/*
+	 * LDC
+	 */
+	
+	public void LDC(Object cst)
+	{
+		itsVisitor.visitLdcInsn(cst);
+	}
 
 	/*
 	 * Simple instructions
@@ -972,6 +981,33 @@ public class SyntaxInsnList extends InsnList
 	{
 		itsVisitor.visitTableSwitchInsn(min, max, dflt, labels);
 	}
+	
+	/*
+	 * Type instructions
+	 */
+	
+	public void NEW(String type) 
+	{
+		itsVisitor.visitTypeInsn(Opcodes.NEW, type);
+	}
+	
+	public void ANEWARRAY(String type) 
+	{
+		itsVisitor.visitTypeInsn(Opcodes.ANEWARRAY, type);
+	}
+	
+	public void CHECKCAST(String type) 
+	{
+		itsVisitor.visitTypeInsn(Opcodes.CHECKCAST, type);
+	}
+	
+	public void INSTANCEOF(String type) 
+	{
+		itsVisitor.visitTypeInsn(Opcodes.INSTANCEOF, type);
+	}
+	
+	
+	
 	
 	/**
 	 * Inserts a label corresponding to the given name.

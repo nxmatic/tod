@@ -146,7 +146,7 @@ public final class EventCollector
 			throw new RuntimeException(e);
 		}
 		
-		itsIOThread = new IOThread(this, itsChannel);
+		itsIOThread = new IOThread(itsChannel);
 		
 		AgentReady.COLLECTOR_READY = true;
 

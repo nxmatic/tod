@@ -32,36 +32,16 @@ Inc. MD5 Message-Digest Algorithm".
 package tod.impl.bci.asm2;
 
 import java.tod.ThreadData;
-import java.util.HashMap;
-import java.util.ListIterator;
-import java.util.Map;
 
 import org.objectweb.asm.Type;
-import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
-import org.objectweb.asm.tree.analysis.SourceInterpreter;
 
 import tod.core.database.structure.IMutableBehaviorInfo;
 import tod.core.database.structure.IMutableStructureDatabase;
-import tod.impl.bci.asm2.Analysis.SourceFrame;
 
 public abstract class MethodInstrumenter
 {
-	protected static final String CLS_EVENTCOLLECTOR = "java/tod/EventCollector";
-	protected static final String DSC_EVENTCOLLECTOR = "L"+CLS_EVENTCOLLECTOR+";";
-	protected static final String CLS_AGENTREADY = "java/tod/AgentReady";
-	protected static final String CLS_EXCEPTIONGENERATEDRECEIVER = "java/tod/ExceptionGeneratedReceiver";
-	protected static final String CLS_TRACEDMETHODS = "java/tod/TracedMethods";
-	protected static final String CLS_THREADDATA = "java/tod/ThreadData";
-	protected static final String DSC_THREADDATA = "L"+CLS_THREADDATA+";";
-	protected static final String CLS_OBJECT = "java/lang/Object";
-	protected static final String DSC_OBJECT = "L"+CLS_OBJECT+";";
-	protected static final String CLS_THROWABLE = "java/lang/Throwable";
-	protected static final String DSC_THROWABLE = "L"+CLS_THROWABLE+";";
-	protected static final String CLS_STRING = "java/lang/String";
-	protected static final String CLS_CLASS = "java/lang/Class";
-	
 	private final ClassInstrumenter itsClassInstrumenter;
 	private final MethodNode itsNode;
 	private final IMutableBehaviorInfo itsBehavior;
@@ -81,16 +61,10 @@ public abstract class MethodInstrumenter
 	 */
 	private int itsTraceEnabledVar;
 	
-	/**
-	 * Maps instructions to frames.
-	 */
-	private Map<AbstractInsnNode, SourceFrame> itsFramesMap;
-	
 	public MethodInstrumenter(
 			ClassInstrumenter aClassInstrumenter, 
 			MethodNode aNode, 
-			IMutableBehaviorInfo aBehavior,
-			boolean aAnalyze)
+			IMutableBehaviorInfo aBehavior)
 	{
 		itsClassInstrumenter = aClassInstrumenter;
 		itsNode = aNode;
@@ -105,8 +79,6 @@ public abstract class MethodInstrumenter
 		
 		itsThreadDataVar = nextFreeVar(1);
 		itsTraceEnabledVar = nextFreeVar(1);
-		
-		if (aAnalyze) setupFrames();
 	}
 	
 	public ClassInstrumenter getClassInstrumenter()
@@ -225,86 +197,63 @@ public abstract class MethodInstrumenter
 	{
 		s.ALOAD(itsThreadDataVar);
 		s.ILOAD(aIndex); 
-		s.INVOKEVIRTUAL(CLS_THREADDATA, "sendValue_Boolean", "(Z)V");
+		s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "sendValue_Boolean", "(Z)V");
 	}
 	
 	protected void sendValue_Byte(SyntaxInsnList s, int aIndex)
 	{
 		s.ALOAD(itsThreadDataVar);
 		s.ILOAD(aIndex); 
-		s.INVOKEVIRTUAL(CLS_THREADDATA, "sendValue_Byte", "(B)V");
+		s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "sendValue_Byte", "(B)V");
 	}
 	
 	protected void sendValue_Char(SyntaxInsnList s, int aIndex)
 	{
 		s.ALOAD(itsThreadDataVar);
 		s.ILOAD(aIndex); 
-		s.INVOKEVIRTUAL(CLS_THREADDATA, "sendValue_Char", "(C)V");
+		s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "sendValue_Char", "(C)V");
 	}
 	
 	protected void sendValue_Short(SyntaxInsnList s, int aIndex)
 	{
 		s.ALOAD(itsThreadDataVar);
 		s.ILOAD(aIndex); 
-		s.INVOKEVIRTUAL(CLS_THREADDATA, "sendValue_Short", "(S)V");
+		s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "sendValue_Short", "(S)V");
 	}
 	
 	protected void sendValue_Int(SyntaxInsnList s, int aIndex)
 	{
 		s.ALOAD(itsThreadDataVar);
 		s.ILOAD(aIndex); 
-		s.INVOKEVIRTUAL(CLS_THREADDATA, "sendValue_Int", "(I)V");
+		s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "sendValue_Int", "(I)V");
 	}
 	
 	protected void sendValue_Long(SyntaxInsnList s, int aIndex)
 	{
 		s.ALOAD(itsThreadDataVar);
 		s.LLOAD(aIndex); 
-		s.INVOKEVIRTUAL(CLS_THREADDATA, "sendValue_Long", "(J)V");
+		s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "sendValue_Long", "(J)V");
 	}
 	
 	protected void sendValue_Float(SyntaxInsnList s, int aIndex)
 	{
 		s.ALOAD(itsThreadDataVar);
 		s.FLOAD(aIndex); 
-		s.INVOKEVIRTUAL(CLS_THREADDATA, "sendValue_Float", "(F)V");
+		s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "sendValue_Float", "(F)V");
 	}
 	
 	protected void sendValue_Double(SyntaxInsnList s, int aIndex)
 	{
 		s.ALOAD(itsThreadDataVar);
 		s.DLOAD(aIndex); 
-		s.INVOKEVIRTUAL(CLS_THREADDATA, "sendValue_Double", "(D)V");
+		s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "sendValue_Double", "(D)V");
 	}
 	
 	protected void sendValue_Ref(SyntaxInsnList s, int aIndex)
 	{
 		s.ALOAD(itsThreadDataVar);
 		s.ALOAD(aIndex); 
-		s.INVOKEVIRTUAL(CLS_THREADDATA, "sendValue_Ref", "("+DSC_OBJECT+")V");
+		s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "sendValue_Ref", "("+BCIUtils.DSC_OBJECT+")V");
 	}
 	
-	/**
-	 * Returns the stack frames resulting from the analysis of the method
-	 * using the {@link SourceInterpreter}.
-	 */
-	private void setupFrames()
-	{
-		itsFramesMap = new HashMap<AbstractInsnNode, SourceFrame>();
-		SourceFrame[] theFrames = Analysis.analyze_nocflow(getClassNode().name, getNode());
-		
-		int i = 0; // Instruction rank
-		ListIterator<AbstractInsnNode> theIterator = getNode().instructions.iterator();
-		while(theIterator.hasNext()) itsFramesMap.put(theIterator.next(), theFrames[i++]);
-	}
-	
-	/**
-	 * Gets the frame corresponding to the specified node.
-	 * @param aNode A node that is part of the original method body.
-	 */
-	protected SourceFrame getFrame(AbstractInsnNode aNode)
-	{
-		return itsFramesMap.get(aNode);
-	}
-
 }

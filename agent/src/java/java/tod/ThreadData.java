@@ -91,8 +91,8 @@ public final class ThreadData
 	private int itsLastSentLTimestamp = 0;
 	
 
-	private int[] itsEvCount = new int[Message.SYNC];
-	private long[] itsEvData = new long[Message.SYNC];
+	private int[] itsEvCount = new int[Message.MSG_COUNT];
+	private long[] itsEvData = new long[Message.MSG_COUNT];
 	private int itsLastBufferPos = -1;
 	private int itsExpectedArgsCount = -1;
 	private int itsAccountToCharge = -1;
@@ -254,7 +254,7 @@ public final class ThreadData
 	    
 	    long theTotalData = 0;
 	    
-	    for(int i = Message.FIELD_READ;i<Message.SYNC;i++)
+	    for(int i = Message.FIELD_READ;i<Message.MSG_COUNT;i++)
 	    {
 	        if (i >= 20 && itsEvCount[i] == 0 && itsEvData[i] == 0) continue;
 	        b.append("[ThreadData] ");
@@ -402,25 +402,40 @@ public final class ThreadData
         exit();
 	}
 	
-	public void evNew(Object aValue)
+	public void evNewArray(Object aValue)
 	{
 		if (enter()) return;
 		
-		sendRegisteredObjects();
-		
-		msgStart(Message.NEW, 0);
+		msgStart(Message.NEW_ARRAY, 0);
 	    
 		checkTimestamp();
-		sendMessageType(itsBuffer, Message.NEW);
+		sendMessageType(itsBuffer, Message.NEW_ARRAY);
 		sendValue(itsBuffer, aValue);
 		
 		msgStop();
 		
 		commitBuffer();
 		
-		// Objects that are sent by value must not be serialized now as they
-		// are not yet initialized
-		if (! shouldSendByValue(aValue)) sendRegisteredObjects();
+		sendRegisteredObjects();
+		
+		exit();
+	}
+	
+	public void evCst(Object aValue)
+	{
+		if (enter()) return;
+		
+		msgStart(Message.CONSTANT, 0);
+		
+		checkTimestamp();
+		sendMessageType(itsBuffer, Message.CONSTANT);
+		sendValue(itsBuffer, aValue);
+		
+		msgStop();
+		
+		commitBuffer();
+		
+		sendRegisteredObjects();
 		
 		exit();
 	}
@@ -434,7 +449,7 @@ public final class ThreadData
 		msgStart(Message.OBJECT_INITIALIZED, 0);
 
 		checkTimestamp();
-		sendMessageType(itsBuffer, Message.NEW);
+		sendMessageType(itsBuffer, Message.NEW_ARRAY);
 		sendValue(itsBuffer, aValue);
 
 		msgStop();

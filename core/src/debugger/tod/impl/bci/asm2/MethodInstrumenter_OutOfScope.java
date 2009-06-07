@@ -56,7 +56,7 @@ public class MethodInstrumenter_OutOfScope extends MethodInstrumenter
 
 	public MethodInstrumenter_OutOfScope(ClassInstrumenter aClassInstrumenter, MethodNode aNode, IMutableBehaviorInfo aBehavior)
 	{
-		super(aClassInstrumenter, aNode, aBehavior, false);
+		super(aClassInstrumenter, aNode, aBehavior);
 		itsResultVar = nextFreeVar(2); //result might need two slots.
 		getNode().maxStack += 3; // This is the max we add to the stack
 	}
@@ -77,7 +77,7 @@ public class MethodInstrumenter_OutOfScope extends MethodInstrumenter
 		if (getClassNode().name.startsWith("java/lang/ThreadLocal")) return;
 		if (getClassNode().name.indexOf("ClassLoader") >= 0) return;
 		
-		if (CLS_OBJECT.equals(getClassNode().name)) 
+		if (BCIUtils.CLS_OBJECT.equals(getClassNode().name)) 
 		{
 //			if ("equals".equals(getNode().name)) return;
 //			if ("toString".equals(getNode().name)) return;
@@ -96,7 +96,7 @@ public class MethodInstrumenter_OutOfScope extends MethodInstrumenter
 
 			// Store the monitoring mode for the behavior in a local
 			s.pushInt(getBehavior().getId()); 
-			s.INVOKESTATIC(CLS_TRACEDMETHODS, "traceEnveloppe", "(I)Z");
+			s.INVOKESTATIC(BCIUtils.CLS_TRACEDMETHODS, "traceEnveloppe", "(I)Z");
 			s.DUP();
 			s.ISTORE(getTraceEnabledVar());
 			
@@ -106,12 +106,12 @@ public class MethodInstrumenter_OutOfScope extends MethodInstrumenter
 			// Monitoring enabled
 			{
 				// Store ThreadData object
-				s.INVOKESTATIC(CLS_EVENTCOLLECTOR, "_getThreadData", "()"+DSC_THREADDATA);
+				s.INVOKESTATIC(BCIUtils.CLS_EVENTCOLLECTOR, "_getThreadData", "()"+BCIUtils.DSC_THREADDATA);
 				s.DUP();
 				s.ASTORE(getThreadDataVar());
 				
 				// Send event
-				s.INVOKEVIRTUAL(CLS_THREADDATA, "evOutOfScopeBehaviorEnter", "()V");
+				s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evOutOfScopeBehaviorEnter", "()V");
 				
 				s.GOTO("start");
 			}
@@ -127,18 +127,18 @@ public class MethodInstrumenter_OutOfScope extends MethodInstrumenter
 
 			// Monitoring active, send event
 			s.ALOAD(getThreadDataVar());
-			s.INVOKEVIRTUAL(CLS_THREADDATA, "evOutOfScopeBehaviorExit_Normal", "()V");				
+			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evOutOfScopeBehaviorExit_Normal", "()V");				
 
 			// Send return value if needed
 			Type theReturnType = getReturnType();
 			if (theReturnType.getSort() != Type.VOID) 
 			{
 				s.ALOAD(getThreadDataVar());
-				s.INVOKEVIRTUAL(CLS_THREADDATA, "isInScope", "()Z");
+				s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "isInScope", "()Z");
 				s.IFfalse("return");
 
 				s.ALOAD(getThreadDataVar());
-				s.INVOKEVIRTUAL(CLS_THREADDATA, "sendOutOfScopeBehaviorResult", "()V");
+				s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "sendOutOfScopeBehaviorResult", "()V");
 				s.ISTORE(theReturnType, itsResultVar); // We can't use DUP in case of long or double, so we just store the value
 				sendValue(s, itsResultVar, theReturnType);
 				s.ILOAD(theReturnType, itsResultVar);
@@ -157,7 +157,7 @@ public class MethodInstrumenter_OutOfScope extends MethodInstrumenter
 			s.IFfalse("throw");
 			
 			s.ALOAD(getThreadDataVar());
-			s.INVOKEVIRTUAL(CLS_THREADDATA, "evOutOfScopeBehaviorExit_Exception", "()V");
+			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evOutOfScopeBehaviorExit_Exception", "()V");
 
 			s.label("throw");
 			s.ATHROW();

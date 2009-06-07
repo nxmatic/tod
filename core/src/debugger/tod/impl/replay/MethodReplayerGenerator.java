@@ -31,10 +31,10 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.replay;
 
-import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
@@ -50,23 +50,35 @@ import org.objectweb.asm.tree.FieldInsnNode;
 import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.InsnNode;
+import org.objectweb.asm.tree.JumpInsnNode;
 import org.objectweb.asm.tree.LabelNode;
+import org.objectweb.asm.tree.LdcInsnNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
-import org.objectweb.asm.tree.TableSwitchInsnNode;
+import org.objectweb.asm.tree.TypeInsnNode;
 import org.objectweb.asm.tree.VarInsnNode;
 
 import tod.core.config.TODConfig;
+import tod.core.database.structure.IFieldInfo;
+import tod.core.database.structure.IMutableStructureDatabase;
+import tod.core.database.structure.ObjectId;
 import tod.impl.bci.asm2.BCIUtils;
+import tod.impl.bci.asm2.MethodInfo;
 import tod.impl.bci.asm2.SyntaxInsnList;
+import tod.impl.bci.asm2.MethodInfo.BCIFrame;
 
 public class MethodReplayerGenerator
 {
+	public static final Type TYPE_OBJECTID = Type.getType(ObjectId.class);
+	
 	private final TODConfig itsConfig;
+	private final IMutableStructureDatabase itsDatabase;
 	private final ClassNode itsTarget;
 	
 	private final ClassNode itsClassNode;
 	private final MethodNode itsMethodNode;
+	
+	private final MethodInfo itsMethodInfo;
 	
 	private Type[] itsArgTypes;
 	private Type itsReturnType;
@@ -76,16 +88,32 @@ public class MethodReplayerGenerator
 	 */
 	private int itsTmpVar;
 	
+	/**
+	 * The set of fields that replace local variables
+	 */
 	private Set<String> itsCreatedFields = new HashSet<String>();
 	
 	/**
-	 * Maps instructions to block numbers. The instruction is the first one of the block.
+	 * The list of blocks.
 	 */
-	private Map<AbstractInsnNode, BlockData> itsBlocksMap = new HashMap<AbstractInsnNode, BlockData>();
+	private List<BlockData> itsBlocks = new ArrayList<BlockData>();
 	
-	public MethodReplayerGenerator(TODConfig aConfig, ClassNode aClassNode, MethodNode aMethodNode)
+	/**
+	 * Maps field keys (see {@link #getFieldKey(FieldInsnNode)}) to the corresponding cache slot. 
+	 */
+	private Map<String, Integer> itsFieldCacheMap = new HashMap<String, Integer>();
+	
+	// Number of local variable slots used for each type 
+	private int itsLastRefSlot = 0;
+	private int itsLastIntSlot = 0;
+	private int itsLastDoubleSlot = 0;
+	private int itsLastFloatSlot = 0;
+	private int itsLastLongSlot = 0;
+	
+	public MethodReplayerGenerator(TODConfig aConfig, IMutableStructureDatabase aDatabase, ClassNode aClassNode, MethodNode aMethodNode)
 	{
 		itsConfig = aConfig;
+		itsDatabase = aDatabase;
 		itsClassNode = aClassNode;
 		itsMethodNode = aMethodNode;
 		
@@ -93,8 +121,8 @@ public class MethodReplayerGenerator
 		itsReturnType = Type.getReturnType(itsMethodNode.desc);
 		
 		itsTarget = new ClassNode();
-		itsTarget.name = makeTargetName();
-		itsTarget.superName = AbstractMethodReplayer.class.getName().replace('.', '/');
+		itsTarget.name = ThreadReplayer.makeReplayerClassName(itsClassNode.name, itsMethodNode.name, itsMethodNode.desc);
+		itsTarget.superName = BCIUtils.CLS_REPLAYER;
 		itsTarget.methods.add(itsMethodNode);
 		
 		itsMethodNode.name = "proceed";
@@ -102,38 +130,39 @@ public class MethodReplayerGenerator
 		itsMethodNode.access = Opcodes.ACC_PROTECTED;
 		
 		itsTmpVar = nextFreeVar(2);
+		
+		itsMethodInfo = new MethodInfo(itsDatabase, itsClassNode, itsMethodNode);
 	}
 	
-	private String makeTargetName()
-	{
-		String theName = "$todgen$"+itsClassNode.name+"_"+itsMethodNode.name+"_"+itsMethodNode.desc;
-		char[] r = new char[theName.length()];
-		for (int i=0;i<r.length;i++)
-		{
-			char c = theName.charAt(i);
-			switch(c)
-			{
-			case '/':
-			case '(':
-			case ')':
-			case '[':
-			case ';':
-				c = '_';
-				break;
-			}
-			r[i] = c;
-		}
-		return new String(r);
-	}
-
 	public TODConfig getConfig()
 	{
 		return itsConfig;
 	}
 	
+	public IMutableStructureDatabase getDatabase()
+	{
+		return itsDatabase;
+	}
+	
 	public byte[] generate()
 	{
+		// Allocate first block as block 0
+		Label lStart = new Label();
+		itsMethodNode.instructions.insert(new LabelNode(lStart));
+		int theFirstBlockId = getBlockId(lStart);
+		if (theFirstBlockId != 0) throw new RuntimeException();
+		
+		// Create constructor
+		addConstructor();
+		
+		// Modify code
 		processInstructions(itsMethodNode.instructions);
+		
+		addSlotSetters();
+		
+		itsMethodNode.name = "proceed";
+		itsMethodNode.desc = "(I)V";
+		itsTarget.methods.add(itsMethodNode);
 		
 		// Output the modified class
 		ClassWriter theWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
@@ -141,6 +170,7 @@ public class MethodReplayerGenerator
 		
 		byte[] theBytecode = theWriter.toByteArray();
 
+		// Check the methods
 		try
 		{
 			BCIUtils.checkClass(theBytecode);
@@ -155,54 +185,154 @@ public class MethodReplayerGenerator
 		
 		return theBytecode;
 	}
+	
+	/**
+	 * Returns the type corresponding to the given sort.
+	 * If the sort corresponds to object or array, returns {@link ObjectId}
+	 * @param aSort
+	 * @return
+	 */
+	private Type getTypeOrId(int aSort)
+	{
+		switch(aSort)
+		{
+		case Type.OBJECT:
+		case Type.ARRAY:
+			return TYPE_OBJECTID;
+		
+		default:
+			return BCIUtils.getType(aSort);
+		}
+	}
+	
+	private void addConstructor()
+	{
+		MethodNode theConstructor = new MethodNode();
+		theConstructor.name = "<init>";
+		theConstructor.desc = "()V";
+		
+		SyntaxInsnList s = new SyntaxInsnList(null);
+		s.ALOAD(0);
+		s.LDC(itsMethodNode.desc);
+		s.LDC(getEncodedFieldCacheCounts());
+		s.INVOKESPECIAL(BCIUtils.CLS_REPLAYER, "<init>", "("+BCIUtils.DSC_STRING+BCIUtils.DSC_STRING+")V");
+		s.RETURN();
+		
+		itsTarget.methods.add(theConstructor);
+	}
+	
+	/**
+	 * Creates a string that represents the number of slots for each field cache type.
+	 * Also sets up the field cache map.
+	 */
+	private String getEncodedFieldCacheCounts()
+	{
+		char[] theCounts = new char[11]; // There are 11 sorts
+		
+		List<IFieldInfo> theCachedFields = itsMethodInfo.getCachedFields();
+		
+		for (IFieldInfo theField : theCachedFields)
+		{
+			Type theType = Type.getType(theField.getType().getJvmName());
+			
+			itsFieldCacheMap.put(getFieldKey(theField), Integer.valueOf(theCounts[theType.getSort()]));
+			theCounts[theType.getSort()]++;
+		}
+		
+		return new String(theCounts);
+	}
+	
+	private int getFieldCacheSlot(FieldInsnNode aNode)
+	{
+		Integer theSlot = itsFieldCacheMap.get(getFieldKey(aNode));
+		return theSlot != null ? theSlot.intValue() : -1;
+	}
+	
+	private String getFieldKey(IFieldInfo aField)
+	{
+		return aField.getDeclaringType().getJvmName()+"_"+aField.getName();
+	}
+	
+	private String getFieldKey(FieldInsnNode aNode)
+	{
+		return aNode.owner+"_"+aNode.name;
+	}
 
 	/**
-	 * Allocates a block id for the given instruction
+	 * Allocates a block id for the given block start label
 	 */
-	private int getBlockId(AbstractInsnNode aNode)
+	private int getBlockId(Label aLabel)
 	{
-		BlockData theData = itsBlocksMap.get(aNode);
-		if (theData == null)
-		{
-			Label theLabel;
-			if (aNode.getPrevious() instanceof LabelNode) theLabel = ((LabelNode) aNode.getPrevious()).getLabel();
-			else theLabel = new Label();
-			
-			int theId = itsBlocksMap.size(); 
-			
-			theData = new BlockData(theLabel, theId);
-			itsBlocksMap.put(aNode, theData);
-		}
-		return theData.id;
+		int theId = itsBlocks.size(); 
+		itsBlocks.add(new BlockData(aLabel, theId));
+		return theId;
 	}
 	
 	/**
 	 * Generates the switch statement that jumps to a specific block
 	 */
-	private InsnList generateBlockSwitch()
+	private InsnList genBlockSwitch()
 	{
 		SyntaxInsnList s = new SyntaxInsnList(null);
 		Label theDefault = new Label();
 		
-		int theCount = itsBlocksMap.size();
+		int theCount = itsBlocks.size();
 		
 		// Sort blocks by id
-		BlockData[] theDatas = new BlockData[theCount];
-		Iterator<BlockData> theIterator = itsBlocksMap.values().iterator();
-		for (int i=0;i<theCount;i++) theDatas[i] = theIterator.next();
-		Arrays.sort(theDatas);
+		Collections.sort(itsBlocks);
 		
 		// Obtain labels
 		Label[] theLabels = new Label[theCount];
-		for(int i=0;i<theCount;i++) theLabels[i] = theDatas[i].label;
+		for(int i=0;i<theCount;i++) theLabels[i] = itsBlocks.get(i).label;
 		
 		// Generate tableswitch
 		s.TABLESWITCH(0, theCount-1, theDefault, theLabels);
 		
 		// Generate default case
 		s.label(theDefault);
-		s.ATHROW(); xxxx
+		BCIUtils.throwRTEx(s, "Bad block id");
 		
+		return s;
+	}
+	
+	/**
+	 * Generates a block of code that saves the operand stack into
+	 * the {@link AbstractMethodReplayer}'s stack.
+	 */
+	private InsnList genSaveStack(BCIFrame aFrame)
+	{
+		SyntaxInsnList s = new SyntaxInsnList(null);
+		int theStackSize = aFrame.getStackSize();
+		for(int i=theStackSize-1;i>=0;i--)
+		{
+			Type theType = aFrame.getStack(i).type;
+			s.ISTORE(theType, itsTmpVar);
+			s.ALOAD(0);
+			s.ILOAD(theType, itsTmpVar);
+			String[] theSig = pushMethodSig(theType);
+			s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, theSig[0], theSig[1]);
+		}
+		
+		return s;
+	}
+	
+	/**
+	 * Generates a block of code that loads the operand stack from
+	 * the {@link AbstractMethodReplayer}'s stack.
+	 */
+	private InsnList genLoadStack(BCIFrame aFrame)
+	{
+		SyntaxInsnList s = new SyntaxInsnList(null);
+		int theStackSize = aFrame.getStackSize();
+		for(int i=0;i<theStackSize;i++)
+		{
+			Type theType = aFrame.getStack(i).type;
+			s.ALOAD(0);
+			String[] theSig = popMethodSig(theType);
+			s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, theSig[0], theSig[1]);
+		}
+		
+		return s;
 	}
 	
 	private int nextFreeVar(int aSize)
@@ -213,7 +343,8 @@ public class MethodReplayerGenerator
 	}
 	
 	/**
-	 * Returns the name of the field that holds the value for the specified variable, and ensures that the field is created.
+	 * Returns the name of the field that holds the value for the specified local variable, 
+	 * and ensures that the field is created.
 	 * There is one field per (slot, type) combination. 
 	 */
 	private String getFieldForVar(int aSlot, Type aType)
@@ -228,23 +359,28 @@ public class MethodReplayerGenerator
         case Type.SHORT:
         case Type.INT:
         	theName = "vInt_"+aSlot;
+        	itsLastIntSlot = aSlot;
         	break;
         	
         case Type.FLOAT:
         	theName = "vFloat_"+aSlot;
+        	itsLastFloatSlot = aSlot;
         	break;
         	
         case Type.LONG:
         	theName = "vLong_"+aSlot;
+        	itsLastLongSlot = aSlot;
         	break;
         	
         case Type.DOUBLE:
         	theName = "vDouble_"+aSlot;
+        	itsLastDoubleSlot = aSlot;
         	break;
 
         case Type.OBJECT:
         case Type.ARRAY:
         	theName = "vRef_"+aSlot;
+        	itsLastRefSlot = aSlot;
         	break;
         	
         default:
@@ -257,6 +393,114 @@ public class MethodReplayerGenerator
 		}
 		
 		return theName;
+	}
+	
+	/**
+	 * Adds the implementation of the {@link AbstractMethodReplayer#lRefSet(int, ObjectId)}
+	 * methods.
+	 */
+	private void addSlotSetters()
+	{
+		addSlotSetter(itsLastRefSlot, "Ref", TYPE_OBJECTID);
+		addSlotSetter(itsLastIntSlot, "Int", Type.INT_TYPE);
+		addSlotSetter(itsLastDoubleSlot, "Double", Type.DOUBLE_TYPE);
+		addSlotSetter(itsLastFloatSlot, "Float", Type.FLOAT_TYPE);
+		addSlotSetter(itsLastLongSlot, "Long", Type.LONG_TYPE);
+	}
+	
+	private void addSlotSetter(int aSlotCount, String aNameBase, Type aType)
+	{
+		MethodNode theSetter = new MethodNode();
+		theSetter.name = "l"+aNameBase+"Set";
+		theSetter.desc = "(I"+aType.getDescriptor()+")V";
+		theSetter.access = Opcodes.ACC_PROTECTED;
+		
+		SyntaxInsnList s = new SyntaxInsnList(null);
+		Label[] l = new Label[aSlotCount];
+		Label lDefault = new Label();
+		for(int i=0;i<aSlotCount;i++) l[i] = new Label();
+		
+		s.ILOAD(1);
+		s.TABLESWITCH(0, aSlotCount-1, lDefault, l);
+		
+		for (int i=0;i<aSlotCount;i++)
+		{
+			s.label(l[i]);
+			s.ALOAD(0);
+			s.ILOAD(aType, 2);
+			s.PUTFIELD(itsTarget.name, getFieldForVar(i, aType), aType.getDescriptor());
+			s.RETURN();
+		}
+		
+		s.label(lDefault);
+		BCIUtils.throwRTEx(s, "No such slot");
+		
+		theSetter.instructions = s;
+		itsTarget.methods.add(theSetter);
+	}
+	
+	/**
+	 * Returns the name of the {@link AbstractMethodReplayer#vBoolean()} method
+	 * corresponding to the given type.
+	 */
+	private String valueMethodName(Type aType)
+	{
+		switch(aType.getSort())
+		{
+		case Type.ARRAY:
+		case Type.OBJECT: return "vRef";
+		case Type.BOOLEAN: return "vBoolean";
+		case Type.BYTE: return "vByte";
+		case Type.CHAR: return "vChar";
+		case Type.DOUBLE: return "vDouble";
+		case Type.FLOAT: return "vFloat";
+		case Type.INT: return "vInt";
+		case Type.LONG: return "vLong";
+		case Type.SHORT: return "vShort";
+		default: throw new RuntimeException("Unknown type: "+aType);
+		}
+	}
+	
+	/**
+	 * Returns the name and descriptor of the {@link AbstractMethodReplayer#vBoolean()} push method
+	 * corresponding to the given type.
+	 */
+	private String[] pushMethodSig(Type aType)
+	{
+		switch(aType.getSort())
+		{
+		case Type.OBJECT: return new String[] { "sRefPush", "("+BCIUtils.DSC_OBJECTID+")V" };
+		case Type.BOOLEAN: 
+		case Type.BYTE: 
+		case Type.CHAR: 
+		case Type.SHORT: 
+		case Type.INT: return new String[] { "sIntPush", "(I)V" };
+		case Type.DOUBLE: return new String[] { "sDoublePush", "(D)V" };
+		case Type.FLOAT: return new String[] { "sFloatPush", "(F)V" };
+		case Type.LONG: return new String[] { "sLongPush", "(J)V" };
+		default: throw new RuntimeException("Unknown type: "+aType);
+		}
+	}
+	
+	/**
+	 * Returns the name and descriptor of the {@link AbstractMethodReplayer#vBoolean()} pop method
+	 * corresponding to the given type.
+	 */
+	private String[] popMethodSig(Type aType)
+	{
+		switch(aType.getSort())
+		{
+		case Type.OBJECT: return new String[] { "sRefPop", "()"+BCIUtils.DSC_OBJECTID };
+		case Type.BOOLEAN: 
+		case Type.BYTE: 
+		case Type.CHAR: 
+		case Type.SHORT: 
+		case Type.INT: return new String[] { "sIntPop", "()I" };
+		case Type.DOUBLE: return new String[] { "sDoublePop", "()D" };
+		case Type.FLOAT: return new String[] { "sFloatPop", "()F" };
+		case Type.LONG: return new String[] { "sLongPop", "()J" };
+		default: throw new RuntimeException("Unknown type: "+aType);
+		}
 	}
 	
 	private void processInstructions(InsnList aInsns)
@@ -279,6 +523,10 @@ public class MethodReplayerGenerator
 				processReturn(aInsns, (InsnNode) theNode);
 				break;
 				
+			case Opcodes.ATHROW:
+				processThrow(aInsns, (InsnNode) theNode);
+				break;
+				
 			case Opcodes.INVOKEVIRTUAL:
 			case Opcodes.INVOKESPECIAL:
 			case Opcodes.INVOKESTATIC:
@@ -290,6 +538,10 @@ public class MethodReplayerGenerator
 			case Opcodes.ANEWARRAY:
 			case Opcodes.MULTIANEWARRAY:
 				processNewArray(aInsns, theNode);
+				break;
+				
+			case Opcodes.NEW:
+				processNew(aInsns, (TypeInsnNode) theNode);
 				break;
 				
 			case Opcodes.GETFIELD:
@@ -323,6 +575,15 @@ public class MethodReplayerGenerator
 			case Opcodes.ASTORE:
 				processPutVar(aInsns, (VarInsnNode) theNode);
 				break;
+				
+			case Opcodes.LDC:
+				processLdc(aInsns, (LdcInsnNode) theNode);
+				break;
+				
+			case Opcodes.IF_ACMPEQ:
+			case Opcodes.IF_ACMPNE:
+				processIfAcmp(aInsns, (JumpInsnNode) theNode);
+				break;
 			}
 		}
 	}
@@ -331,20 +592,161 @@ public class MethodReplayerGenerator
 	{
 	}
 	
+	private void processThrow(InsnList aInsns, InsnNode aNode)
+	{
+	}
+	
 	private void processInvoke(InsnList aInsns, MethodInsnNode aNode)
 	{
 	}
 
+	private void processNew(InsnList aInsns, TypeInsnNode aNode)
+	{
+		SyntaxInsnList s = new SyntaxInsnList(null);
+		
+		s.ALOAD(0);
+		s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, "nextTmpId", "()"+BCIUtils.DSC_OBJECTID);
+		
+		aInsns.insert(aNode, s);
+		aInsns.remove(aNode);
+	}
+
 	private void processNewArray(InsnList aInsns, AbstractInsnNode aNode)
 	{
+		Type theType = TYPE_OBJECTID;
+		BCIFrame theFrame = itsMethodInfo.getFrame(aNode);
+
+		SyntaxInsnList s = new SyntaxInsnList(null);
+		
+		// Generate block id
+		Label l = new Label();
+		int theBlockId = getBlockId(l);
+		
+		// Save state
+		s.add(genSaveStack(theFrame));
+		s.ALOAD(0);
+		s.pushInt(theBlockId);
+		s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, "expectNewArray", "(I)V");
+		s.RETURN();
+		
+		// Got value
+		s.label(l);
+		s.add(genLoadStack(theFrame));
+		s.ALOAD(0);
+		s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, valueMethodName(theType), "()"+theType.getDescriptor());
+		
+		aInsns.insert(aNode, s);
+		aInsns.remove(aNode);
+	}
+	
+	/**
+	 * LDC of class constant can throw an exception
+	 */
+	private void processLdc(InsnList aInsns, LdcInsnNode aNode)
+	{
+		if (! (aNode.cst instanceof Type)) return;
+		
+		Type theType = TYPE_OBJECTID;
+		BCIFrame theFrame = itsMethodInfo.getFrame(aNode);
+
+		SyntaxInsnList s = new SyntaxInsnList(null);
+		
+		// Generate block id
+		Label l = new Label();
+		int theBlockId = getBlockId(l);
+		
+		// Save state
+		s.add(genSaveStack(theFrame));
+		s.ALOAD(0);
+		s.pushInt(theBlockId);
+		s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, "expectClassCst", "(I)V");
+		s.RETURN();
+		
+		// Got value
+		s.label(l);
+		s.add(genLoadStack(theFrame));
+		s.ALOAD(0);
+		s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, valueMethodName(theType), "()"+theType.getDescriptor());
+		
+		aInsns.insert(aNode, s);
+		aInsns.remove(aNode);
+	}
+	
+	/**
+	 * References are transformed into {@link ObjectId} so we must compare ids.
+	 */
+	private void processIfAcmp(InsnList aInsns, JumpInsnNode aNode)
+	{
+		SyntaxInsnList s = new SyntaxInsnList(null);
+
+		s.INVOKESTATIC(BCIUtils.CLS_REPLAYER, "cmpId", "("+BCIUtils.DSC_OBJECTID+BCIUtils.DSC_OBJECTID+")Z");
+		switch(aNode.getOpcode())
+		{
+		case Opcodes.IF_ACMPEQ: s.IFtrue(aNode.label.getLabel()); break;
+		case Opcodes.IF_ACMPNE: s.IFfalse(aNode.label.getLabel()); break;
+		default:
+			throw new RuntimeException("Not handled: "+aNode);
+		}
+		
+		aInsns.insert(aNode, s);
+		aInsns.remove(aNode);
 	}
 
 	private void processGetField(InsnList aInsns, FieldInsnNode aNode)
 	{
+		Type theType = getTypeOrId(Type.getType(aNode.desc).getSort());
+		BCIFrame theFrame = itsMethodInfo.getFrame(aNode);
+
+		SyntaxInsnList s = new SyntaxInsnList(null);
+		
+		// Generate block id
+		Label l = new Label();
+		int theBlockId = getBlockId(l);
+		
+		// Save state
+		s.add(genSaveStack(theFrame));
+		s.ALOAD(0);
+		s.pushInt(theType.getSort());
+		s.pushInt(theBlockId);
+		s.pushInt(getFieldCacheSlot(aNode));
+		s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, "expectField", "(III)V");
+		s.RETURN();
+		
+		// Got value
+		s.label(l);
+		s.add(genLoadStack(theFrame));
+		s.ALOAD(0);
+		s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, valueMethodName(theType), "()"+theType.getDescriptor());
+		
+		aInsns.insert(aNode, s);
+		aInsns.remove(aNode);
 	}
 
 	private void processGetArray(InsnList aInsns, InsnNode aNode)
 	{
+		Type theType = getTypeOrId(BCIUtils.getSort(aNode.getOpcode()));
+		BCIFrame theFrame = itsMethodInfo.getFrame(aNode);
+		
+		SyntaxInsnList s = new SyntaxInsnList(null);
+		
+		// Generate block id
+		Label l = new Label();
+		int theBlockId = getBlockId(l);
+		
+		s.add(genSaveStack(theFrame));
+		s.ALOAD(0);
+		s.pushInt(theType.getSort());
+		s.pushInt(theBlockId);
+		s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, "expectArray", "(II)V");
+		s.RETURN();
+		
+		s.label(l);
+		s.add(genLoadStack(theFrame));
+		s.ALOAD(0);
+		s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, valueMethodName(theType), "()"+theType.getDescriptor());
+		
+		aInsns.insert(aNode, s);
+		aInsns.remove(aNode);
 	}
 
 	private void processGetVar(InsnList aInsns, VarInsnNode aNode)

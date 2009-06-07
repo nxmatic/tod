@@ -90,7 +90,10 @@ public class ObjectIdentity
 	
 	public static synchronized long nextId()
 	{
-		return itsNextId++;
+		// We create odd ids. Event ids are used for temporary ids (see TmpIdManager)
+		long theId = itsNextId;
+		itsNextId += 2;
+		return theId;
 	}
 	
 	private static int itsNextClassId = 1;

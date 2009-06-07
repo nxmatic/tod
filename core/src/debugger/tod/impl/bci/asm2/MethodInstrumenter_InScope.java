@@ -31,13 +31,7 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.bci.asm2;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
 import java.util.ListIterator;
-import java.util.Map;
-import java.util.Set;
 
 import org.objectweb.asm.Label;
 import org.objectweb.asm.Opcodes;
@@ -46,24 +40,13 @@ import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.FieldInsnNode;
 import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.InsnNode;
-import org.objectweb.asm.tree.JumpInsnNode;
-import org.objectweb.asm.tree.LookupSwitchInsnNode;
+import org.objectweb.asm.tree.LdcInsnNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
-import org.objectweb.asm.tree.TableSwitchInsnNode;
-import org.objectweb.asm.tree.VarInsnNode;
-import org.objectweb.asm.tree.analysis.SourceValue;
 
 import tod.Util;
-import tod.core.database.structure.IFieldInfo;
 import tod.core.database.structure.IMutableBehaviorInfo;
 import tod.core.database.structure.IMutableClassInfo;
-import tod.core.database.structure.ITypeInfo;
-import tod.impl.bci.asm2.Analysis.SourceFrame;
-import zz.utils.ArrayStack;
-import zz.utils.ListMap;
-import zz.utils.Stack;
-import zz.utils.Utils;
 
 /**
  * Instruments in-scope methods.
@@ -83,49 +66,29 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 	 */
 	private int itsTmpValueVar;
 	
-	/**
-	 * For constructors, the invocation instructions that corresponds to constructor chaining.
-	 */
-	private MethodInsnNode itsChainingInvocation;
+	private MethodInfo itsMethodInfo;
 
-	/**
-	 * Maps field access instructions to the local variable slot that holds the cached value.
-	 */
-	private Map<FieldInsnNode, Integer> itsCachedFieldAccesses = new HashMap<FieldInsnNode, Integer>();
-	
-	/**
-	 * Instructions that initializes each slot of the field cache.
-	 */
-	private InsnList itsFieldCacheInit;
-	
 	public MethodInstrumenter_InScope(ClassInstrumenter aClassInstrumenter, MethodNode aNode, IMutableBehaviorInfo aBehavior)
 	{
-		super(aClassInstrumenter, aNode, aBehavior, true);
+		super(aClassInstrumenter, aNode, aBehavior);
 
 		// At least for now...
-		if (CLS_OBJECT.equals(getClassNode().name)) throw new RuntimeException("java.lang.Object cannot be in scope!");
+		if (BCIUtils.CLS_OBJECT.equals(getClassNode().name)) throw new RuntimeException("java.lang.Object cannot be in scope!");
 		
 		itsFromScopeVar = nextFreeVar(1);
 		itsTmpValueVar = nextFreeVar(2);
 		getNode().maxStack += 3; // This is the max we add to the stack
 	}
 	
-	private void throwRTEx(String aMessage)
-	{
-		Utils.rtex("Error in %s.%s%s: %s", getClassNode().name, getNode().name, getNode().desc, aMessage);	
-	}
-
 	@Override
 	public void proceed()
 	{
 		// Abstracts and natives have no body.
 		if (isAbstract() || isNative()) return;
 		
-		itsChainingInvocation = findChainingInvocation();
-		if (! CLS_OBJECT.equals(getClassNode().name) && isConstructor() && itsChainingInvocation == null) 
-			throwRTEx("Should have constructor chaining");
-		
-		setupFieldCaches();
+		itsMethodInfo = new MethodInfo(getDatabase(), getClassNode(), getNode());
+		int theSlotsCount = itsMethodInfo.setupLocalCacheSlots(getNode().maxLocals);
+		getNode().maxLocals += theSlotsCount;
 
 		SyntaxInsnList s = new SyntaxInsnList(itsLabelManager);
 
@@ -135,11 +98,11 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 			s.ACONST_NULL();
 			s.ASTORE(getThreadDataVar());
 			
-			s.add(itsFieldCacheInit);
+			s.add(itsMethodInfo.getFieldCacheInitInstructions());
 			
 			// Store the monitoring mode for the behavior in a local
 			s.pushInt(getBehavior().getId()); 
-			s.INVOKESTATIC(CLS_TRACEDMETHODS, "traceFull", "(I)Z");
+			s.INVOKESTATIC(BCIUtils.CLS_TRACEDMETHODS, "traceFull", "(I)Z");
 			s.DUP();
 			s.ISTORE(getTraceEnabledVar());
 			
@@ -149,18 +112,18 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 			// Monitoring enabled
 			{
 				// Store ThreadData object
-				s.INVOKESTATIC(CLS_EVENTCOLLECTOR, "_getThreadData", "()"+DSC_THREADDATA); // ThD
+				s.INVOKESTATIC(BCIUtils.CLS_EVENTCOLLECTOR, "_getThreadData", "()"+BCIUtils.DSC_THREADDATA); // ThD
 				s.DUP(); // ThD ThD
 				s.DUP(); // ThD ThD ThD
 				s.ASTORE(getThreadDataVar()); // ThD ThD
 
 				// Store inScope 
-				s.INVOKEVIRTUAL(CLS_THREADDATA, "isInScope", "()Z"); // ThD, inScope
+				s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "isInScope", "()Z"); // ThD, inScope
 				s.ISTORE(itsFromScopeVar); // ThD
 				
 				// Send event
 				s.pushInt(getBehavior().getId()); // ThD, BId 
-				s.INVOKEVIRTUAL(CLS_THREADDATA, "evInScopeBehaviorEnter", "(I)V");
+				s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evInScopeBehaviorEnter", "(I)V");
 				
 				//Check if we must send args
 				s.ILOAD(itsFromScopeVar);
@@ -181,7 +144,7 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 			s.IFfalse("return");
 			
 			s.ALOAD(getThreadDataVar());
-			s.INVOKEVIRTUAL(CLS_THREADDATA, "evInScopeBehaviorExit_Normal", "()V");
+			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evInScopeBehaviorExit_Normal", "()V");
 			
 			s.label("return");
 			s.RETURN(Type.getReturnType(getNode().desc));
@@ -196,7 +159,7 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 			s.IFfalse("throw");
 			
 			s.ALOAD(getThreadDataVar());
-			s.INVOKEVIRTUAL(CLS_THREADDATA, "evInScopeBehaviorExit_Exception", "()V");
+			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evInScopeBehaviorExit_Exception", "()V");
 
 			s.label("throw");
 			s.ATHROW();
@@ -226,7 +189,7 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 
 		s.ALOAD(getThreadDataVar());
 		s.pushInt(theArgCount); 
-		s.INVOKEVIRTUAL(CLS_THREADDATA, "sendBehaviorEnterArgs", "(I)V");
+		s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "sendBehaviorEnterArgs", "(I)V");
 
 		int theArgIndex = 0;
 		if (theSendThis) sendValue_Ref(s, theArgIndex++);
@@ -239,203 +202,6 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		}
 	}
 	
-	private static boolean isALOAD0(AbstractInsnNode aNode)
-	{
-		if (aNode.getOpcode() == Opcodes.ALOAD)
-		{
-			VarInsnNode theVarNode = (VarInsnNode) aNode;
-			if (theVarNode.var == 0) return true;
-		}
-		return false;
-	}
-	
-	private static boolean isConstructorCall(AbstractInsnNode aNode)
-	{
-		if (aNode.getOpcode() == Opcodes.INVOKESPECIAL)
-		{
-			MethodInsnNode theMethodNode = (MethodInsnNode) aNode;
-			if ("<init>".equals(theMethodNode.name)) return true;
-		}
-		return false;
-	}
-
-	private boolean hasAload0Only(SourceValue aValue)
-	{
-		if (aValue.insns.size() != 1) return false;
-		return isALOAD0((AbstractInsnNode) aValue.insns.iterator().next()); 
-	}
-	
-	/**
-	 * For constructors, looks for the invoke instruction that corresponds to constructor
-	 * chaining, if any (the only case there is none is for java.lang.Object);
-	 */
-	private MethodInsnNode findChainingInvocation()
-	{
-		if (! isConstructor()) return null;
-
-		ListIterator<AbstractInsnNode> theIterator = getNode().instructions.iterator();
-		while(theIterator.hasNext()) 
-		{
-			AbstractInsnNode theNode = theIterator.next();
-			
-			if (isConstructorCall(theNode))
-			{
-				SourceFrame theFrame = getFrame(theNode);
-				int theArgCount = Type.getArgumentTypes(((MethodInsnNode) theNode).desc).length;
-				
-				// Check if the target of the call is "this"
-				SourceValue theThis = theFrame.getStack(theFrame.getStackSize()-theArgCount-1);
-				if (hasAload0Only(theThis)) return (MethodInsnNode) theNode;
-			}
-		}
-		
-		return null;
-	}
-	
-	/**
-	 * Returns the TOD field referred to by the given instruction.
-	 */
-	private IFieldInfo getField(FieldInsnNode aNode)
-	{
-		IMutableClassInfo theOwner = getDatabase().getNewClass(aNode.owner);
-		ITypeInfo theType = getDatabase().getNewType(aNode.desc);
-
-		return theOwner.getNewField(aNode.name, theType, aNode.getOpcode() == Opcodes.GETSTATIC);
-	}
-	
-	/**
-	 * Whether the given field access instructions accesses a field on self (this).
-	 */
-	private boolean isSelfFieldAccess(FieldInsnNode aNode)
-	{
-		if (isStatic()) return false; //Not an error: a static method can get fields of some object.
-		
-		SourceValue theTarget = getFrame(aNode).getStack(0);
-
-		for(AbstractInsnNode theNode : (Set<AbstractInsnNode>) theTarget.insns)
-		{
-			if (theNode instanceof VarInsnNode)
-			{
-				VarInsnNode theVarInsnNode = (VarInsnNode) theNode;
-				if (theVarInsnNode.var == 0) return true;
-			}
-		}
-		
-		return false;
-	}
-	
-	/**
-	 * For each field access on the current object or static field access,
-	 * check if the access might execute more than once (because of several
-	 * access locations or of loops). If so, reserve a local variable to hold the
-	 * last observed value of the field so that we can optimize the Get Field event.  
-	 */
-	private void setupFieldCaches()
-	{
-		Set<AbstractInsnNode> theVisitedJumps = new HashSet<AbstractInsnNode>();
-		
-		// Maps each field to the instructions that read that field on self.
-		// Note: the same instruction can appear twice, which is actually what ultimately
-		// triggers the field to be cached.
-		ListMap<IFieldInfo, FieldInsnNode> theAccessMap = new ListMap<IFieldInfo, FieldInsnNode>();
-
-		// A list of paths to process (denoted by the first instruction of the path) 
-		Stack<AbstractInsnNode> theWorkList = new ArrayStack<AbstractInsnNode>();
-		theWorkList.push(getNode().instructions.getFirst());
-		
-		// Build the access maps
-		while(! theWorkList.isEmpty()) 
-		{
-			AbstractInsnNode theNode = theWorkList.pop();
-			
-			// If this flag is true the next instruction is pushed onto
-			// the working list at the end of the iteration
-			boolean theContinue = false;
-			
-			if (theNode instanceof FieldInsnNode)
-			{
-				FieldInsnNode theFieldInsnNode = (FieldInsnNode) theNode;
-				
-				if (theNode.getOpcode() == Opcodes.GETFIELD)
-				{
-					if (isSelfFieldAccess(theFieldInsnNode))
-					{
-						IFieldInfo theField = getField(theFieldInsnNode);
-						theAccessMap.add(theField, theFieldInsnNode);
-					}
-				}
-				else if (theNode.getOpcode() == Opcodes.GETSTATIC)
-				{
-					IFieldInfo theField = getField(theFieldInsnNode);
-					theAccessMap.add(theField, theFieldInsnNode);
-				}
-				
-				theContinue = true;
-			}
-			else if (theNode instanceof JumpInsnNode)
-			{
-				JumpInsnNode theJumpInsnNode = (JumpInsnNode) theNode;
-				if (theVisitedJumps.add(theNode)) 
-				{
-					theWorkList.push(theJumpInsnNode.label);
-					if (theNode.getOpcode() != Opcodes.GOTO) theContinue = true;
-				}
-			}
-			else if (theNode instanceof TableSwitchInsnNode)
-			{
-				TableSwitchInsnNode theTableSwitchInsnNode = (TableSwitchInsnNode) theNode;
-				if (theVisitedJumps.add(theNode))
-				{
-					theWorkList.push(theTableSwitchInsnNode.dflt);
-					theWorkList.pushAll(theTableSwitchInsnNode.labels);
-				}
-			}
-			else if (theNode instanceof LookupSwitchInsnNode)
-			{
-				LookupSwitchInsnNode theLookupSwitchInsnNode = (LookupSwitchInsnNode) theNode;
-				if (theVisitedJumps.add(theNode))
-				{
-					theWorkList.push(theLookupSwitchInsnNode.dflt);
-					theWorkList.pushAll(theLookupSwitchInsnNode.labels);
-				}
-			}
-			else if ((theNode.getOpcode() >= Opcodes.IRETURN && theNode.getOpcode() <= Opcodes.RETURN)
-				|| theNode.getOpcode() == Opcodes.RET)
-			{
-				// Don't continue
-			}
-			else
-			{
-				theContinue = true;
-			}
-			
-			if (theContinue && theNode.getNext() != null) theWorkList.push(theNode.getNext()); 
-		}
-
-		// Set up the final structure
-		SyntaxInsnList s = new SyntaxInsnList(null);
-		Iterator<Map.Entry<IFieldInfo, List<FieldInsnNode>>> theIterator = theAccessMap.entrySet().iterator();
-		while(theIterator.hasNext())
-		{
-			Map.Entry<IFieldInfo, List<FieldInsnNode>> theEntry = theIterator.next();
-			if (theEntry.getValue().size() >= 2)
-			{
-				String theDesc = theEntry.getValue().get(0).desc;
-				Type theType = Type.getType(theDesc);
-				int theSlot = nextFreeVar(theType.getSize());
-				
-				// Register instruction in the map
-				for(FieldInsnNode theNode : theEntry.getValue()) 
-					itsCachedFieldAccesses.put(theNode, theSlot);
-				
-				// Create initializing instruction.
-				s.pushDefaultValue(theType);
-				s.ISTORE(theType, theSlot);
-			}
-		}
-		
-		itsFieldCacheInit = s;
-	}
 	
 	private void processInstructions(InsnList aInsns)
 	{
@@ -490,6 +256,10 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 			case Opcodes.SALOAD:
 				processGetArray(aInsns, (InsnNode) theNode);
 				break;
+				
+			case Opcodes.LDC:
+				processLdc(aInsns, (LdcInsnNode) theNode);
+				break;
 			}
 		}
 	}
@@ -504,24 +274,6 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		aInsns.remove(aNode);
 	}
 
-	/**
-	 * Determines if the given node is an invocation that corresponds to constructor chaining.
-	 */
-	private boolean isChainingInvocation(MethodInsnNode aNode)
-	{
-		return aNode == itsChainingInvocation;
-	}
-	
-	/**
-	 * Determines if the given node corresponds to the initial constructor call
-	 * (vs. constructor chaining).
-	 */
-	private boolean isObjectInitialization(MethodInsnNode aNode)
-	{
-		if (! isConstructorCall(aNode)) return false;
-		else return !isChainingInvocation(aNode);
-	}
-	
 	private boolean isCalleeInScope(MethodInsnNode aNode)
 	{
 		return getClassInstrumenter().getInstrumenter().isInScope(aNode.owner);
@@ -556,19 +308,19 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 			Label lCheckChaining = new Label();
 			
 			// For constructor calls scope is resolved statically
-			if (isConstructorCall(aNode)) 
+			if (BCIUtils.isConstructorCall(aNode)) 
 				processInvoke_TraceEnabled_Constructor(s, aNode, lCheckChaining);
 			else 
 				processInvoke_TraceEnabled_Method(s, aNode, lCheckChaining);
 			
 			s.label(lCheckChaining);
 			
-			if (isChainingInvocation(aNode))
+			if (itsMethodInfo.isChainingInvocation(aNode))
 			{
 				// Send deferred target
 				s.ALOAD(getThreadDataVar());
 				s.ALOAD(0);
-				s.INVOKEVIRTUAL(CLS_THREADDATA, "sendConstructorTarget", "("+DSC_OBJECT+")V");
+				s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "sendConstructorTarget", "("+BCIUtils.DSC_OBJECT+")V");
 			}
 
 			s.GOTO(lEnd);
@@ -598,7 +350,7 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 
 		// Check if called method is monitored
 		s.pushInt(getBehaviorId(aNode));
-		s.INVOKESTATIC(CLS_TRACEDMETHODS, "traceUnmonitored", "(I)Z");
+		s.INVOKESTATIC(BCIUtils.CLS_TRACEDMETHODS, "traceUnmonitored", "(I)Z");
 		s.IFtrue(lUnmonitored);
 
 		// Monitored call
@@ -614,7 +366,7 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		
 		// before call
 		s.ALOAD(getThreadDataVar());
-		s.INVOKEVIRTUAL(CLS_THREADDATA, "evUnmonitoredBehaviorCall", "()V");
+		s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evUnmonitoredBehaviorCall", "()V");
 		
 		// call
 		s.label(lHnStart);
@@ -626,14 +378,14 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 
 		if (theReturnType.getSort() != Type.VOID) 
 		{
-			s.INVOKEVIRTUAL(CLS_THREADDATA, "evUnmonitoredBehaviorResultNonVoid", "()V");
+			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evUnmonitoredBehaviorResultNonVoid", "()V");
 			s.ISTORE(theReturnType, itsTmpValueVar);
 			sendValue(s, itsTmpValueVar, theReturnType);
 			s.ILOAD(theReturnType, itsTmpValueVar);
 		}
 		else
 		{
-			s.INVOKEVIRTUAL(CLS_THREADDATA, "evUnmonitoredBehaviorResultVoid", "()V");
+			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evUnmonitoredBehaviorResultVoid", "()V");
 		}
 		
 		s.GOTO(lCheckChaining);
@@ -642,7 +394,7 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		s.label(lHandler);
 		
 		s.ALOAD(getThreadDataVar());
-		s.INVOKEVIRTUAL(CLS_THREADDATA, "evUnmonitoredBehaviorException", "()V");
+		s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evUnmonitoredBehaviorException", "()V");
 		s.ATHROW();
 		
 		getNode().visitTryCatchBlock(lHnStart, lHnEnd, lHandler, null);
@@ -675,7 +427,7 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 			
 			// before call
 			s.ALOAD(getThreadDataVar());
-			s.INVOKEVIRTUAL(CLS_THREADDATA, "evUnmonitoredBehaviorCall", "()V");
+			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evUnmonitoredBehaviorCall", "()V");
 			
 			// call
 			s.label(lHnStart);
@@ -683,15 +435,15 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 			s.label(lHnEnd);
 			
 			s.ALOAD(getThreadDataVar());
-			s.INVOKEVIRTUAL(CLS_THREADDATA, "evUnmonitoredBehaviorResultVoid", "()V");
+			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evUnmonitoredBehaviorResultVoid", "()V");
 	
 			// Send object initialized
-			if (!isChainingInvocation(aNode))
+			if (! itsMethodInfo.isChainingInvocation(aNode))
 			{
 				s.DUP(); // Note that this relies on standard compiler behavior (NEW followed by DUP)
 				s.ALOAD(getThreadDataVar());
 				s.SWAP();
-				s.INVOKEVIRTUAL(CLS_THREADDATA, "evObjectInitialized", "("+DSC_OBJECT+")V");
+				s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evObjectInitialized", "("+BCIUtils.DSC_OBJECT+")V");
 			}
 			
 			s.GOTO(lCheckChaining);
@@ -700,7 +452,7 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 			s.label(lHandler);
 			
 			s.ALOAD(getThreadDataVar());
-			s.INVOKEVIRTUAL(CLS_THREADDATA, "evUnmonitoredBehaviorException", "()V");
+			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evUnmonitoredBehaviorException", "()V");
 			s.ATHROW();
 			
 			getNode().visitTryCatchBlock(lHnStart, lHnEnd, lHandler, null);
@@ -719,7 +471,7 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 			s.DUP();
 			s.ALOAD(getThreadDataVar());
 			s.SWAP();
-			s.INVOKEVIRTUAL(CLS_THREADDATA, "evNew", "("+DSC_OBJECT+")V");
+			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evNewArray", "("+BCIUtils.DSC_OBJECT+")V");
 		}
 		
 		s.label(l);
@@ -744,7 +496,7 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 			s.ALOAD(getThreadDataVar()); 
 
 			
-			Integer theCacheSlot = itsCachedFieldAccesses.get(aNode);
+			Integer theCacheSlot = itsMethodInfo.getCacheSlot(aNode);
 			if (theCacheSlot != null)
 			{
 				// Check if value is the same as before
@@ -789,7 +541,7 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 			
 			// Value not equal to cached value
 			{
-				s.INVOKEVIRTUAL(CLS_THREADDATA, "evFieldRead", "()V"); 
+				s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evFieldRead", "()V"); 
 				sendValue(s, itsTmpValueVar, theType);
 			}
 			
@@ -805,7 +557,7 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 				
 				// Same value as cached
 				{
-					s.INVOKEVIRTUAL(CLS_THREADDATA, "evFieldRead_Same", "()V");
+					s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evFieldRead_Same", "()V");
 				}
 				
 				s.label(lEndIf);
@@ -824,7 +576,7 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		SyntaxInsnList s = new SyntaxInsnList(itsLabelManager);
 		Type theType = Type.getType(aNode.desc);
 		
-		Integer theCacheSlot = itsCachedFieldAccesses.get(aNode);
+		Integer theCacheSlot = itsMethodInfo.getCacheSlot(aNode);
 		if (theCacheSlot != null)
 		{
 			// Store the value in the cache
@@ -845,7 +597,7 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		s.IFfalse(l);
 		{
 			s.ALOAD(getThreadDataVar()); 
-			s.INVOKEVIRTUAL(CLS_THREADDATA, "evArrayRead", "()V"); 
+			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evArrayRead", "()V"); 
 			
 			s.ISTORE(theType, itsTmpValueVar);
 			sendValue(s, itsTmpValueVar, theType);
@@ -856,5 +608,30 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		
 		aInsns.insert(aNode, s);
 	}
+
+	/**
+	 * LDC of class constant can throw an exception
+	 */
+	private void processLdc(InsnList aInsns, LdcInsnNode aNode)
+	{
+		if (! (aNode.cst instanceof Type) && ! (aNode.cst instanceof String)) return;
+		
+		SyntaxInsnList s = new SyntaxInsnList(null);
+		Label l = new Label();
+		
+		s.ILOAD(getTraceEnabledVar());
+		s.IFfalse(l);
+		{
+			s.DUP();
+			s.ALOAD(getThreadDataVar());
+			s.SWAP();
+			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evCst", "("+BCIUtils.DSC_OBJECT+")V");
+		}
+		
+		s.label(l);
+		
+		aInsns.insert(aNode, s);
+	}
+	
 
 }

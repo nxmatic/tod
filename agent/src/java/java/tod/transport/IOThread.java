@@ -23,8 +23,8 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 package java.tod.transport;
 
 import java.lang.ref.WeakReference;
+import java.nio.channels.ByteChannel;
 import java.tod.AgentReady;
-import java.tod.EventCollector;
 import java.tod.TOD;
 import java.tod.ThreadData;
 import java.tod.TracedMethods;
@@ -38,6 +38,7 @@ import java.tod.util._SyncRingBuffer;
 
 import tod.agent.AgentDebugFlags;
 import tod.agent.Command;
+import tod.agent.Message;
 import tod.agent.io._ByteBuffer;
 
 /**
@@ -55,8 +56,6 @@ import tod.agent.io._ByteBuffer;
  */
 public class IOThread extends Thread
 {
-	private final EventCollector itsEventCollector;
-	
 	private final _SocketChannel itsChannel;
 	
 	/**
@@ -107,12 +106,11 @@ public class IOThread extends Thread
 
 
 
-	public IOThread(EventCollector aEventCollector, _SocketChannel aChannel)
+	public IOThread(_SocketChannel aChannel)
 	{
 		super("[TOD] IOThread");
 		setDaemon(true);
 		assert aChannel != null;
-		itsEventCollector = aEventCollector;
 		itsChannel = aChannel;
 		
 		itsHeaderBuffer = _ByteBuffer.allocate(9);
@@ -207,7 +205,7 @@ public class IOThread extends Thread
 	private void sendThreadPacket(ThreadPacket aPacket) throws _IOException
 	{
 		itsHeaderBuffer.clear();
-		itsHeaderBuffer.put(ThreadPacket.PACKET_TYPE);
+		itsHeaderBuffer.put(Message.PACKET_TYPE_THREAD);
 		itsHeaderBuffer.putInt(aPacket.threadId);
 		itsHeaderBuffer.putInt(aPacket.length);
 		
@@ -240,7 +238,7 @@ public class IOThread extends Thread
 	private void sendStringPacket(StringPacket aPacket) throws _IOException
 	{
 		itsHeaderBuffer.clear();
-		itsHeaderBuffer.put(StringPacket.PACKET_TYPE);
+		itsHeaderBuffer.put(Message.PACKET_TYPE_STRING);
 		
 		itsHeaderBuffer.flip();
 		itsChannel.write(itsHeaderBuffer);
@@ -398,8 +396,6 @@ public class IOThread extends Thread
 	 */
 	public static final class ThreadPacket extends Packet
 	{
-		public static final byte PACKET_TYPE = 1;
-		
 		/**
 		 * Recycle queue for standard packets (all have the same length).
 		 */
@@ -450,8 +446,6 @@ public class IOThread extends Thread
 	 */
 	public static final class StringPacket extends Packet
 	{
-		public static final byte PACKET_TYPE = 2;
-		
 		public final long id;
 		public final String string;
 		

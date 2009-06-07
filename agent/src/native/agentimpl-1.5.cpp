@@ -241,7 +241,8 @@ jlong getNextOid()
 	jlong val;
 	{
 		t_lock lock(oidMutex);
-		val = oidCurrent++;
+		val = oidCurrent;
+		oidCurrent += 2; // We create odd ids. Event ids are used for temporary ids (see TmpIdManager)
 	}
 	
 	// Include host id

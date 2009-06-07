@@ -4,7 +4,9 @@
 package tod.agent.io;
 
 import java.io.DataInputStream;
+import java.io.EOFException;
 import java.io.IOException;
+import java.io.InputStream;
 
 import tod.access.TODAccessor;
 
@@ -243,68 +245,73 @@ public class _ByteBuffer
 	/**
 	 * Retrieves a little-endian long from a {@link DataInputStream}.
 	 */
-	public static long getLongL(DataInputStream aStream) throws IOException
+	public static long getLongL(InputStream aStream) throws IOException
 	{
-		byte b0 = aStream.readByte();
-		byte b1 = aStream.readByte();
-		byte b2 = aStream.readByte();
-		byte b3 = aStream.readByte();
-		byte b4 = aStream.readByte();
-		byte b5 = aStream.readByte();
-		byte b6 = aStream.readByte();
-		byte b7 = aStream.readByte();
-		return makeLong(b7, b6, b5, b4, b3, b2, b1, b0);
+		final int l = 8;
+		byte[] b = new byte[l];
+		int c = 0;
+		while (c < l) c += aStream.read(b, c, l-c);
+		
+		return makeLong(b[7], b[6], b[5], b[4], b[3], b[2], b[1], b[0]);
 	}
 	
 	/**
 	 * Retrieves a little-endian int from a {@link DataInputStream}.
 	 */
-	public static int getIntL(DataInputStream aStream) throws IOException
+	public static int getIntL(InputStream aStream) throws IOException
 	{
-		byte b0 = aStream.readByte();
-		byte b1 = aStream.readByte();
-		byte b2 = aStream.readByte();
-		byte b3 = aStream.readByte();
-		return makeInt(b3, b2, b1, b0);
+		final int l = 4;
+		byte[] b = new byte[l];
+		int c = 0;
+		while (c < l) c += aStream.read(b, c, l-c);
+		
+		return makeInt(b[3], b[2], b[1], b[0]);
 	}
 	
 	/**
 	 * Retrieves a big-endian int from a {@link DataInputStream}.
 	 */
-	public static int getIntB(DataInputStream aStream) throws IOException
+	public static int getIntB(InputStream aStream) throws IOException
 	{
-		byte b0 = aStream.readByte();
-		byte b1 = aStream.readByte();
-		byte b2 = aStream.readByte();
-		byte b3 = aStream.readByte();
-		return makeInt(b0, b1, b2, b3);
+		final int l = 4;
+		byte[] b = new byte[l];
+		int c = 0;
+		while (c < l) c += aStream.read(b, c, l-c);
+		
+		return makeInt(b[0], b[1], b[2], b[3]);
 	}
 	
 	/**
 	 * Retrieves a little-endian char from a {@link DataInputStream}.
 	 */
-	public static char getCharL(DataInputStream aStream) throws IOException
+	public static char getCharL(InputStream aStream) throws IOException
 	{
-		byte b0 = aStream.readByte();
-		byte b1 = aStream.readByte();
-		return makeChar(b1, b0);
+		final int l = 2;
+		byte[] b = new byte[l];
+		int c = 0;
+		while (c < l) c += aStream.read(b, c, l-c);
+		
+		return makeChar(b[1], b[0]);
 	}
 	
 	/**
 	 * Retrieves a big-endian char from a {@link DataInputStream}.
 	 */
-	public static char getCharB(DataInputStream aStream) throws IOException
+	public static char getCharB(InputStream aStream) throws IOException
 	{
-		byte b0 = aStream.readByte();
-		byte b1 = aStream.readByte();
-		return makeChar(b0, b1);
+		final int l = 2;
+		byte[] b = new byte[l];
+		int c = 0;
+		while (c < l) c += aStream.read(b, c, l-c);
+		
+		return makeChar(b[0], b[1]);
 	}
 	
 	/**
 	 * Reads a stream written by {@link #putString(String)} from a
 	 * {@link DataInputStream}.
 	 */
-	public static String getString(DataInputStream aStream) throws IOException
+	public static String getString(InputStream aStream) throws IOException
 	{
 		int theLength = getIntL(aStream);
 		char[] theChars = new char[theLength];
