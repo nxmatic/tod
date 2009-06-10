@@ -123,7 +123,7 @@ public class ASM2Test
 		
 		InstrumentedClass theInstrumentedClass = aInstrumenter.instrumentClass(theName, aData, false);
 		
-		for(BehaviorMonitoringMode theMode : theInstrumentedClass.modeChanges)
+		for(BehaviorMonitoringModeChange theMode : theInstrumentedClass.modeChanges)
 		{
 			IBehaviorInfo theBehavior = aDatabase.getBehavior(theMode.behaviorId, true);
 			Utils.println("  %s -> %s", LocationUtils.toString(theBehavior), MonitoringMode.toString(theMode.mode));

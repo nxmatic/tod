@@ -98,6 +98,11 @@ public interface IClassInfo extends ITypeInfo
 	public IBehaviorInfo getBehavior(String aName, ITypeInfo[] aArgumentTypes, ITypeInfo aReturnType);
 
 	/**
+	 * Searches a behavior according to its signature
+	 */
+	public IMutableBehaviorInfo getBehavior(String aName, String aDescriptor);
+	
+	/**
 	 * Returns all the fields of this class (excluding inherited ones).
 	 */
 	public Iterable<IFieldInfo> getFields();

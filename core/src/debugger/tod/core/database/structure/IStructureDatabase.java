@@ -23,8 +23,10 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 package tod.core.database.structure;
 
 import java.io.Serializable;
+import java.tod.TracedMethods;
 import java.util.Map;
 
+import tod.agent.MonitoringMode;
 import tod.core.config.TODConfig;
 import tod.core.database.structure.IBehaviorInfo.BytecodeRole;
 import tod.impl.database.structure.standard.AspectInfo;
@@ -167,6 +169,13 @@ public interface IStructureDatabase
 	public int getProbeCount();
 	
 	/**
+	 * Returns an ordered iterable of all mode changes performed.
+	 * This is aimed to be used in conjunction with {@link TracedMethods} versioning.
+	 * @param aVersion The version number that was created in response to the change.
+	 */
+	public BehaviorMonitoringModeChange getBehaviorMonitoringModeChange(int aVersion);
+	
+	/**
 	 * Returns the information (location of the source code) for the specified advice source id.
 	 * @param aAdviceId An advice source id.
 	 * @return The advice info, or null if not available.
@@ -189,6 +198,9 @@ public interface IStructureDatabase
 	public void addListener(Listener aListener);
 	public void removeListener(Listener aListener);
 
+	public boolean isInScope(String aClassName);
+	public boolean isInIdScope(String aClassName);
+
 	/**
 	 * A listener that is notified of changes in the database.
 	 * @author gpothier
@@ -199,6 +211,27 @@ public interface IStructureDatabase
 		public void classChanged(IClassInfo aClass);
 		public void behaviorAdded(IBehaviorInfo aBehavior);
 		public void fieldAdded(IFieldInfo aField);
+		
+		/**
+		 * @see MonitoringMode
+		 */
+		public void monitoringModeChanged(BehaviorMonitoringModeChange aChange);
+	}
+
+	public static class BehaviorMonitoringModeChange
+	{
+		public final int behaviorId;
+		
+		/**
+		 * One of the constants in {@link MonitoringMode}.
+		 */
+		public final int mode;
+		
+		public BehaviorMonitoringModeChange(int aBehaviorId, int aMode)
+		{
+			behaviorId = aBehaviorId;
+			mode = aMode;
+		}
 	}
 
 	

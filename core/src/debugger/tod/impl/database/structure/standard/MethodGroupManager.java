@@ -29,7 +29,7 @@ POSSIBILITY OF SUCH DAMAGE.
 Parts of this work rely on the MD5 algorithm "derived from the RSA Data Security, 
 Inc. MD5 Message-Digest Algorithm".
 */
-package tod.impl.bci.asm2;
+package tod.impl.database.structure.standard;
 
 import java.tod.TracedMethods;
 import java.util.ArrayList;
@@ -40,13 +40,11 @@ import java.util.Map;
 import java.util.Set;
 
 import tod.agent.MonitoringMode;
-import tod.core.bci.IInstrumenter;
-import tod.core.database.browser.LocationUtils;
 import tod.core.database.structure.IBehaviorInfo;
 import tod.core.database.structure.IClassInfo;
 import tod.core.database.structure.IFieldInfo;
 import tod.core.database.structure.IStructureDatabase;
-import zz.utils.ListMap;
+import tod.core.database.structure.IStructureDatabase.BehaviorMonitoringModeChange;
 import zz.utils.SetMap;
 
 /**
@@ -63,7 +61,7 @@ import zz.utils.SetMap;
  */
 public class MethodGroupManager implements IStructureDatabase.Listener
 {
-	private final ASMInstrumenter2 itsInstrumenter;
+	private final StructureDatabase itsStructureDatabase;
 	
 	/**
 	 * Maps signatures to signature groups. Each signature groups contains method groups.
@@ -76,30 +74,25 @@ public class MethodGroupManager implements IStructureDatabase.Listener
 	private final SetMap<IClassInfo, IClassInfo> itsChildrenMap = new SetMap<IClassInfo, IClassInfo>();
 
 	/**
-	 * Collects pending changes until {@link #getModeChangesAndReset()} is called.
+	 * Keeps track of all mode changes.
+	 * This is used in conjunction with {@link TracedMethods} versioning.
 	 */
-	private List<IInstrumenter.BehaviorMonitoringMode> itsChanges = new ArrayList<IInstrumenter.BehaviorMonitoringMode>();
-	
+	private final List<BehaviorMonitoringModeChange> itsChanges = new ArrayList<BehaviorMonitoringModeChange>();
 
-	public MethodGroupManager(ASMInstrumenter2 aInstrumenter)
+	public MethodGroupManager(StructureDatabase aStructureDatabase)
 	{
-		itsInstrumenter = aInstrumenter;
-		itsInstrumenter.getStructureDatabase().addListener(this);
+		itsStructureDatabase = aStructureDatabase;
+		itsStructureDatabase.addListener(this);
 	}
 	
-	/**
-	 * Returns a list of the needed changes, and clears the internal list.
-	 */
-	public List<IInstrumenter.BehaviorMonitoringMode> getModeChangesAndReset()
+	public BehaviorMonitoringModeChange getChange(int aVersion)
 	{
-		List<IInstrumenter.BehaviorMonitoringMode> theChanges = itsChanges;
-		itsChanges = new ArrayList<IInstrumenter.BehaviorMonitoringMode>();
-		return theChanges;
+		return itsChanges.get(aVersion);
 	}
 	
 	private boolean isInScope(IBehaviorInfo aBehavior)
 	{
-		return itsInstrumenter.isInScope(aBehavior.getDeclaringType().getName());
+		return itsStructureDatabase.isInScope(aBehavior.getDeclaringType().getName());
 	}
 	
 	private String getSignature(IBehaviorInfo aBehavior)
@@ -115,9 +108,12 @@ public class MethodGroupManager implements IStructureDatabase.Listener
 	
 	private void markMonitored(IBehaviorInfo aBehavior)
 	{
-		itsChanges.add(new IInstrumenter.BehaviorMonitoringMode(
+		BehaviorMonitoringModeChange theChange = new BehaviorMonitoringModeChange(
 				aBehavior.getId(), 
-				isInScope(aBehavior) ? MonitoringMode.FULL : MonitoringMode.ENVELOPPE));
+				isInScope(aBehavior) ? MonitoringMode.FULL : MonitoringMode.ENVELOPPE);
+		
+		itsChanges.add(theChange);
+		itsStructureDatabase.fireMonitoringModeChanged(theChange);
 	}
 	
 	public void classAdded(IClassInfo aClass)
@@ -226,6 +222,11 @@ public class MethodGroupManager implements IStructureDatabase.Listener
 	{
 	}
 	
+
+	public void monitoringModeChanged(BehaviorMonitoringModeChange aChange)
+	{
+	}
+
 	/**
 	 * Calls {@link #merge(MethodSignatureGroup, IClassInfo, IClassInfo)} on each signature group
 	 */

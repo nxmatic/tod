@@ -348,6 +348,14 @@ implements IMutableClassInfo, ISerializableLocationInfo
 		return getBehaviorsMap().get(getBehaviorKey(aName, aArgumentTypes, aReturnType));
 	}
 	
+	public IMutableBehaviorInfo getBehavior(String aName, String aDescriptor)
+	{
+		ITypeInfo[] theArgumentTypes = LocationUtils.getArgumentTypes(getDatabase(), aDescriptor);
+		ITypeInfo theReturnType = LocationUtils.getReturnType(getDatabase(), aDescriptor);
+
+		return getBehavior(aName, theArgumentTypes, theReturnType);
+	}
+	
 	Map<String, IMutableBehaviorInfo> _getBehaviorsMap()
 	{
 		return itsBehaviorsMap;

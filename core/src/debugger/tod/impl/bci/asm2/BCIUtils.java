@@ -56,7 +56,7 @@ import tod.core.database.structure.IMutableStructureDatabase;
 import tod.core.database.structure.ITypeInfo;
 import tod.core.database.structure.ObjectId;
 import tod.impl.database.structure.standard.PrimitiveTypeInfo;
-import tod.impl.replay.AbstractMethodReplayer;
+import tod.impl.replay.InScopeMethodReplayer;
 import zz.utils.Utils;
 
 public class BCIUtils implements Opcodes
@@ -78,7 +78,7 @@ public class BCIUtils implements Opcodes
 	public static final String DSC_CLASS = "L"+CLS_CLASS+";";
 	public static final String CLS_OBJECTID = getJvmClassName(ObjectId.class);
 	public static final String DSC_OBJECTID = "L"+CLS_OBJECTID+";";
-	public static final String CLS_REPLAYER = getJvmClassName(AbstractMethodReplayer.class);
+	public static final String CLS_REPLAYER = getJvmClassName(InScopeMethodReplayer.class);
 
 	private static final Type[] TYPE_FOR_SORT = new Type[11];
 	static

@@ -276,7 +276,7 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 
 	private boolean isCalleeInScope(MethodInsnNode aNode)
 	{
-		return getClassInstrumenter().getInstrumenter().isInScope(aNode.owner);
+		return getDatabase().isInScope(aNode.owner);
 	}
 	
 	/**

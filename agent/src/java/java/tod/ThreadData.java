@@ -89,7 +89,7 @@ public final class ThreadData
 	private RegisteredRefObjectsStack itsRegisteredRefObjectsStack = new RegisteredRefObjectsStack();
 	
 	private int itsLastSentLTimestamp = 0;
-	
+	private int itsLastTracedMethodsVersion = 0;
 
 	private int[] itsEvCount = new int[Message.MSG_COUNT];
 	private long[] itsEvData = new long[Message.MSG_COUNT];
@@ -339,6 +339,26 @@ public final class ThreadData
 	}
 	
 	/**
+	 * Checks if the current version of the {@link TracedMethods} structure
+	 * is the same as the last observed; if not, send a message to inform the database.
+	 */
+	public void checkTracedMethodsVersion()
+	{
+		int theCurrentVersion = TracedMethods.version;
+		if (itsLastTracedMethodsVersion != theCurrentVersion)
+		{
+			itsLastTracedMethodsVersion = theCurrentVersion;
+			
+		    msgStart(Message.TRACEDMETHODS_VERSION, 0);
+			sendMessageType(itsBuffer, Message.TRACEDMETHODS_VERSION);
+			itsBuffer.putInt(theCurrentVersion);
+			msgStop();
+			
+			commitBuffer();
+		}
+	}
+	
+	/**
 	 * Sends a synchronization message.
 	 */
 	private void sendSync(long aTimestamp)
@@ -551,10 +571,7 @@ public final class ThreadData
 		if (enter()) return;
 		
 	    msgStart(Message.BEHAVIOR_ENTER_ARGS, aCount);
-	    
 		sendMessageType(itsBuffer, Message.BEHAVIOR_ENTER_ARGS);
-		itsBuffer.putInt(aCount);
-		
 		msgStop();
 		
 		exit();

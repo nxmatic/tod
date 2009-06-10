@@ -120,7 +120,7 @@ public class ClassInstrumenter
 		
 		itsClassInfo.setup(
 				itsInterface, 
-				itsInstrumenter.isInScope(itsName), 
+				getDatabase().isInScope(itsName), 
 				Utils.md5String(aBytecode), 
 				theInterfaces, 
 				itsSuperclass);
@@ -170,7 +170,7 @@ public class ClassInstrumenter
 		
 		return new InstrumentedClass(
 				theBytecode, 
-				getInstrumenter().getMethodGroupManager().getModeChangesAndReset());
+				getInstrumenter().getModeChangesAndReset());
 	}
 	
 	private void processNormalClass()
@@ -195,7 +195,7 @@ public class ClassInstrumenter
 		// Add infrastructure
 		if (! itsInterface
 				&& BCIUtils.CLS_OBJECT.equals(getNode().superName) 
-				&& getInstrumenter().isInIdScope(getNode().name)) 
+				&& getDatabase().isInIdScope(getNode().name)) 
 		{
 			addGetIdMethod_InScope();
 		}
@@ -208,7 +208,7 @@ public class ClassInstrumenter
 				aNode.desc, 
 				BCIUtils.isStatic(aNode.access));
 		
-		if (itsInstrumenter.isInScope(itsName)) new MethodInstrumenter_InScope(this, aNode, theBehavior).proceed();
+		if (getDatabase().isInScope(itsName)) new MethodInstrumenter_InScope(this, aNode, theBehavior).proceed();
 		else new MethodInstrumenter_OutOfScope(this, aNode, theBehavior).proceed();
 	}
 	

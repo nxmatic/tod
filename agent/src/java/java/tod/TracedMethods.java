@@ -41,6 +41,8 @@ public class TracedMethods
 	private static _BitSet tracedB = null;
 	private static _ByteArray tracedA = null;
 	
+	public static volatile int version = 0;
+	
 	/**
 	 * Sets the monitoring mode for a method  
 	 * @param aId The behavior id.
@@ -59,6 +61,8 @@ public class TracedMethods
 			if (tracedA == null) tracedA = new _ByteArray(16384);
 			tracedA.set(aId, (byte) aMode);
 		}
+		
+		version++;
 	}
 	
 	/**

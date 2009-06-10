@@ -34,6 +34,7 @@ import org.objectweb.asm.Type;
 
 import tod.Util;
 import tod.core.DebugFlags;
+import tod.core.config.ClassSelector;
 import tod.core.config.TODConfig;
 import tod.core.database.structure.IAdviceInfo;
 import tod.core.database.structure.IArrayTypeInfo;
@@ -49,7 +50,9 @@ import tod.core.database.structure.IStructureDatabase;
 import tod.core.database.structure.ITypeInfo;
 import tod.core.database.structure.SourceRange;
 import tod.core.database.structure.IBehaviorInfo.BytecodeRole;
-import tod.core.database.structure.IStructureDatabase.Listener;
+import tod.impl.bci.asm2.BCIUtils;
+import tod.tools.parsers.ParseException;
+import tod.tools.parsers.workingset.WorkingSetFactory;
 import tod.utils.remote.RemoteStructureDatabase;
 import zz.utils.Utils;
 
@@ -106,6 +109,14 @@ implements Serializable, IShareableStructureDatabase
 	
 	private transient List<Listener> itsListeners = new ArrayList<Listener>();
 	
+	private final MethodGroupManager itsMethodGroupManager; 
+
+	private ClassSelector itsGlobalSelector;
+	private ClassSelector itsTraceSelector;
+	private ClassSelector itsIdSelector;
+	
+
+	
 	protected StructureDatabase(TODConfig aConfig, String aId, File aFile, Ids aIds)
 	{
 		itsConfig = aConfig;
@@ -114,6 +125,12 @@ implements Serializable, IShareableStructureDatabase
 		itsIds = aIds;
 		itsProbes = new ArrayList<ProbeInfo>(10000);
 		itsProbes.add(null);
+		
+		itsTraceSelector = parseWorkingSet(aConfig.get(TODConfig.SCOPE_TRACE_FILTER));
+		itsGlobalSelector = parseWorkingSet(aConfig.get(TODConfig.SCOPE_GLOBAL_FILTER));
+		itsIdSelector = parseWorkingSet(aConfig.get(TODConfig.SCOPE_ID_FILTER));
+		
+		itsMethodGroupManager = new MethodGroupManager(this);
 	}
 
 	/**
@@ -223,6 +240,23 @@ implements Serializable, IShareableStructureDatabase
 	public TODConfig getConfig()
 	{
 		return itsConfig;
+	}
+	
+	private ClassSelector parseWorkingSet(String aWorkingSet)
+	{
+		try
+		{
+			return WorkingSetFactory.parseWorkingSet(aWorkingSet);
+		}
+		catch (ParseException e)
+		{
+			throw new RuntimeException("Cannot parse selector: "+aWorkingSet, e);
+		}
+	}
+	
+	void fireMonitoringModeChanged(BehaviorMonitoringModeChange aChange)
+	{
+		for (Listener theListener : itsListeners) theListener.monitoringModeChanged(aChange);
 	}
 
 	public IClassInfo getClass(String aName, String aChecksum, boolean aFailIfAbsent)
@@ -527,6 +561,11 @@ implements Serializable, IShareableStructureDatabase
 		return itsProbes.size();
 	}
 	
+	public BehaviorMonitoringModeChange getBehaviorMonitoringModeChange(int aVersion)
+	{
+		return itsMethodGroupManager.getChange(aVersion);
+	}
+
 	public IAdviceInfo getAdvice(int aAdviceId)
 	{
 		return Utils.listGet(itsAdvices, aAdviceId);
@@ -671,6 +710,18 @@ implements Serializable, IShareableStructureDatabase
 	{
 		itsListeners.remove(aListener);
 	}
+
+	public boolean isInScope(String aClassName)
+	{
+		return BCIUtils.acceptClass(aClassName, itsGlobalSelector)
+			&& BCIUtils.acceptClass(aClassName, itsTraceSelector);
+	}
+	
+	public boolean isInIdScope(String aClassName)
+	{
+		return BCIUtils.acceptClass(aClassName, itsIdSelector);
+	}
+	
 
 
 

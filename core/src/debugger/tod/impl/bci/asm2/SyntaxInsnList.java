@@ -325,6 +325,16 @@ public class SyntaxInsnList extends InsnList
 		itsVisitor.visitInsn(Opcodes.POP2);
 	}
 	
+	public void POP(Type type)
+	{
+		switch(type.getSize())
+		{
+		case 1: POP(); break;
+		case 2: POP2(); break;
+		default: throw new RuntimeException("Bad size");
+		}
+	}
+	
 	public void DUP()
 	{
 		itsVisitor.visitInsn(Opcodes.DUP);

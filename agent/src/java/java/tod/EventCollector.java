@@ -196,7 +196,9 @@ public final class EventCollector
 	 */
 	public ThreadData getThreadData()
 	{
-		return itsThreadData.get();
+		ThreadData theThreadData = itsThreadData.get();
+		theThreadData.checkTracedMethodsVersion();
+		return theThreadData;
 	}
 	
 	public static ThreadData _getThreadData()

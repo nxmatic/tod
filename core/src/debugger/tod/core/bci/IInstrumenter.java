@@ -25,8 +25,8 @@ package tod.core.bci;
 import java.tod.TracedMethods;
 import java.util.List;
 
-import tod.agent.MonitoringMode;
 import tod.core.config.TODConfig;
+import tod.core.database.structure.IStructureDatabase.BehaviorMonitoringModeChange;
 
 public interface IInstrumenter
 {
@@ -67,28 +67,13 @@ public interface IInstrumenter
 		 * List of behaviors whose monitoring mode changes as a result of processing the class.
 		 * @see TracedMethods
 		 */
-		public final List<BehaviorMonitoringMode> modeChanges;
+		public final List<BehaviorMonitoringModeChange> modeChanges;
 
-		public InstrumentedClass(byte[] aBytecode, List<BehaviorMonitoringMode> aModeChanges)
+		public InstrumentedClass(byte[] aBytecode, List<BehaviorMonitoringModeChange> aModeChanges)
 		{
 			bytecode = aBytecode;
 			modeChanges = aModeChanges;
 		}
 	}
 	
-	public static class BehaviorMonitoringMode
-	{
-		public final int behaviorId;
-		
-		/**
-		 * One of the constants in {@link MonitoringMode}.
-		 */
-		public final int mode;
-		
-		public BehaviorMonitoringMode(int aBehaviorId, int aMode)
-		{
-			behaviorId = aBehaviorId;
-			mode = aMode;
-		}
-	}
 }

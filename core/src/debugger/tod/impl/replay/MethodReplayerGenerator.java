@@ -58,9 +58,13 @@ import org.objectweb.asm.tree.MethodNode;
 import org.objectweb.asm.tree.TypeInsnNode;
 import org.objectweb.asm.tree.VarInsnNode;
 
+import tod.Util;
 import tod.core.config.TODConfig;
+import tod.core.database.structure.IBehaviorInfo;
+import tod.core.database.structure.IClassInfo;
 import tod.core.database.structure.IFieldInfo;
 import tod.core.database.structure.IMutableStructureDatabase;
+import tod.core.database.structure.IStructureDatabase;
 import tod.core.database.structure.ObjectId;
 import tod.impl.bci.asm2.BCIUtils;
 import tod.impl.bci.asm2.MethodInfo;
@@ -139,7 +143,7 @@ public class MethodReplayerGenerator
 		return itsConfig;
 	}
 	
-	public IMutableStructureDatabase getDatabase()
+	public IStructureDatabase getDatabase()
 	{
 		return itsDatabase;
 	}
@@ -155,14 +159,17 @@ public class MethodReplayerGenerator
 		// Create constructor
 		addConstructor();
 		
-		// Modify code
+		// Modify method
 		processInstructions(itsMethodNode.instructions);
-		
-		addSlotSetters();
 		
 		itsMethodNode.name = "proceed";
 		itsMethodNode.desc = "(I)V";
 		itsTarget.methods.add(itsMethodNode);
+		
+		itsMethodNode.instructions.insert(genBlockSwitch());
+
+		// Generate infrastructure
+		addSlotSetters();
 		
 		// Output the modified class
 		ClassWriter theWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
@@ -297,7 +304,7 @@ public class MethodReplayerGenerator
 	
 	/**
 	 * Generates a block of code that saves the operand stack into
-	 * the {@link AbstractMethodReplayer}'s stack.
+	 * the {@link InScopeMethodReplayer}'s stack.
 	 */
 	private InsnList genSaveStack(BCIFrame aFrame)
 	{
@@ -318,7 +325,7 @@ public class MethodReplayerGenerator
 	
 	/**
 	 * Generates a block of code that loads the operand stack from
-	 * the {@link AbstractMethodReplayer}'s stack.
+	 * the {@link InScopeMethodReplayer}'s stack.
 	 */
 	private InsnList genLoadStack(BCIFrame aFrame)
 	{
@@ -396,7 +403,7 @@ public class MethodReplayerGenerator
 	}
 	
 	/**
-	 * Adds the implementation of the {@link AbstractMethodReplayer#lRefSet(int, ObjectId)}
+	 * Adds the implementation of the {@link InScopeMethodReplayer#lRefSet(int, ObjectId)}
 	 * methods.
 	 */
 	private void addSlotSetters()
@@ -440,7 +447,7 @@ public class MethodReplayerGenerator
 	}
 	
 	/**
-	 * Returns the name of the {@link AbstractMethodReplayer#vBoolean()} method
+	 * Returns the name of the {@link InScopeMethodReplayer#vBoolean()} method
 	 * corresponding to the given type.
 	 */
 	private String valueMethodName(Type aType)
@@ -462,7 +469,7 @@ public class MethodReplayerGenerator
 	}
 	
 	/**
-	 * Returns the name and descriptor of the {@link AbstractMethodReplayer#vBoolean()} push method
+	 * Returns the name and descriptor of the {@link InScopeMethodReplayer#vBoolean()} push method
 	 * corresponding to the given type.
 	 */
 	private String[] pushMethodSig(Type aType)
@@ -483,7 +490,7 @@ public class MethodReplayerGenerator
 	}
 	
 	/**
-	 * Returns the name and descriptor of the {@link AbstractMethodReplayer#vBoolean()} pop method
+	 * Returns the name and descriptor of the {@link InScopeMethodReplayer#vBoolean()} pop method
 	 * corresponding to the given type.
 	 */
 	private String[] popMethodSig(Type aType)
@@ -510,7 +517,6 @@ public class MethodReplayerGenerator
 		{
 			AbstractInsnNode theNode = theIterator.next();
 			int theOpcode = theNode.getOpcode();
-			
 			
 			switch(theOpcode)
 			{
@@ -584,20 +590,70 @@ public class MethodReplayerGenerator
 			case Opcodes.IF_ACMPNE:
 				processIfAcmp(aInsns, (JumpInsnNode) theNode);
 				break;
+				
+			case Opcodes.IDIV:
+			case Opcodes.LDIV:
+			case Opcodes.FDIV:
+			case Opcodes.DDIV:
+			case Opcodes.IREM:
+			case Opcodes.LREM:
+			case Opcodes.FREM:
+			case Opcodes.DREM:
+				processDiv(aInsns, (InsnNode) theNode);
+				break;
 			}
 		}
 	}
 
 	private void processReturn(InsnList aInsns, InsnNode aNode)
 	{
+		SyntaxInsnList s = new SyntaxInsnList(null);
+		
+		s.ALOAD(0);
+		s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, "processReturn", "()V");
+		s.RETURN();
+		
+		aInsns.insert(aNode, s);
+		aInsns.remove(aNode);
 	}
 	
 	private void processThrow(InsnList aInsns, InsnNode aNode)
 	{
+		SyntaxInsnList s = new SyntaxInsnList(null);
+		
+		s.ALOAD(0);
+		s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, "expectException", "()V");
+		s.RETURN();
+		
+		aInsns.insert(aNode, s);
+		aInsns.remove(aNode);
 	}
+	
+	/**
+	 * Returns the id of the behavior invoked by the given node.
+	 */
+	private int getBehaviorId(MethodInsnNode aNode)
+	{
+		IClassInfo theClass = getDatabase().getClass(Util.jvmToScreen(aNode.owner), true);
+		IBehaviorInfo theBehavior = theClass.getBehavior(aNode.name, aNode.desc);
+		return theBehavior.getId();
+	}
+	
+
 	
 	private void processInvoke(InsnList aInsns, MethodInsnNode aNode)
 	{
+		int theBehaviorId = getBehaviorId(aNode);
+		
+		SyntaxInsnList s = new SyntaxInsnList(null);
+		
+		s.ALOAD(0);
+		s.pushInt(theBehaviorId);
+		s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, "invoke", "(I)V");
+		s.RETURN();
+		
+		aInsns.insert(aNode, s);
+		aInsns.remove(aNode);
 	}
 
 	private void processNew(InsnList aInsns, TypeInsnNode aNode)
@@ -775,6 +831,59 @@ public class MethodReplayerGenerator
 		
 		aInsns.insert(aNode, s);
 		aInsns.remove(aNode);
+	}
+	
+	/**
+	 * We need to check if an exception is going to be thrown.
+	 */
+	private void processDiv(InsnList aInsns, InsnNode aNode)
+	{
+		Type theType = BCIUtils.getType(BCIUtils.getSort(aNode.getOpcode()));
+
+		SyntaxInsnList s = new SyntaxInsnList(null);
+		Label lNormal = new Label();
+		s.DUP(theType);
+		switch(theType.getSort()) 
+		{
+		case Type.BOOLEAN:
+		case Type.BYTE:
+		case Type.CHAR:
+		case Type.SHORT:
+		case Type.INT: break;
+		
+		case Type.LONG:
+			s.pushLong(0);
+			s.LCMP();
+			break;
+		
+		case Type.DOUBLE:
+			s.pushDouble(0.0);
+			s.DCMPG();
+			break;
+			
+		case Type.FLOAT:
+			s.pushFloat(0f);
+			s.FCMPG();
+			break;
+		
+		default: throw new RuntimeException("Unexpected type: "+theType);
+
+		}
+		
+		s.IFNE(lNormal);
+		
+		{
+			// An arithmetic exception will occur
+			s.POP(theType);
+			s.POP(theType);
+			
+			s.ALOAD(0);
+			s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, "expectException", "()V");
+			s.RETURN();
+		}
+		
+		s.label(lNormal);
+		aInsns.insertBefore(aNode, s);
 	}
 	
 	private static final class BlockData implements Comparable<BlockData>

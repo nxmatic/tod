@@ -268,21 +268,21 @@ void agentClassFileLoadHook(
 			nTracedMethods = readInt(gSocket);
 			tracedMethods = new int[nTracedMethods];
 			for (int i=0;i<nTracedMethods;i++) tracedMethods[i] = readInt(gSocket);
-			
 		}
 		else if (len == -1)
 		{
 			char* errorString = readUTF(gSocket);
 			fatal_error(errorString);
 		}
+		
+		// Register traced methods
+		if (tracedMethods) 
+		{
+			registerTracedMethods(jni, nTracedMethods, tracedMethods);
+			delete tracedMethods;
+		}
 	}
 	
-	// Register traced methods
-	if (tracedMethods) 
-	{
-		registerTracedMethods(jni, nTracedMethods, tracedMethods);
-		delete tracedMethods;
-	}
 	fflush(stdout);
 }
 

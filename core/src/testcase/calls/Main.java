@@ -68,11 +68,28 @@ public class Main
 		}
 	}
 	
+	public static void zap(Zoup z)
+	{
+		z.foo();
+	}
+	
 	private static class A implements Comparator<String>
 	{
 		public int compare(String aO1, String aO2)
 		{
 			return aO1.compareToIgnoreCase(aO2);
 		}
+	}
+	
+	public static class Zip
+	{
+		public void foo()
+		{
+			System.out.println(getClass());
+		}
+	}
+	
+	public static class Zoup extends Zip
+	{
 	}
 }

@@ -3,14 +3,19 @@
  */
 package tod.impl.bci.asm2;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 
 import tod.core.bci.IInstrumenter;
-import tod.core.config.ClassSelector;
 import tod.core.config.TODConfig;
+import tod.core.database.structure.IBehaviorInfo;
+import tod.core.database.structure.IClassInfo;
+import tod.core.database.structure.IFieldInfo;
 import tod.core.database.structure.IMutableStructureDatabase;
-import tod.tools.parsers.ParseException;
-import tod.tools.parsers.workingset.WorkingSetFactory;
+import tod.core.database.structure.IStructureDatabase;
+import tod.core.database.structure.IStructureDatabase.BehaviorMonitoringModeChange;
+import tod.impl.bci.asm.ASMInstrumenter;
 
 /**
  * A new version of the instrumenter ({@link ASMInstrumenter}) that reduces the runtime
@@ -19,46 +24,49 @@ import tod.tools.parsers.workingset.WorkingSetFactory;
  */
 public class ASMInstrumenter2 implements IInstrumenter
 {
-	private final IMutableStructureDatabase itsDatabase;
-	private final MethodGroupManager itsMethodGroupManager; 
-
-	private ClassSelector itsGlobalSelector;
-	private ClassSelector itsTraceSelector;
-	private ClassSelector itsIdSelector;
-	
 	private TODConfig itsConfig;
-	
-	
+	private final IMutableStructureDatabase itsDatabase;
+	private final IStructureDatabase.Listener itsListener = new IStructureDatabase.Listener()
+	{
+		public void behaviorAdded(IBehaviorInfo aBehavior)
+		{
+		}
 
+		public void classAdded(IClassInfo aClass)
+		{
+		}
+
+		public void classChanged(IClassInfo aClass)
+		{
+		}
+
+		public void fieldAdded(IFieldInfo aField)
+		{
+		}
+
+		public void monitoringModeChanged(BehaviorMonitoringModeChange aChange)
+		{
+			itsChanges.add(aChange);
+		}
+	};
+	
+	/**
+	 * Collects pending changes until {@link #getModeChangesAndReset()} is called.
+	 */
+	private List<BehaviorMonitoringModeChange> itsChanges = new ArrayList<BehaviorMonitoringModeChange>();
+	
 	public ASMInstrumenter2(TODConfig aConfig, IMutableStructureDatabase aDatabase)
 	{
 		setConfig(aConfig);
 		itsDatabase = aDatabase;
-		itsMethodGroupManager = new MethodGroupManager(this);
+		itsDatabase.addListener(itsListener);
 	}
 	
-	public MethodGroupManager getMethodGroupManager()
-	{
-		return itsMethodGroupManager;
-	}
-
 	public Iterable<String> getSpecialCaseClasses()
 	{
 		return Collections.EMPTY_LIST;
 	}
 
-	private ClassSelector parseWorkingSet(String aWorkingSet)
-	{
-		try
-		{
-			return WorkingSetFactory.parseWorkingSet(aWorkingSet);
-		}
-		catch (ParseException e)
-		{
-			throw new RuntimeException("Cannot parse selector: "+aWorkingSet, e);
-		}
-	}
-	
 	public TODConfig getConfig()
 	{
 		return itsConfig;
@@ -67,20 +75,6 @@ public class ASMInstrumenter2 implements IInstrumenter
 	public void setConfig(TODConfig aConfig)
 	{
 		itsConfig = aConfig;
-		itsTraceSelector = parseWorkingSet(aConfig.get(TODConfig.SCOPE_TRACE_FILTER));
-		itsGlobalSelector = parseWorkingSet(aConfig.get(TODConfig.SCOPE_GLOBAL_FILTER));
-		itsIdSelector = parseWorkingSet(aConfig.get(TODConfig.SCOPE_ID_FILTER));
-	}
-	
-	public boolean isInScope(String aClassName)
-	{
-		return BCIUtils.acceptClass(aClassName, itsGlobalSelector)
-			&& BCIUtils.acceptClass(aClassName, itsTraceSelector);
-	}
-	
-	public boolean isInIdScope(String aClassName)
-	{
-		return BCIUtils.acceptClass(aClassName, itsIdSelector);
 	}
 	
 	public IMutableStructureDatabase getStructureDatabase()
@@ -92,6 +86,16 @@ public class ASMInstrumenter2 implements IInstrumenter
 	{
 		if (aUseJava14) throw new RuntimeException("Java 1.4 mode not yet supported in asm2");
 		return new ClassInstrumenter(this, aClassName, aBytecode, aUseJava14).proceed();
+	}
+
+	/**
+	 * Returns a list of the needed changes, and clears the internal list.
+	 */
+	public List<BehaviorMonitoringModeChange> getModeChangesAndReset()
+	{
+		List<BehaviorMonitoringModeChange> theChanges = itsChanges;
+		itsChanges = new ArrayList<BehaviorMonitoringModeChange>();
+		return theChanges;
 	}
 
 }

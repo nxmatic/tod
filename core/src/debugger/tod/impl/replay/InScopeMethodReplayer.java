@@ -38,34 +38,22 @@ import gnu.trove.TLongStack;
 
 import org.objectweb.asm.Type;
 
+import tod.agent.Message;
+import tod.agent.MonitoringMode;
 import tod.agent.io._ByteBuffer;
-import tod.core.database.structure.IBehaviorInfo;
 import tod.core.database.structure.ObjectId;
 import tod.impl.bci.asm2.BCIUtils;
 import zz.utils.ArrayStack;
 
-public abstract class AbstractMethodReplayer
+public abstract class InScopeMethodReplayer extends MethodReplayer
 {
-	// States
-	private static int s = 0;
-	static final int S_UNDEFINED = s++; 
-	static final int S_INITIALIZED = s++; // The replayer is ready to start
-	static final int S_WAIT_ARGS = s++; // Waiting for method args
-	static final int S_STARTED = s++; // The replayer has started replaying
-	static final int S_WAIT_FIELD = s++; // Waiting for a field value
-	static final int S_WAIT_ARRAY = s++; // Waiting for an array slot value
-	static final int S_WAIT_NEWARRAY = s++; // Waiting for a new array ref
-	static final int S_WAIT_CST = s++; // Waiting for a class constant (LDC)
-	static final int S_FINISHED_NORMAL = s++; // Execution finished normally
-	static final int S_FINISHED_EXCEPTION = s++; // Execution finished because an exception was thrown
+	private final String itsName;
+	private final int itsAccess;
 	
 	private final Type[] itsArgTypes;
 	private final Type itsReturnType;
 	
-	private TmpIdManager itsTmpIdManager;
-	
 	private int itsNextBlock = 0;
-	private int itsState = S_INITIALIZED;
 	
 	/**
 	 * The type for expected values (for field reads and behavior calls).
@@ -104,15 +92,13 @@ public abstract class AbstractMethodReplayer
 	private final TLongStack itsLongStack = new TLongStack();
 	
 	/**
-	 * Indicates if the replayer is processing an out-of-scope call
-	 */
-	private boolean itsCallingOutOfScope = false;
-	
-	/**
 	 * @param aCacheCounts "encoded" cache counts.
 	 */
-	protected AbstractMethodReplayer(String aDescriptor, String aCacheCounts)
+	protected InScopeMethodReplayer(String aName, int aAccess, String aDescriptor, String aCacheCounts)
 	{
+		itsName = aName;
+		itsAccess = aAccess;
+		
 		itsArgTypes = Type.getArgumentTypes(aDescriptor);
 		itsReturnType = Type.getReturnType(aDescriptor);
 		
@@ -125,36 +111,6 @@ public abstract class AbstractMethodReplayer
 		itsIntCache = new int[aCacheCounts.charAt(Type.INT)];
 		itsLongCache = new long[aCacheCounts.charAt(Type.LONG)];
 		itsShortCache = new short[aCacheCounts.charAt(Type.SHORT)];
-	}
-	
-	/**
-	 * Finishes the setup of this replayer (we don't add these args
-	 * to the constructor to simplify generated code). 
-	 */
-	public void setup(TmpIdManager aTmpIdManager)
-	{
-		itsTmpIdManager = aTmpIdManager;
-	}
-	
-	/**
-	 * Whether the execution of the method has terminated (normally).
-	 */
-	public boolean hasFinishedNormally()
-	{
-		return itsState == S_FINISHED_NORMAL;
-	}
-	
-	/**
-	 * Whether the execution of the method has terminated (by throwing an exception).
-	 */
-	public boolean hasFinishedWithException()
-	{
-		return itsState == S_FINISHED_EXCEPTION;
-	}
-	
-	public boolean isCallingOutOfScope()
-	{
-		return itsCallingOutOfScope;
 	}
 	
 	/**
@@ -208,31 +164,88 @@ public abstract class AbstractMethodReplayer
 	{
 		itsExpectedType = null;
 		itsExpectedFieldCacheSlot = -1;
-		itsState = S_UNDEFINED;
+		setState(S_UNDEFINED);
 		int theNextBlock = itsNextBlock;
 		itsNextBlock = -1;
 		
 		proceed(theNextBlock);
 	}
 	
-	private void allowedState(int aState)
+	private void transferArg(InScopeMethodReplayer aParent, Type aType, int aSlot)
 	{
-		if (itsState != aState) throw new IllegalStateException();
+		switch(aType.getSort())
+		{
+        case Type.BOOLEAN:
+        case Type.BYTE:
+        case Type.CHAR:
+        case Type.SHORT:
+		case Type.INT: lIntSet(aSlot, aParent.sIntPop()); break;
+		case Type.OBJECT: lRefSet(aSlot, aParent.sRefPop()); break;
+		case Type.DOUBLE: lDoubleSet(aSlot, aParent.sDoublePop()); break;
+		case Type.FLOAT: lFloatSet(aSlot, aParent.sFloatPop()); break;
+		case Type.LONG: lLongSet(aSlot, aParent.sLongPop()); break;
+		default: throw new RuntimeException("Unknown type: "+aType);
+		}	
 	}
 	
-	private void allowedStates(int... aStates)
+	/**
+	 * Transfers a value from the source replayer's stack to this repler's stack
+	 */
+	public void transferResult(InScopeMethodReplayer aSource)
 	{
-		for (int s : aStates) if (itsState == s) return;
-		throw new IllegalStateException();
+		Type theType = aSource.itsReturnType;
+		switch(theType.getSort())
+		{
+        case Type.BOOLEAN:
+        case Type.BYTE:
+        case Type.CHAR:
+        case Type.SHORT:
+		case Type.INT: sIntPush(aSource.sIntPop()); break;
+		case Type.OBJECT: sRefPush(aSource.sRefPop()); break;
+		case Type.DOUBLE: sDoublePush(aSource.sDoublePop()); break;
+		case Type.FLOAT: sFloatPush(aSource.sFloatPop()); break;
+		case Type.LONG: sLongPush(aSource.sLongPop()); break;
+		default: throw new RuntimeException("Unknown type: "+theType);
+		}	
 	}
-
+	
 	/**
 	 * Starts the replay of the method, taking arguments from the parent replayer.
 	 */
-	public void startFromScope(AbstractMethodReplayer aParent)
+	public void startFromScope(InScopeMethodReplayer aParent)
 	{
 		allowedState(S_INITIALIZED);
+		
+		boolean theStatic = BCIUtils.isStatic(itsAccess);
+		boolean theConstructor = "<init>".equals(itsName);
+		
+		int theSlot = 0;
+		
+		// We go in reverse arg order, so find out the last slot index
+		if (! theStatic) theSlot++;
+		for(Type theType : itsArgTypes) theSlot += theType.getSize();
+
+		// Pop args from parent and set them as locals
+		for(int i=itsArgTypes.length-1;i>=0;i--)
+		{
+			Type theType = itsArgTypes[i];
+			theSlot -= theType.getSize();
+			transferArg(aParent, theType, theSlot);
+		}
+		
+		// Check how to proceed for the target argument (this)
+		if (! theStatic)
+		{
+			assert theSlot == 1;
+			theSlot = 0;
+			
+			if (theConstructor) lRefSet(0, nextTmpId()); // Target is deferred
+			else lRefSet(0, aParent.sRefPop());
+		}
+
 		itsNextBlock = 0;
+		setState(S_STARTED);
+		next();
 	}
 	
 	/**
@@ -241,7 +254,45 @@ public abstract class AbstractMethodReplayer
 	public void startFromOutOfScope()
 	{
 		allowedState(S_INITIALIZED);
-		itsState = S_WAIT_ARGS;
+		setState(S_WAIT_ARGS);
+	}
+	
+	/**
+	 * Reads a value corresponding to the specified type from the stream, and set it 
+	 * as current value.
+	 */
+	private void readArg(_ByteBuffer aBuffer, Type aType, int aSlot)
+	{
+		switch(aType.getSort())
+		{
+		case Type.OBJECT: lRefSet(aSlot, getThreadReplayer().readValue(aBuffer)); break;
+		case Type.BOOLEAN: lIntSet(aSlot, aBuffer.get()); break;
+		case Type.SHORT: lIntSet(aSlot, aBuffer.getShort()); break;
+		case Type.BYTE: lIntSet(aSlot, aBuffer.get()); break;
+		case Type.CHAR: lIntSet(aSlot, aBuffer.getChar()); break;
+		case Type.DOUBLE: lDoubleSet(aSlot, aBuffer.getDouble()); break;
+		case Type.FLOAT: lFloatSet(aSlot, aBuffer.getFloat()); break;
+		case Type.INT: lIntSet(aSlot, aBuffer.getInt()); break;
+		case Type.LONG: lLongSet(aSlot, aBuffer.getLong()); break;
+		default: throw new RuntimeException("Unknown type: "+aType);
+		}
+	}
+	
+	public void processMessage(byte aMessage, _ByteBuffer aBuffer)
+	{
+		switch(aMessage)
+		{
+		case Message.ARRAY_READ: evArrayRead(aBuffer); break;
+		case Message.CONSTANT: evCst(aBuffer); break;
+		case Message.FIELD_READ: evFieldRead(aBuffer); break;
+		case Message.FIELD_READ_SAME: evFieldRead_Same(); break;
+		case Message.NEW_ARRAY: evNewArray(getThreadReplayer().readValue(aBuffer)); break;
+		case Message.OBJECT_INITIALIZED: evObjectInitialized(getThreadReplayer().readValue(aBuffer)); break;
+		case Message.EXCEPTION: evExceptionGenerated(aBuffer); break;
+		case Message.HANDLER_REACHED: evHandlerReached(aBuffer); break;
+			
+		default: throw new IllegalStateException(""+aMessage);
+		}
 	}
 	
 	/**
@@ -250,10 +301,28 @@ public abstract class AbstractMethodReplayer
 	public void args(_ByteBuffer aBuffer)
 	{
 		allowedState(S_WAIT_ARGS);
+		
+		boolean theStatic = BCIUtils.isStatic(itsAccess);
+		boolean theConstructor = "<init>".equals(itsName);
+		
+		int theSlot = 0;
+		
+		if (! theStatic && ! theConstructor)
+		{
+			readArg(aBuffer, BCIUtils.getType(Type.OBJECT), theSlot);
+			theSlot++;
+		}
+		
+		for(int i=0;i<itsArgTypes.length;i++)
+		{
+			Type theType = itsArgTypes[i];
+			readArg(aBuffer, theType, theSlot);
+			theSlot += theType.getSize();
+		}
+		
 		itsNextBlock = 0;
-		int theCount = aBuffer.getInt();
-		
-		
+		setState(S_STARTED);
+		next();
 	}
 	
 	
@@ -293,8 +362,33 @@ public abstract class AbstractMethodReplayer
 	
 	public abstract void evNewArray(ObjectId aObject);
 	public abstract void evObjectInitialized(ObjectId aObject);
-	public abstract void evExceptionGenerated(IBehaviorInfo aBehavior, int aBytecodeIndex, ObjectId aException);
-	public abstract void evHandlerReached(int aLocation);
+	
+	private void evExceptionGenerated(_ByteBuffer aBuffer)
+	{
+		String theMethodName = aBuffer.getString();
+		String theMethodSignature = aBuffer.getString();
+		String theDeclaringClassSignature = aBuffer.getString();
+		short theBytecodeIndex = aBuffer.getShort();
+		ObjectId theException = getThreadReplayer().readValue(aBuffer);
+		
+		String theClassName;
+		try
+		{
+			theClassName = Type.getType(theDeclaringClassSignature).getClassName();
+		}
+		catch (Exception e)
+		{
+			throw new RuntimeException("Bad declaring class signature: "+theDeclaringClassSignature, e);
+		}
+		
+		int theBehaviorId = getDatabase().getBehaviorId(theClassName, theMethodName, theMethodSignature);
+
+		evExceptionGenerated(theBehaviorId, theBytecodeIndex, theException);
+	}
+	
+
+	public abstract void evExceptionGenerated(int aBehaviorId, int aBytecodeIndex, ObjectId aException);
+	public abstract void evHandlerReached(_ByteBuffer aBuffer);
 	public abstract void constructorTarget(long aId);
 
 	/**
@@ -309,7 +403,7 @@ public abstract class AbstractMethodReplayer
 	
 	protected void expectField(int aSort, int aNextBlock, int aCacheSlot)
 	{
-		itsState = S_WAIT_FIELD;
+		setState(S_WAIT_FIELD);
 		itsNextBlock = aNextBlock;
 		itsExpectedFieldCacheSlot = aCacheSlot;
 		expect(aSort);
@@ -317,21 +411,33 @@ public abstract class AbstractMethodReplayer
 	
 	protected void expectArray(int aSort, int aNextBlock)
 	{
-		itsState = S_WAIT_ARRAY;
+		setState(S_WAIT_ARRAY);
 		itsNextBlock = aNextBlock;
 		expect(aSort);
 	}
 	
 	protected void expectClassCst(int aNextBlock)
 	{
-		itsState = S_WAIT_CST;
+		setState(S_WAIT_CST);
 		itsNextBlock = aNextBlock;
 	}
 	
 	protected void expectNewArray(int aNextBlock)
 	{
-		itsState = S_WAIT_NEWARRAY;
+		setState(S_WAIT_NEWARRAY);
 		itsNextBlock = aNextBlock;
+	}
+	
+	public void expectException()
+	{
+		setState(S_WAIT_EXCEPTION);
+		itsNextBlock = -1;
+	}
+	
+	protected void processReturn()
+	{
+		setState(S_FINISHED_NORMAL);
+		itsNextBlock = -1;
 	}
 	
 	/**
@@ -342,7 +448,7 @@ public abstract class AbstractMethodReplayer
 	{
 		switch(aType.getSort())
 		{
-		case Type.OBJECT: vRef(new ObjectId(aBuffer.getLong())); break;
+		case Type.OBJECT: vRef(getThreadReplayer().readValue(aBuffer)); break;
 		case Type.BOOLEAN: vBoolean(aBuffer.get() != 0); break;
 		case Type.BYTE: vByte(aBuffer.get()); break;
 		case Type.CHAR: vChar(aBuffer.getChar()); break;
@@ -401,7 +507,28 @@ public abstract class AbstractMethodReplayer
 	
 	protected ObjectId nextTmpId()
 	{
-		return new ObjectId(itsTmpIdManager.nextId());
+		return new ObjectId(getThreadReplayer().getTmpIdManager().nextId());
+	}
+	
+	/**
+	 * Processes an invocation
+	 */
+	protected void invoke(int aBehaviorId)
+	{
+		int theMode = getThreadReplayer().getBehaviorMonitoringMode(aBehaviorId);
+		switch(theMode)
+		{
+		case MonitoringMode.FULL:
+		case MonitoringMode.ENVELOPPE:
+			setState(S_CALLING_MONITORED);
+			break;
+			
+		case MonitoringMode.NONE:
+			setState(S_CALLING_UNMONITORED);
+			break;
+			
+		default: throw new RuntimeException("Mode not handled: "+theMode); 
+		}
 	}
 
 	/**

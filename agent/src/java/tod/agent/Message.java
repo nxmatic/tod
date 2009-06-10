@@ -72,12 +72,14 @@ public class Message
 	public static final byte REGISTER_CLASSLOADER = 27;
 	public static final byte REGISTER_THREAD = 28;
 	
+	public static final byte TRACEDMETHODS_VERSION = 29;
+	
 	/**
 	 * Args: timestamp
 	 */
-	public static final byte SYNC = 29;
+	public static final byte SYNC = 30;
 	
-	public static final int MSG_COUNT = 29;
+	public static final int MSG_COUNT = 30;
 	
 	public static final String[] _NAMES = 
 	{
@@ -109,6 +111,8 @@ public class Message
 		"REGISTER_REFOBJECT_DELTA",
 		"REGISTER_CLASS",
 		"REGISTER_CLASSLOADER",
-		"REGISTER_THREAD"
+		"REGISTER_THREAD",
+		"TRACEDMETHODS_VERSION",
+		"SYNC"
 	};
 }

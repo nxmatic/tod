@@ -35,9 +35,9 @@ import java.net.Socket;
 import tod.agent.AgentConfig;
 import tod.core.DebugFlags;
 import tod.core.bci.IInstrumenter;
-import tod.core.bci.IInstrumenter.BehaviorMonitoringMode;
 import tod.core.bci.IInstrumenter.InstrumentedClass;
 import tod.core.config.TODConfig;
+import tod.core.database.structure.IStructureDatabase.BehaviorMonitoringModeChange;
 import tod.core.server.TODServer;
 import zz.utils.Utils;
 
@@ -300,7 +300,7 @@ public abstract class NativeAgentPeer extends SocketThread
 			// Write out traced method ids
 			if (DebugFlags.INSTRUMENTER_LOG) System.out.println("Sending "+theInstrumentedClass.modeChanges.size()+" mode changes.");
 			aOutputStream.writeInt(theInstrumentedClass.modeChanges.size());
-			for(BehaviorMonitoringMode theMode : theInstrumentedClass.modeChanges)
+			for(BehaviorMonitoringModeChange theMode : theInstrumentedClass.modeChanges)
 			{
 				aOutputStream.writeInt((theMode.behaviorId << 2) | (theMode.mode & 0x3));
 			}
