@@ -36,10 +36,10 @@ import java.tod.util._ArrayList;
 import java.tod.util._StringBuilder;
 import java.tod.util._SyncRingBuffer;
 
-import tod.agent.AgentDebugFlags;
-import tod.agent.Command;
-import tod.agent.Message;
-import tod.agent.io._ByteBuffer;
+import tod2.agent.AgentDebugFlags;
+import tod2.agent.Command;
+import tod2.agent.Message;
+import tod2.agent.io._ByteBuffer;
 
 /**
  * This class implements the thread that communicates with the TOD database.
@@ -244,7 +244,7 @@ public class IOThread extends Thread
 		itsChannel.write(itsHeaderBuffer);
 		
 		itsChannel.writeStringPacket(aPacket.id, aPacket.string);
-		
+
 		if (AgentDebugFlags.COLLECT_PROFILE) 
 		{
 			itsBytesSent += 1+8+4+aPacket.string.length()*2;
@@ -485,6 +485,14 @@ public class IOThread extends Thread
 			}
 			
 			printStats();
+			try
+			{
+				itsChannel.flush();
+			}
+			catch (_IOException e)
+			{
+				e.printStackTrace();
+			}
 			
 //			_IO.out("[TOD] Flushing buffers...");
 //			

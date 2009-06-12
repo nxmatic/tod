@@ -24,8 +24,8 @@ package tod.core.transport;
 
 import java.tod.EventCollector;
 
-import tod.agent.BehaviorCallType;
-import tod.agent.Output;
+import tod2.agent.BehaviorCallType;
+import tod2.agent.Output;
 
 /**
  * An interface for collecting low-level events.

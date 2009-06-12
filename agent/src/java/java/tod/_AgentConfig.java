@@ -5,7 +5,7 @@ package java.tod;
 
 import java.tod.io._IO;
 
-import tod.agent.AgentUtils;
+import tod2.agent.AgentUtils;
 
 /**
  * Agent configuration data that other parts of TOD should not attempt

@@ -49,7 +49,7 @@ public class TmpIdManager
 	
 	private long itsNextId = 2; // We use even ids. Odd ids are created by the agent
 	
-	public long nextId()
+	public synchronized long nextId()
 	{
 		long theId = itsNextId;
 		itsNextId += 2;
@@ -59,7 +59,7 @@ public class TmpIdManager
 	/**
 	 * Associates a temporary id with the corresponding real one, once the relation is known.
 	 */
-	public void associate(long aTmpId, long aRealId)
+	public synchronized void associate(long aTmpId, long aRealId)
 	{
 		itsTmpIdsMap.put(aTmpId, aRealId);
 	}

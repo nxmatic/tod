@@ -1,14 +1,14 @@
 /*
  * Created on Jan 12, 2009
  */
-package tod.agent.io;
+package tod2.agent.io;
 
 import java.io.DataInputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 
-import tod.access.TODAccessor;
+import tod2.access.TODAccessor;
 
 
 
@@ -58,6 +58,13 @@ public class _ByteBuffer
 	{
 		checkRemaining(aLength);
 		System.arraycopy(aBytes, aOffset, itsBytes, itsPos, aLength);
+		itsPos += aLength;
+	}
+	
+	public final void get(byte[] aBuffer, int aOffset, int aLength)
+	{
+		checkRemaining(aLength);
+		System.arraycopy(itsBytes, itsPos, aBuffer, aOffset, aLength);
 		itsPos += aLength;
 	}
 	

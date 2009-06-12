@@ -31,9 +31,6 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.bci.asm2;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 
@@ -47,13 +44,13 @@ import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.MethodNode;
 
 import tod.Util;
-import tod.access.TODAccessor;
 import tod.core.bci.IInstrumenter.InstrumentedClass;
 import tod.core.config.TODConfig;
 import tod.core.database.structure.IClassInfo;
 import tod.core.database.structure.IMutableBehaviorInfo;
 import tod.core.database.structure.IMutableClassInfo;
 import tod.core.database.structure.IMutableStructureDatabase;
+import tod2.access.TODAccessor;
 import zz.utils.Utils;
 
 /**
@@ -167,6 +164,8 @@ public class ClassInstrumenter
 			System.err.println("Class "+getNode().name+" failed check. Writing out bytecode.");
 			e.printStackTrace();
 		}
+		
+		itsClassInfo.setBytecode(theBytecode, itsOriginal);
 		
 		return new InstrumentedClass(
 				theBytecode, 

@@ -24,9 +24,9 @@ package java.tod;
 
 import java.tod.util.WeakLongHashMap;
 
-import tod.agent.AgentConfig;
-import tod.agent.AgentDebugFlags;
-import tod.agent.util.BitUtilsLite;
+import tod2.agent.AgentConfig;
+import tod2.agent.AgentDebugFlags;
+import tod2.agent.util.BitUtilsLite;
 
 
 /**

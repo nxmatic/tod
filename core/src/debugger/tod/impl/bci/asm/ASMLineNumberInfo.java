@@ -28,7 +28,7 @@ import tod.core.database.structure.IStructureDatabase.LineNumberInfo;
 
 /**
  * Represents an unresolved entry of a method's LineNumberTable attribute.
- * @see tod.core.database.browser.ILocationRegisterer.LineNumberInfo
+ * @see tod2.core.database.browser.ILocationRegisterer.LineNumberInfo
  * @see http://java.sun.com/docs/books/vmspec/2nd-edition/html/ClassFile.doc.html#22856 
  * @author gpothier
  */

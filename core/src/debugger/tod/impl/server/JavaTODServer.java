@@ -34,7 +34,6 @@ import java.util.Map;
 
 import org.python.modules.synchronize;
 
-import tod.agent.AgentConfig;
 import tod.core.ILogCollector;
 import tod.core.bci.IInstrumenter;
 import tod.core.config.TODConfig;
@@ -43,6 +42,7 @@ import tod.core.server.TODServer;
 import tod.core.transport.CollectorLogReceiver;
 import tod.core.transport.LogReceiver;
 import tod.impl.database.structure.standard.HostInfo;
+import tod2.agent.AgentConfig;
 import zz.utils.properties.IRWProperty;
 import zz.utils.properties.SimpleRWProperty;
 

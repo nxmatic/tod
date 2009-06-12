@@ -3,8 +3,8 @@
  */
 package java.tod.util;
 
-import tod.agent.AgentDebugFlags;
-import tod.agent.io._ByteBuffer;
+import tod2.agent.AgentDebugFlags;
+import tod2.agent.io._ByteBuffer;
 
 public final class LongDeltaSender
 {

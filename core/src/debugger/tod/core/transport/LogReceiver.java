@@ -36,14 +36,14 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
 
-import tod.agent.Command;
-import tod.agent.io._ByteBuffer;
 import tod.core.DebugFlags;
 import tod.core.config.TODConfig;
 import tod.core.database.structure.IStructureDatabase;
 import tod.impl.database.structure.standard.HostInfo;
 import tod.impl.database.structure.standard.StructureDatabaseUtils;
 import tod.utils.TODUtils;
+import tod2.agent.Command;
+import tod2.agent.io._ByteBuffer;
 
 /**
  * Receives (low-level) events from the debugged application through a socket.
@@ -326,9 +326,6 @@ public abstract class LogReceiver extends PacketProcessor
 			
 			theCount += theRead;
 
-			// TEMP: the following prevents actual storage of the trace
-			if (theRead >= 0) continue;
-			
 			if (theRead == 0) continue;
 			else if (theRead > 0) itsFileOut.write(theBuffer, 0, theRead);
 			else
@@ -338,6 +335,7 @@ public abstract class LogReceiver extends PacketProcessor
 			}
 		}
 		
+		itsFileOut.flush();
 		System.out.println("Received "+theCount+" bytes");
 	}
 	

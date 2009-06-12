@@ -46,7 +46,6 @@ import tod.core.database.structure.SourceRange;
 import tod.core.database.structure.IBehaviorInfo.BytecodeRole;
 import tod.core.database.structure.ILocationInfo.ISerializableLocationInfo;
 import tod.core.database.structure.IStructureDatabase.LineNumberInfo;
-import tod.core.database.structure.IStructureDatabase.Listener;
 import tod.core.database.structure.IStructureDatabase.LocalVariableInfo;
 import tod.core.database.structure.IStructureDatabase.ProbeInfo;
 import tod.core.database.structure.IStructureDatabase.Stats;
@@ -737,6 +736,21 @@ public class RemoteStructureDatabase implements RIStructureDatabase
 		}
 
 		public void removeListener(Listener aListener)
+		{
+			throw new UnsupportedOperationException();
+		}
+
+		public BehaviorMonitoringModeChange getBehaviorMonitoringModeChange(int aVersion)
+		{
+			throw new UnsupportedOperationException();
+		}
+
+		public boolean isInIdScope(String aClassName)
+		{
+			throw new UnsupportedOperationException();
+		}
+
+		public boolean isInScope(String aClassName)
 		{
 			throw new UnsupportedOperationException();
 		}

@@ -3,7 +3,7 @@
  */
 package java.tod.io;
 
-import tod.agent.io._ByteBuffer;
+import tod2.agent.io._ByteBuffer;
 
 
 /**

@@ -29,41 +29,30 @@ POSSIBILITY OF SUCH DAMAGE.
 Parts of this work rely on the MD5 algorithm "derived from the RSA Data Security, 
 Inc. MD5 Message-Digest Algorithm".
 */
-package tod.core.transport;
-
-import java.io.ByteArrayInputStream;
-import java.io.DataInputStream;
-import java.io.FileNotFoundException;
-import java.tod.ObjectValueFactory;
-import java.tod.transport.ObjectEncoder;
-
-import org.junit.Test;
+package tod.impl.replay;
 
 import tod2.agent.io._ByteBuffer;
 
-
-/**
- * Test object encoding/decoding
- * This test requires to have the agent in the bootstrap classpath. 
- * @author gpothier
- */
-public class TestObjectCodec
+public class UnmonitoredMethodReplayer extends MethodReplayer
 {
-	@Test public void testCodec()
+	@Override
+	public void processMessage(byte aMessage, _ByteBuffer aBuffer)
 	{
-		doTest("Hola");
-		doTest(new FileNotFoundException("Hop"));
+		throw new IllegalStateException();
 	}
-	
-	void doTest(Object aObject)
+
+	@Override
+	public void transferResult(InScopeMethodReplayer aSource)
 	{
-		aObject = ObjectValueFactory.convert(aObject);
-		_ByteBuffer theBuffer = _ByteBuffer.allocate(10000);
-		ObjectEncoder.encode(aObject, theBuffer);
-		byte[] theData = new byte[theBuffer.position()];
-		System.arraycopy(theBuffer.array(), 0, theData, 0, theBuffer.position());
-		
-		DataInputStream theIn = new DataInputStream(new ByteArrayInputStream(theData));
-		Object theObject = ObjectDecoder.decode(theIn);
+	}
+
+	@Override
+	public void transferResult(_ByteBuffer aBuffer)
+	{
+	}
+
+	@Override
+	public void expectException()
+	{
 	}
 }

@@ -33,9 +33,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Properties;
 
-import tod.agent.AgentConfig;
 import tod.impl.server.JavaTODServerFactory2;
 import tod.utils.ConfigUtils;
+import tod2.agent.AgentConfig;
 import zz.utils.PublicCloneable;
 
 /**

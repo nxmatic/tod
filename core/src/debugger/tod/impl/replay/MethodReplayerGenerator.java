@@ -55,6 +55,7 @@ import org.objectweb.asm.tree.LabelNode;
 import org.objectweb.asm.tree.LdcInsnNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
+import org.objectweb.asm.tree.TryCatchBlockNode;
 import org.objectweb.asm.tree.TypeInsnNode;
 import org.objectweb.asm.tree.VarInsnNode;
 
@@ -63,7 +64,6 @@ import tod.core.config.TODConfig;
 import tod.core.database.structure.IBehaviorInfo;
 import tod.core.database.structure.IClassInfo;
 import tod.core.database.structure.IFieldInfo;
-import tod.core.database.structure.IMutableStructureDatabase;
 import tod.core.database.structure.IStructureDatabase;
 import tod.core.database.structure.ObjectId;
 import tod.impl.bci.asm2.BCIUtils;
@@ -76,7 +76,7 @@ public class MethodReplayerGenerator
 	public static final Type TYPE_OBJECTID = Type.getType(ObjectId.class);
 	
 	private final TODConfig itsConfig;
-	private final IMutableStructureDatabase itsDatabase;
+	private final IStructureDatabase itsDatabase;
 	private final ClassNode itsTarget;
 	
 	private final ClassNode itsClassNode;
@@ -114,7 +114,7 @@ public class MethodReplayerGenerator
 	private int itsLastFloatSlot = 0;
 	private int itsLastLongSlot = 0;
 	
-	public MethodReplayerGenerator(TODConfig aConfig, IMutableStructureDatabase aDatabase, ClassNode aClassNode, MethodNode aMethodNode)
+	public MethodReplayerGenerator(TODConfig aConfig, IStructureDatabase aDatabase, ClassNode aClassNode, MethodNode aMethodNode)
 	{
 		itsConfig = aConfig;
 		itsDatabase = aDatabase;
@@ -128,10 +128,12 @@ public class MethodReplayerGenerator
 		itsTarget.name = ThreadReplayer.makeReplayerClassName(itsClassNode.name, itsMethodNode.name, itsMethodNode.desc);
 		itsTarget.superName = BCIUtils.CLS_REPLAYER;
 		itsTarget.methods.add(itsMethodNode);
+		itsTarget.version = Opcodes.V1_5;
 		
 		itsMethodNode.name = "proceed";
-		itsMethodNode.desc = "()V";
+		itsMethodNode.desc = "(I)V";
 		itsMethodNode.access = Opcodes.ACC_PROTECTED;
+		itsMethodNode.exceptions = Collections.EMPTY_LIST;
 		
 		itsTmpVar = nextFreeVar(2);
 		
@@ -162,14 +164,11 @@ public class MethodReplayerGenerator
 		// Modify method
 		processInstructions(itsMethodNode.instructions);
 		
-		itsMethodNode.name = "proceed";
-		itsMethodNode.desc = "(I)V";
-		itsTarget.methods.add(itsMethodNode);
-		
 		itsMethodNode.instructions.insert(genBlockSwitch());
 
 		// Generate infrastructure
 		addSlotSetters();
+		addSlotGetters();
 		
 		// Output the modified class
 		ClassWriter theWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
@@ -217,13 +216,22 @@ public class MethodReplayerGenerator
 		MethodNode theConstructor = new MethodNode();
 		theConstructor.name = "<init>";
 		theConstructor.desc = "()V";
+		theConstructor.exceptions = Collections.EMPTY_LIST;
 		
 		SyntaxInsnList s = new SyntaxInsnList(null);
 		s.ALOAD(0);
+		s.LDC(itsMethodNode.name);
+		s.pushInt(itsMethodNode.access);
 		s.LDC(itsMethodNode.desc);
 		s.LDC(getEncodedFieldCacheCounts());
-		s.INVOKESPECIAL(BCIUtils.CLS_REPLAYER, "<init>", "("+BCIUtils.DSC_STRING+BCIUtils.DSC_STRING+")V");
+		s.LDC(getEncodedHandlerBlocks());
+		s.INVOKESPECIAL(
+				BCIUtils.CLS_REPLAYER, 
+				"<init>", 
+				"("+BCIUtils.DSC_STRING+"I"+BCIUtils.DSC_STRING+BCIUtils.DSC_STRING+BCIUtils.DSC_STRING+")V");
 		s.RETURN();
+		
+		theConstructor.instructions = s;
 		
 		itsTarget.methods.add(theConstructor);
 	}
@@ -247,6 +255,22 @@ public class MethodReplayerGenerator
 		}
 		
 		return new String(theCounts);
+	}
+	
+	/**
+	 * Creates a string that represents the mapping of exception handler ids to block ids.
+	 */
+	private String getEncodedHandlerBlocks()
+	{
+		StringBuilder theBuilder = new StringBuilder();
+		Set<Label> theProcessedLabels = new HashSet<Label>();
+		for(TryCatchBlockNode theNode : (List<TryCatchBlockNode>) itsMethodNode.tryCatchBlocks)
+		{
+			Label theLabel = theNode.handler.getLabel();
+			if (theProcessedLabels.add(theLabel)) theBuilder.append((char) getBlockId(theLabel));
+		}
+		
+		return theBuilder.toString();
 	}
 	
 	private int getFieldCacheSlot(FieldInsnNode aNode)
@@ -312,7 +336,7 @@ public class MethodReplayerGenerator
 		int theStackSize = aFrame.getStackSize();
 		for(int i=theStackSize-1;i>=0;i--)
 		{
-			Type theType = aFrame.getStack(i).type;
+			Type theType = aFrame.getStack(i).getType();
 			s.ISTORE(theType, itsTmpVar);
 			s.ALOAD(0);
 			s.ILOAD(theType, itsTmpVar);
@@ -333,7 +357,7 @@ public class MethodReplayerGenerator
 		int theStackSize = aFrame.getStackSize();
 		for(int i=0;i<theStackSize;i++)
 		{
-			Type theType = aFrame.getStack(i).type;
+			Type theType = aFrame.getStack(i).getType();
 			s.ALOAD(0);
 			String[] theSig = popMethodSig(theType);
 			s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, theSig[0], theSig[1]);
@@ -421,29 +445,81 @@ public class MethodReplayerGenerator
 		theSetter.name = "l"+aNameBase+"Set";
 		theSetter.desc = "(I"+aType.getDescriptor()+")V";
 		theSetter.access = Opcodes.ACC_PROTECTED;
+		theSetter.exceptions = Collections.EMPTY_LIST;
 		
 		SyntaxInsnList s = new SyntaxInsnList(null);
-		Label[] l = new Label[aSlotCount];
-		Label lDefault = new Label();
-		for(int i=0;i<aSlotCount;i++) l[i] = new Label();
 		
-		s.ILOAD(1);
-		s.TABLESWITCH(0, aSlotCount-1, lDefault, l);
-		
-		for (int i=0;i<aSlotCount;i++)
+		if (aSlotCount > 0)
 		{
-			s.label(l[i]);
-			s.ALOAD(0);
-			s.ILOAD(aType, 2);
-			s.PUTFIELD(itsTarget.name, getFieldForVar(i, aType), aType.getDescriptor());
-			s.RETURN();
+			Label[] l = new Label[aSlotCount];
+			Label lDefault = new Label();
+			
+			for(int i=0;i<aSlotCount;i++) l[i] = new Label();
+			
+			s.ILOAD(1);
+			s.TABLESWITCH(0, aSlotCount-1, lDefault, l);
+			
+			for (int i=0;i<aSlotCount;i++)
+			{
+				s.label(l[i]);
+				s.ALOAD(0);
+				s.ILOAD(aType, 2);
+				s.PUTFIELD(itsTarget.name, getFieldForVar(i, aType), aType.getDescriptor());
+				s.RETURN();
+			}
+			
+			s.label(lDefault);
 		}
 		
-		s.label(lDefault);
 		BCIUtils.throwRTEx(s, "No such slot");
 		
 		theSetter.instructions = s;
 		itsTarget.methods.add(theSetter);
+	}
+	
+	/**
+	 * Adds the implementation of the {@link InScopeMethodReplayer#lRefGet(int)}
+	 * methods.
+	 */
+	private void addSlotGetters()
+	{
+		addSlotGetter(itsLastRefSlot, "Ref", TYPE_OBJECTID);
+	}
+	
+	private void addSlotGetter(int aSlotCount, String aNameBase, Type aType)
+	{
+		MethodNode theGetter = new MethodNode();
+		theGetter.name = "l"+aNameBase+"Get";
+		theGetter.desc = "(I)"+aType.getDescriptor();
+		theGetter.access = Opcodes.ACC_PROTECTED;
+		theGetter.exceptions = Collections.EMPTY_LIST;
+		
+		SyntaxInsnList s = new SyntaxInsnList(null);
+		
+		if (aSlotCount > 0)
+		{
+			Label[] l = new Label[aSlotCount];
+			Label lDefault = new Label();
+			for(int i=0;i<aSlotCount;i++) l[i] = new Label();
+			
+			s.ILOAD(1);
+			s.TABLESWITCH(0, aSlotCount-1, lDefault, l);
+			
+			for (int i=0;i<aSlotCount;i++)
+			{
+				s.label(l[i]);
+				s.ALOAD(0);
+				s.GETFIELD(itsTarget.name, getFieldForVar(i, aType), aType.getDescriptor());
+				s.IRETURN(aType);
+			}
+			
+			s.label(lDefault);
+		}
+		
+		BCIUtils.throwRTEx(s, "No such slot");
+		
+		theGetter.instructions = s;
+		itsTarget.methods.add(theGetter);
 	}
 	
 	/**

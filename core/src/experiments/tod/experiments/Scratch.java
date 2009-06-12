@@ -31,7 +31,7 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.experiments;
 
-import tod.agent.AgentUtils;
+import tod2.agent.AgentUtils;
 
 public class Scratch
 {

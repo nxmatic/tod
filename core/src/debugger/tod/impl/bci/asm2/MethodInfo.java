@@ -63,8 +63,12 @@ import org.objectweb.asm.tree.analysis.SourceInterpreter;
 import org.objectweb.asm.tree.analysis.SourceValue;
 import org.objectweb.asm.tree.analysis.Value;
 
+import tod.core.database.structure.IClassInfo;
 import tod.core.database.structure.IFieldInfo;
+import tod.core.database.structure.IMutableClassInfo;
 import tod.core.database.structure.IMutableStructureDatabase;
+import tod.core.database.structure.IStructureDatabase;
+import tod.core.database.structure.ITypeInfo;
 import zz.utils.ArrayStack;
 import zz.utils.ListMap;
 import zz.utils.Stack;
@@ -77,7 +81,7 @@ import zz.utils.Utils;
  */
 public class MethodInfo
 {
-	private final IMutableStructureDatabase itsDatabase;
+	private final IStructureDatabase itsDatabase;
 	private final ClassNode itsClassNode;
 	private final MethodNode itsMethodNode;
 	
@@ -108,7 +112,7 @@ public class MethodInfo
 	 */
 	private MethodInsnNode itsChainingInvocation;
 
-	public MethodInfo(IMutableStructureDatabase aDatabase, ClassNode aClassNode, MethodNode aMethodNode)
+	public MethodInfo(IStructureDatabase aDatabase, ClassNode aClassNode, MethodNode aMethodNode)
 	{
 		itsDatabase = aDatabase;
 		itsClassNode = aClassNode;
@@ -128,7 +132,7 @@ public class MethodInfo
 		return itsMethodNode;
 	}
 	
-	public IMutableStructureDatabase getDatabase()
+	public IStructureDatabase getDatabase()
 	{
 		return itsDatabase;
 	}
@@ -327,7 +331,7 @@ public class MethodInfo
 		
 		BCIValue theTarget = getFrame(aNode).getStack(0);
 
-		for(AbstractInsnNode theNode : theTarget.insns)
+		for(AbstractInsnNode theNode : theTarget.getInsns())
 		{
 			if (theNode instanceof VarInsnNode)
 			{
@@ -338,6 +342,24 @@ public class MethodInfo
 		
 		return false;
 	}
+	
+	private IFieldInfo getField(FieldInsnNode aNode)
+	{
+		if (getDatabase() instanceof IMutableStructureDatabase)
+		{
+			IMutableStructureDatabase theDatabase = (IMutableStructureDatabase) getDatabase();
+			IMutableClassInfo theOwner = theDatabase.getNewClass(aNode.owner);
+			ITypeInfo theType = theDatabase.getNewType(aNode.desc);
+
+			return theOwner.getNewField(aNode.name, theType, aNode.getOpcode() == Opcodes.GETSTATIC);
+		}
+		else
+		{
+			IClassInfo theOwner = getDatabase().getClass(aNode.owner, true);
+			return theOwner.getField(aNode.name);
+		}
+	}
+	
 	
 
 
@@ -373,13 +395,13 @@ public class MethodInfo
 				{
 					if (isSelfFieldAccess(theFieldInsnNode))
 					{
-						IFieldInfo theField = BCIUtils.getField(getDatabase(), theFieldInsnNode);
+						IFieldInfo theField = getField(theFieldInsnNode);
 						itsAccessMap.add(theField, theFieldInsnNode);
 					}
 				}
 				else if (theNode.getOpcode() == Opcodes.GETSTATIC)
 				{
-					IFieldInfo theField = BCIUtils.getField(getDatabase(), theFieldInsnNode);
+					IFieldInfo theField = getField(theFieldInsnNode);
 					itsAccessMap.add(theField, theFieldInsnNode);
 				}
 				
@@ -444,8 +466,8 @@ public class MethodInfo
 	
 	private boolean hasAload0Only(BCIValue aValue)
 	{
-		if (aValue.insns.size() != 1) return false;
-		return isALOAD0(aValue.insns.iterator().next()); 
+		if (aValue.getInsns().size() != 1) return false;
+		return isALOAD0(aValue.getInsns().iterator().next()); 
 	}
 	
 
@@ -497,65 +519,97 @@ public class MethodInfo
 		private final BasicInterpreter itsBasicInterpreter = new BasicInterpreter();
 		private final SourceInterpreter itsSourceInterpreter = new SourceInterpreter();
 		
+		private BasicValue b(Value v)
+		{
+			return v != null ? ((BCIValue) v).getBasicValue() : null;
+		}
+		
+		private SourceValue s(Value v)
+		{
+			return v != null ? ((BCIValue) v).getSourceValue() : null;
+		}
+		
+		private List<BasicValue> b(List<BCIValue> aValues)
+		{
+			List<BasicValue> theResult = new ArrayList<BasicValue>(aValues.size());
+			for (BCIValue theValue : aValues) theResult.add(b(theValue));
+			return theResult;
+		}
+		
+		private List<SourceValue> s(List<BCIValue> aValues)
+		{
+			List<SourceValue> theResult = new ArrayList<SourceValue>(aValues.size());
+			for (BCIValue theValue : aValues) theResult.add(s(theValue));
+			return theResult;
+		}
+		
+		private BCIValue create(Value b, Value s)
+		{
+			return new BCIValue((BasicValue) b, (SourceValue) s);
+		}
+		
 		public Value binaryOperation(AbstractInsnNode aInsn, Value aValue1, Value aValue2)
 				throws AnalyzerException
 		{
-			BasicValue b = (BasicValue) itsBasicInterpreter.binaryOperation(aInsn, aValue1, aValue2);
-			SourceValue s = (SourceValue) itsSourceInterpreter.binaryOperation(aInsn, aValue1, aValue2);
-			return new BCIValue(b.getType(), s.insns);
+			return create(
+					itsBasicInterpreter.binaryOperation(aInsn, b(aValue1), b(aValue2)),
+					itsSourceInterpreter.binaryOperation(aInsn, s(aValue1), s(aValue2)));
 		}
 		
 		public Value copyOperation(AbstractInsnNode aInsn, Value aValue) throws AnalyzerException
 		{
-			BasicValue b = (BasicValue) itsBasicInterpreter.copyOperation(aInsn, aValue);
-			SourceValue s = (SourceValue) itsSourceInterpreter.copyOperation(aInsn, aValue);
-			return new BCIValue(b.getType(), s.insns);
+			return create(
+					itsBasicInterpreter.copyOperation(aInsn, b(aValue)),
+					itsSourceInterpreter.copyOperation(aInsn, s(aValue)));
 		}
 		
-		public Value merge(Value aV, Value aW)
+		public Value merge(Value aV1, Value aV2)
 		{
-			BasicValue b = (BasicValue) itsBasicInterpreter.merge(aV, aW);
-			SourceValue s = (SourceValue) itsSourceInterpreter.merge(aV, aW);
-			return new BCIValue(b.getType(), s.insns);
+			Value b = itsBasicInterpreter.merge(b(aV1), b(aV2));
+			Value s = itsSourceInterpreter.merge(s(aV1), s(aV2));
+			if (b == b(aV1) && s == s(aV1)) return aV1;
+			else return create(b, s);
 		}
 		
 		public Value naryOperation(AbstractInsnNode aInsn, List aValues) throws AnalyzerException
 		{
-			BasicValue b = (BasicValue) itsBasicInterpreter.naryOperation(aInsn, aValues);
-			SourceValue s = (SourceValue) itsSourceInterpreter.naryOperation(aInsn, aValues);
-			return new BCIValue(b.getType(), s.insns);
+			return create(
+					itsBasicInterpreter.naryOperation(aInsn, b(aValues)),
+					itsSourceInterpreter.naryOperation(aInsn, s(aValues)));
 		}
 		
 		public Value newOperation(AbstractInsnNode aInsn) throws AnalyzerException
 		{
-			BasicValue b = (BasicValue) itsBasicInterpreter.newOperation(aInsn);
-			SourceValue s = (SourceValue) itsSourceInterpreter.newOperation(aInsn);
-			return new BCIValue(b.getType(), s.insns);
+			return create(
+					itsBasicInterpreter.newOperation(aInsn),
+					itsSourceInterpreter.newOperation(aInsn));
 		}
 		
 		public Value newValue(Type aType)
 		{
-			BasicValue b = (BasicValue) itsBasicInterpreter.newValue(aType);
-			SourceValue s = (SourceValue) itsSourceInterpreter.newValue(aType);
-			return new BCIValue(b.getType(), s.insns);
+			if (aType != null && aType.getSort() == Type.VOID) return null;
+			
+			return create(
+					itsBasicInterpreter.newValue(aType),
+					itsSourceInterpreter.newValue(aType));
 		}
 		
 		public Value ternaryOperation(
 				AbstractInsnNode aInsn,
-				Value aValue1,
-				Value aValue2,
-				Value aValue3) throws AnalyzerException
+				Value aV1,
+				Value aV2,
+				Value aV3) throws AnalyzerException
 		{
-			BasicValue b = (BasicValue) itsBasicInterpreter.ternaryOperation(aInsn, aValue1, aValue2, aValue3);
-			SourceValue s = (SourceValue) itsSourceInterpreter.ternaryOperation(aInsn, aValue1, aValue2, aValue3);
-			return new BCIValue(b.getType(), s.insns);
+			return create(
+					itsBasicInterpreter.ternaryOperation(aInsn, b(aV1), b(aV2), b(aV3)),
+					itsSourceInterpreter.ternaryOperation(aInsn, s(aV1), s(aV2), s(aV3)));
 		}
 		
 		public Value unaryOperation(AbstractInsnNode aInsn, Value aValue) throws AnalyzerException
 		{
-			BasicValue b = (BasicValue) itsBasicInterpreter.unaryOperation(aInsn, aValue);
-			SourceValue s = (SourceValue) itsSourceInterpreter.unaryOperation(aInsn, aValue);
-			return new BCIValue(b.getType(), s.insns);
+			return create(
+					itsBasicInterpreter.unaryOperation(aInsn, b(aValue)),
+					itsSourceInterpreter.unaryOperation(aInsn, s(aValue)));
 		}
 
 		public void returnOperation(AbstractInsnNode aInsn, Value aValue, Value aExpected)
@@ -598,41 +652,72 @@ public class MethodInfo
 	 */
 	public static class BCIValue implements Value
 	{
-	    public final Type type;
-	    public final Set<AbstractInsnNode> insns;
+		private final BasicValue itsBasicValue;
+		private final SourceValue itsSourceValue;
+		
+		public BCIValue(BasicValue aBasicValue, SourceValue aSourceValue)
+		{
+			itsBasicValue = aBasicValue;
+			itsSourceValue = aSourceValue;
+			
+			if (itsBasicValue != null && itsSourceValue != null && itsBasicValue.getSize() != itsSourceValue.getSize()) 
+				throw new RuntimeException("Size mismatch");
+		}
+		
+		public BasicValue getBasicValue()
+		{
+			return itsBasicValue;
+		}
+		
+		public SourceValue getSourceValue()
+		{
+			return itsSourceValue;
+		}
 
-	    public BCIValue(final Type type) {
-	        this(type, SmallSet.EMPTY_SET);
-	    }
+		public int getSize()
+		{
+			return itsBasicValue.getSize();
+		}
+		
+		public Type getType()
+		{
+			return itsBasicValue.getType();
+		}
+		
+		public Set<AbstractInsnNode> getInsns()
+		{
+			return itsSourceValue.insns;
+		}
 
-	    public BCIValue(final Type type, final AbstractInsnNode insn) {
-	        this.type = type;
-	        this.insns = new SmallSet(insn, null);
-	    }
+		@Override
+		public int hashCode()
+		{
+			final int prime = 31;
+			int result = 1;
+			result = prime * result + ((itsBasicValue == null) ? 0 : itsBasicValue.hashCode());
+			result = prime * result + ((itsSourceValue == null) ? 0 : itsSourceValue.hashCode());
+			return result;
+		}
 
-	    public BCIValue(final Type type, final Set<AbstractInsnNode> insns) {
-	        this.type = type;
-	        this.insns = insns;
-	    }
-
-	    public int getSize() {
-	        return type.getSize();
-	    }
-
-	    @Override
-		public boolean equals(final Object value) {
-	        if (!(value instanceof BCIValue)) {
-	        	return false;
-	        }
-	        BCIValue v = (BCIValue) value;
-	        return type.equals(v.type) && insns.equals(v.insns);
-	    }
-
-	    @Override
-		public int hashCode() {
-	        return insns.hashCode()*27+type.hashCode();
-	    }
-
+		@Override
+		public boolean equals(Object obj)
+		{
+			if (this == obj) return true;
+			if (obj == null) return false;
+			if (getClass() != obj.getClass()) return false;
+			BCIValue other = (BCIValue) obj;
+			if (itsBasicValue == null)
+			{
+				if (other.itsBasicValue != null) return false;
+			}
+			else if (!itsBasicValue.equals(other.itsBasicValue)) return false;
+			if (itsSourceValue == null)
+			{
+				if (other.itsSourceValue != null) return false;
+			}
+			else if (!itsSourceValue.equals(other.itsSourceValue)) return false;
+			return true;
+		}
 	}
 	
 	public static class Node extends Frame 

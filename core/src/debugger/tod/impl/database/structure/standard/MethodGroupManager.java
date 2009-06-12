@@ -31,6 +31,7 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.database.structure.standard;
 
+import java.io.Serializable;
 import java.tod.TracedMethods;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -39,12 +40,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import tod.agent.MonitoringMode;
 import tod.core.database.structure.IBehaviorInfo;
 import tod.core.database.structure.IClassInfo;
 import tod.core.database.structure.IFieldInfo;
 import tod.core.database.structure.IStructureDatabase;
 import tod.core.database.structure.IStructureDatabase.BehaviorMonitoringModeChange;
+import tod2.agent.MonitoringMode;
 import zz.utils.SetMap;
 
 /**
@@ -59,8 +60,10 @@ import zz.utils.SetMap;
  * the agent.
  * @author gpothier
  */
-public class MethodGroupManager implements IStructureDatabase.Listener
+public class MethodGroupManager implements IStructureDatabase.Listener, Serializable
 {
+	private static final long serialVersionUID = 173278295020871234L;
+
 	private final StructureDatabase itsStructureDatabase;
 	
 	/**
@@ -262,8 +265,10 @@ public class MethodGroupManager implements IStructureDatabase.Listener
 	 * Represents a group of methods that have the same signature and belong to related types.
 	 * @author gpothier
 	 */
-	public class MethodGroup
+	public class MethodGroup implements Serializable
 	{
+		private static final long serialVersionUID = 7719483876342347891L;
+
 		private final Set<IClassInfo> itsTypes = new HashSet<IClassInfo>();
 		private final List<IBehaviorInfo> itsBehaviors = new ArrayList<IBehaviorInfo>();
 		private boolean itsMonitored = false;
@@ -306,8 +311,10 @@ public class MethodGroupManager implements IStructureDatabase.Listener
 	 * A group of methods that have the same signature. Each such group contains a number of method groups.
 	 * @author gpothier
 	 */
-	public class MethodSignatureGroup
+	public class MethodSignatureGroup implements Serializable
 	{
+		private static final long serialVersionUID = 1029462904632099612L;
+		
 		private final String itsSignature;
 		private final List<MethodGroup> itsGroups = new ArrayList<MethodGroup>();
 		

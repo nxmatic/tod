@@ -30,15 +30,17 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.net.Socket;
 
-import tod.agent.AgentConfig;
 import tod.core.DebugFlags;
 import tod.core.bci.IInstrumenter;
 import tod.core.bci.IInstrumenter.InstrumentedClass;
 import tod.core.config.TODConfig;
 import tod.core.database.structure.IStructureDatabase.BehaviorMonitoringModeChange;
 import tod.core.server.TODServer;
+import tod2.agent.AgentConfig;
 import zz.utils.Utils;
 
 
@@ -264,16 +266,16 @@ public abstract class NativeAgentPeer extends SocketThread
 		
 		if (DebugFlags.INSTRUMENTER_LOG) System.out.println("Instrumenting "+theClassName+"... ");
 		InstrumentedClass theInstrumentedClass = null;
-		String theError = null;
+		Throwable theError = null;
 		try
 		{
 			theInstrumentedClass = aInstrumenter.instrumentClass(theClassName, theBytecode, itsUseJava14);
 		}
-		catch (Exception e)
+		catch (Throwable e)
 		{
 			System.err.println("Error during instrumentation of "+theClassName+", reporting to client: ");
 			e.printStackTrace();
-			theError = e.getMessage();
+			theError = e;
 		}
 
 		if (theInstrumentedClass != null)
@@ -308,7 +310,11 @@ public abstract class NativeAgentPeer extends SocketThread
 		else if (theError != null)
 		{
 			aOutputStream.writeInt(-1);
-			aOutputStream.writeUTF(theError);
+			StringWriter theStringWriter = new StringWriter();
+			PrintWriter thePrintWriter = new PrintWriter(theStringWriter);
+			thePrintWriter.println("Error occurred in database process while instrumenting "+theClassName+":");
+			theError.printStackTrace(thePrintWriter);
+			aOutputStream.writeUTF(theStringWriter.toString());
 		}
 		else
 		{

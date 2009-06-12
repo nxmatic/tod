@@ -33,7 +33,7 @@ package tod.impl.replay;
 
 import java.tod.util.LongDeltaSender;
 
-import tod.agent.io._ByteBuffer;
+import tod2.agent.io._ByteBuffer;
 
 /**
  * Symmetric of {@link LongDeltaSender}

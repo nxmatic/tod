@@ -25,7 +25,7 @@ package java.tod;
 import java.tod.util._BitSet;
 import java.tod.util._ByteArray;
 
-import tod.agent.MonitoringMode;
+import tod2.agent.MonitoringMode;
 
 /**
  * This class keeps a registry of traced methods.

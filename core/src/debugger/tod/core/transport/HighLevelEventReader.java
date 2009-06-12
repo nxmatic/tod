@@ -28,8 +28,8 @@ import static tod.core.transport.ValueReader.readValue;
 import java.io.DataInputStream;
 import java.io.IOException;
 
-import tod.agent.Output;
 import tod.core.ILogCollector;
+import tod2.agent.Output;
 
 public class HighLevelEventReader
 {

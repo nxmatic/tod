@@ -31,8 +31,9 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.replay;
 
-import tod.agent.io._ByteBuffer;
 import tod.core.database.structure.IStructureDatabase;
+import tod2.agent.Message;
+import tod2.agent.io._ByteBuffer;
 
 public abstract class MethodReplayer
 {
@@ -46,12 +47,13 @@ public abstract class MethodReplayer
 	static final int S_WAIT_NEWARRAY = 6; // Waiting for a new array ref
 	static final int S_WAIT_CST = 7; // Waiting for a class constant (LDC)
 	static final int S_WAIT_EXCEPTION = 8; // Waiting for an exception
+	static final int S_EXCEPTION_THROWN = 9; // An exception was thrown, expect handler or exit
 	
 	// Public states (used by ThreadReplayer)
-	public static final int S_FINISHED_NORMAL = 9; // Execution finished normally
-	public static final int S_FINISHED_EXCEPTION = 10; // Execution finished because an exception was thrown
-	public static final int S_CALLING_MONITORED = 11; // Processing invocation of monitored code
-	public static final int S_CALLING_UNMONITORED = 12; // Processing invocation of unmonitored code
+	public static final int S_FINISHED_NORMAL = 10; // Execution finished normally
+	public static final int S_FINISHED_EXCEPTION = 11; // Execution finished because an exception was thrown
+	public static final int S_CALLING_MONITORED = 12; // Processing invocation of monitored code
+	public static final int S_CALLING_UNMONITORED = 13; // Processing invocation of unmonitored code
 	
 	private int itsState = S_INITIALIZED;
 	private ThreadReplayer itsThreadReplayer;
@@ -99,9 +101,16 @@ public abstract class MethodReplayer
 	public abstract void processMessage(byte aMessage, _ByteBuffer aBuffer);
 
 	/**
-	 * Transfers a value from the source replayer's stack to this repler's stack.
+	 * Transfers a value from the source replayer's stack to this replayer's stack.
 	 */
 	public abstract void transferResult(InScopeMethodReplayer aSource);
+	
+	/**
+	 * Transfers a value from the input buffer (usually from {@link Message#BEHAVIOR_ENTER_ARGS})
+	 * to this replayer's stack.
+	 */
+	public abstract void transferResult(_ByteBuffer aBuffer);
+	
 	public abstract void expectException();
 
 }

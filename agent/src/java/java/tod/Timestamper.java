@@ -22,7 +22,7 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 */
 package java.tod;
 
-import tod.agent.util.BitUtilsLite;
+import tod2.agent.util.BitUtilsLite;
 
 /**
  * A thread that maintains the current timestamp, with a granularity.

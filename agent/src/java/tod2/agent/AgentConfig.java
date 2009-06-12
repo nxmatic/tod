@@ -20,9 +20,9 @@ MA 02111-1307 USA
 Parts of this work rely on the MD5 algorithm "derived from the 
 RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 */
-package tod.agent;
+package tod2.agent;
 
-import tod.agent.util.BitUtilsLite;
+import tod2.agent.util.BitUtilsLite;
 
 
 /**

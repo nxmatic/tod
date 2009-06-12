@@ -31,7 +31,10 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.bci.asm2;
 
+import java.util.HashSet;
+import java.util.List;
 import java.util.ListIterator;
+import java.util.Set;
 
 import org.objectweb.asm.Label;
 import org.objectweb.asm.Opcodes;
@@ -43,6 +46,7 @@ import org.objectweb.asm.tree.InsnNode;
 import org.objectweb.asm.tree.LdcInsnNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
+import org.objectweb.asm.tree.TryCatchBlockNode;
 
 import tod.Util;
 import tod.core.database.structure.IMutableBehaviorInfo;
@@ -168,6 +172,7 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		s.label("start");
 		
 		processInstructions(getNode().instructions);
+		processHandlers();
 		
 		getNode().instructions.insert(s);
 		getNode().visitLabel(s.getLabel("end"));
@@ -202,6 +207,40 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		}
 	}
 	
+	/**
+	 * Assigns an id to each handler (based on the order of the try-catch nodes)
+	 * and add corresponding event emission.
+	 */
+	private void processHandlers()
+	{
+		Set<Label> theProcessedLabels = new HashSet<Label>();
+		int theId = 0;
+		for(TryCatchBlockNode theNode : (List<TryCatchBlockNode>) getNode().tryCatchBlocks)
+		{
+			Label theLabel = theNode.handler.getLabel();
+			if (theProcessedLabels.add(theLabel)) 
+			{
+				// Add event emission code
+				SyntaxInsnList s = new SyntaxInsnList(null);
+				Label l = new Label();
+
+				s.ILOAD(getTraceEnabledVar());
+				s.IFfalse(l);
+				{
+					s.ALOAD(getThreadDataVar());
+					s.pushInt(theId);
+					s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evHandlerReached", "(I)V");
+				}
+				
+				s.label(l);
+				
+				getNode().instructions.insert(theNode.handler, s);
+				
+				// Update id
+				theId++;
+			}
+		}
+	}
 	
 	private void processInstructions(InsnList aInsns)
 	{

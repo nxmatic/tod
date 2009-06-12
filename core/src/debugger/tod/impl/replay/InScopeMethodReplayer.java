@@ -38,12 +38,15 @@ import gnu.trove.TLongStack;
 
 import org.objectweb.asm.Type;
 
-import tod.agent.Message;
-import tod.agent.MonitoringMode;
-import tod.agent.io._ByteBuffer;
+import tod.core.database.structure.IBehaviorInfo;
 import tod.core.database.structure.ObjectId;
 import tod.impl.bci.asm2.BCIUtils;
+import tod.impl.replay.ThreadReplayer.ExceptionInfo;
+import tod2.agent.Message;
+import tod2.agent.MonitoringMode;
+import tod2.agent.io._ByteBuffer;
 import zz.utils.ArrayStack;
+import zz.utils.primitive.IntArray;
 
 public abstract class InScopeMethodReplayer extends MethodReplayer
 {
@@ -92,9 +95,19 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 	private final TLongStack itsLongStack = new TLongStack();
 	
 	/**
+	 * Block id corresponding to each handler id. Indexed by handler id.
+	 */
+	private final IntArray itsHandlerBlocks = new IntArray();
+	
+	/**
 	 * @param aCacheCounts "encoded" cache counts.
 	 */
-	protected InScopeMethodReplayer(String aName, int aAccess, String aDescriptor, String aCacheCounts)
+	protected InScopeMethodReplayer(
+			String aName, 
+			int aAccess, 
+			String aDescriptor, 
+			String aCacheCounts,
+			String aHandlerBlocks)
 	{
 		itsName = aName;
 		itsAccess = aAccess;
@@ -111,6 +124,8 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 		itsIntCache = new int[aCacheCounts.charAt(Type.INT)];
 		itsLongCache = new long[aCacheCounts.charAt(Type.LONG)];
 		itsShortCache = new short[aCacheCounts.charAt(Type.SHORT)];
+
+		for(int i=0;i<aHandlerBlocks.length();i++) itsHandlerBlocks.set(i, aHandlerBlocks.charAt(i));
 	}
 	
 	/**
@@ -188,12 +203,12 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 		}	
 	}
 	
-	/**
-	 * Transfers a value from the source replayer's stack to this repler's stack
-	 */
+	@Override
 	public void transferResult(InScopeMethodReplayer aSource)
 	{
 		Type theType = aSource.itsReturnType;
+		if (! theType.equals(itsExpectedType)) throw new IllegalStateException();
+		
 		switch(theType.getSort())
 		{
         case Type.BOOLEAN:
@@ -206,6 +221,24 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 		case Type.FLOAT: sFloatPush(aSource.sFloatPop()); break;
 		case Type.LONG: sLongPush(aSource.sLongPop()); break;
 		default: throw new RuntimeException("Unknown type: "+theType);
+		}	
+	}
+	
+	@Override
+	public void transferResult(_ByteBuffer aBuffer)
+	{
+		switch(itsExpectedType.getSort())
+		{
+		case Type.OBJECT: sRefPush(getThreadReplayer().readValue(aBuffer)); break;
+		case Type.BOOLEAN: sIntPush(aBuffer.get()); break;
+		case Type.BYTE: sIntPush(aBuffer.get()); break;
+		case Type.CHAR: sIntPush(aBuffer.getChar()); break;
+		case Type.DOUBLE: sDoublePush(aBuffer.getDouble()); break;
+		case Type.FLOAT: sFloatPush(aBuffer.getFloat()); break;
+		case Type.INT: sIntPush(aBuffer.getInt()); break;
+		case Type.LONG: sLongPush(aBuffer.getLong()); break;
+		case Type.SHORT: sIntPush(aBuffer.getShort()); break;
+		default: throw new RuntimeException("Unknown type: "+itsExpectedType);
 		}	
 	}
 	
@@ -278,15 +311,17 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 		}
 	}
 	
+	@Override
 	public void processMessage(byte aMessage, _ByteBuffer aBuffer)
 	{
 		switch(aMessage)
 		{
+		case Message.BEHAVIOR_ENTER_ARGS: args(aBuffer); break;
 		case Message.ARRAY_READ: evArrayRead(aBuffer); break;
 		case Message.CONSTANT: evCst(aBuffer); break;
 		case Message.FIELD_READ: evFieldRead(aBuffer); break;
 		case Message.FIELD_READ_SAME: evFieldRead_Same(); break;
-		case Message.NEW_ARRAY: evNewArray(getThreadReplayer().readValue(aBuffer)); break;
+		case Message.NEW_ARRAY: evNewArray(aBuffer); break;
 		case Message.OBJECT_INITIALIZED: evObjectInitialized(getThreadReplayer().readValue(aBuffer)); break;
 		case Message.EXCEPTION: evExceptionGenerated(aBuffer); break;
 		case Message.HANDLER_REACHED: evHandlerReached(aBuffer); break;
@@ -360,36 +395,48 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 		next();
 	}
 	
-	public abstract void evNewArray(ObjectId aObject);
-	public abstract void evObjectInitialized(ObjectId aObject);
+	public void evNewArray(_ByteBuffer aBuffer)
+	{
+		allowedState(S_WAIT_NEWARRAY);
+		readValue(BCIUtils.getType(Type.OBJECT), aBuffer);
+		next();
+	}
+	
+	public void evObjectInitialized(ObjectId aObject)
+	{
+		ObjectId theTmpId = sRefPeek();
+		getThreadReplayer().getTmpIdManager().associate(theTmpId.getId(), aObject.getId());
+	}
 	
 	private void evExceptionGenerated(_ByteBuffer aBuffer)
 	{
-		String theMethodName = aBuffer.getString();
-		String theMethodSignature = aBuffer.getString();
-		String theDeclaringClassSignature = aBuffer.getString();
-		short theBytecodeIndex = aBuffer.getShort();
-		ObjectId theException = getThreadReplayer().readValue(aBuffer);
+		ExceptionInfo theExceptionInfo = getThreadReplayer().readExceptionInfo(aBuffer);
 		
-		String theClassName;
-		try
-		{
-			theClassName = Type.getType(theDeclaringClassSignature).getClassName();
-		}
-		catch (Exception e)
-		{
-			throw new RuntimeException("Bad declaring class signature: "+theDeclaringClassSignature, e);
-		}
-		
-		int theBehaviorId = getDatabase().getBehaviorId(theClassName, theMethodName, theMethodSignature);
-
-		evExceptionGenerated(theBehaviorId, theBytecodeIndex, theException);
+		evExceptionGenerated(
+				theExceptionInfo.behaviorId, 
+				theExceptionInfo.bytecodeIndex, 
+				theExceptionInfo.exception);
 	}
 	
 
-	public abstract void evExceptionGenerated(int aBehaviorId, int aBytecodeIndex, ObjectId aException);
-	public abstract void evHandlerReached(_ByteBuffer aBuffer);
-	public abstract void constructorTarget(long aId);
+	public void evExceptionGenerated(int aBehaviorId, int aBytecodeIndex, ObjectId aException)
+	{
+		setState(S_EXCEPTION_THROWN);
+	}
+	
+	public void evHandlerReached(_ByteBuffer aBuffer)
+	{
+		allowedState(S_EXCEPTION_THROWN);
+		int theHandlerId = aBuffer.getInt();
+		itsNextBlock = itsHandlerBlocks.get(theHandlerId);
+		setState(S_STARTED);
+	}
+	
+	public void constructorTarget(long aId)
+	{
+		ObjectId theTmpId = lRefGet(0);
+		getThreadReplayer().getTmpIdManager().associate(theTmpId.getId(), aId);
+	}
 
 	/**
 	 * Sets the expected type.
@@ -497,6 +544,9 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 	protected float sFloatPop() { return itsFloatStack.pop(); }
 	protected long sLongPop() { return itsLongStack.pop(); }
 	
+	// Peek operand stack
+	protected ObjectId sRefPeek() { return itsRefStack.peek(); }
+	
 	// Set local variable slot
 	protected abstract void lRefSet(int aSlot, ObjectId v);
 	protected abstract void lIntSet(int aSlot, int v);
@@ -504,6 +554,8 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 	protected abstract void lFloatSet(int aSlot, float v);
 	protected abstract void lLongSet(int aSlot, long v);
 	
+	// Get local variable slot
+	protected abstract ObjectId lRefGet(int aSlot);
 	
 	protected ObjectId nextTmpId()
 	{
@@ -516,6 +568,9 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 	protected void invoke(int aBehaviorId)
 	{
 		int theMode = getThreadReplayer().getBehaviorMonitoringMode(aBehaviorId);
+		IBehaviorInfo theBehavior = getDatabase().getBehavior(aBehaviorId, true);
+		itsExpectedType = Type.getType(theBehavior.getReturnType().getJvmName());
+		
 		switch(theMode)
 		{
 		case MonitoringMode.FULL:

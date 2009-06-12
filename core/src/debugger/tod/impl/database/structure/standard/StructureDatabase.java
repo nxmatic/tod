@@ -23,6 +23,8 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 package tod.impl.database.structure.standard;
 
 import java.io.File;
+import java.io.IOException;
+import java.io.ObjectInputStream;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.util.ArrayList;
@@ -111,9 +113,9 @@ implements Serializable, IShareableStructureDatabase
 	
 	private final MethodGroupManager itsMethodGroupManager; 
 
-	private ClassSelector itsGlobalSelector;
-	private ClassSelector itsTraceSelector;
-	private ClassSelector itsIdSelector;
+	private transient ClassSelector itsGlobalSelector;
+	private transient ClassSelector itsTraceSelector;
+	private transient ClassSelector itsIdSelector;
 	
 
 	
@@ -126,12 +128,22 @@ implements Serializable, IShareableStructureDatabase
 		itsProbes = new ArrayList<ProbeInfo>(10000);
 		itsProbes.add(null);
 		
-		itsTraceSelector = parseWorkingSet(aConfig.get(TODConfig.SCOPE_TRACE_FILTER));
-		itsGlobalSelector = parseWorkingSet(aConfig.get(TODConfig.SCOPE_GLOBAL_FILTER));
-		itsIdSelector = parseWorkingSet(aConfig.get(TODConfig.SCOPE_ID_FILTER));
+		itsTraceSelector = parseWorkingSet(itsConfig.get(TODConfig.SCOPE_TRACE_FILTER));
+		itsGlobalSelector = parseWorkingSet(itsConfig.get(TODConfig.SCOPE_GLOBAL_FILTER));
+		itsIdSelector = parseWorkingSet(itsConfig.get(TODConfig.SCOPE_ID_FILTER));
 		
 		itsMethodGroupManager = new MethodGroupManager(this);
 	}
+	
+	private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException
+	{
+		in.defaultReadObject();
+		
+		itsTraceSelector = parseWorkingSet(itsConfig.get(TODConfig.SCOPE_TRACE_FILTER));
+		itsGlobalSelector = parseWorkingSet(itsConfig.get(TODConfig.SCOPE_GLOBAL_FILTER));
+		itsIdSelector = parseWorkingSet(itsConfig.get(TODConfig.SCOPE_ID_FILTER));
+	}
+
 
 	/**
 	 * Creates a non-persistent structure database.

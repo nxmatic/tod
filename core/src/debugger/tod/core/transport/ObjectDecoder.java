@@ -37,9 +37,9 @@ import java.tod.transport.ObjectEncoder;
 import java.util.HashMap;
 import java.util.Map;
 
-import tod.agent.ObjectValue;
-import tod.agent.ObjectValue.FieldValue;
-import tod.agent.io._ByteBuffer;
+import tod2.agent.ObjectValue;
+import tod2.agent.ObjectValue.FieldValue;
+import tod2.agent.io._ByteBuffer;
 
 /**
  * Decodes objects encoded by {@link ObjectEncoder}

@@ -1,7 +1,7 @@
 /*
  * Created on Apr 23, 2009
  */
-package tod.agent;
+package tod2.agent;
 
 /**
  * Contains constants used to build messages.

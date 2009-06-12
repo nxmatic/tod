@@ -30,7 +30,6 @@ import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Shell;
 import org.eclipse.ui.PlatformUI;
 
-import tod.agent.AgentUtils;
 import tod.core.config.DeploymentConfig;
 import tod.core.config.TODConfig;
 import tod.core.session.ConnectionInfo;
@@ -41,6 +40,7 @@ import tod.core.session.TODSessionManager;
 import tod.plugin.TODPlugin;
 import tod.plugin.TODPluginUtils;
 import tod.plugin.views.main.MainView;
+import tod2.agent.AgentUtils;
 import zz.utils.Utils;
 
 public class LaunchUtils 

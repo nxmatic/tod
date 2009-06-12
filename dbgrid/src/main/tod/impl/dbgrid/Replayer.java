@@ -39,7 +39,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 
 import tod.Util;
-import tod.agent.LowLevelEventType;
 import tod.core.ILogCollector;
 import tod.core.config.TODConfig;
 import tod.core.database.structure.IStructureDatabase;
@@ -48,7 +47,9 @@ import tod.core.transport.LogReceiver;
 import tod.core.transport.LowLevelEventReader;
 import tod.core.transport.PacketProcessor;
 import tod.impl.database.structure.standard.StructureDatabase;
+import tod.impl.database.structure.standard.StructureDatabaseUtils;
 import tod.utils.TODUtils;
+import tod2.agent.LowLevelEventType;
 import zz.utils.Utils;
 import zz.utils.srpc.SRPCRegistry;
 
@@ -121,10 +122,8 @@ public class Replayer extends PacketProcessor
 	{
 		TODConfig theConfig = new TODConfig();
 		
-		StructureDatabase theStructureDatabase = (StructureDatabase) Utils.readObject(
-				new File(theConfig.get(TODConfig.DB_RAW_EVENTS_DIR)+"/db.raw"));
-		
-		theStructureDatabase.reown();
+		File theFile = new File(theConfig.get(TODConfig.DB_RAW_EVENTS_DIR)+"/db.raw");
+		StructureDatabase theStructureDatabase = StructureDatabaseUtils.loadDatabase(theFile);
 		
 		SRPCRegistry theRegistry = Util.getLocalSRPCRegistry();
 		GridMaster theMaster = DBGridUtils.setupLocalMaster(theRegistry, theConfig, theStructureDatabase);

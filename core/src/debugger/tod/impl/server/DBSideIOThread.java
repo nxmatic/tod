@@ -31,15 +31,22 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.server;
 
+import java.io.EOFException;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
 
-import tod.agent.Message;
-import tod.agent.io._ByteBuffer;
+import tod.core.config.TODConfig;
+import tod.core.database.structure.IStructureDatabase;
+import tod.impl.database.structure.standard.StructureDatabaseUtils;
 import tod.impl.replay.ThreadReplayer;
+import tod.impl.replay.TmpIdManager;
+import tod2.agent.Message;
+import tod2.agent.io._ByteBuffer;
 import zz.utils.Utils;
 
 /**
@@ -48,13 +55,19 @@ import zz.utils.Utils;
  */
 public class DBSideIOThread
 {
+	private final TODConfig itsConfig;
+	private final IStructureDatabase itsDatabase;
+	
 	private final InputStream itsIn;
 	private final OutputStream itsOut;
 	
 	private final List<ThreadReplayer> itsReplayers = new ArrayList<ThreadReplayer>();
+	private final TmpIdManager itsTmpIdManager = new TmpIdManager();
 	
-	public DBSideIOThread(InputStream aIn, OutputStream aOut)
+	public DBSideIOThread(TODConfig aConfig, IStructureDatabase aDatabase, InputStream aIn, OutputStream aOut)
 	{
+		itsConfig = aConfig;
+		itsDatabase = aDatabase;
 		itsIn = aIn;
 		itsOut = aOut;
 	}
@@ -63,6 +76,8 @@ public class DBSideIOThread
 	{
 		try
 		{
+			int thePacketCount = 0;
+			
 			loop:
 			while(true)
 			{
@@ -74,6 +89,8 @@ public class DBSideIOThread
 				case -1: break loop;
 				default: throw new RuntimeException("Not handled: "+thePacketType);
 				}
+				
+				thePacketCount++;
 			}
 		}
 		catch (IOException e)
@@ -87,7 +104,7 @@ public class DBSideIOThread
 		ThreadReplayer theReplayer = Utils.listGet(itsReplayers, aThreadId);
 		if (theReplayer == null)
 		{
-			theReplayer = new ThreadReplayer();
+			theReplayer = new ThreadReplayer(itsConfig, itsDatabase, itsTmpIdManager);
 			Utils.listSet(itsReplayers, aThreadId, theReplayer);
 		}
 		return theReplayer;
@@ -97,7 +114,15 @@ public class DBSideIOThread
 	{
 		int l = aBuffer.length;
 		int c = 0;
-		while(c < l) c += itsIn.read(aBuffer, c, l-c);
+		while(c < l) 
+		{
+			int r = itsIn.read(aBuffer, c, l-c);
+			if (r == -1)
+			{
+				throw new EOFException();
+			}
+			c += r;
+		}
 	}
 	
 	private void processThreadPacket() throws IOException
@@ -117,5 +142,26 @@ public class DBSideIOThread
 		String theString = _ByteBuffer.getString(itsIn);
 		
 		System.out.println("Got string "+theObjectId+": "+theString);
+	}
+	
+	public static void main(String[] args) throws InterruptedException
+	{
+		try
+		{
+			TODConfig theConfig = new TODConfig();
+			File theEventsFile = new File(theConfig.get(TODConfig.DB_RAW_EVENTS_DIR)+"/events.raw");
+			File theDbFile = new File(theConfig.get(TODConfig.DB_RAW_EVENTS_DIR)+"/db.raw");
+			
+			IStructureDatabase theDatabase = StructureDatabaseUtils.loadDatabase(theDbFile);
+			
+			DBSideIOThread theIOThread = new DBSideIOThread(theConfig, theDatabase, new FileInputStream(theEventsFile), null);
+			theIOThread.run();
+		}
+		catch (Throwable e)
+		{
+			e.printStackTrace();
+		}
+		Thread.sleep(1000);
+		System.err.println("END");
 	}
 }

@@ -25,9 +25,9 @@ package tod.core.transport;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
-import tod.agent.Output;
-import tod.agent.ValueType;
 import tod.core.database.structure.ObjectId;
+import tod2.agent.Output;
+import tod2.agent.ValueType;
 
 /**
  * Provides the methods used to encode streamed log data. Non-static methods are

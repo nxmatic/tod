@@ -25,7 +25,6 @@ package tod.gui.formatter;
 
 
 import tod.Util;
-import tod.agent.ObjectValue;
 import tod.core.database.browser.ILogBrowser;
 import tod.core.database.event.IArrayWriteEvent;
 import tod.core.database.event.IBehaviorCallEvent;
@@ -37,6 +36,7 @@ import tod.core.database.event.ILocalVariableWriteEvent;
 import tod.core.database.event.ILogEvent;
 import tod.core.database.structure.IBehaviorInfo;
 import tod.core.database.structure.ILocationInfo;
+import tod2.agent.ObjectValue;
 import zz.utils.AbstractFormatter;
 
 /**

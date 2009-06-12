@@ -7,8 +7,8 @@ import java.lang.reflect.Field;
 import java.tod.util._ArrayList;
 import java.tod.util._IdentityHashMap;
 
-import tod.agent.ObjectValue;
-import tod.agent.ObjectValue.FieldValue;
+import tod2.agent.ObjectValue;
+import tod2.agent.ObjectValue.FieldValue;
 
 
 /**

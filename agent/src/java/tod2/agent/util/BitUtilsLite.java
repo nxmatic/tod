@@ -20,23 +20,38 @@ MA 02111-1307 USA
 Parts of this work rely on the MD5 algorithm "derived from the 
 RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 */
-package tod.agent;
+package tod2.agent.util;
 
-/**
- * Enumerates all possible value types.
- * @author gpothier
- */
-public class ValueType 
+public class BitUtilsLite
 {
-	public static final byte NULL = 1;
-	public static final byte BOOLEAN = 2; 
-	public static final byte BYTE = 3;
-	public static final byte CHAR = 4;
-	public static final byte SHORT = 5;
-	public static final byte INT = 6;
-	public static final byte LONG = 7;
-	public static final byte FLOAT = 8;
-	public static final byte DOUBLE = 9;
-	public static final byte OBJECT_ID = 10;
-	public static final byte OBJECT_ID_DELTA = 11;
+	/**
+	 * Copied from zz.utils.
+	 * Can't depend on it. 
+	 */
+	public static final long pow2(int aN)
+	{
+		return 1L << aN;
+	}
+	
+	public static final int pow2i(int aN)
+	{
+		return aN < 32 ? 1 << aN : 0;
+	}
+
+	/**
+	 * Returns the base-2 logarithm of the argument
+	 */
+	public static final double log2(int aN)
+	{
+		return Math.log(aN)/Math.log(2);
+	}
+	
+	/**
+	 * Returns the smallest integer that is greater than the 
+	 * log of the specified number.
+	 */
+	public static final int log2ceil(int aN)
+	{
+		return (int) Math.ceil(log2(aN));
+	}
 }

@@ -30,11 +30,11 @@ import java.tod.transport.IOThread;
 import java.tod.util._ArrayList;
 import java.tod.util._StringBuilder;
 
-import tod.agent.AgentConfig;
-import tod.agent.AgentDebugFlags;
-import tod.agent.Command;
-import tod.agent.io._ByteBuffer;
-import tod.agent.io._GrowingByteBuffer;
+import tod2.agent.AgentConfig;
+import tod2.agent.AgentDebugFlags;
+import tod2.agent.Command;
+import tod2.agent.io._ByteBuffer;
+import tod2.agent.io._GrowingByteBuffer;
 
 
 /**

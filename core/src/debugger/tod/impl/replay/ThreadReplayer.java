@@ -41,16 +41,16 @@ import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
 
-import tod.agent.Message;
-import tod.agent.ValueType;
-import tod.agent.io._ByteBuffer;
 import tod.core.config.TODConfig;
 import tod.core.database.browser.LocationUtils;
 import tod.core.database.structure.IBehaviorInfo;
 import tod.core.database.structure.IClassInfo;
-import tod.core.database.structure.IMutableStructureDatabase;
+import tod.core.database.structure.IStructureDatabase;
 import tod.core.database.structure.ObjectId;
 import tod.core.database.structure.IStructureDatabase.BehaviorMonitoringModeChange;
+import tod2.agent.Message;
+import tod2.agent.ValueType;
+import tod2.agent.io._ByteBuffer;
 import zz.utils.ArrayStack;
 import zz.utils.Stack;
 import zz.utils.Utils;
@@ -61,15 +61,15 @@ public class ThreadReplayer
 	static final int S_UNDEFINED = 0; 
 	static final int S_INSCOPE = 1; 
 	static final int S_CALLING_MONITORED = 2; 
-	static final int S_CALLING_UNMONITORED = 3; 
-	static final int S_OUTOFSCOPE = 4; 
+	static final int S_OUTOFSCOPE = 3; 
 
 	public static final String REPLAYER_NAME_PREFIX = "$todgen$";
 	
-	private TODConfig itsConfig;
-	private IMutableStructureDatabase itsDatabase;
+	private final TODConfig itsConfig;
+	private final IStructureDatabase itsDatabase;
+	private final TmpIdManager itsTmpIdManager;
 	
-	private int itsState = S_UNDEFINED;
+	private int itsState = S_OUTOFSCOPE;
 
 	/**
 	 * The cached replayer classes, indexed by behavior id.
@@ -82,7 +82,6 @@ public class ThreadReplayer
 	private final IntDeltaReceiver itsBehIdReceiver = new IntDeltaReceiver();
 	private final LongDeltaReceiver itsObjIdReceiver = new LongDeltaReceiver();
 	
-	private final TmpIdManager itsTmpIdManager = null; // TODO: get one
 	
 	/**
 	 * The monitoring modes of each behavior, indexed by behavior id.
@@ -92,37 +91,62 @@ public class ThreadReplayer
 	
 	private int itsCurrentMonitoringModeVersion = 0;
 
+	public ThreadReplayer(TODConfig aConfig, IStructureDatabase aDatabase, TmpIdManager aTmpIdManager)
+	{
+		itsConfig = aConfig;
+		itsDatabase = aDatabase;
+		itsTmpIdManager = aTmpIdManager;
+	}
+
 	public TmpIdManager getTmpIdManager()
 	{
 		return itsTmpIdManager;
 	}
 	
-	public IMutableStructureDatabase getDatabase()
+	public IStructureDatabase getDatabase()
 	{
 		return itsDatabase;
 	}
 	
 	public void replay(_ByteBuffer aBuffer)
 	{
-		loop:
-		while(true)
+		while(aBuffer.remaining() > 0)
 		{
 			byte theMessage = aBuffer.get();
 			
+			boolean theProcessed = true;
 			// Filter state-independant messages
 			switch(theMessage)
 			{
 			case Message.TRACEDMETHODS_VERSION:
 				processTracedMethodsVersion(aBuffer.getInt());
-				continue loop;
+				break;
+				
+			case Message.REGISTER_REFOBJECT:
+				processRegisterRefObject(itsObjIdReceiver.receiveFull(aBuffer), aBuffer);
+				break;
+				
+			case Message.REGISTER_REFOBJECT_DELTA:
+				processRegisterRefObject(itsObjIdReceiver.receiveDelta(aBuffer), aBuffer);
+				break;
+				
+			case Message.REGISTER_OBJECT: processRegisterObject(aBuffer); break;
+			case Message.REGISTER_OBJECT_DELTA: throw new UnsupportedOperationException();
+			case Message.REGISTER_THREAD: processRegisterThread(aBuffer); break;
+			case Message.REGISTER_CLASS: processRegisterClass(aBuffer); break;
+			case Message.REGISTER_CLASSLOADER: processRegisterClassLoader(aBuffer); break;
+			case Message.SYNC: processSync(aBuffer); break;
+			
+			default:
+				theProcessed = false;
 			}
+			if (theProcessed) continue;
 
 			// Dispatch the message according to the current state
 			switch(itsState)
 			{
 			case S_INSCOPE: process_InScope(theMessage, aBuffer); break;
 			case S_CALLING_MONITORED: process_CallingMonitored(theMessage, aBuffer); break;
-			case S_CALLING_UNMONITORED: process_CallingUnmonitored(theMessage, aBuffer); break;
 			case S_OUTOFSCOPE: process_OutOfScope(theMessage, aBuffer); break;
 			default: throw new RuntimeException("Not handled: "+itsState);
 			}
@@ -136,8 +160,10 @@ public class ThreadReplayer
 	{
 		InScopeMethodReplayer theCurrentReplayer = (InScopeMethodReplayer) peekReplayer();
 		
+		// Let the current replayer process the message
 		switch(aMessage)
 		{
+		case Message.BEHAVIOR_ENTER_ARGS: 
 		case Message.ARRAY_READ: 
 		case Message.CONSTANT: 
 		case Message.FIELD_READ: 
@@ -152,6 +178,7 @@ public class ThreadReplayer
 		default: throw new IllegalStateException(""+aMessage);
 		}
 		
+		// Once the message has been replayed, check the state of the replayer for interprocedural control flow
 		switch(theCurrentReplayer.getState())
 		{
 		case InScopeMethodReplayer.S_FINISHED_NORMAL:
@@ -179,7 +206,8 @@ public class ThreadReplayer
 			break;
 			
 		case InScopeMethodReplayer.S_CALLING_UNMONITORED:
-			itsState = S_CALLING_UNMONITORED;			
+			pushReplayer(new UnmonitoredMethodReplayer());
+			itsState = S_OUTOFSCOPE;			
 			break;
 		}
 	}
@@ -191,7 +219,7 @@ public class ThreadReplayer
 	{
 		switch(aMessage)
 		{
-		case Message.EXCEPTION: processExceptionMessage(aBuffer); break;
+		case Message.EXCEPTION: peekReplayer().processMessage(aMessage, aBuffer); break;
 		
 		case Message.INSCOPE_BEHAVIOR_ENTER: 
 			processInScopeBehaviorEnter(itsBehIdReceiver.receiveFull(aBuffer)); 
@@ -212,32 +240,16 @@ public class ThreadReplayer
 		}
 	}
 	
-	/**
-	 * Process the next event considering we are in the {@link #S_CALLING_UNMONITORED} state.
-	 */
-	private void process_CallingUnmonitored(byte aMessage, _ByteBuffer aBuffer)
-	{
-		switch(aMessage)
-		{
-		case Message.EXCEPTION: processExceptionMessage(aBuffer); break;
-		
-		case Message.INSCOPE_BEHAVIOR_ENTER: 
-			processInScopeBehaviorEnter(itsBehIdReceiver.receiveFull(aBuffer)); 
-			break;
-			
-		case Message.INSCOPE_BEHAVIOR_ENTER_DELTA: 
-			processInScopeBehaviorEnter(itsBehIdReceiver.receiveDelta(aBuffer)); 
-			break;
-			
-		default: throw new RuntimeException("Command not handled: "+aMessage);
-		}
-	}
-
 	private void process_OutOfScope(byte aMessage, _ByteBuffer aBuffer)
 	{
 		switch(aMessage)
 		{
-		case Message.EXCEPTION: processExceptionMessage(aBuffer); break;
+		case Message.EXCEPTION:
+		{
+			ExceptionInfo theExceptionInfo = readExceptionInfo(aBuffer);
+			// TODO: register the exception
+			break;
+		}
 		
 		case Message.INSCOPE_BEHAVIOR_ENTER: 
 			processInScopeBehaviorEnter(itsBehIdReceiver.receiveFull(aBuffer)); 
@@ -246,6 +258,38 @@ public class ThreadReplayer
 		case Message.INSCOPE_BEHAVIOR_ENTER_DELTA: 
 			processInScopeBehaviorEnter(itsBehIdReceiver.receiveDelta(aBuffer)); 
 			break;
+			
+		case Message.OUTOFSCOPE_BEHAVIOR_ENTER:
+			pushReplayer(new OutOfScopeMethodReplayer());
+			break;
+			
+		case Message.OUTOFSCOPE_BEHAVIOR_EXIT_NORMAL: popReplayer(); break;
+		case Message.OUTOFSCOPE_BEHAVIOR_EXIT_EXCEPTION: popReplayer(); break;
+			
+		case Message.OUTOFSCOPE_BEHAVIOR_EXIT_RESULT:
+		{
+			MethodReplayer theReplayer = popReplayer();
+			if (! (theReplayer instanceof OutOfScopeMethodReplayer)) throw new IllegalStateException();
+			MethodReplayer theParentReplayer = peekReplayer();
+			theParentReplayer.transferResult(aBuffer);
+			break;
+		}
+		
+		case Message.UNMONITORED_BEHAVIOR_CALL_RESULT:
+		{
+			MethodReplayer theReplayer = popReplayer();
+			if (! (theReplayer instanceof UnmonitoredMethodReplayer)) throw new IllegalStateException();
+			InScopeMethodReplayer theParentReplayer = (InScopeMethodReplayer) peekReplayer();
+			theParentReplayer.transferResult(aBuffer);
+			break;
+		}
+		
+		case Message.UNMONITORED_BEHAVIOR_CALL_EXCEPTION:
+		{
+			MethodReplayer theReplayer = popReplayer();
+			if (! (theReplayer instanceof UnmonitoredMethodReplayer)) throw new IllegalStateException();
+			break;
+		}
 			
 		default: throw new RuntimeException("Command not handled: "+aMessage);
 		}
@@ -292,7 +336,7 @@ public class ThreadReplayer
 		{
 			switch(itsState)
 			{
-			case S_CALLING_UNMONITORED:
+			case S_OUTOFSCOPE:
 				theNextReplayer.startFromOutOfScope();
 				break;
 				
@@ -318,6 +362,58 @@ public class ThreadReplayer
 		
 		itsCurrentMonitoringModeVersion = aVersion;
 	}
+	
+	private void processRegisterObject(_ByteBuffer aBuffer)
+	{
+		int theDataSize = aBuffer.getInt();
+		long theId = aBuffer.getLong();
+		boolean theIndexable = aBuffer.get() != 0;
+		
+		byte[] theData = new byte[theDataSize];
+		aBuffer.get(theData, 0, theDataSize);
+		
+		//TODO: register object
+	}
+	
+	private void processRegisterRefObject(long aId, _ByteBuffer aBuffer)
+	{
+		int theClassId = aBuffer.getInt();
+		
+		// TODO: register object
+	}
+	
+	private void processRegisterThread(_ByteBuffer aBuffer)
+	{
+		long theId = aBuffer.getLong();
+		String theName = aBuffer.getString();
+		
+		// TODO: register
+	}
+	
+	private void processRegisterClass(_ByteBuffer aBuffer)
+	{
+		int theClassId = aBuffer.getInt();
+		long theLoaderId = aBuffer.getLong();
+		String theName = aBuffer.getString();
+		
+		// TODO: register
+	}
+	
+	private void processRegisterClassLoader(_ByteBuffer aBuffer)
+	{
+		long theLoaderId = aBuffer.getLong();
+		long theLoaderClassId = aBuffer.getLong();
+		
+		// TODO: register
+	}
+	
+	private void processSync(_ByteBuffer aBuffer)
+	{
+		long theTimestamp = aBuffer.getLong();
+		
+		// TODO: register
+	}
+	
 	
 	public int getBehaviorMonitoringMode(int aBehaviorId)
 	{
@@ -351,7 +447,7 @@ public class ThreadReplayer
 		IBehaviorInfo theBehavior = itsDatabase.getBehavior(aBehaviorId, true);
 		IClassInfo theClass = theBehavior.getDeclaringType();
 
-		byte[] theClassBytecode = theClass.getBytecode();
+		byte[] theClassBytecode = theClass.getOriginalBytecode();
 		ClassNode theClassNode = new ClassNode();
 		ClassReader theReader = new ClassReader(theClassBytecode);
 		theReader.accept(theClassNode, 0);
@@ -404,7 +500,36 @@ public class ThreadReplayer
 		return new String(r);
 	}
 	
-	private final class ReplayerClassLoader extends ClassLoader
+	public ExceptionInfo readExceptionInfo(_ByteBuffer aBuffer)
+	{
+		String theMethodName = aBuffer.getString();
+		String theMethodSignature = aBuffer.getString();
+		String theDeclaringClassSignature = aBuffer.getString();
+		short theBytecodeIndex = aBuffer.getShort();
+		ObjectId theException = readValue(aBuffer);
+		
+		String theClassName;
+		try
+		{
+			theClassName = Type.getType(theDeclaringClassSignature).getClassName();
+		}
+		catch (Exception e)
+		{
+			throw new RuntimeException("Bad declaring class signature: "+theDeclaringClassSignature, e);
+		}
+		
+		int theBehaviorId = getDatabase().getBehaviorId(theClassName, theMethodName, theMethodSignature);
+
+		return new ExceptionInfo(
+				theMethodName, 
+				theMethodSignature, 
+				theDeclaringClassSignature,
+				theBehaviorId,
+				theBytecodeIndex, 
+				theException);
+	}
+	
+	private static class ReplayerClassLoader extends ClassLoader
 	{
 		private final ClassLoader itsParent;
 		private final String itsClassName;
@@ -421,6 +546,32 @@ public class ThreadReplayer
 		{
 			if (itsClassName.equals(name)) return super.defineClass(itsClassName, itsBytecode, 0, itsBytecode.length);
 			else return itsParent.loadClass(name);
+		}
+	}
+	
+	public static class ExceptionInfo
+	{
+		public final String methodName;
+		public final String methodSignature;
+		public final String declaringClassSignature;
+		public final int behaviorId;
+		public final short bytecodeIndex;
+		public final ObjectId exception;
+		
+		public ExceptionInfo(
+				String aMethodName,
+				String aMethodSignature,
+				String aDeclaringClassSignature,
+				int aBehaviorId,
+				short aBytecodeIndex,
+				ObjectId aException)
+		{
+			methodName = aMethodName;
+			methodSignature = aMethodSignature;
+			declaringClassSignature = aDeclaringClassSignature;
+			behaviorId = aBehaviorId;
+			bytecodeIndex = aBytecodeIndex;
+			exception = aException;
 		}
 	}
 }

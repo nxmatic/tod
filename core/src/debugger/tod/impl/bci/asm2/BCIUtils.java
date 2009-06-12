@@ -25,13 +25,7 @@ package tod.impl.bci.asm2;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.tod.AgentReady;
-import java.tod.EventCollector;
-import java.tod.ExceptionGeneratedReceiver;
-import java.tod.ThreadData;
-import java.tod.TracedMethods;
 import java.util.ListIterator;
-import java.util.Set;
 
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
@@ -43,16 +37,16 @@ import org.objectweb.asm.tree.IntInsnNode;
 import org.objectweb.asm.tree.LdcInsnNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
-import org.objectweb.asm.tree.VarInsnNode;
 import org.objectweb.asm.tree.analysis.Analyzer;
 import org.objectweb.asm.tree.analysis.AnalyzerException;
 import org.objectweb.asm.tree.analysis.BasicVerifier;
-import org.objectweb.asm.tree.analysis.SourceValue;
 
 import tod.core.config.ClassSelector;
+import tod.core.database.structure.IClassInfo;
 import tod.core.database.structure.IFieldInfo;
 import tod.core.database.structure.IMutableClassInfo;
 import tod.core.database.structure.IMutableStructureDatabase;
+import tod.core.database.structure.IStructureDatabase;
 import tod.core.database.structure.ITypeInfo;
 import tod.core.database.structure.ObjectId;
 import tod.impl.database.structure.standard.PrimitiveTypeInfo;
@@ -61,12 +55,12 @@ import zz.utils.Utils;
 
 public class BCIUtils implements Opcodes
 {
-	public static final String CLS_EVENTCOLLECTOR = getJvmClassName(EventCollector.class);
+	public static final String CLS_EVENTCOLLECTOR = "java/tod/EventCollector";
 	public static final String DSC_EVENTCOLLECTOR = "L"+CLS_EVENTCOLLECTOR+";";
-	public static final String CLS_AGENTREADY = getJvmClassName(AgentReady.class);
-	public static final String CLS_EXCEPTIONGENERATEDRECEIVER = getJvmClassName(ExceptionGeneratedReceiver.class);
-	public static final String CLS_TRACEDMETHODS = getJvmClassName(TracedMethods.class);
-	public static final String CLS_THREADDATA = getJvmClassName(ThreadData.class);
+	public static final String CLS_AGENTREADY = "java/tod/AgentReady";
+	public static final String CLS_EXCEPTIONGENERATEDRECEIVER = "java/tod/ExceptionGeneratedReceiver";
+	public static final String CLS_TRACEDMETHODS = "java/tod/TracedMethods";
+	public static final String CLS_THREADDATA = "java/tod/ThreadData";
 	public static final String DSC_THREADDATA = "L"+CLS_THREADDATA+";";
 	public static final String CLS_OBJECT = getJvmClassName(Object.class);
 	public static final String DSC_OBJECT = "L"+CLS_OBJECT+";";
@@ -446,17 +440,4 @@ public class BCIUtils implements Opcodes
 		s.INVOKESPECIAL("java/lang/RuntimeException", "<init>", "(Ljava/lang/String;)V");
 		s.ATHROW();
 	}
-
-	/**
-	 * Returns the TOD field referred to by the given instruction.
-	 */
-	public static IFieldInfo getField(IMutableStructureDatabase aDatabase, FieldInsnNode aNode)
-	{
-		IMutableClassInfo theOwner = aDatabase.getNewClass(aNode.owner);
-		ITypeInfo theType = aDatabase.getNewType(aNode.desc);
-
-		return theOwner.getNewField(aNode.name, theType, aNode.getOpcode() == Opcodes.GETSTATIC);
-	}
-
-
 }

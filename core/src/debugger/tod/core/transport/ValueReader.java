@@ -25,10 +25,10 @@ package tod.core.transport;
 import java.io.DataInput;
 import java.io.IOException;
 
-import tod.agent.AgentConfig;
-import tod.agent.ValueType;
 import tod.core.DebugFlags;
 import tod.core.database.structure.ObjectId;
+import tod2.agent.AgentConfig;
+import tod2.agent.ValueType;
 
 /**
  * Permits to read registered objects.

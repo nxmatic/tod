@@ -77,6 +77,20 @@ public class StructureDatabaseUtils
 		}
 	}
 	
+	public static StructureDatabase loadDatabase(File aFile) throws IOException
+	{
+		try
+		{
+			StructureDatabase theDatabase = (StructureDatabase) Utils.readObject(aFile);
+			theDatabase.reown();
+			return theDatabase;
+		}
+		catch (ClassNotFoundException e)
+		{
+			throw new RuntimeException(e);
+		}
+	}
+	
 	static boolean isSaving()
 	{
 		return SAVING.get();

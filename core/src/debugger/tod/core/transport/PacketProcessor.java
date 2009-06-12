@@ -32,10 +32,10 @@ import java.nio.ByteOrder;
 import java.util.HashMap;
 import java.util.Map;
 
-import tod.agent.AgentConfig;
-import tod.agent.AgentDebugFlags;
-import tod.agent.Command;
 import tod.core.DebugFlags;
+import tod2.agent.AgentConfig;
+import tod2.agent.AgentDebugFlags;
+import tod2.agent.Command;
 import zz.utils.Utils;
 import zz.utils.notification.IEvent;
 import zz.utils.notification.IFireableEvent;

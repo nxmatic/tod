@@ -38,7 +38,6 @@ import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
 import tod.Util;
-import tod.agent.BehaviorCallType;
 import tod.core.config.TODConfig;
 import tod.core.database.structure.Access;
 import tod.core.database.structure.IBehaviorInfo;
@@ -55,6 +54,7 @@ import tod.impl.bci.asm.attributes.AspectInfoAttribute;
 import tod.impl.bci.asm.attributes.DummyLabelsAttribute;
 import tod.impl.bci.asm.attributes.SootAttribute;
 import tod.impl.database.structure.standard.TagMap;
+import tod2.agent.BehaviorCallType;
 
 /**
  * The ASM visitor that instruments the classes.

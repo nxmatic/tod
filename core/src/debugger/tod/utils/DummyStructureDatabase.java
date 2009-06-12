@@ -201,6 +201,21 @@ implements IMutableStructureDatabase
 	public void removeListener(Listener aListener)
 	{
 	}
+
+	public BehaviorMonitoringModeChange getBehaviorMonitoringModeChange(int aVersion)
+	{
+		return null;
+	}
+
+	public boolean isInIdScope(String aClassName)
+	{
+		return false;
+	}
+
+	public boolean isInScope(String aClassName)
+	{
+		return false;
+	}
 	
 	
 

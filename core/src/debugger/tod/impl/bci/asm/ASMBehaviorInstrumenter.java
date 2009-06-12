@@ -31,7 +31,6 @@ import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 
 import tod.Util;
-import tod.agent.BehaviorCallType;
 import tod.core.config.TODConfig;
 import tod.core.database.structure.Access;
 import tod.core.database.structure.IBehaviorInfo;
@@ -47,6 +46,7 @@ import tod.impl.bci.asm.ASMInstrumenter.CodeRange;
 import tod.impl.bci.asm.ASMInstrumenter.RangeManager;
 import tod.impl.bci.asm.ProbesManager.TmpProbeInfo;
 import tod.impl.database.structure.standard.TagMap;
+import tod2.agent.BehaviorCallType;
 
 /**
  * Provides all the methods that perform the insertion

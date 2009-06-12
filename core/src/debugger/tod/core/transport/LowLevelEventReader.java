@@ -28,10 +28,10 @@ import static tod.core.transport.ValueReader.readValue;
 import java.io.DataInput;
 import java.io.IOException;
 
-import tod.agent.AgentConfig;
-import tod.agent.BehaviorCallType;
-import tod.agent.LowLevelEventType;
 import tod.core.DebugFlags;
+import tod2.agent.AgentConfig;
+import tod2.agent.BehaviorCallType;
+import tod2.agent.LowLevelEventType;
 
 public class LowLevelEventReader
 {

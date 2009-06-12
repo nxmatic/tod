@@ -1,7 +1,7 @@
 /*
  * Created on May 23, 2009
  */
-package tod.access;
+package tod2.access;
 
 /**
  * This class is modified by the instrumenter so that it calls various generated 

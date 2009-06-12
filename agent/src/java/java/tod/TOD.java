@@ -24,8 +24,8 @@ package java.tod;
 
 import java.tod.io._IO;
 
-import tod.agent.AgentConfig;
-import tod.agent.AgentUtils;
+import tod2.agent.AgentConfig;
+import tod2.agent.AgentUtils;
 
 
 /**

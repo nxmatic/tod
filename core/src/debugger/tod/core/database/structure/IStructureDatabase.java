@@ -26,10 +26,10 @@ import java.io.Serializable;
 import java.tod.TracedMethods;
 import java.util.Map;
 
-import tod.agent.MonitoringMode;
 import tod.core.config.TODConfig;
 import tod.core.database.structure.IBehaviorInfo.BytecodeRole;
 import tod.impl.database.structure.standard.AspectInfo;
+import tod2.agent.MonitoringMode;
 
 /**
  * The structure database contains static information about the
@@ -218,8 +218,10 @@ public interface IStructureDatabase
 		public void monitoringModeChanged(BehaviorMonitoringModeChange aChange);
 	}
 
-	public static class BehaviorMonitoringModeChange
+	public static class BehaviorMonitoringModeChange implements Serializable
 	{
+		private static final long serialVersionUID = 69242304676431987L;
+
 		public final int behaviorId;
 		
 		/**

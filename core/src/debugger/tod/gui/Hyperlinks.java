@@ -27,7 +27,6 @@ import java.awt.Color;
 import javax.swing.JComponent;
 
 import tod.Util;
-import tod.agent.ObjectValue;
 import tod.core.database.browser.ILogBrowser;
 import tod.core.database.event.ILogEvent;
 import tod.core.database.structure.IBehaviorInfo;
@@ -44,6 +43,7 @@ import tod.gui.kit.html.HtmlText;
 import tod.gui.kit.messages.Message;
 import tod.gui.kit.messages.ShowObjectMsg;
 import tod.tools.scheduling.IJobScheduler;
+import tod2.agent.ObjectValue;
 import zz.utils.ui.ZLabel;
 
 /** 

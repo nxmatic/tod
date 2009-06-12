@@ -13,13 +13,13 @@ import java.tod.util.IntDeltaSender;
 import java.tod.util.LongDeltaSender;
 import java.tod.util._StringBuilder;
 
-import tod.access.TODAccessor;
-import tod.agent.AgentDebugFlags;
-import tod.agent.Command;
-import tod.agent.Message;
-import tod.agent.ValueType;
-import tod.agent.io._ByteBuffer;
-import tod.agent.io._GrowingByteBuffer;
+import tod2.access.TODAccessor;
+import tod2.agent.AgentDebugFlags;
+import tod2.agent.Command;
+import tod2.agent.Message;
+import tod2.agent.ValueType;
+import tod2.agent.io._ByteBuffer;
+import tod2.agent.io._GrowingByteBuffer;
 
 /**
  * Per-thread data managed by the {@link EventCollector}.
@@ -211,13 +211,6 @@ public final class ThreadData
 	private static void sendCommand(_ByteBuffer aBuffer, byte aCommand) 
 	{
 		aBuffer.put(aCommand);
-	}
-	
-	private static void sendString(_ByteBuffer aBuffer, String aString)
-	{
-		int theSize = aString.length();
-		aBuffer.putInt(theSize);
-		for(int i=0;i<theSize;i++) aBuffer.putChar(aString.charAt(i));
 	}
 	
 	private void msgStart(int aAccount, int aExpectedArgsCount)
@@ -501,9 +494,9 @@ public final class ThreadData
 		checkTimestamp();
 		sendMessageType(itsBuffer, Message.EXCEPTION);
 
-		sendString(itsBuffer, aMethodName);
-		sendString(itsBuffer, aMethodSignature);
-		sendString(itsBuffer, aMethodDeclaringClassSignature);
+		itsBuffer.putString(aMethodName);
+		itsBuffer.putString(aMethodSignature);
+		itsBuffer.putString(aMethodDeclaringClassSignature);
 		itsBuffer.putShort((short) aBytecodeIndex);
 		sendValue(itsBuffer, aException);
 
@@ -886,7 +879,7 @@ public final class ThreadData
 		sendMessageType(itsBuffer, Message.REGISTER_THREAD);
 
 		itsBuffer.putLong(aJVMThreadId);
-		sendString(itsBuffer, aName);
+		itsBuffer.putString(aName);
 
 		commitBuffer();
 
@@ -1024,24 +1017,27 @@ public final class ThreadData
 		
 		thePacket.threadId = getId();
 		
+		final int HEADER_SIZE = 14; // msg type (1), size (4), id (8), indexable (1)
+		
 		// We use a different buffer here because the packet might be huge.
 		_GrowingByteBuffer theBuffer = _GrowingByteBuffer.wrap(thePacket.data);
-		theBuffer.position(14); // Header placeholder
+		theBuffer.position(HEADER_SIZE); // Leave room for header
 		
 		ObjectEncoder.encode(ObjectValueFactory.convert(aObject), theBuffer);
 		
 		int thePacketSize = theBuffer.position(); 
-		int theSize = thePacketSize-5; // 5: event type + size 
+		int theDataSize = thePacketSize-HEADER_SIZE; 
 	
 		theBuffer.position(0);
 		sendMessageType(theBuffer, Message.REGISTER_OBJECT);
-		theBuffer.putInt(theSize); 
+		theBuffer.putInt(theDataSize); 
 		
 		theBuffer.putLong(aId);
 		theBuffer.put(isIndexable(aObject) ? (byte) 1 : (byte) 0);
 		
 		thePacket.offset = 0;
 		thePacket.length = thePacketSize;
+		thePacket.data = theBuffer.array();
 		itsIOThread.pushPacket(thePacket);
 		
 		if (AgentDebugFlags.COLLECT_PROFILE)
