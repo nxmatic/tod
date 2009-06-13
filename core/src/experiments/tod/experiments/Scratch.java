@@ -35,8 +35,8 @@ import tod2.agent.AgentUtils;
 
 public class Scratch
 {
-	public static void main(String[] args)
+	public Object lRefGet(int i)
 	{
-		AgentUtils.loadClass("bounm");
+		throw new RuntimeException("PLOP");
 	}
 }

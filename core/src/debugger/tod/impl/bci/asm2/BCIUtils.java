@@ -377,6 +377,15 @@ public class BCIUtils implements Opcodes
 					getBytecodeRank(aNode, e.node),
 					e.getMessage());
 		}
+		catch (Exception e)
+		{
+			Utils.rtex(
+					e,
+					"Exception while analyzing %s.%s%s",
+					aClassNode.name,
+					aNode.name,
+					aNode.desc);
+		}
 	}
 
 	public static int getBytecodeRank(MethodNode aNode, AbstractInsnNode aInstruction)
@@ -436,7 +445,6 @@ public class BCIUtils implements Opcodes
 		s.NEW("java/lang/RuntimeException");
 		s.DUP();
 		s.LDC(aMessage);
-		s.SWAP();
 		s.INVOKESPECIAL("java/lang/RuntimeException", "<init>", "(Ljava/lang/String;)V");
 		s.ATHROW();
 	}

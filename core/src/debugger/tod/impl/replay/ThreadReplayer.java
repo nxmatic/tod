@@ -63,7 +63,7 @@ public class ThreadReplayer
 	static final int S_CALLING_MONITORED = 2; 
 	static final int S_OUTOFSCOPE = 3; 
 
-	public static final String REPLAYER_NAME_PREFIX = "$todgen$";
+	public static final String REPLAYER_NAME_PREFIX = "$tod$replayer$";
 	
 	private final TODConfig itsConfig;
 	private final IStructureDatabase itsDatabase;
@@ -175,7 +175,14 @@ public class ThreadReplayer
 			theCurrentReplayer.processMessage(aMessage, aBuffer);
 			break;
 			
-		default: throw new IllegalStateException(""+aMessage);
+		case Message.OUTOFSCOPE_BEHAVIOR_EXIT_RESULT:
+		{
+			MethodReplayer theParentReplayer = peekReplayer();
+			theParentReplayer.transferResult(aBuffer);
+			break;
+		}
+
+		default: throw new IllegalStateException("State: INSCOPE, got "+Message._NAMES[aMessage]);
 		}
 		
 		// Once the message has been replayed, check the state of the replayer for interprocedural control flow
@@ -185,6 +192,7 @@ public class ThreadReplayer
 		{
 			popReplayer();
 			MethodReplayer theParentReplayer = peekReplayer();
+			itsState = getStateForReplayer(theParentReplayer);
 			if (theParentReplayer == null) break;
 			
 			theParentReplayer.transferResult(theCurrentReplayer);
@@ -195,6 +203,7 @@ public class ThreadReplayer
 		{
 			popReplayer();
 			MethodReplayer theParentReplayer = peekReplayer();
+			itsState = getStateForReplayer(theParentReplayer);
 			if (theParentReplayer == null) break;
 			
 			theParentReplayer.expectException();
@@ -212,6 +221,12 @@ public class ThreadReplayer
 		}
 	}
 	
+	private int getStateForReplayer(MethodReplayer aReplayer)
+	{
+		if (aReplayer instanceof InScopeMethodReplayer) return S_INSCOPE;
+		else return S_OUTOFSCOPE;
+	}
+	
 	/**
 	 * Process the next event considering we are in the {@link #S_CALLING_MONITORED} state.
 	 */
@@ -223,12 +238,10 @@ public class ThreadReplayer
 		
 		case Message.INSCOPE_BEHAVIOR_ENTER: 
 			processInScopeBehaviorEnter(itsBehIdReceiver.receiveFull(aBuffer)); 
-			itsState = S_INSCOPE;
 			break;
 			
 		case Message.INSCOPE_BEHAVIOR_ENTER_DELTA: 
 			processInScopeBehaviorEnter(itsBehIdReceiver.receiveDelta(aBuffer)); 
-			itsState = S_INSCOPE;
 			break;
 			
 		case Message.OUTOFSCOPE_BEHAVIOR_ENTER:
@@ -236,7 +249,7 @@ public class ThreadReplayer
 			itsState = S_OUTOFSCOPE;
 			break;
 			
-		default: throw new RuntimeException("Command not handled: "+aMessage);
+		default: throw new RuntimeException("Command not handled: "+Message._NAMES[aMessage]);
 		}
 	}
 	
@@ -263,13 +276,24 @@ public class ThreadReplayer
 			pushReplayer(new OutOfScopeMethodReplayer());
 			break;
 			
-		case Message.OUTOFSCOPE_BEHAVIOR_EXIT_NORMAL: popReplayer(); break;
-		case Message.OUTOFSCOPE_BEHAVIOR_EXIT_EXCEPTION: popReplayer(); break;
+		case Message.OUTOFSCOPE_BEHAVIOR_EXIT_NORMAL: 
+		{
+			popReplayer();
+			MethodReplayer theParentReplayer = peekReplayer();
+			itsState = getStateForReplayer(theParentReplayer);
+			break;
+		}
+
+		case Message.OUTOFSCOPE_BEHAVIOR_EXIT_EXCEPTION: 
+		{
+			popReplayer();
+			MethodReplayer theParentReplayer = peekReplayer();
+			itsState = getStateForReplayer(theParentReplayer);
+			break;
+		}
 			
 		case Message.OUTOFSCOPE_BEHAVIOR_EXIT_RESULT:
 		{
-			MethodReplayer theReplayer = popReplayer();
-			if (! (theReplayer instanceof OutOfScopeMethodReplayer)) throw new IllegalStateException();
 			MethodReplayer theParentReplayer = peekReplayer();
 			theParentReplayer.transferResult(aBuffer);
 			break;
@@ -281,6 +305,7 @@ public class ThreadReplayer
 			if (! (theReplayer instanceof UnmonitoredMethodReplayer)) throw new IllegalStateException();
 			InScopeMethodReplayer theParentReplayer = (InScopeMethodReplayer) peekReplayer();
 			theParentReplayer.transferResult(aBuffer);
+			itsState = S_INSCOPE;
 			break;
 		}
 		
@@ -288,10 +313,11 @@ public class ThreadReplayer
 		{
 			MethodReplayer theReplayer = popReplayer();
 			if (! (theReplayer instanceof UnmonitoredMethodReplayer)) throw new IllegalStateException();
+			itsState = S_INSCOPE;
 			break;
 		}
 			
-		default: throw new RuntimeException("Command not handled: "+aMessage);
+		default: throw new RuntimeException("Command not handled: "+Message._NAMES[aMessage]);
 		}
 	}
 
@@ -349,6 +375,8 @@ public class ThreadReplayer
 			
 			}
 		}
+		
+		itsState = S_INSCOPE;
 	}
 	
 	private void processTracedMethodsVersion(int aVersion)
@@ -426,7 +454,9 @@ public class ThreadReplayer
 		try
 		{
 			Class<InScopeMethodReplayer> theClass = getReplayerClass(aBehaviorId);
-			return theClass.newInstance();
+			InScopeMethodReplayer theReplayer = theClass.newInstance();
+			theReplayer.setup(this);
+			return theReplayer;
 		}
 		catch (Exception e)
 		{
@@ -454,11 +484,27 @@ public class ThreadReplayer
 
 		for (MethodNode theMethodNode : (List<MethodNode>) theClassNode.methods)
 		{
-			MethodReplayerGenerator theGenerator = new MethodReplayerGenerator(itsConfig, itsDatabase, theClassNode, theMethodNode);
-			byte[] theReplayerBytecode = theGenerator.generate();
-			String theReplayerName = makeReplayerClassName(theClassNode.name, theMethodNode.name, theMethodNode.desc);
+			// Get info about the method before transforming, as the generator modifies it.
+			String theMethodName = theMethodNode.name;
+			String theMethodDesc = theMethodNode.desc;
 			
-			ClassLoader theLoader = new ReplayerClassLoader(getClass().getClassLoader(), theReplayerName, theReplayerBytecode);
+			MethodReplayerGenerator theGenerator = new MethodReplayerGenerator(
+					itsConfig, 
+					itsDatabase, 
+					theClassNode, 
+					theMethodNode);
+			
+			byte[] theReplayerBytecode = theGenerator.generate();
+			
+			String theReplayerName = makeReplayerClassName(
+					theClassNode.name, 
+					theMethodName, 
+					theMethodDesc).replace('/', '.');
+			
+			ClassLoader theLoader = new ReplayerClassLoader(
+					getClass().getClassLoader(), 
+					theReplayerName, 
+					theReplayerBytecode);
 			try
 			{
 				theReplayerClass = theLoader.loadClass(theReplayerName).asSubclass(InScopeMethodReplayer.class);
@@ -468,7 +514,7 @@ public class ThreadReplayer
 				throw new RuntimeException(e);
 			}
 			
-			theBehavior = LocationUtils.getBehavior(itsDatabase, theClass, theMethodNode.name, theMethodNode.desc, false);
+			theBehavior = LocationUtils.getBehavior(itsDatabase, theClass, theMethodName, theMethodDesc, false);
 			Utils.listSet(itsReplayers, theBehavior.getId(), theReplayerClass);
 		}
 		
@@ -480,9 +526,9 @@ public class ThreadReplayer
 	 */
 	public static String makeReplayerClassName(String aJvmClassName, String aJvmMethodName, String aDesc)
 	{
-		String theName = REPLAYER_NAME_PREFIX+aJvmClassName+"_"+aJvmMethodName+"_"+aDesc;
-		char[] r = new char[theName.length()];
-		for (int i=0;i<r.length;i++)
+		String theName = aJvmClassName+"_"+aJvmMethodName+"_"+aDesc;
+		StringBuilder theBuilder = new StringBuilder(theName.length());
+		for (int i=0;i<theName.length();i++)
 		{
 			char c = theName.charAt(i);
 			switch(c)
@@ -490,14 +536,16 @@ public class ThreadReplayer
 			case '/':
 			case '(':
 			case ')':
+			case '<':
+			case '>':
 			case '[':
 			case ';':
 				c = '_';
 				break;
 			}
-			r[i] = c;
+			theBuilder.append(c);
 		}
-		return new String(r);
+		return REPLAYER_NAME_PREFIX+theBuilder.toString();
 	}
 	
 	public ExceptionInfo readExceptionInfo(_ByteBuffer aBuffer)

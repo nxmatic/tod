@@ -37,6 +37,7 @@ import gnu.trove.TIntStack;
 import gnu.trove.TLongStack;
 
 import org.objectweb.asm.Type;
+import org.python.modules.types;
 
 import tod.core.database.structure.IBehaviorInfo;
 import tod.core.database.structure.ObjectId;
@@ -136,7 +137,11 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 	{
 		switch(aType.getSort())
 		{
-		case Type.OBJECT: itsRefCache[aCacheSlot] = vRef(); break;
+		case Type.OBJECT: 
+		case Type.ARRAY:
+			itsRefCache[aCacheSlot] = vRef(); 
+			break;
+			
 		case Type.BOOLEAN: itsBooleanCache[aCacheSlot] = vBoolean(); break;
 		case Type.BYTE: itsByteCache[aCacheSlot] = vByte(); break;
 		case Type.CHAR: itsCharCache[aCacheSlot] = vChar(); break;
@@ -159,7 +164,11 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 	{
 		switch(aType.getSort())
 		{
-		case Type.OBJECT: vRef(itsRefCache[aCacheSlot]); break;
+		case Type.OBJECT:
+		case Type.ARRAY:
+			vRef(itsRefCache[aCacheSlot]); 
+			break;
+			
 		case Type.BOOLEAN: vBoolean(itsBooleanCache[aCacheSlot]); break;
 		case Type.BYTE: vByte(itsByteCache[aCacheSlot]); break;
 		case Type.CHAR: vChar(itsCharCache[aCacheSlot]); break;
@@ -194,8 +203,15 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
         case Type.BYTE:
         case Type.CHAR:
         case Type.SHORT:
-		case Type.INT: lIntSet(aSlot, aParent.sIntPop()); break;
-		case Type.OBJECT: lRefSet(aSlot, aParent.sRefPop()); break;
+		case Type.INT: 
+			lIntSet(aSlot, aParent.sIntPop()); 
+			break;
+			
+		case Type.OBJECT:
+		case Type.ARRAY:
+			lRefSet(aSlot, aParent.sRefPop()); 
+			break;
+			
 		case Type.DOUBLE: lDoubleSet(aSlot, aParent.sDoublePop()); break;
 		case Type.FLOAT: lFloatSet(aSlot, aParent.sFloatPop()); break;
 		case Type.LONG: lLongSet(aSlot, aParent.sLongPop()); break;
@@ -215,8 +231,15 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
         case Type.BYTE:
         case Type.CHAR:
         case Type.SHORT:
-		case Type.INT: sIntPush(aSource.sIntPop()); break;
-		case Type.OBJECT: sRefPush(aSource.sRefPop()); break;
+		case Type.INT: 
+			sIntPush(aSource.sIntPop());
+			break;
+			
+		case Type.OBJECT:
+		case Type.ARRAY:
+			sRefPush(aSource.sRefPop()); 
+			break;
+			
 		case Type.DOUBLE: sDoublePush(aSource.sDoublePop()); break;
 		case Type.FLOAT: sFloatPush(aSource.sFloatPop()); break;
 		case Type.LONG: sLongPush(aSource.sLongPop()); break;
@@ -229,7 +252,11 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 	{
 		switch(itsExpectedType.getSort())
 		{
-		case Type.OBJECT: sRefPush(getThreadReplayer().readValue(aBuffer)); break;
+		case Type.OBJECT:
+		case Type.ARRAY:
+			sRefPush(getThreadReplayer().readValue(aBuffer)); 
+			break;
+			
 		case Type.BOOLEAN: sIntPush(aBuffer.get()); break;
 		case Type.BYTE: sIntPush(aBuffer.get()); break;
 		case Type.CHAR: sIntPush(aBuffer.getChar()); break;
@@ -238,6 +265,9 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 		case Type.INT: sIntPush(aBuffer.getInt()); break;
 		case Type.LONG: sLongPush(aBuffer.getLong()); break;
 		case Type.SHORT: sIntPush(aBuffer.getShort()); break;
+		
+		case Type.VOID: break;
+		
 		default: throw new RuntimeException("Unknown type: "+itsExpectedType);
 		}	
 	}
@@ -298,7 +328,11 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 	{
 		switch(aType.getSort())
 		{
-		case Type.OBJECT: lRefSet(aSlot, getThreadReplayer().readValue(aBuffer)); break;
+		case Type.OBJECT:
+		case Type.ARRAY:
+			lRefSet(aSlot, getThreadReplayer().readValue(aBuffer)); 
+			break;
+			
 		case Type.BOOLEAN: lIntSet(aSlot, aBuffer.get()); break;
 		case Type.SHORT: lIntSet(aSlot, aBuffer.getShort()); break;
 		case Type.BYTE: lIntSet(aSlot, aBuffer.get()); break;
@@ -422,6 +456,7 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 	public void evExceptionGenerated(int aBehaviorId, int aBytecodeIndex, ObjectId aException)
 	{
 		setState(S_EXCEPTION_THROWN);
+		vRef(aException);
 	}
 	
 	public void evHandlerReached(_ByteBuffer aBuffer)
@@ -495,7 +530,11 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 	{
 		switch(aType.getSort())
 		{
-		case Type.OBJECT: vRef(getThreadReplayer().readValue(aBuffer)); break;
+		case Type.OBJECT:
+		case Type.ARRAY:
+			vRef(getThreadReplayer().readValue(aBuffer)); 
+			break;
+			
 		case Type.BOOLEAN: vBoolean(aBuffer.get() != 0); break;
 		case Type.BYTE: vByte(aBuffer.get()); break;
 		case Type.CHAR: vChar(aBuffer.getChar()); break;
@@ -565,7 +604,7 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 	/**
 	 * Processes an invocation
 	 */
-	protected void invoke(int aBehaviorId)
+	protected void invoke(int aBehaviorId, int aNextBlock)
 	{
 		int theMode = getThreadReplayer().getBehaviorMonitoringMode(aBehaviorId);
 		IBehaviorInfo theBehavior = getDatabase().getBehavior(aBehaviorId, true);
@@ -584,6 +623,8 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 			
 		default: throw new RuntimeException("Mode not handled: "+theMode); 
 		}
+		
+		itsNextBlock = aNextBlock;
 	}
 
 	/**

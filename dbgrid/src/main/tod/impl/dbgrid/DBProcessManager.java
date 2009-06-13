@@ -243,7 +243,11 @@ public class DBProcessManager
 		{
 			if (itsKeepAliveThread != null) itsKeepAliveThread.kill();
 
-			if (itsProcess != null) itsProcess.destroy();
+			if (itsProcess != null) 
+			{
+				itsProcess.destroy();
+				Thread.sleep(500);
+			}
 			printOutput("--- Preparing...");
 			boolean theJDWP = false;
 
