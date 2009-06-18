@@ -126,16 +126,16 @@ public class IOThread extends Thread
 	
 	public void printStats()
 	{
-	    if (! AgentDebugFlags.COLLECT_PROFILE) return;
-	    _StringBuilder b = new _StringBuilder();
-        
-        b.append("[IOThread] Bytes sent: ");
-        b.append(itsBytesSent);
-        b.append(" - packets: ");
-        b.append(itsPacketsSent);
-        b.append("\n");
+		if (! AgentDebugFlags.COLLECT_PROFILE) return;
+		_StringBuilder b = new _StringBuilder();
+		
+		b.append("[IOThread] Bytes sent: ");
+		b.append(itsBytesSent);
+		b.append(" - packets: ");
+		b.append(itsPacketsSent);
+		b.append("\n");
 
-        _IO.out(b.toString());
+		_IO.out(b.toString());
 	}
 	
 	public void registerThreadData(ThreadData aThreadData)

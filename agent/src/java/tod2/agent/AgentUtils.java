@@ -166,13 +166,13 @@ public class AgentUtils
 	
 	public static int getJvmMinorVersion(String aVersionString)
 	{
-        String[] theVersionComponents = split(aVersionString, '.');
-        int theMajor = Integer.parseInt(theVersionComponents[0]);
-        int theMinor = Integer.parseInt(theVersionComponents[1]);
-        
-        if (theMajor != 1) throw new RuntimeException("JVM version not supported: "+aVersionString);
-        
-        return theMinor;
+		String[] theVersionComponents = split(aVersionString, '.');
+		int theMajor = Integer.parseInt(theVersionComponents[0]);
+		int theMinor = Integer.parseInt(theVersionComponents[1]);
+		
+		if (theMajor != 1) throw new RuntimeException("JVM version not supported: "+aVersionString);
+		
+		return theMinor;
 	}
 	
 	public static String[] split(String aString, char aChar)

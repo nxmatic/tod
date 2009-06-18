@@ -39,6 +39,7 @@ void fatal_error(char* message)
 
 void fatal_ioerror(char* message)
 {
+	fprintf(stderr, "FATAL IO ERROR, ABORTING: ");
 	perror(message);
 	exit(-1);
 }

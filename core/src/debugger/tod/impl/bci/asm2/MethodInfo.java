@@ -449,7 +449,7 @@ public class MethodInfo
 
 	}
 	
-	private boolean isConstructor()
+	public boolean isConstructor()
 	{
 		return "<init>".equals(getMethodNode().name);
 	}

@@ -26,6 +26,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.PrintStream;
+import java.tod.ThreadData;
 import java.tod.io._IO;
 
 /**
@@ -42,9 +43,9 @@ public class AgentDebugFlags
 	public static final boolean COLLECT_PROFILE = true;
 	
 	/**
-	 * If true, the {@link EventInterpreter} prints all the events it receives
+	 * If true, {@link ThreadData} prints all the events it receives
 	 */
-	public static final boolean COLLECTOR_LOG = false;
+	public static final boolean EVENT_LOG = true;
 	
 	/**
 	 * Stream to which the {@link EventInterpreter} sends debug info.

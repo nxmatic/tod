@@ -37,7 +37,6 @@ import gnu.trove.TIntStack;
 import gnu.trove.TLongStack;
 
 import org.objectweb.asm.Type;
-import org.python.modules.types;
 
 import tod.core.database.structure.IBehaviorInfo;
 import tod.core.database.structure.ObjectId;
@@ -69,6 +68,8 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 	 */
 	private int itsExpectedFieldCacheSlot = -1;
 	
+	private boolean itsExpectObjectInitialized = false;
+	
 	private ObjectId itsRefValue;
 	private boolean itsBooleanValue;
 	private byte itsByteValue;
@@ -99,6 +100,11 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 	 * Block id corresponding to each handler id. Indexed by handler id.
 	 */
 	private final IntArray itsHandlerBlocks = new IntArray();
+	
+	/**
+	 * Data for pending invocation
+	 */
+	private InvocationData itsInvokeData;
 	
 	/**
 	 * @param aCacheCounts "encoded" cache counts.
@@ -192,6 +198,7 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 		int theNextBlock = itsNextBlock;
 		itsNextBlock = -1;
 		
+		getThreadReplayer().echo("Proceed: %d", theNextBlock);
 		proceed(theNextBlock);
 	}
 	
@@ -222,6 +229,8 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 	@Override
 	public void transferResult(InScopeMethodReplayer aSource)
 	{
+		if (itsExpectObjectInitialized) throw new IllegalStateException();
+		
 		Type theType = aSource.itsReturnType;
 		if (! theType.equals(itsExpectedType)) throw new IllegalStateException();
 		
@@ -243,8 +252,13 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 		case Type.DOUBLE: sDoublePush(aSource.sDoublePop()); break;
 		case Type.FLOAT: sFloatPush(aSource.sFloatPop()); break;
 		case Type.LONG: sLongPush(aSource.sLongPop()); break;
+
+		case Type.VOID: break;
+		
 		default: throw new RuntimeException("Unknown type: "+theType);
 		}	
+		
+		next();
 	}
 	
 	@Override
@@ -270,6 +284,18 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 		
 		default: throw new RuntimeException("Unknown type: "+itsExpectedType);
 		}	
+		
+		if (itsExpectObjectInitialized)
+		{
+			if (itsExpectedType.getSort() != Type.VOID) throw new IllegalStateException();
+			itsExpectObjectInitialized = false;
+			getThreadReplayer().echo("expectObjectInitialized");
+			setState(S_WAIT_OBJECTINITIALIZED);
+		}
+		else
+		{
+			next();
+		}
 	}
 	
 	/**
@@ -357,11 +383,19 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 		case Message.FIELD_READ_SAME: evFieldRead_Same(); break;
 		case Message.NEW_ARRAY: evNewArray(aBuffer); break;
 		case Message.OBJECT_INITIALIZED: evObjectInitialized(getThreadReplayer().readValue(aBuffer)); break;
+		case Message.CONSTRUCTOR_TARGET: evConstructorTarget(getThreadReplayer().readValue(aBuffer)); break;
 		case Message.EXCEPTION: evExceptionGenerated(aBuffer); break;
 		case Message.HANDLER_REACHED: evHandlerReached(aBuffer); break;
+		case Message.INSCOPE_BEHAVIOR_EXIT_EXCEPTION: evExitException(aBuffer); break;
 			
 		default: throw new IllegalStateException(""+aMessage);
 		}
+	}
+	
+	public void proceed()
+	{
+		allowedState(S_HOLD);
+		next();
 	}
 	
 	/**
@@ -438,8 +472,18 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 	
 	public void evObjectInitialized(ObjectId aObject)
 	{
+		allowedState(S_WAIT_OBJECTINITIALIZED);
 		ObjectId theTmpId = sRefPeek();
 		getThreadReplayer().getTmpIdManager().associate(theTmpId.getId(), aObject.getId());
+		next();
+	}
+	
+	public void evConstructorTarget(ObjectId aObject)
+	{
+		allowedState(S_WAIT_CONSTRUCTORTARGET);
+		ObjectId theTmpId = lRefGet(0);
+		getThreadReplayer().getTmpIdManager().associate(theTmpId.getId(), aObject.getId());
+		next();
 	}
 	
 	private void evExceptionGenerated(_ByteBuffer aBuffer)
@@ -464,13 +508,20 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 		allowedState(S_EXCEPTION_THROWN);
 		int theHandlerId = aBuffer.getInt();
 		itsNextBlock = itsHandlerBlocks.get(theHandlerId);
-		setState(S_STARTED);
+		next();
+	}
+	
+	public void evExitException(_ByteBuffer aBuffer)
+	{
+		allowedStates(S_EXCEPTION_THROWN);
+		setState(S_FINISHED_EXCEPTION);
 	}
 	
 	public void constructorTarget(long aId)
 	{
 		ObjectId theTmpId = lRefGet(0);
 		getThreadReplayer().getTmpIdManager().associate(theTmpId.getId(), aId);
+		next();
 	}
 
 	/**
@@ -485,6 +536,7 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 	
 	protected void expectField(int aSort, int aNextBlock, int aCacheSlot)
 	{
+		getThreadReplayer().echo("expectField");
 		setState(S_WAIT_FIELD);
 		itsNextBlock = aNextBlock;
 		itsExpectedFieldCacheSlot = aCacheSlot;
@@ -493,6 +545,7 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 	
 	protected void expectArray(int aSort, int aNextBlock)
 	{
+		getThreadReplayer().echo("expectArray");
 		setState(S_WAIT_ARRAY);
 		itsNextBlock = aNextBlock;
 		expect(aSort);
@@ -500,20 +553,42 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 	
 	protected void expectClassCst(int aNextBlock)
 	{
+		getThreadReplayer().echo("expectClassCst");
 		setState(S_WAIT_CST);
 		itsNextBlock = aNextBlock;
 	}
 	
 	protected void expectNewArray(int aNextBlock)
 	{
+		getThreadReplayer().echo("expectNewArray");
 		setState(S_WAIT_NEWARRAY);
 		itsNextBlock = aNextBlock;
 	}
 	
+	protected void expectConstructorTarget(int aNextBlock)
+	{
+		getThreadReplayer().echo("expectConstructorTarget");
+		setState(S_WAIT_CONSTRUCTORTARGET);
+		itsNextBlock = aNextBlock;
+	}
+	
+	@Override
 	public void expectException()
 	{
+		getThreadReplayer().echo("expectException");
 		setState(S_WAIT_EXCEPTION);
 		itsNextBlock = -1;
+	}
+	
+	/**
+	 * Hold execution until the next message is received.
+	 * If it is not an exception, then proceed.
+	 */
+	public void hold(int aNextBlock)
+	{
+		getThreadReplayer().echo("Hold");
+		setState(S_HOLD);
+		itsNextBlock = aNextBlock;
 	}
 	
 	protected void processReturn()
@@ -601,10 +676,34 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 		return new ObjectId(getThreadReplayer().getTmpIdManager().nextId());
 	}
 	
+	@Override
+	protected void allowedState(int aState)
+	{
+		super.allowedState(aState);
+		if (itsInvokeData != null && aState != S_INVOKE_PENDING) throw new IllegalStateException();
+	}
+
+	
 	/**
 	 * Processes an invocation
+	 * Actually saves the data for later processing by {@link #proceedInvoke()}.
+	 * This is to allow a {@link Message#TRACEDMETHODS_VERSION} message to
+	 * be processed before the invocation is actually processed
 	 */
-	protected void invoke(int aBehaviorId, int aNextBlock)
+	protected void invoke(int aBehaviorId, int aNextBlock, boolean aExpectObjectInitialized)
+	{
+		itsInvokeData = new InvocationData(aBehaviorId, aNextBlock, aExpectObjectInitialized);
+		setState(S_INVOKE_PENDING);
+	}
+	
+	public void proceedInvoke()
+	{
+		allowedState(S_INVOKE_PENDING);
+		proceedInvoke(itsInvokeData.behaviorId, itsInvokeData.nextBlock, itsInvokeData.expectObjectInitialized);
+		itsInvokeData = null;
+	}
+	
+	private void proceedInvoke(int aBehaviorId, int aNextBlock, boolean aExpectObjectInitialized)
 	{
 		int theMode = getThreadReplayer().getBehaviorMonitoringMode(aBehaviorId);
 		IBehaviorInfo theBehavior = getDatabase().getBehavior(aBehaviorId, true);
@@ -614,10 +713,12 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 		{
 		case MonitoringMode.FULL:
 		case MonitoringMode.ENVELOPPE:
+			getThreadReplayer().echo("invoke (monitored): "+theBehavior+" ["+aExpectObjectInitialized+"]");
 			setState(S_CALLING_MONITORED);
 			break;
 			
 		case MonitoringMode.NONE:
+			getThreadReplayer().echo("invoke (unmonitored): "+theBehavior+" ["+aExpectObjectInitialized+"]");
 			setState(S_CALLING_UNMONITORED);
 			break;
 			
@@ -625,6 +726,7 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 		}
 		
 		itsNextBlock = aNextBlock;
+		itsExpectObjectInitialized = aExpectObjectInitialized;
 	}
 
 	/**
@@ -638,5 +740,19 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 		if (id1 == null && id2 == null) return true;
 		if (id1 == null || id2 == null) return false;
 		return id1.getId() == id2.getId();
+	}
+	
+	private static final class InvocationData
+	{
+		public final int behaviorId;
+		public final int nextBlock;
+		public final boolean expectObjectInitialized;
+
+		public InvocationData(int aBehaviorId, int aNextBlock, boolean aExpectObjectInitialized)
+		{
+			behaviorId = aBehaviorId;
+			nextBlock = aNextBlock;
+			expectObjectInitialized = aExpectObjectInitialized;
+		}
 	}
 }

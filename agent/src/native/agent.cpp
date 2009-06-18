@@ -207,7 +207,7 @@ void agentClassFileLoadHook(
 
 	// Unconditionally skip agent classes
 	if (startsWith(name, "java/tod/")) return;
-	if (startsWith(name, "tod/agent/")) return;
+	if (startsWith(name, "tod2/agent/")) return;
 	if (startsWith(name, "com/yourkit/")) return;
 	
 	if (! CAPTURE_STARTED)

@@ -161,7 +161,9 @@ public class MethodReplayerGenerator
 		int theFirstBlockId = getBlockId(lStart);
 		if (theFirstBlockId != 0) throw new RuntimeException();
 
-		if (BCIUtils.isStatic(itsMethodNode.access)) itsMethodNode.maxLocals++; // Target is not static
+		boolean theStatic = BCIUtils.isStatic(itsMethodNode.access);
+		
+		if (theStatic) itsMethodNode.maxLocals++; // Generated method is not static
 		itsTmpVar = nextFreeVar(2);
 		
 		// Pre-process handlers
@@ -177,6 +179,20 @@ public class MethodReplayerGenerator
 		hookHandlers(itsMethodNode.instructions);
 		itsMethodNode.tryCatchBlocks.clear();
 
+		// Ensure a field is created for each arg (even if it is not used in the body)
+		int theSlot = 0;
+		if (! theStatic)
+		{
+			getFieldForVar(theSlot, TYPE_OBJECTID);
+			theSlot++;
+		}
+		
+		for(Type theType : itsArgTypes)
+		{
+			getFieldForVar(theSlot, getTypeOrId(theType.getSort()));
+			theSlot += theType.getSize();
+		}
+		
 		// Setup infrastructure
 		itsMethodNode.name = "proceed";
 		itsMethodNode.desc = "(I)V";
@@ -461,28 +477,28 @@ public class MethodReplayerGenerator
         case Type.SHORT:
         case Type.INT:
         	theName = "vInt_"+aSlot;
-        	itsLastIntSlot = aSlot;
+        	itsLastIntSlot = Math.max(itsLastIntSlot, aSlot);
         	break;
         	
         case Type.FLOAT:
         	theName = "vFloat_"+aSlot;
-        	itsLastFloatSlot = aSlot;
+        	itsLastFloatSlot = Math.max(itsLastFloatSlot, aSlot);
         	break;
         	
         case Type.LONG:
         	theName = "vLong_"+aSlot;
-        	itsLastLongSlot = aSlot;
+        	itsLastLongSlot = Math.max(itsLastLongSlot, aSlot);
         	break;
         	
         case Type.DOUBLE:
         	theName = "vDouble_"+aSlot;
-        	itsLastDoubleSlot = aSlot;
+        	itsLastDoubleSlot = Math.max(itsLastDoubleSlot, aSlot);
         	break;
 
         case Type.OBJECT:
         case Type.ARRAY:
         	theName = "vRef_"+aSlot;
-        	itsLastRefSlot = aSlot;
+        	itsLastRefSlot = Math.max(itsLastRefSlot, aSlot);
         	break;
         	
         default:
@@ -503,11 +519,11 @@ public class MethodReplayerGenerator
 	 */
 	private void addSlotSetters()
 	{
-		addSlotSetter(itsLastRefSlot, "Ref", TYPE_OBJECTID);
-		addSlotSetter(itsLastIntSlot, "Int", Type.INT_TYPE);
-		addSlotSetter(itsLastDoubleSlot, "Double", Type.DOUBLE_TYPE);
-		addSlotSetter(itsLastFloatSlot, "Float", Type.FLOAT_TYPE);
-		addSlotSetter(itsLastLongSlot, "Long", Type.LONG_TYPE);
+		addSlotSetter(itsLastRefSlot+1, "Ref", TYPE_OBJECTID);
+		addSlotSetter(itsLastIntSlot+1, "Int", Type.INT_TYPE);
+		addSlotSetter(itsLastDoubleSlot+1, "Double", Type.DOUBLE_TYPE);
+		addSlotSetter(itsLastFloatSlot+1, "Float", Type.FLOAT_TYPE);
+		addSlotSetter(itsLastLongSlot+1, "Long", Type.LONG_TYPE);
 	}
 	
 	private void addSlotSetter(int aSlotCount, String aNameBase, Type aType)
@@ -557,7 +573,7 @@ public class MethodReplayerGenerator
 	 */
 	private void addSlotGetters()
 	{
-		addSlotGetter(itsLastRefSlot, "Ref", TYPE_OBJECTID);
+		addSlotGetter(itsLastRefSlot+1, "Ref", TYPE_OBJECTID);
 	}
 	
 	private void addSlotGetter(int aSlotCount, String aNameBase, Type aType)
@@ -773,6 +789,10 @@ public class MethodReplayerGenerator
 			case Opcodes.MONITOREXIT:
 				processMonitor(aInsns, (InsnNode) theNode);
 				break;
+				
+			case Opcodes.CHECKCAST:
+				processCheckCast(aInsns, (TypeInsnNode) theNode);
+				break;
 			}
 		}
 	}
@@ -816,34 +836,61 @@ public class MethodReplayerGenerator
 	private void processInvoke(InsnList aInsns, MethodInsnNode aNode)
 	{
 		Type[] theArgTypes = Type.getArgumentTypes(aNode.desc);
-		Type theType = Type.getReturnType(aNode.desc);
+		Type theType = getTypeOrId(Type.getReturnType(aNode.desc).getSort());
 		int theBehaviorId = getBehaviorId(aNode);
 		BCIFrame theFrame = itsMethodInfo.getFrame(aNode);
 
+		boolean theExpectObjectInitialized = 
+			"<init>".equals(aNode.name) 
+			&& ! itsMethodInfo.isChainingInvocation(aNode)
+			&& ! getDatabase().isInScope(aNode.owner);
+		
 		SyntaxInsnList s = new SyntaxInsnList(null);
 		
-		// Generate block id
-		Label l = new Label();
-		int theBlockId = getBlockId(l);
-		
-		// Save state
-		s.add(genSaveStack(theFrame)); // The stack will be popped by the next replayer
-		s.ALOAD(0);
-		s.pushInt(theBehaviorId);
-		s.pushInt(theBlockId);
-		s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, "invoke", "(II)V");
-		s.RETURN();
-		
-		// Got result
-		s.label(l);
-		int theSkip = theArgTypes.length;
-		if (aNode.getOpcode() != Opcodes.INVOKESTATIC) theSkip++;
-		s.add(genLoadStack(theFrame, theSkip));
-		
-		if (theType.getSort() != Type.VOID)
 		{
+			// Generate block id
+			Label l = new Label();
+			int theBlockId = getBlockId(l);
+			
+			// Save state
+			s.add(genSaveStack(theFrame)); // The stack will be popped by the next replayer
 			s.ALOAD(0);
-			s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, valueMethodName(theType), "()"+theType.getDescriptor());
+			s.pushInt(theBehaviorId);
+			s.pushInt(theBlockId);
+			s.pushInt(theExpectObjectInitialized ? 1 : 0);
+			s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, "invoke", "(IIZ)V");
+			s.RETURN();
+			
+			// Got result
+			s.label(l);
+			int theSkip = theArgTypes.length;
+			if (aNode.getOpcode() != Opcodes.INVOKESTATIC) theSkip++;
+			s.add(genLoadStack(theFrame, theSkip));
+			
+			if (theType.getSort() != Type.VOID)
+			{
+				s.ALOAD(0);
+				s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, valueMethodName(theType), "()"+theType.getDescriptor());
+			}
+		}
+		
+		// Wait for constructor target event if applicable
+		if (itsMethodInfo.isChainingInvocation(aNode))
+		{
+			Label l = new Label();
+			int theBlockId = getBlockId(l);
+			BCIFrame theFrame2 = itsMethodInfo.getFrame(aNode.getNext());
+
+			// Save state
+			s.add(genSaveStack(theFrame2)); 
+			s.ALOAD(0);
+			s.pushInt(theBlockId);
+			s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, "expectConstructorTarget", "(I)V");
+			s.RETURN();
+			
+			// Got event
+			s.label(l);
+			s.add(genLoadStack(theFrame2));
 		}
 
 		aInsns.insert(aNode, s);
@@ -1107,6 +1154,34 @@ public class MethodReplayerGenerator
 		s.label(lNormal);
 		aInsns.insertBefore(aNode, s);
 	}
+	
+	/**
+	 * Put execution on hold until next message is received
+	 */
+	private void processCheckCast(InsnList aInsns, TypeInsnNode aNode)
+	{
+		BCIFrame theFrame = itsMethodInfo.getFrame(aNode);
+		
+		SyntaxInsnList s = new SyntaxInsnList(null);
+
+		// Generate block id
+		Label l = new Label();
+		int theBlockId = getBlockId(l);
+		
+		s.add(genSaveStack(theFrame));
+		s.ALOAD(0);
+		s.pushInt(theBlockId);
+		s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, "hold", "(I)V");
+		s.RETURN();
+		
+		// Got value
+		s.label(l);
+		s.add(genLoadStack(theFrame));
+		
+		aInsns.insert(aNode, s);
+		aInsns.remove(aNode);
+	}
+
 	
 	private void processMonitor(InsnList aInsns, InsnNode aNode)
 	{

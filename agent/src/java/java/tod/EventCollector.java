@@ -187,7 +187,7 @@ public final class EventCollector
 		{
 			throw new Error("POlop");
 		}
-        
+		
 		return theThreadData;
 	}
 	

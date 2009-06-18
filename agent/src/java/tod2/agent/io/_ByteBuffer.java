@@ -356,62 +356,62 @@ public class _ByteBuffer
 		return itsBytes.length;
 	}
 	
-    public final _ByteBuffer flip()
+	public final _ByteBuffer flip()
 	{
 		itsLimit = itsPos;
 		itsPos = 0;
 		itsMark = -1;
 		return this;
 	}
-    
-    public final _ByteBuffer clear()
+	
+	public final _ByteBuffer clear()
 	{
 		itsPos = 0;
 		itsLimit = itsBytes.length;
 		itsMark = -1;
 		return this;
 	}
-    
-    public final void clear(byte[] aNewData)
-    {
-    	itsBytes = aNewData;
-    	clear();
-    }
+	
+	public final void clear(byte[] aNewData)
+	{
+		itsBytes = aNewData;
+		clear();
+	}
 
-    private static byte int3(int x) { return (byte)(x >> 24); }
-    private static byte int2(int x) { return (byte)(x >> 16); }
-    private static byte int1(int x) { return (byte)(x >>  8); }
-    private static byte int0(int x) { return (byte)(x >>  0); }
+	private static byte int3(int x) { return (byte)(x >> 24); }
+	private static byte int2(int x) { return (byte)(x >> 16); }
+	private static byte int1(int x) { return (byte)(x >>  8); }
+	private static byte int0(int x) { return (byte)(x >>  0); }
 
-    private static byte long7(long x) { return (byte)(x >> 56); }
-    private static byte long6(long x) { return (byte)(x >> 48); }
-    private static byte long5(long x) { return (byte)(x >> 40); }
-    private static byte long4(long x) { return (byte)(x >> 32); }
-    private static byte long3(long x) { return (byte)(x >> 24); }
-    private static byte long2(long x) { return (byte)(x >> 16); }
-    private static byte long1(long x) { return (byte)(x >>  8); }
-    private static byte long0(long x) { return (byte)(x >>  0); }
-    
-    public static long makeLong(byte b7, byte b6, byte b5, byte b4, byte b3, byte b2, byte b1, byte b0)
+	private static byte long7(long x) { return (byte)(x >> 56); }
+	private static byte long6(long x) { return (byte)(x >> 48); }
+	private static byte long5(long x) { return (byte)(x >> 40); }
+	private static byte long4(long x) { return (byte)(x >> 32); }
+	private static byte long3(long x) { return (byte)(x >> 24); }
+	private static byte long2(long x) { return (byte)(x >> 16); }
+	private static byte long1(long x) { return (byte)(x >>  8); }
+	private static byte long0(long x) { return (byte)(x >>  0); }
+	
+	public static long makeLong(byte b7, byte b6, byte b5, byte b4, byte b3, byte b2, byte b1, byte b0)
 	{
 		return ((b7 & 0xff) << 56) | ((b6 & 0xff) << 48) | ((b5 & 0xff) << 40) | ((b4 & 0xff) << 32)
 			| ((b3 & 0xff) << 24) | ((b2 & 0xff) << 16) | ((b1 & 0xff) << 8) | ((b0 & 0xff) << 0);
 	}
 
-    public static int makeInt(byte b3, byte b2, byte b1, byte b0)
-    {
-    	return ((b3 & 0xff) << 24) | ((b2 & 0xff) << 16) | ((b1 & 0xff) << 8) | ((b0 & 0xff) << 0);
-    }
-    
-    public static char makeChar(byte b1, byte b0)
+	public static int makeInt(byte b3, byte b2, byte b1, byte b0)
+	{
+		return ((b3 & 0xff) << 24) | ((b2 & 0xff) << 16) | ((b1 & 0xff) << 8) | ((b0 & 0xff) << 0);
+	}
+	
+	public static char makeChar(byte b1, byte b0)
 	{
 		return (char) ((b1 << 8) | (b0 & 0xff));
 	}
 
-    public static short makeShort(byte b1, byte b0)
-    {
-    	return (short) ((b1 << 8) | (b0 & 0xff));
-    }
-    
+	public static short makeShort(byte b1, byte b0)
+	{
+		return (short) ((b1 << 8) | (b0 & 0xff));
+	}
+	
 
 }

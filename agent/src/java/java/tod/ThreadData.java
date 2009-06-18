@@ -198,9 +198,19 @@ public final class ThreadData
 		return itsScopeStack.pop();
 	}
 	
-	private static void sendMessageType(_ByteBuffer aBuffer, byte aType) 
+	public static void sendMessageType(_ByteBuffer aBuffer, byte aType) 
 	{
+		if (AgentDebugFlags.EVENT_LOG) echoMessageType(aType); 
 		aBuffer.put(aType);
+	}
+	
+	public static void echoMessageType(byte aMessage)
+	{
+		_StringBuilder theBuilder = new _StringBuilder();
+		theBuilder.append(Thread.currentThread().getId());
+		theBuilder.append(' ');
+		theBuilder.append(Message._NAMES[aMessage]);
+		_IO.out(theBuilder.toString());		
 	}
 
 	private static void sendValueType(_ByteBuffer aBuffer, byte aType) 
@@ -215,11 +225,11 @@ public final class ThreadData
 	
 	private void msgStart(int aAccount, int aExpectedArgsCount)
 	{
-	    if (!AgentDebugFlags.COLLECT_PROFILE) return;
-	    if (itsExpectedArgsCount != -1) 
-	    {
-	    	_IO.err("Illegal state in msgStart");
-	    }
+		if (!AgentDebugFlags.COLLECT_PROFILE) return;
+		if (itsExpectedArgsCount != -1) 
+		{
+			_IO.err("Illegal state in msgStart");
+		}
 		itsLastBufferPos = itsBuffer.position();
 		itsAccountToCharge = aAccount;
 		itsExpectedArgsCount = aExpectedArgsCount;
@@ -227,65 +237,65 @@ public final class ThreadData
 	
 	private void msgStop()
 	{
-        if (!AgentDebugFlags.COLLECT_PROFILE) return;
-        if (itsExpectedArgsCount == -1) 
-        {
-	    	_IO.err("Illegal state in msgStop");
-        }
-        if (itsExpectedArgsCount-- == 0)
-        {
-            itsEvData[itsAccountToCharge] += itsBuffer.position() - itsLastBufferPos;
-            itsEvCount[itsAccountToCharge] ++;
-            itsAccountToCharge = -1;
-        }
+		if (!AgentDebugFlags.COLLECT_PROFILE) return;
+		if (itsExpectedArgsCount == -1) 
+		{
+			_IO.err("Illegal state in msgStop");
+		}
+		if (itsExpectedArgsCount-- == 0)
+		{
+			itsEvData[itsAccountToCharge] += itsBuffer.position() - itsLastBufferPos;
+			itsEvCount[itsAccountToCharge] ++;
+			itsAccountToCharge = -1;
+		}
 	}
 	
 	public void printStats()
 	{
-	    if (! AgentDebugFlags.COLLECT_PROFILE) return;
-	    _StringBuilder b = new _StringBuilder();
-	    
-	    long theTotalData = 0;
-	    
-	    for(int i = Message.FIELD_READ;i<Message.MSG_COUNT;i++)
-	    {
-	        if (i >= 20 && itsEvCount[i] == 0 && itsEvData[i] == 0) continue;
-	        b.append("[ThreadData] ");
-	        b.append(Message._NAMES[i]);
-	        b.append(": ");
-	        b.append(itsEvCount[i]);
-	        b.append(" - ");
-	        b.append(itsEvData[i]);
-	        b.append("\n");
-	        
-	        theTotalData += itsEvData[i];
-	    }
-	    
-	    b.append("[ThreadData] Total: ");
-	    b.append(theTotalData);
-        b.append("\n");
-        
-        b.append("[ThreadData] Object ids: ");
-        b.append(itsObjIdSender.toString());
-        b.append("\n");
-	    
-        b.append("[ThreadData] Object ids cache access: ");
-        b.append(ObjectIdentity.itsObjIdCacheAccess);
-        b.append(" - hits: ");
-        b.append(ObjectIdentity.itsObjIdCacheHit);
-        if (ObjectIdentity.itsObjIdCacheAccess != 0)
-        {
-            b.append(" - ");
-            b.append(ObjectIdentity.itsObjIdCacheHit*100/ObjectIdentity.itsObjIdCacheAccess);
-            b.append("%");
-        }
-        b.append("\n");
-        
-        b.append("[ThreadData] Behavior ids: ");
-        b.append(itsBehIdSender.toString());
-        b.append("\n");
+		if (! AgentDebugFlags.COLLECT_PROFILE) return;
+		_StringBuilder b = new _StringBuilder();
+		
+		long theTotalData = 0;
+		
+		for(int i = Message.FIELD_READ;i<Message.MSG_COUNT;i++)
+		{
+			if (i >= 20 && itsEvCount[i] == 0 && itsEvData[i] == 0) continue;
+			b.append("[ThreadData] ");
+			b.append(Message._NAMES[i]);
+			b.append(": ");
+			b.append(itsEvCount[i]);
+			b.append(" - ");
+			b.append(itsEvData[i]);
+			b.append("\n");
+			
+			theTotalData += itsEvData[i];
+		}
+		
+		b.append("[ThreadData] Total: ");
+		b.append(theTotalData);
+		b.append("\n");
+		
+		b.append("[ThreadData] Object ids: ");
+		b.append(itsObjIdSender.toString());
+		b.append("\n");
+		
+		b.append("[ThreadData] Object ids cache access: ");
+		b.append(ObjectIdentity.itsObjIdCacheAccess);
+		b.append(" - hits: ");
+		b.append(ObjectIdentity.itsObjIdCacheHit);
+		if (ObjectIdentity.itsObjIdCacheAccess != 0)
+		{
+			b.append(" - ");
+			b.append(ObjectIdentity.itsObjIdCacheHit*100/ObjectIdentity.itsObjIdCacheAccess);
+			b.append("%");
+		}
+		b.append("\n");
+		
+		b.append("[ThreadData] Behavior ids: ");
+		b.append(itsBehIdSender.toString());
+		b.append("\n");
 
-	    _IO.out(b.toString());
+		_IO.out(b.toString());
 	}
 	
 	
@@ -342,7 +352,7 @@ public final class ThreadData
 		{
 			itsLastTracedMethodsVersion = theCurrentVersion;
 			
-		    msgStart(Message.TRACEDMETHODS_VERSION, 0);
+			msgStart(Message.TRACEDMETHODS_VERSION, 0);
 			sendMessageType(itsBuffer, Message.TRACEDMETHODS_VERSION);
 			itsBuffer.putInt(theCurrentVersion);
 			msgStop();
@@ -374,9 +384,9 @@ public final class ThreadData
 		sendMessageType(itsBuffer, Message.FIELD_READ);
 		msgStop();
 		
-        commitBuffer();
-        
-        exit();
+		commitBuffer();
+		
+		exit();
 	}
 	
 	/**
@@ -388,13 +398,13 @@ public final class ThreadData
 		
 		sendRegisteredObjects();
 		
-	    msgStart(Message.FIELD_READ_SAME, 0);
+		msgStart(Message.FIELD_READ_SAME, 0);
 		sendMessageType(itsBuffer, Message.FIELD_READ_SAME);
 		msgStop();
 		
-        commitBuffer();
+		commitBuffer();
 
-        exit();
+		exit();
 	}
 	
 	/**
@@ -406,13 +416,13 @@ public final class ThreadData
 		
 		sendRegisteredObjects();
 		
-	    msgStart(Message.ARRAY_READ, 1);
+		msgStart(Message.ARRAY_READ, 1);
 		sendMessageType(itsBuffer, Message.ARRAY_READ);
 		msgStop();
 		
-        commitBuffer();
-        
-        exit();
+		commitBuffer();
+		
+		exit();
 	}
 	
 	public void evNewArray(Object aValue)
@@ -420,7 +430,7 @@ public final class ThreadData
 		if (enter()) return;
 		
 		msgStart(Message.NEW_ARRAY, 0);
-	    
+		
 		checkTimestamp();
 		sendMessageType(itsBuffer, Message.NEW_ARRAY);
 		sendValue(itsBuffer, aValue);
@@ -462,7 +472,7 @@ public final class ThreadData
 		msgStart(Message.OBJECT_INITIALIZED, 0);
 
 		checkTimestamp();
-		sendMessageType(itsBuffer, Message.NEW_ARRAY);
+		sendMessageType(itsBuffer, Message.OBJECT_INITIALIZED);
 		sendValue(itsBuffer, aValue);
 
 		msgStop();
@@ -519,7 +529,7 @@ public final class ThreadData
 		
 		sendRegisteredObjects();
 		
-	    msgStart(Message.HANDLER_REACHED, 0);
+		msgStart(Message.HANDLER_REACHED, 0);
 		
 		checkTimestamp();
 		sendMessageType(itsBuffer, Message.HANDLER_REACHED);
@@ -541,6 +551,7 @@ public final class ThreadData
 		msgStart(Message.INSCOPE_BEHAVIOR_ENTER, 0);
 
 		checkTimestamp();
+		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.INSCOPE_BEHAVIOR_ENTER); 
 		itsBehIdSender.send(itsBuffer, aBehaviorId, Message.INSCOPE_BEHAVIOR_ENTER_DELTA, Message.INSCOPE_BEHAVIOR_ENTER);
 
 		msgStop();
@@ -563,7 +574,7 @@ public final class ThreadData
 	{
 		if (enter()) return;
 		
-	    msgStart(Message.BEHAVIOR_ENTER_ARGS, aCount);
+		msgStart(Message.BEHAVIOR_ENTER_ARGS, aCount);
 		sendMessageType(itsBuffer, Message.BEHAVIOR_ENTER_ARGS);
 		msgStop();
 		
@@ -585,9 +596,9 @@ public final class ThreadData
 		if (enter()) return;
 		
 		itsBuffer.put(aValue);
-        msgStop();
-        
-        exit();
+		msgStop();
+		
+		exit();
 	}
 	
 	public void sendValue_Char(char aValue)
@@ -595,9 +606,9 @@ public final class ThreadData
 		if (enter()) return;
 		
 		itsBuffer.putChar(aValue);
-        msgStop();
-        
-        exit();
+		msgStop();
+		
+		exit();
 	}
 	
 	public void sendValue_Short(short aValue)
@@ -605,9 +616,9 @@ public final class ThreadData
 		if (enter()) return;
 		
 		itsBuffer.putShort(aValue);
-        msgStop();
-        
-        exit();
+		msgStop();
+		
+		exit();
 	}
 	
 	public void sendValue_Int(int aValue)
@@ -615,9 +626,9 @@ public final class ThreadData
 		if (enter()) return;
 		
 		itsBuffer.putInt(aValue);
-        msgStop();
-        
-        exit();
+		msgStop();
+		
+		exit();
 	}
 	
 	public void sendValue_Long(long aValue)
@@ -625,9 +636,9 @@ public final class ThreadData
 		if (enter()) return;
 		
 		itsBuffer.putLong(aValue);
-        msgStop();
-        
-        exit();
+		msgStop();
+		
+		exit();
 	}
 	
 	public void sendValue_Float(float aValue)
@@ -635,9 +646,9 @@ public final class ThreadData
 		if (enter()) return;
 		
 		itsBuffer.putFloat(aValue);
-        msgStop();
-        
-        exit();
+		msgStop();
+		
+		exit();
 	}
 	
 	public void sendValue_Double(double aValue)
@@ -645,9 +656,9 @@ public final class ThreadData
 		if (enter()) return;
 		
 		itsBuffer.putDouble(aValue);
-        msgStop();
-        
-        exit();
+		msgStop();
+		
+		exit();
 	}
 	
 	public void sendValue_Ref(Object aValue)
@@ -655,9 +666,9 @@ public final class ThreadData
 		if (enter()) return;
 		
 		sendValue(itsBuffer, aValue);
-        msgStop();
-        
-        exit();
+		msgStop();
+		
+		exit();
 	}
 	
 	public void sendConstructorTarget(Object aTarget)
@@ -682,7 +693,7 @@ public final class ThreadData
 	{
 		if (enter()) return;
 		
-	    msgStart(Message.INSCOPE_BEHAVIOR_EXIT_NORMAL, 0);
+		msgStart(Message.INSCOPE_BEHAVIOR_EXIT_NORMAL, 0);
 		msgStop();
 		
 		if (! popScope()) throw new Error("Unexpected scope state");
@@ -696,7 +707,7 @@ public final class ThreadData
 		
 		sendRegisteredObjects();
 		
-	    msgStart(Message.INSCOPE_BEHAVIOR_EXIT_EXCEPTION, 0);
+		msgStart(Message.INSCOPE_BEHAVIOR_EXIT_EXCEPTION, 0);
 		sendMessageType(itsBuffer, Message.INSCOPE_BEHAVIOR_EXIT_EXCEPTION);
 		msgStop();
 		
@@ -716,7 +727,7 @@ public final class ThreadData
 		
 		sendRegisteredObjects();
 		
-	    msgStart(Message.OUTOFSCOPE_BEHAVIOR_ENTER, 0);
+		msgStart(Message.OUTOFSCOPE_BEHAVIOR_ENTER, 0);
 		sendMessageType(itsBuffer, Message.OUTOFSCOPE_BEHAVIOR_ENTER);
 		msgStop();
 		
@@ -736,7 +747,7 @@ public final class ThreadData
 		
 		sendRegisteredObjects();
 		
-	    msgStart(Message.OUTOFSCOPE_BEHAVIOR_EXIT_NORMAL, 0);
+		msgStart(Message.OUTOFSCOPE_BEHAVIOR_EXIT_NORMAL, 0);
 		sendMessageType(itsBuffer, Message.OUTOFSCOPE_BEHAVIOR_EXIT_NORMAL);
 		msgStop();
 		
@@ -754,7 +765,7 @@ public final class ThreadData
 	{
 		if (enter()) return;
 		
-	    msgStart(Message.BEHAVIOR_ENTER_ARGS, 1);
+		msgStart(Message.OUTOFSCOPE_BEHAVIOR_EXIT_RESULT, 1);
 		sendMessageType(itsBuffer, Message.OUTOFSCOPE_BEHAVIOR_EXIT_RESULT);
 		msgStop();
 		
@@ -770,7 +781,7 @@ public final class ThreadData
 		
 		sendRegisteredObjects();
 		
-	    msgStart(Message.OUTOFSCOPE_BEHAVIOR_EXIT_EXCEPTION, 0);
+		msgStart(Message.OUTOFSCOPE_BEHAVIOR_EXIT_EXCEPTION, 0);
 		sendMessageType(itsBuffer, Message.OUTOFSCOPE_BEHAVIOR_EXIT_EXCEPTION);
 		msgStop();
 		
@@ -789,7 +800,7 @@ public final class ThreadData
 	{
 		if (enter()) return;
 		
-	    msgStart(Message.UNMONITORED_BEHAVIOR_CALL, 0);
+		msgStart(Message.UNMONITORED_BEHAVIOR_CALL, 0);
 		msgStop();
 		pushOutOfScope();
 		
@@ -846,7 +857,7 @@ public final class ThreadData
 	{
 		if (enter()) return;
 		
-	    msgStart(Message.UNMONITORED_BEHAVIOR_CALL_EXCEPTION, 0);
+		msgStart(Message.UNMONITORED_BEHAVIOR_CALL_EXCEPTION, 0);
 		msgStop();
 		if (popScope()) throw new Error("Unexpected scope state");
 		
@@ -1063,6 +1074,7 @@ public final class ThreadData
 		
 		msgStart(Message.REGISTER_REFOBJECT, 0);
 		
+		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.REGISTER_REFOBJECT); 
 		itsObjIdSender.send(itsBuffer, aId, Message.REGISTER_REFOBJECT_DELTA, Message.REGISTER_REFOBJECT);
 		itsBuffer.putInt(theClassId);
 		

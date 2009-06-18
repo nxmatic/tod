@@ -36,8 +36,8 @@ import tod2.agent.util.BitUtilsLite;
  */
 public class ObjectIdentity
 {
-    private static final boolean USE_CACHE = false;
-    
+	private static final boolean USE_CACHE = false;
+	
 	/**
 	 * Used as a monitor within generated $tod$getId code.
 	 */
@@ -64,24 +64,24 @@ public class ObjectIdentity
 	 */
 	public static long get (Object aObject)
 	{
-	    if (! USE_CACHE) return USE_JAVA ? get14(aObject) : get15(aObject);
-	    
-        if (AgentDebugFlags.COLLECT_PROFILE) itsObjIdCacheAccess++;
-        
-        for (int i = 0; i < OBJID_CACHE_SIZE; i++) if (itsObjIdCacheKey[i] == aObject)
-        {
-            if (AgentDebugFlags.COLLECT_PROFILE) itsObjIdCacheHit++;
-            return itsObjIdCacheValue[i];
-        }
+		if (! USE_CACHE) return USE_JAVA ? get14(aObject) : get15(aObject);
+		
+		if (AgentDebugFlags.COLLECT_PROFILE) itsObjIdCacheAccess++;
+		
+		for (int i = 0; i < OBJID_CACHE_SIZE; i++) if (itsObjIdCacheKey[i] == aObject)
+		{
+			if (AgentDebugFlags.COLLECT_PROFILE) itsObjIdCacheHit++;
+			return itsObjIdCacheValue[i];
+		}
 
-        long theId = USE_JAVA ? get14(aObject) : get15(aObject);
+		long theId = USE_JAVA ? get14(aObject) : get15(aObject);
 
-        int theIndex = itsObjIdCacheIndex;
-        itsObjIdCacheKey[theIndex] = aObject;
-        itsObjIdCacheValue[theIndex] = theId;
-        itsObjIdCacheIndex = (theIndex + 1) & OBJID_CACHE_MASK;
+		int theIndex = itsObjIdCacheIndex;
+		itsObjIdCacheKey[theIndex] = aObject;
+		itsObjIdCacheValue[theIndex] = theId;
+		itsObjIdCacheIndex = (theIndex + 1) & OBJID_CACHE_MASK;
 
-        return theId;
+		return theId;
 	}
 	
 	private static native long get15(Object aObject);

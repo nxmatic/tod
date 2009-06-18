@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import tod.Util;
 import tod.core.database.structure.BehaviorKind;
 import tod.core.database.structure.IClassInfo;
 import tod.core.database.structure.IMutableBehaviorInfo;
@@ -357,7 +358,7 @@ public class BehaviorInfo extends MemberInfo implements IMutableBehaviorInfo
 	@Override
 	public String toString()
 	{
-		return "Behavior ("+getId()+", "+getName()+") of "+getDeclaringType();
+		return String.format("%s.%s (bid: %d, cid: %d)", getDeclaringType().getName(), Util.getFullName(this), getId(), getDeclaringType().getId());
 	}
 	
 }

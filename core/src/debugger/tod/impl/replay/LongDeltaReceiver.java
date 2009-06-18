@@ -45,7 +45,7 @@ public class LongDeltaReceiver
 	
 	public long receiveFull(_ByteBuffer aBuffer)
 	{
-		itsValue = aBuffer.getInt();
+		itsValue = aBuffer.getLong();
 		return itsValue;
 	}
 	

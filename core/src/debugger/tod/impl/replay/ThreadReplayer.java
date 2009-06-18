@@ -62,6 +62,18 @@ public class ThreadReplayer
 	static final int S_INSCOPE = 1; 
 	static final int S_CALLING_MONITORED = 2; 
 	static final int S_OUTOFSCOPE = 3; 
+	static final int S_INVOKE_PENDING = 4; 
+	static final int S_HOLD = 5; 
+	
+	private static final String[] _STATES = 
+	{
+		"S_UNDEFINED", 
+		"S_INSCOPE",
+		"S_CALLING_MONITORED", 
+		"S_OUTOFSCOPE",
+		"S_INVOKE_PENDING", 
+		"S_HOLD",
+	};
 
 	public static final String REPLAYER_NAME_PREFIX = "$tod$replayer$";
 	
@@ -108,18 +120,82 @@ public class ThreadReplayer
 		return itsDatabase;
 	}
 	
+	public void echo(String aText, Object... aArgs)
+	{
+		Utils.printlnIndented(itsStack.size()*2, aText, aArgs);
+	}
+	
+	private void setState(int aState)
+	{
+		itsState = aState;
+		echo("State: "+_STATES[aState]);
+	}
+
+	private int getState()
+	{
+		return itsState;
+	}
+
+
 	public void replay(_ByteBuffer aBuffer)
 	{
 		while(aBuffer.remaining() > 0)
 		{
 			byte theMessage = aBuffer.get();
+			echo("Message: "+Message._NAMES[theMessage]+" [@"+aBuffer.position()+"]");
 			
+			// Process held state
+			while(true)
+			{
+				boolean theChanged = false;
+				
+				switch(getState())
+				{
+				case S_INVOKE_PENDING:
+					if (theMessage != Message.TRACEDMETHODS_VERSION)
+					{
+						InScopeMethodReplayer theReplayer = (InScopeMethodReplayer) peekReplayer();
+						theReplayer.proceedInvoke();
+						setState(S_INSCOPE);
+						postprocess();
+						theChanged = true;
+					}
+					break;
+					
+				case S_HOLD:
+					if (theMessage != Message.EXCEPTION)
+					{
+						InScopeMethodReplayer theReplayer = (InScopeMethodReplayer) peekReplayer();
+						theReplayer.proceed();
+						setState(S_INSCOPE);
+						postprocess();
+						theChanged = true;
+					}
+					else
+					{
+						setState(S_INSCOPE);
+					}
+					break;
+				}
+				
+				if (! theChanged) break;
+			} 
+			
+			// Process message
 			boolean theProcessed = true;
+			
 			// Filter state-independant messages
 			switch(theMessage)
 			{
 			case Message.TRACEDMETHODS_VERSION:
 				processTracedMethodsVersion(aBuffer.getInt());
+				if (getState() == S_INVOKE_PENDING)
+				{
+					InScopeMethodReplayer theReplayer = (InScopeMethodReplayer) peekReplayer();
+					theReplayer.proceedInvoke();
+					setState(S_INSCOPE);
+					postprocess();
+				}
 				break;
 				
 			case Message.REGISTER_REFOBJECT:
@@ -143,13 +219,15 @@ public class ThreadReplayer
 			if (theProcessed) continue;
 
 			// Dispatch the message according to the current state
-			switch(itsState)
+			switch(getState())
 			{
 			case S_INSCOPE: process_InScope(theMessage, aBuffer); break;
 			case S_CALLING_MONITORED: process_CallingMonitored(theMessage, aBuffer); break;
 			case S_OUTOFSCOPE: process_OutOfScope(theMessage, aBuffer); break;
-			default: throw new RuntimeException("Not handled: "+itsState);
+			default: throw new RuntimeException("Not handled: "+getState());
 			}
+			
+			postprocess();
 		}
 	}
 	
@@ -160,7 +238,6 @@ public class ThreadReplayer
 	{
 		InScopeMethodReplayer theCurrentReplayer = (InScopeMethodReplayer) peekReplayer();
 		
-		// Let the current replayer process the message
 		switch(aMessage)
 		{
 		case Message.BEHAVIOR_ENTER_ARGS: 
@@ -170,54 +247,79 @@ public class ThreadReplayer
 		case Message.FIELD_READ_SAME: 
 		case Message.NEW_ARRAY: 
 		case Message.OBJECT_INITIALIZED: 
+		case Message.CONSTRUCTOR_TARGET: 
 		case Message.EXCEPTION: 
 		case Message.HANDLER_REACHED: 
+		case Message.INSCOPE_BEHAVIOR_EXIT_EXCEPTION:
+			// Let the current replayer process the message
 			theCurrentReplayer.processMessage(aMessage, aBuffer);
 			break;
 			
-		case Message.OUTOFSCOPE_BEHAVIOR_EXIT_RESULT:
-		{
-			MethodReplayer theParentReplayer = peekReplayer();
-			theParentReplayer.transferResult(aBuffer);
-			break;
-		}
+//		case Message.OUTOFSCOPE_BEHAVIOR_EXIT_RESULT:
+//		{
+//			MethodReplayer theParentReplayer = peekReplayer();
+//			theParentReplayer.transferResult(aBuffer);
+//			break;
+//		}
+//		
 
 		default: throw new IllegalStateException("State: INSCOPE, got "+Message._NAMES[aMessage]);
 		}
-		
-		// Once the message has been replayed, check the state of the replayer for interprocedural control flow
-		switch(theCurrentReplayer.getState())
+	}
+	
+	private void postprocess()
+	{
+		InScopeMethodReplayer theLastReplayer = null;
+		while (getState() == S_INSCOPE)
 		{
-		case InScopeMethodReplayer.S_FINISHED_NORMAL:
-		{
-			popReplayer();
-			MethodReplayer theParentReplayer = peekReplayer();
-			itsState = getStateForReplayer(theParentReplayer);
-			if (theParentReplayer == null) break;
+			InScopeMethodReplayer theCurrentReplayer = (InScopeMethodReplayer) peekReplayer();
+
+			switch(theCurrentReplayer.getState())
+			{
+			case InScopeMethodReplayer.S_FINISHED_NORMAL:
+			{
+				popReplayer();
+				MethodReplayer theParentReplayer = peekReplayer();
+				setState(getStateForReplayer(theParentReplayer));
+				if (theParentReplayer == null) break;
+				
+				theParentReplayer.transferResult(theCurrentReplayer);
+				break;
+			}
+				
+			case InScopeMethodReplayer.S_FINISHED_EXCEPTION:
+			{
+				popReplayer();
+				MethodReplayer theParentReplayer = peekReplayer();
+				setState(getStateForReplayer(theParentReplayer));
+				if (theParentReplayer == null) break;
+				
+				theParentReplayer.expectException();
+				break;
+			}
+				
+			case InScopeMethodReplayer.S_CALLING_MONITORED:
+				setState(S_CALLING_MONITORED);
+				break;
+				
+			case InScopeMethodReplayer.S_CALLING_UNMONITORED:
+				pushReplayer(new UnmonitoredMethodReplayer());
+				setState(S_OUTOFSCOPE);			
+				break;
+				
+			case InScopeMethodReplayer.S_INVOKE_PENDING:
+				setState(S_INVOKE_PENDING);
+				return;
+				
+			case InScopeMethodReplayer.S_HOLD:
+				setState(S_HOLD);
+				return;
+				
+			default: return;
+			}
 			
-			theParentReplayer.transferResult(theCurrentReplayer);
-			break;
-		}
-			
-		case InScopeMethodReplayer.S_FINISHED_EXCEPTION:
-		{
-			popReplayer();
-			MethodReplayer theParentReplayer = peekReplayer();
-			itsState = getStateForReplayer(theParentReplayer);
-			if (theParentReplayer == null) break;
-			
-			theParentReplayer.expectException();
-			break;
-		}
-			
-		case InScopeMethodReplayer.S_CALLING_MONITORED:
-			itsState = S_CALLING_MONITORED;
-			break;
-			
-		case InScopeMethodReplayer.S_CALLING_UNMONITORED:
-			pushReplayer(new UnmonitoredMethodReplayer());
-			itsState = S_OUTOFSCOPE;			
-			break;
+			if (theLastReplayer == theCurrentReplayer) return;
+			theLastReplayer = theCurrentReplayer;
 		}
 	}
 	
@@ -246,7 +348,7 @@ public class ThreadReplayer
 			
 		case Message.OUTOFSCOPE_BEHAVIOR_ENTER:
 			pushReplayer(new OutOfScopeMethodReplayer());
-			itsState = S_OUTOFSCOPE;
+			setState(S_OUTOFSCOPE);
 			break;
 			
 		default: throw new RuntimeException("Command not handled: "+Message._NAMES[aMessage]);
@@ -280,7 +382,7 @@ public class ThreadReplayer
 		{
 			popReplayer();
 			MethodReplayer theParentReplayer = peekReplayer();
-			itsState = getStateForReplayer(theParentReplayer);
+			setState(getStateForReplayer(theParentReplayer));
 			break;
 		}
 
@@ -288,7 +390,7 @@ public class ThreadReplayer
 		{
 			popReplayer();
 			MethodReplayer theParentReplayer = peekReplayer();
-			itsState = getStateForReplayer(theParentReplayer);
+			setState(getStateForReplayer(theParentReplayer));
 			break;
 		}
 			
@@ -305,7 +407,7 @@ public class ThreadReplayer
 			if (! (theReplayer instanceof UnmonitoredMethodReplayer)) throw new IllegalStateException();
 			InScopeMethodReplayer theParentReplayer = (InScopeMethodReplayer) peekReplayer();
 			theParentReplayer.transferResult(aBuffer);
-			itsState = S_INSCOPE;
+			setState(S_INSCOPE);
 			break;
 		}
 		
@@ -313,7 +415,7 @@ public class ThreadReplayer
 		{
 			MethodReplayer theReplayer = popReplayer();
 			if (! (theReplayer instanceof UnmonitoredMethodReplayer)) throw new IllegalStateException();
-			itsState = S_INSCOPE;
+			setState(S_INSCOPE);
 			break;
 		}
 			
@@ -352,6 +454,7 @@ public class ThreadReplayer
 	{
 		MethodReplayer theCurrentReplayer = peekReplayer();
 		InScopeMethodReplayer theNextReplayer = createReplayer(aBehaviorId);
+		echo("Entering "+getDatabase().getBehavior(aBehaviorId, true));
 		pushReplayer(theNextReplayer);
 		
 		if (theCurrentReplayer == null)
@@ -360,7 +463,7 @@ public class ThreadReplayer
 		}
 		else
 		{
-			switch(itsState)
+			switch(getState())
 			{
 			case S_OUTOFSCOPE:
 				theNextReplayer.startFromOutOfScope();
@@ -371,12 +474,12 @@ public class ThreadReplayer
 				break;
 				
 			default:
-				throw new IllegalStateException(""+itsState);
+				throw new IllegalStateException(""+getState());
 			
 			}
 		}
 		
-		itsState = S_INSCOPE;
+		setState(S_INSCOPE);
 	}
 	
 	private void processTracedMethodsVersion(int aVersion)

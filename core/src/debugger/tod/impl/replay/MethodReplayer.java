@@ -48,12 +48,16 @@ public abstract class MethodReplayer
 	static final int S_WAIT_CST = 7; // Waiting for a class constant (LDC)
 	static final int S_WAIT_EXCEPTION = 8; // Waiting for an exception
 	static final int S_EXCEPTION_THROWN = 9; // An exception was thrown, expect handler or exit
+	static final int S_WAIT_OBJECTINITIALIZED = 10; // Waiting for an object initialized message
+	static final int S_WAIT_CONSTRUCTORTARGET = 11; // Waiting for a constructor target message
 	
 	// Public states (used by ThreadReplayer)
-	public static final int S_FINISHED_NORMAL = 10; // Execution finished normally
-	public static final int S_FINISHED_EXCEPTION = 11; // Execution finished because an exception was thrown
-	public static final int S_CALLING_MONITORED = 12; // Processing invocation of monitored code
-	public static final int S_CALLING_UNMONITORED = 13; // Processing invocation of unmonitored code
+	public static final int S_HOLD = 12; // Pause execution until the next message is received, if not an exception.
+	public static final int S_FINISHED_NORMAL = 13; // Execution finished normally
+	public static final int S_FINISHED_EXCEPTION = 14; // Execution finished because an exception was thrown
+	public static final int S_INVOKE_PENDING = 15; // An invocation is pending
+	public static final int S_CALLING_MONITORED = 16; // Processing invocation of monitored code
+	public static final int S_CALLING_UNMONITORED = 17; // Processing invocation of unmonitored code
 	
 	private int itsState = S_INITIALIZED;
 	private ThreadReplayer itsThreadReplayer;

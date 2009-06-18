@@ -3,6 +3,8 @@
  */
 package java.tod.util;
 
+import java.tod.ThreadData;
+
 import tod2.agent.AgentDebugFlags;
 import tod2.agent.io._ByteBuffer;
 
@@ -16,61 +18,61 @@ public final class IntDeltaSender
 
 	private void updateProfile(int aDelta)
 	{
-        if (AgentDebugFlags.COLLECT_PROFILE)
-        {
-            if (aDelta >= Byte.MIN_VALUE && aDelta <= Byte.MAX_VALUE) itsDeltaByteCount++;
-            else if (aDelta >= Short.MIN_VALUE && aDelta <= Short.MAX_VALUE) itsDeltaShortCount++;
-            
-            itsCount++;
-        }
+		if (AgentDebugFlags.COLLECT_PROFILE)
+		{
+			if (aDelta >= Byte.MIN_VALUE && aDelta <= Byte.MAX_VALUE) itsDeltaByteCount++;
+			else if (aDelta >= Short.MIN_VALUE && aDelta <= Short.MAX_VALUE) itsDeltaShortCount++;
+			
+			itsCount++;
+		}
 	}
 	
 	public void send(_ByteBuffer aBuffer, int aValue)
 	{
 		int theDelta = aValue - itsLastValueSent;
 		itsLastValueSent = aValue;
-	    
-	    if (theDelta >= Byte.MIN_VALUE && theDelta <= Byte.MAX_VALUE)
-	    {
-            aBuffer.put((byte) theDelta);
-	    }
-	    else
-	    {
-	        aBuffer.putInt(aValue);
-	    }
-        
-	    updateProfile(theDelta);
+		
+		if (theDelta >= Byte.MIN_VALUE && theDelta <= Byte.MAX_VALUE)
+		{
+			aBuffer.put((byte) theDelta);
+		}
+		else
+		{
+			aBuffer.putInt(aValue);
+		}
+		
+		updateProfile(theDelta);
 	}
 	
 	public void send(_ByteBuffer aBuffer, int aValue, byte aSendByteCmd, byte aSendFullCmd)
 	{
 		int theDelta = aValue - itsLastValueSent;
 		itsLastValueSent = aValue;
-	    
-	    if (theDelta >= Byte.MIN_VALUE && theDelta <= Byte.MAX_VALUE)
-	    {
-	    	aBuffer.put(aSendByteCmd);
-            aBuffer.put((byte) theDelta);
-	    }
-	    else
-	    {
-	    	aBuffer.put(aSendFullCmd);
-	        aBuffer.putInt(aValue);
-	    }
-        
-	    updateProfile(theDelta);
+		
+		if (theDelta >= Byte.MIN_VALUE && theDelta <= Byte.MAX_VALUE)
+		{
+		    aBuffer.put(aSendByteCmd);
+			aBuffer.put((byte) theDelta);
+		}
+		else
+		{
+		    aBuffer.put(aSendFullCmd);
+			aBuffer.putInt(aValue);
+		}
+		
+		updateProfile(theDelta);
 	}
 	
 	@Override
 	public String toString()
 	{
 		_StringBuilder b = new _StringBuilder();
-        b.append(itsCount);
-        b.append(" - b: ");
-        b.append(itsDeltaByteCount);
-        b.append(" - s: ");
-        b.append(itsDeltaShortCount);
-        b.append("\n");
-        return b.toString();
+		b.append(itsCount);
+		b.append(" - b: ");
+		b.append(itsDeltaByteCount);
+		b.append(" - s: ");
+		b.append(itsDeltaShortCount);
+		b.append("\n");
+		return b.toString();
 	}
 }
