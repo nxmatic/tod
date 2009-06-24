@@ -32,8 +32,8 @@ Inc. MD5 Message-Digest Algorithm".
 package tod.impl.replay;
 
 import tod.core.database.structure.IStructureDatabase;
+import tod.impl.server.BufferStream;
 import tod2.agent.Message;
-import tod2.agent.io._ByteBuffer;
 
 public abstract class MethodReplayer
 {
@@ -44,15 +44,15 @@ public abstract class MethodReplayer
 	static final int S_STARTED = 3; // The replayer has started replaying
 	static final int S_WAIT_FIELD = 4; // Waiting for a field value
 	static final int S_WAIT_ARRAY = 5; // Waiting for an array slot value
-	static final int S_WAIT_NEWARRAY = 6; // Waiting for a new array ref
-	static final int S_WAIT_CST = 7; // Waiting for a class constant (LDC)
-	static final int S_WAIT_EXCEPTION = 8; // Waiting for an exception
-	static final int S_EXCEPTION_THROWN = 9; // An exception was thrown, expect handler or exit
-	static final int S_WAIT_OBJECTINITIALIZED = 10; // Waiting for an object initialized message
-	static final int S_WAIT_CONSTRUCTORTARGET = 11; // Waiting for a constructor target message
+	static final int S_WAIT_ARRAYLENGTH = 6; // Waiting for an array length
+	static final int S_WAIT_NEWARRAY = 7; // Waiting for a new array ref
+	static final int S_WAIT_CST = 8; // Waiting for a class constant (LDC)
+	static final int S_WAIT_EXCEPTION = 9; // Waiting for an exception
+	static final int S_EXCEPTION_THROWN = 10; // An exception was thrown, expect handler or exit
+	static final int S_WAIT_OBJECTINITIALIZED = 11; // Waiting for an object initialized message
+	static final int S_WAIT_CONSTRUCTORTARGET = 12; // Waiting for a constructor target message
 	
 	// Public states (used by ThreadReplayer)
-	public static final int S_HOLD = 12; // Pause execution until the next message is received, if not an exception.
 	public static final int S_FINISHED_NORMAL = 13; // Execution finished normally
 	public static final int S_FINISHED_EXCEPTION = 14; // Execution finished because an exception was thrown
 	public static final int S_INVOKE_PENDING = 15; // An invocation is pending
@@ -102,7 +102,7 @@ public abstract class MethodReplayer
 		throw new IllegalStateException();
 	}
 
-	public abstract void processMessage(byte aMessage, _ByteBuffer aBuffer);
+	public abstract void processMessage(byte aMessage, BufferStream aBuffer);
 
 	/**
 	 * Transfers a value from the source replayer's stack to this replayer's stack.
@@ -113,7 +113,7 @@ public abstract class MethodReplayer
 	 * Transfers a value from the input buffer (usually from {@link Message#BEHAVIOR_ENTER_ARGS})
 	 * to this replayer's stack.
 	 */
-	public abstract void transferResult(_ByteBuffer aBuffer);
+	public abstract void transferResult(BufferStream aBuffer);
 	
 	public abstract void expectException();
 

@@ -31,21 +31,15 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.replay;
 
-import gnu.trove.TDoubleStack;
-import gnu.trove.TFloatStack;
-import gnu.trove.TIntStack;
-import gnu.trove.TLongStack;
-
 import org.objectweb.asm.Type;
 
 import tod.core.database.structure.IBehaviorInfo;
 import tod.core.database.structure.ObjectId;
 import tod.impl.bci.asm2.BCIUtils;
 import tod.impl.replay.ThreadReplayer.ExceptionInfo;
+import tod.impl.server.BufferStream;
 import tod2.agent.Message;
 import tod2.agent.MonitoringMode;
-import tod2.agent.io._ByteBuffer;
-import zz.utils.ArrayStack;
 import zz.utils.primitive.IntArray;
 
 public abstract class InScopeMethodReplayer extends MethodReplayer
@@ -90,11 +84,8 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 	private final long[] itsLongCache;
 	private final short[] itsShortCache;
 	
-	private final ArrayStack<ObjectId> itsRefStack = new ArrayStack<ObjectId>();
-	private final TIntStack itsIntStack = new TIntStack();
-	private final TDoubleStack itsDoubleStack = new TDoubleStack();
-	private final TFloatStack itsFloatStack = new TFloatStack();
-	private final TLongStack itsLongStack = new TLongStack();
+	private PrimitiveMultiStack itsSaveStack = new PrimitiveMultiStack();
+	private PrimitiveMultiStack itsArgsStack = new PrimitiveMultiStack();
 	
 	/**
 	 * Block id corresponding to each handler id. Indexed by handler id.
@@ -211,17 +202,17 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
         case Type.CHAR:
         case Type.SHORT:
 		case Type.INT: 
-			lIntSet(aSlot, aParent.sIntPop()); 
+			lIntSet(aSlot, aParent.aIntPop()); 
 			break;
 			
 		case Type.OBJECT:
 		case Type.ARRAY:
-			lRefSet(aSlot, aParent.sRefPop()); 
+			lRefSet(aSlot, aParent.aRefPop()); 
 			break;
 			
-		case Type.DOUBLE: lDoubleSet(aSlot, aParent.sDoublePop()); break;
-		case Type.FLOAT: lFloatSet(aSlot, aParent.sFloatPop()); break;
-		case Type.LONG: lLongSet(aSlot, aParent.sLongPop()); break;
+		case Type.DOUBLE: lDoubleSet(aSlot, aParent.aDoublePop()); break;
+		case Type.FLOAT: lFloatSet(aSlot, aParent.aFloatPop()); break;
+		case Type.LONG: lLongSet(aSlot, aParent.aLongPop()); break;
 		default: throw new RuntimeException("Unknown type: "+aType);
 		}	
 	}
@@ -232,27 +223,24 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 		if (itsExpectObjectInitialized) throw new IllegalStateException();
 		
 		Type theType = aSource.itsReturnType;
-		if (! theType.equals(itsExpectedType)) throw new IllegalStateException();
+		if (! theType.equals(itsExpectedType)) throw new IllegalStateException("Expected "+itsExpectedType+", got "+theType);
 		
 		switch(theType.getSort())
 		{
-        case Type.BOOLEAN:
-        case Type.BYTE:
-        case Type.CHAR:
-        case Type.SHORT:
-		case Type.INT: 
-			sIntPush(aSource.sIntPop());
-			break;
+        case Type.BOOLEAN: vBoolean(aSource.vBoolean()); break;
+        case Type.BYTE: vByte(aSource.vByte()); break;
+        case Type.CHAR: vChar(aSource.vChar()); break;
+        case Type.SHORT: vShort(aSource.vShort()); break;
+		case Type.INT: vInt(aSource.vInt()); break;
+		case Type.DOUBLE: vDouble(aSource.vDouble()); break;
+		case Type.FLOAT: vFloat(aSource.vFloat()); break;
+		case Type.LONG: vLong(aSource.vLong()); break;
 			
 		case Type.OBJECT:
 		case Type.ARRAY:
-			sRefPush(aSource.sRefPop()); 
+			vRef(aSource.vRef()); 
 			break;
 			
-		case Type.DOUBLE: sDoublePush(aSource.sDoublePop()); break;
-		case Type.FLOAT: sFloatPush(aSource.sFloatPop()); break;
-		case Type.LONG: sLongPush(aSource.sLongPop()); break;
-
 		case Type.VOID: break;
 		
 		default: throw new RuntimeException("Unknown type: "+theType);
@@ -262,7 +250,7 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 	}
 	
 	@Override
-	public void transferResult(_ByteBuffer aBuffer)
+	public void transferResult(BufferStream aBuffer)
 	{
 		switch(itsExpectedType.getSort())
 		{
@@ -271,14 +259,14 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 			sRefPush(getThreadReplayer().readValue(aBuffer)); 
 			break;
 			
-		case Type.BOOLEAN: sIntPush(aBuffer.get()); break;
-		case Type.BYTE: sIntPush(aBuffer.get()); break;
-		case Type.CHAR: sIntPush(aBuffer.getChar()); break;
-		case Type.DOUBLE: sDoublePush(aBuffer.getDouble()); break;
-		case Type.FLOAT: sFloatPush(aBuffer.getFloat()); break;
-		case Type.INT: sIntPush(aBuffer.getInt()); break;
-		case Type.LONG: sLongPush(aBuffer.getLong()); break;
-		case Type.SHORT: sIntPush(aBuffer.getShort()); break;
+		case Type.BOOLEAN: vBoolean(aBuffer.get() != 0); break;
+		case Type.BYTE: vByte(aBuffer.get()); break;
+		case Type.CHAR: vChar(aBuffer.getChar()); break;
+		case Type.DOUBLE: vDouble(aBuffer.getDouble()); break;
+		case Type.FLOAT: vFloat(aBuffer.getFloat()); break;
+		case Type.INT: vInt(aBuffer.getInt()); break;
+		case Type.LONG: vLong(aBuffer.getLong()); break;
+		case Type.SHORT: vShort(aBuffer.getShort()); break;
 		
 		case Type.VOID: break;
 		
@@ -329,7 +317,7 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 			theSlot = 0;
 			
 			if (theConstructor) lRefSet(0, nextTmpId()); // Target is deferred
-			else lRefSet(0, aParent.sRefPop());
+			else lRefSet(0, aParent.aRefPop());
 		}
 
 		itsNextBlock = 0;
@@ -350,7 +338,7 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 	 * Reads a value corresponding to the specified type from the stream, and set it 
 	 * as current value.
 	 */
-	private void readArg(_ByteBuffer aBuffer, Type aType, int aSlot)
+	private void readArg(BufferStream aBuffer, Type aType, int aSlot)
 	{
 		switch(aType.getSort())
 		{
@@ -372,12 +360,13 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 	}
 	
 	@Override
-	public void processMessage(byte aMessage, _ByteBuffer aBuffer)
+	public void processMessage(byte aMessage, BufferStream aBuffer)
 	{
 		switch(aMessage)
 		{
 		case Message.BEHAVIOR_ENTER_ARGS: args(aBuffer); break;
 		case Message.ARRAY_READ: evArrayRead(aBuffer); break;
+		case Message.ARRAY_LENGTH: evArrayLength(aBuffer); break;
 		case Message.CONSTANT: evCst(aBuffer); break;
 		case Message.FIELD_READ: evFieldRead(aBuffer); break;
 		case Message.FIELD_READ_SAME: evFieldRead_Same(); break;
@@ -401,7 +390,7 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 	/**
 	 * Read the method arguments from the buffer
 	 */
-	public void args(_ByteBuffer aBuffer)
+	public void args(BufferStream aBuffer)
 	{
 		allowedState(S_WAIT_ARGS);
 		
@@ -429,7 +418,7 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 	}
 	
 	
-	public void evFieldRead(_ByteBuffer aBuffer)
+	public void evFieldRead(BufferStream aBuffer)
 	{
 		allowedState(S_WAIT_FIELD);
 		
@@ -449,21 +438,29 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 		next();
 	}
 	
-	public void evArrayRead(_ByteBuffer aBuffer)
+	public void evArrayRead(BufferStream aBuffer)
 	{
 		allowedState(S_WAIT_ARRAY);
 		readValue(itsExpectedType, aBuffer);
 		next();
 	}
 	
-	public void evCst(_ByteBuffer aBuffer)
+	public void evArrayLength(BufferStream aBuffer)
+	{
+		allowedState(S_WAIT_ARRAYLENGTH);
+		int theLength = aBuffer.getInt();
+		vInt(theLength);
+		next();
+	}
+	
+	public void evCst(BufferStream aBuffer)
 	{
 		allowedState(S_WAIT_CST);
 		readValue(BCIUtils.getType(Type.OBJECT), aBuffer);
 		next();
 	}
 	
-	public void evNewArray(_ByteBuffer aBuffer)
+	public void evNewArray(BufferStream aBuffer)
 	{
 		allowedState(S_WAIT_NEWARRAY);
 		readValue(BCIUtils.getType(Type.OBJECT), aBuffer);
@@ -486,7 +483,7 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 		next();
 	}
 	
-	private void evExceptionGenerated(_ByteBuffer aBuffer)
+	private void evExceptionGenerated(BufferStream aBuffer)
 	{
 		ExceptionInfo theExceptionInfo = getThreadReplayer().readExceptionInfo(aBuffer);
 		
@@ -503,7 +500,7 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 		vRef(aException);
 	}
 	
-	public void evHandlerReached(_ByteBuffer aBuffer)
+	public void evHandlerReached(BufferStream aBuffer)
 	{
 		allowedState(S_EXCEPTION_THROWN);
 		int theHandlerId = aBuffer.getInt();
@@ -511,7 +508,7 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 		next();
 	}
 	
-	public void evExitException(_ByteBuffer aBuffer)
+	public void evExitException(BufferStream aBuffer)
 	{
 		allowedStates(S_EXCEPTION_THROWN);
 		setState(S_FINISHED_EXCEPTION);
@@ -551,9 +548,16 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 		expect(aSort);
 	}
 	
-	protected void expectClassCst(int aNextBlock)
+	protected void expectArrayLength(int aNextBlock)
 	{
-		getThreadReplayer().echo("expectClassCst");
+		getThreadReplayer().echo("expectArrayLength");
+		setState(S_WAIT_ARRAYLENGTH);
+		itsNextBlock = aNextBlock;
+	}
+	
+	protected void expectCst(int aNextBlock)
+	{
+		getThreadReplayer().echo("expectCst");
 		setState(S_WAIT_CST);
 		itsNextBlock = aNextBlock;
 	}
@@ -581,14 +585,21 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 	}
 	
 	/**
-	 * Hold execution until the next message is received.
-	 * If it is not an exception, then proceed.
+	 * If the next message is not an exception, proceed, otherwise
+	 * expect exception.
 	 */
-	public void hold(int aNextBlock)
+	public void checkCast(int aNextBlock)
 	{
-		getThreadReplayer().echo("Hold");
-		setState(S_HOLD);
-		itsNextBlock = aNextBlock;
+		getThreadReplayer().echo("checkCast");
+		if (getThreadReplayer().peekNextMessage() != Message.EXCEPTION)
+		{
+			itsNextBlock = aNextBlock;
+			next();
+		}
+		else
+		{
+			expectException();
+		}
 	}
 	
 	protected void processReturn()
@@ -601,7 +612,7 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 	 * Reads a value corresponding to the specified type from the stream, and set it 
 	 * as current value.
 	 */
-	private void readValue(Type aType, _ByteBuffer aBuffer)
+	private void readValue(Type aType, BufferStream aBuffer)
 	{
 		switch(aType.getSort())
 		{
@@ -645,21 +656,35 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 	protected void vShort(short v) { itsShortValue = v; }
 	
 	// Push to operand stack
-	protected void sRefPush(ObjectId v) { itsRefStack.push(v); }
-	protected void sIntPush(int v) { itsIntStack.push(v); }
-	protected void sDoublePush(double v) { itsDoubleStack.push(v); }
-	protected void sFloatPush(float v) { itsFloatStack.push(v); }
-	protected void sLongPush(long v) { itsLongStack.push(v); }
+	protected void sRefPush(ObjectId v) { itsSaveStack.refPush(v); }
+	protected void sIntPush(int v) { itsSaveStack.intPush(v); }
+	protected void sDoublePush(double v) { itsSaveStack.doublePush(v); }
+	protected void sFloatPush(float v) { itsSaveStack.floatPush(v); }
+	protected void sLongPush(long v) { itsSaveStack.longPush(v); }
 	
 	// Pop from operand stack
-	protected ObjectId sRefPop() { return itsRefStack.pop(); }
-	protected int sIntPop() { return itsIntStack.pop(); }
-	protected double sDoublePop() { return itsDoubleStack.pop(); }
-	protected float sFloatPop() { return itsFloatStack.pop(); }
-	protected long sLongPop() { return itsLongStack.pop(); }
+	protected ObjectId sRefPop() { return itsSaveStack.refPop(); }
+	protected int sIntPop() { return itsSaveStack.intPop(); }
+	protected double sDoublePop() { return itsSaveStack.doublePop(); }
+	protected float sFloatPop() { return itsSaveStack.floatPop(); }
+	protected long sLongPop() { return itsSaveStack.longPop(); }
 	
 	// Peek operand stack
-	protected ObjectId sRefPeek() { return itsRefStack.peek(); }
+	protected ObjectId sRefPeek() { return itsSaveStack.refPeek(); }
+	
+	// Push to arg stack
+	protected void aRefPush(ObjectId v) { itsArgsStack.refPush(v); }
+	protected void aIntPush(int v) { itsArgsStack.intPush(v); }
+	protected void aDoublePush(double v) { itsArgsStack.doublePush(v); }
+	protected void aFloatPush(float v) { itsArgsStack.floatPush(v); }
+	protected void aLongPush(long v) { itsArgsStack.longPush(v); }
+	
+	// Pop from arg stack
+	protected ObjectId aRefPop() { return itsArgsStack.refPop(); }
+	protected int aIntPop() { return itsArgsStack.intPop(); }
+	protected double aDoublePop() { return itsArgsStack.doublePop(); }
+	protected float aFloatPop() { return itsArgsStack.floatPop(); }
+	protected long aLongPop() { return itsArgsStack.longPop(); }
 	
 	// Set local variable slot
 	protected abstract void lRefSet(int aSlot, ObjectId v);
@@ -694,6 +719,7 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 	{
 		itsInvokeData = new InvocationData(aBehaviorId, aNextBlock, aExpectObjectInitialized);
 		setState(S_INVOKE_PENDING);
+		getThreadReplayer().echo("invoke pending: "+aBehaviorId);	
 	}
 	
 	public void proceedInvoke()

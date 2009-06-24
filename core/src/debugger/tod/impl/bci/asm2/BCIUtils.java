@@ -31,7 +31,6 @@ import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
-import org.objectweb.asm.tree.FieldInsnNode;
 import org.objectweb.asm.tree.InsnNode;
 import org.objectweb.asm.tree.IntInsnNode;
 import org.objectweb.asm.tree.LdcInsnNode;
@@ -42,12 +41,6 @@ import org.objectweb.asm.tree.analysis.AnalyzerException;
 import org.objectweb.asm.tree.analysis.BasicVerifier;
 
 import tod.core.config.ClassSelector;
-import tod.core.database.structure.IClassInfo;
-import tod.core.database.structure.IFieldInfo;
-import tod.core.database.structure.IMutableClassInfo;
-import tod.core.database.structure.IMutableStructureDatabase;
-import tod.core.database.structure.IStructureDatabase;
-import tod.core.database.structure.ITypeInfo;
 import tod.core.database.structure.ObjectId;
 import tod.impl.database.structure.standard.PrimitiveTypeInfo;
 import tod.impl.replay.InScopeMethodReplayer;
@@ -70,6 +63,7 @@ public class BCIUtils implements Opcodes
 	public static final String DSC_STRING = "L"+CLS_STRING+";";
 	public static final String CLS_CLASS = getJvmClassName(Class.class);
 	public static final String DSC_CLASS = "L"+CLS_CLASS+";";
+	public static final String CLS_CLASSLOADER = getJvmClassName(ClassLoader.class);
 	public static final String CLS_OBJECTID = getJvmClassName(ObjectId.class);
 	public static final String DSC_OBJECTID = "L"+CLS_OBJECTID+";";
 	public static final String CLS_REPLAYER = getJvmClassName(InScopeMethodReplayer.class);
@@ -309,6 +303,9 @@ public class BCIUtils implements Opcodes
 		case SASTORE:
 		case SIPUSH:
 			return Type.SHORT;
+			
+		case RETURN:
+			return Type.VOID;
 
 		default:
 			return -1;

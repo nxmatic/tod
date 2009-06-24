@@ -61,8 +61,10 @@ public class DBSideIOThread
 	private final InputStream itsIn;
 	private final OutputStream itsOut;
 	
-	private final List<ThreadReplayer> itsReplayers = new ArrayList<ThreadReplayer>();
+	private final List<ThreadReplayerThread> itsReplayerThreads = new ArrayList<ThreadReplayerThread>();
 	private final TmpIdManager itsTmpIdManager = new TmpIdManager();
+	
+	private long itsProcessedSize = 0;
 	
 	public DBSideIOThread(TODConfig aConfig, IStructureDatabase aDatabase, InputStream aIn, OutputStream aOut)
 	{
@@ -82,6 +84,8 @@ public class DBSideIOThread
 			while(true)
 			{
 				int thePacketType = itsIn.read();
+				itsProcessedSize++;
+				
 				switch(thePacketType)
 				{
 				case Message.PACKET_TYPE_THREAD: processThreadPacket(); break;
@@ -91,6 +95,13 @@ public class DBSideIOThread
 				}
 				
 				thePacketCount++;
+				
+				if (thePacketCount % 1000 == 0) Utils.println("Processed %d bytes (%d packets)", itsProcessedSize, thePacketCount);
+			}
+			
+			for (ThreadReplayerThread theThread : itsReplayerThreads)
+			{
+				theThread.push(null);
 			}
 		}
 		catch (IOException e)
@@ -99,15 +110,16 @@ public class DBSideIOThread
 		}
 	}
 	
-	private ThreadReplayer getReplayer(int aThreadId)
+	private ThreadReplayerThread getReplayerThread(int aThreadId)
 	{
-		ThreadReplayer theReplayer = Utils.listGet(itsReplayers, aThreadId);
-		if (theReplayer == null)
+		ThreadReplayerThread theThread = Utils.listGet(itsReplayerThreads, aThreadId);
+		if (theThread == null)
 		{
-			theReplayer = new ThreadReplayer(itsConfig, itsDatabase, itsTmpIdManager);
-			Utils.listSet(itsReplayers, aThreadId, theReplayer);
+			ThreadReplayer theReplayer = new ThreadReplayer(itsConfig, itsDatabase, itsTmpIdManager);
+			theThread = new ThreadReplayerThread(theReplayer);
+			Utils.listSet(itsReplayerThreads, aThreadId, theThread);
 		}
-		return theReplayer;
+		return theThread;
 	}
 	
 	private void readFully(byte[] aBuffer) throws IOException
@@ -133,7 +145,9 @@ public class DBSideIOThread
 		byte[] theBuffer = new byte[theLength];
 		readFully(theBuffer);
 		
-		getReplayer(theThreadId).replay(_ByteBuffer.wrap(theBuffer));
+		getReplayerThread(theThreadId).push(theBuffer);
+		
+		itsProcessedSize += 8 + theLength;
 	}
 	
 	private void processStringPacket() throws IOException
@@ -141,7 +155,7 @@ public class DBSideIOThread
 		long theObjectId = _ByteBuffer.getLongL(itsIn);
 		String theString = _ByteBuffer.getString(itsIn);
 		
-		System.out.println("Got string "+theObjectId+": "+theString);
+		itsProcessedSize += 8 + 4 + theString.length()*2;
 	}
 	
 	public static void main(String[] args) throws InterruptedException
@@ -164,4 +178,37 @@ public class DBSideIOThread
 		Thread.sleep(1000);
 		System.err.println("END");
 	}
+	
+	private static class ThreadReplayerThread extends Thread
+	{
+		private BufferStream itsStream;
+		private final ThreadReplayer itsReplayer;
+		
+		public ThreadReplayerThread(ThreadReplayer aReplayer)
+		{
+			super(ThreadReplayerThread.class.getName());
+			itsReplayer = aReplayer;
+		}
+
+		public void push(byte[] aData)
+		{
+			_ByteBuffer theBuffer = aData != null ? _ByteBuffer.wrap(aData) : null;
+			if (itsStream == null)
+			{
+				itsStream = new BufferStream(theBuffer);
+				start();
+			}
+			else
+			{
+				itsStream.pushBuffer(theBuffer);
+			}
+		}
+		
+		@Override
+		public void run()
+		{
+			itsReplayer.replay(itsStream);
+		}
+	}
+	
 }

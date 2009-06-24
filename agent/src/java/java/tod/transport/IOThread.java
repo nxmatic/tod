@@ -481,20 +481,27 @@ public class IOThread extends Thread
 				ThreadData theThreadData = theRef.get();
 				if (theThreadData == null) continue;
 				
+				theThreadData.flushBuffer(); // TODO: see how to properly synchronize this.
 				theThreadData.printStats();
 			}
 			
 			printStats();
+			
+			_IO.out("[TOD] Flushing buffers...");
 			try
 			{
+				while(! itsPendingPackets.isEmpty()) Thread.sleep(100);
 				itsChannel.flush();
 			}
 			catch (_IOException e)
 			{
 				e.printStackTrace();
 			}
+			catch (InterruptedException e)
+			{
+				e.printStackTrace();
+			}
 			
-//			_IO.out("[TOD] Flushing buffers...");
 //			
 //			EventCollector.INSTANCE.end();
 //			

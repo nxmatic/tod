@@ -42,23 +42,30 @@ public class ArrayTypeInfo extends TypeInfo implements IArrayTypeInfo
 	
 	public ArrayTypeInfo(IShareableStructureDatabase aDatabase, ITypeInfo aElementType, int aDimensions)
 	{
-		super(aDatabase, -1, aElementType.getName()+getBrackets(aDimensions));
+		super(aDatabase, -1, aElementType.getName()+getBracketPairs(aDimensions));
 		itsElementType = aElementType;
 		itsDimensions = aDimensions;
 	}
 	
 	public String getJvmName()
 	{
-		throw new UnsupportedOperationException();
+		return getBrackets(getDimensions())+getElementType().getJvmName();
 	}
 	
-	private static String getBrackets(int aDimensions)
+	private static String getBracketPairs(int aDimensions)
 	{
 		StringBuilder theBuilder = new StringBuilder();
 		for(int i=0;i<aDimensions;i++) theBuilder.append("[]");
 		return theBuilder.toString();
 	}
 
+	private static String getBrackets(int aDimensions)
+	{
+		StringBuilder theBuilder = new StringBuilder();
+		for(int i=0;i<aDimensions;i++) theBuilder.append('[');
+		return theBuilder.toString();
+	}
+	
 	public int getDimensions()
 	{
 		return itsDimensions;

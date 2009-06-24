@@ -33,7 +33,7 @@ package tod.impl.replay;
 
 import java.tod.util.IntDeltaSender;
 
-import tod2.agent.io._ByteBuffer;
+import tod.impl.server.BufferStream;
 
 /**
  * Symmetric of {@link IntDeltaSender}
@@ -43,13 +43,13 @@ public class IntDeltaReceiver
 {
 	private int itsValue = 0;
 	
-	public int receiveFull(_ByteBuffer aBuffer)
+	public int receiveFull(BufferStream aBuffer)
 	{
 		itsValue = aBuffer.getInt();
 		return itsValue;
 	}
 	
-	public int receiveDelta(_ByteBuffer aBuffer)
+	public int receiveDelta(BufferStream aBuffer)
 	{
 		byte theDelta = aBuffer.get();
 		itsValue += theDelta;

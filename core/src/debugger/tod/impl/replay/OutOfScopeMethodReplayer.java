@@ -31,12 +31,12 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.replay;
 
-import tod2.agent.io._ByteBuffer;
+import tod.impl.server.BufferStream;
 
 public class OutOfScopeMethodReplayer extends MethodReplayer
 {
 	@Override
-	public void processMessage(byte aMessage, _ByteBuffer aBuffer)
+	public void processMessage(byte aMessage, BufferStream aBuffer)
 	{
 		throw new IllegalStateException();
 	}
@@ -47,7 +47,7 @@ public class OutOfScopeMethodReplayer extends MethodReplayer
 	}
 
 	@Override
-	public void transferResult(_ByteBuffer aBuffer)
+	public void transferResult(BufferStream aBuffer)
 	{
 	}
 

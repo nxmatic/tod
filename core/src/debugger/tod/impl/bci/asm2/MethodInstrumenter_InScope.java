@@ -93,6 +93,9 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		itsMethodInfo = new MethodInfo(getDatabase(), getClassNode(), getNode());
 		int theSlotsCount = itsMethodInfo.setupLocalCacheSlots(getNode().maxLocals);
 		getNode().maxLocals += theSlotsCount;
+		
+		// Save original handlers
+		TryCatchBlockNode[] theHandlers = (TryCatchBlockNode[]) getNode().tryCatchBlocks.toArray(new TryCatchBlockNode[getNode().tryCatchBlocks.size()]);
 
 		SyntaxInsnList s = new SyntaxInsnList(itsLabelManager);
 
@@ -127,7 +130,10 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 				
 				// Send event
 				s.pushInt(getBehavior().getId()); // ThD, BId 
-				s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evInScopeBehaviorEnter", "(I)V");
+				s.INVOKEVIRTUAL(
+						BCIUtils.CLS_THREADDATA, 
+						isStaticInitializer() ? "evInScopeClinitEnter" : "evInScopeBehaviorEnter", 
+						"(I)V");
 				
 				//Check if we must send args
 				s.ILOAD(itsFromScopeVar);
@@ -172,7 +178,7 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		s.label("start");
 		
 		processInstructions(getNode().instructions);
-		processHandlers();
+		processHandlers(theHandlers);
 		
 		getNode().instructions.insert(s);
 		getNode().visitLabel(s.getLabel("end"));
@@ -211,11 +217,11 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 	 * Assigns an id to each handler (based on the order of the try-catch nodes)
 	 * and add corresponding event emission.
 	 */
-	private void processHandlers()
+	private void processHandlers(TryCatchBlockNode[] aHandlers)
 	{
 		Set<Label> theProcessedLabels = new HashSet<Label>();
 		int theId = 0;
-		for(TryCatchBlockNode theNode : (List<TryCatchBlockNode>) getNode().tryCatchBlocks)
+		for(TryCatchBlockNode theNode : aHandlers)
 		{
 			Label theLabel = theNode.handler.getLabel();
 			if (theProcessedLabels.add(theLabel)) 
@@ -294,6 +300,10 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 			case Opcodes.CALOAD:
 			case Opcodes.SALOAD:
 				processGetArray(aInsns, (InsnNode) theNode);
+				break;
+				
+			case Opcodes.ARRAYLENGTH:
+				processArrayLength(aInsns, (InsnNode) theNode);
 				break;
 				
 			case Opcodes.LDC:
@@ -648,6 +658,25 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		aInsns.insert(aNode, s);
 	}
 
+	private void processArrayLength(InsnList aInsns, InsnNode aNode)
+	{
+		SyntaxInsnList s = new SyntaxInsnList(itsLabelManager);
+		Label l = new Label();
+		
+		s.ILOAD(getTraceEnabledVar());
+		s.IFfalse(l);
+		{
+			s.DUP();
+			s.ALOAD(getThreadDataVar());
+			s.SWAP();
+			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evArrayLength", "(I)V"); 
+		}
+		
+		s.label(l);
+		
+		aInsns.insert(aNode, s);
+	}
+	
 	/**
 	 * LDC of class constant can throw an exception
 	 */

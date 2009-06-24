@@ -33,8 +33,25 @@ package tod.impl.replay;
 
 import tod.impl.server.BufferStream;
 
-public class UnmonitoredMethodReplayer extends MethodReplayer
+/**
+ * This is a "dummy" replayer that is only used to wrap an execution of <clinit> that
+ * occurs during a monitored invocation. 
+ * @author gpothier
+ */
+public class ClinitWrapperMethodReplayer extends MethodReplayer
 {
+	private final boolean itsFromScope;
+	
+	public ClinitWrapperMethodReplayer(boolean aFromScope)
+	{
+		itsFromScope = aFromScope;
+	}
+	
+	public boolean isFromScope()
+	{
+		return itsFromScope;
+	}
+
 	@Override
 	public void processMessage(byte aMessage, BufferStream aBuffer)
 	{
@@ -42,7 +59,7 @@ public class UnmonitoredMethodReplayer extends MethodReplayer
 	}
 
 	@Override
-	public void transferResult(InScopeMethodReplayer aSource)
+	public void expectException()
 	{
 	}
 
@@ -52,7 +69,7 @@ public class UnmonitoredMethodReplayer extends MethodReplayer
 	}
 
 	@Override
-	public void expectException()
+	public void transferResult(InScopeMethodReplayer aSource)
 	{
 	}
 }

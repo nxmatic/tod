@@ -22,48 +22,24 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 */
 package dummy;
 
-import java.io.BufferedWriter;
-import java.io.IOException;
-import java.util.Random;
 
 public class Dummy
 {
-	public static void main(String[] args) throws InterruptedException
+	private Object x;
+
+	private static int rndSeed = 1234598;
+
+    public static int random(int max)
+    {
+        rndSeed = rndSeed*57 + 9;
+        if (rndSeed<0) rndSeed = -rndSeed;
+        return rndSeed % max;
+    }
+    
+
+	public static void main(String[] args)
 	{
-		System.out.println("Dummy");
-//		try
-//		{
-//			if (true) throw new RuntimeException("Plop");
-//		}
-//		catch (RuntimeException e)
-//		{
-//			Thread.sleep(100);
-//			System.exit(0);
-//		}
-		int j;
-		
-		long t0 = System.currentTimeMillis();
-		
-		Object[] theObjects = new Object[100];
-		for(int i=0;i<theObjects.length;i++) theObjects[i] = new Object();
-		
-		Random theRandom = new Random(0);
-		for(int i=0;i<2000000;i++)
-		{
-			j = i*2;
-			foo(theObjects[theRandom.nextInt(theObjects.length)], j);
-			if (i % 1000000 == 0) System.out.println(i);
-		}
-		
-		long t1 = System.currentTimeMillis();
-		System.out.println("Time: "+(t1-t0));
-		
-		Thread.sleep(1000000000);
-	}
-	
-	public static int foo(Object o, long b)
-	{
-		long c = o.hashCode()+b;
-		return (int)(c/2);
+	    int i = random(8);
+	    System.out.println(i);
 	}
 }

@@ -83,6 +83,11 @@ public class BehaviorInfo extends MemberInfo implements IMutableBehaviorInfo
 		itsArgumentTypes = aArgumentTypes;
 		itsReturnType = aReturnType;
 		
+		if ("<init>".equals(getName())) itsBehaviourKind = BehaviorKind.CONSTRUCTOR;
+		else if ("<clinit>".equals(getName())) itsBehaviourKind = BehaviorKind.STATIC_INIT;
+		else if (isStatic()) itsBehaviourKind = BehaviorKind.STATIC_METHOD;
+		else itsBehaviourKind = BehaviorKind.METHOD;
+		
 //		System.out.println(String.format(
 //				"[Struct] behavior info [id: %d, sig: %s.%s(%s)]",
 //				aId,
@@ -127,13 +132,11 @@ public class BehaviorInfo extends MemberInfo implements IMutableBehaviorInfo
 	
 	public void setup(
 			boolean aTraced,
-			BehaviorKind aKind,
 			int aCodeSize,
 			LineNumberInfo[] aLineNumberInfos,
 			TagMap aTagMap)
 	{
 		itsHasTrace = aTraced ? HasTrace.YES : HasTrace.NO;
-		itsBehaviourKind = aKind;
 		itsCodeSize = aCodeSize;
 		
 		itsLineNumberTable = aLineNumberInfos;

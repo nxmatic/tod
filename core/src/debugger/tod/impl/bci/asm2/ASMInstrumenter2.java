@@ -15,7 +15,6 @@ import tod.core.database.structure.IFieldInfo;
 import tod.core.database.structure.IMutableStructureDatabase;
 import tod.core.database.structure.IStructureDatabase;
 import tod.core.database.structure.IStructureDatabase.BehaviorMonitoringModeChange;
-import tod.impl.bci.asm.ASMInstrumenter;
 
 /**
  * A new version of the instrumenter ({@link ASMInstrumenter}) that reduces the runtime

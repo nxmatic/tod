@@ -135,4 +135,12 @@ public class TracedMethods
 		default: throw new Error("Invalid mode");
 		}
 	}
+
+	/**
+	 * Simply returns the trace enabled flag.
+	 */
+	public static final boolean traceEnabled()
+	{
+		return AgentReady.CAPTURE_ENABLED;
+	}
 }

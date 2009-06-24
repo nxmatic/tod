@@ -48,6 +48,7 @@ import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldInsnNode;
 import org.objectweb.asm.tree.FieldNode;
+import org.objectweb.asm.tree.IincInsnNode;
 import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.InsnNode;
 import org.objectweb.asm.tree.JumpInsnNode;
@@ -346,7 +347,7 @@ public class MethodReplayerGenerator
 	
 	private String getFieldKey(IFieldInfo aField)
 	{
-		return aField.getDeclaringType().getJvmName()+"_"+aField.getName();
+		return aField.getDeclaringType().getName()+"_"+aField.getName();
 	}
 	
 	private String getFieldKey(FieldInsnNode aNode)
@@ -395,11 +396,13 @@ public class MethodReplayerGenerator
 	/**
 	 * Generates a block of code that saves the operand stack into
 	 * the {@link InScopeMethodReplayer}'s stack.
+	 * The first aArgCount elements are saved to the arg stack instead of the save stack.
 	 */
-	private InsnList genSaveStack(BCIFrame aFrame)
+	private InsnList genSaveStack(BCIFrame aFrame, int aArgCount)
 	{
 		SyntaxInsnList s = new SyntaxInsnList(null);
 		int theStackSize = aFrame.getStackSize();
+		
 		for(int i=theStackSize-1;i>=0;i--)
 		{
 			Type theType = aFrame.getStack(i).getType();
@@ -418,12 +421,21 @@ public class MethodReplayerGenerator
 				
 			default: throw new RuntimeException("Nooo");
 			}
-			String[] theSig = pushMethodSig(theType);
+			
+			String[] theSig = pushMethodSigBase(theType);
+			if (aArgCount-- > 0) theSig[0] = "a"+theSig[0];
+			else theSig[0] = "s"+theSig[0];				
 			s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, theSig[0], theSig[1]);
 		}
 		
 		return s;
 	}
+	
+	private InsnList genSaveStack(BCIFrame aFrame)
+	{
+		return genSaveStack(aFrame, 0);
+	}
+
 	
 	/**
 	 * Same as {@link #genLoadStack(BCIFrame, int)}, with 0 skip
@@ -638,27 +650,28 @@ public class MethodReplayerGenerator
 	}
 	
 	/**
-	 * Returns the name and descriptor of the {@link InScopeMethodReplayer#vBoolean()} push method
+	 * Returns the base name and descriptor of the {@link InScopeMethodReplayer#sIntPush(int)}
+	 * or {@link InScopeMethodReplayer#aIntPush(int)} push methods
 	 * corresponding to the given type.
 	 */
-	private String[] pushMethodSig(Type aType)
+	private String[] pushMethodSigBase(Type aType)
 	{
 		switch(aType.getSort())
 		{
 		case Type.OBJECT:
 		case Type.ARRAY:
-			return new String[] { "sRefPush", "("+BCIUtils.DSC_OBJECTID+")V" };
+			return new String[] { "RefPush", "("+BCIUtils.DSC_OBJECTID+")V" };
 			
 		case Type.BOOLEAN: 
 		case Type.BYTE: 
 		case Type.CHAR: 
 		case Type.SHORT: 
 		case Type.INT: 
-			return new String[] { "sIntPush", "(I)V" };
+			return new String[] { "IntPush", "(I)V" };
 		
-		case Type.DOUBLE: return new String[] { "sDoublePush", "(D)V" };
-		case Type.FLOAT: return new String[] { "sFloatPush", "(F)V" };
-		case Type.LONG: return new String[] { "sLongPush", "(J)V" };
+		case Type.DOUBLE: return new String[] { "DoublePush", "(D)V" };
+		case Type.FLOAT: return new String[] { "FloatPush", "(F)V" };
+		case Type.LONG: return new String[] { "LongPush", "(J)V" };
 		default: throw new RuntimeException("Unknown type: "+aType);
 		}
 	}
@@ -749,6 +762,21 @@ public class MethodReplayerGenerator
 				processGetArray(aInsns, (InsnNode) theNode);
 				break;
 				
+			case Opcodes.ARRAYLENGTH:
+				processArrayLength(aInsns, (InsnNode) theNode);
+				break;
+				
+			case Opcodes.IASTORE:
+			case Opcodes.LASTORE:
+			case Opcodes.FASTORE:
+			case Opcodes.DASTORE:
+			case Opcodes.AASTORE:
+			case Opcodes.BASTORE:
+			case Opcodes.CASTORE:
+			case Opcodes.SASTORE:
+				processPutArray(aInsns, (InsnNode) theNode);
+				break;
+				
 			case Opcodes.ILOAD:
 			case Opcodes.LLOAD:
 			case Opcodes.FLOAD:
@@ -763,6 +791,10 @@ public class MethodReplayerGenerator
 			case Opcodes.DSTORE:
 			case Opcodes.ASTORE:
 				processPutVar(aInsns, (VarInsnNode) theNode);
+				break;
+				
+			case Opcodes.IINC:
+				processIinc(aInsns, (IincInsnNode) theNode);
 				break;
 				
 			case Opcodes.LDC:
@@ -799,8 +831,29 @@ public class MethodReplayerGenerator
 
 	private void processReturn(InsnList aInsns, InsnNode aNode)
 	{
+		Type theType = getTypeOrId(BCIUtils.getSort(aNode.getOpcode()));
 		SyntaxInsnList s = new SyntaxInsnList(null);
 		
+		if (theType.getSort() != Type.VOID)
+		{
+			switch(theType.getSize())
+			{
+			case 1:
+				s.ALOAD(0);
+				s.SWAP();
+				break;
+				
+			case 2:
+				s.ISTORE(theType, itsTmpVar);
+				s.ALOAD(0);
+				s.ILOAD(theType, itsTmpVar);
+				break;
+				
+			default: throw new RuntimeException("Nooo");
+			}
+			s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, valueMethodName(theType), "("+theType.getDescriptor()+")V");
+		}
+
 		s.ALOAD(0);
 		s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, "processReturn", "()V");
 		s.RETURN();
@@ -838,6 +891,9 @@ public class MethodReplayerGenerator
 		Type[] theArgTypes = Type.getArgumentTypes(aNode.desc);
 		Type theType = getTypeOrId(Type.getReturnType(aNode.desc).getSort());
 		int theBehaviorId = getBehaviorId(aNode);
+		boolean theStatic = aNode.getOpcode() == Opcodes.INVOKESTATIC;
+		int theArgCount = theArgTypes.length;
+		if (! theStatic) theArgCount++;
 		BCIFrame theFrame = itsMethodInfo.getFrame(aNode);
 
 		boolean theExpectObjectInitialized = 
@@ -853,7 +909,7 @@ public class MethodReplayerGenerator
 			int theBlockId = getBlockId(l);
 			
 			// Save state
-			s.add(genSaveStack(theFrame)); // The stack will be popped by the next replayer
+			s.add(genSaveStack(theFrame, theArgCount)); // The stack will be popped by the next replayer
 			s.ALOAD(0);
 			s.pushInt(theBehaviorId);
 			s.pushInt(theBlockId);
@@ -863,9 +919,7 @@ public class MethodReplayerGenerator
 			
 			// Got result
 			s.label(l);
-			int theSkip = theArgTypes.length;
-			if (aNode.getOpcode() != Opcodes.INVOKESTATIC) theSkip++;
-			s.add(genLoadStack(theFrame, theSkip));
+			s.add(genLoadStack(theFrame, theArgCount));
 			
 			if (theType.getSort() != Type.VOID)
 			{
@@ -928,7 +982,7 @@ public class MethodReplayerGenerator
 		
 		// Got value
 		s.label(l);
-		s.add(genLoadStack(theFrame));
+		s.add(genLoadStack(theFrame, 1));
 		s.ALOAD(0);
 		s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, valueMethodName(theType), "()"+theType.getDescriptor());
 		
@@ -956,7 +1010,7 @@ public class MethodReplayerGenerator
 		s.add(genSaveStack(theFrame));
 		s.ALOAD(0);
 		s.pushInt(theBlockId);
-		s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, "expectClassCst", "(I)V");
+		s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, "expectCst", "(I)V");
 		s.RETURN();
 		
 		// Got value
@@ -1011,7 +1065,7 @@ public class MethodReplayerGenerator
 		
 		// Got value
 		s.label(l);
-		s.add(genLoadStack(theFrame));
+		s.add(genLoadStack(theFrame, 1));
 		s.ALOAD(0);
 		s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, valueMethodName(theType), "()"+theType.getDescriptor());
 		
@@ -1026,6 +1080,19 @@ public class MethodReplayerGenerator
 		SyntaxInsnList s = new SyntaxInsnList(null);
 		s.POP(theType); // Pop value
 		if (aNode.getOpcode() != Opcodes.PUTSTATIC) s.POP(); // Pop target
+		
+		aInsns.insert(aNode, s);
+		aInsns.remove(aNode);
+	}
+	
+	private void processPutArray(InsnList aInsns, InsnNode aNode)
+	{
+		Type theElementType = getTypeOrId(BCIUtils.getSort(aNode.getOpcode()));
+		
+		SyntaxInsnList s = new SyntaxInsnList(null);
+		s.POP(theElementType); // Pop value
+		s.POP(); // Pop index
+		s.POP(); // Pop array
 		
 		aInsns.insert(aNode, s);
 		aInsns.remove(aNode);
@@ -1053,7 +1120,7 @@ public class MethodReplayerGenerator
 		
 		// Got value
 		s.label(l);
-		s.add(genLoadStack(theFrame));
+		s.add(genLoadStack(theFrame, 2));
 		s.ALOAD(0);
 		s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, valueMethodName(theType), "()"+theType.getDescriptor());
 		
@@ -1061,6 +1128,33 @@ public class MethodReplayerGenerator
 		aInsns.remove(aNode);
 	}
 
+	private void processArrayLength(InsnList aInsns, InsnNode aNode)
+	{
+		Type theType = Type.INT_TYPE;
+		BCIFrame theFrame = itsMethodInfo.getFrame(aNode);
+		
+		SyntaxInsnList s = new SyntaxInsnList(null);
+		
+		// Generate block id
+		Label l = new Label();
+		int theBlockId = getBlockId(l);
+		
+		s.add(genSaveStack(theFrame));
+		s.ALOAD(0);
+		s.pushInt(theBlockId);
+		s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, "expectArrayLength", "(I)V");
+		s.RETURN();
+		
+		// Got value
+		s.label(l);
+		s.add(genLoadStack(theFrame, 1));
+		s.ALOAD(0);
+		s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, valueMethodName(theType), "()"+theType.getDescriptor());
+		
+		aInsns.insert(aNode, s);
+		aInsns.remove(aNode);
+	}
+	
 	private void processGetVar(InsnList aInsns, VarInsnNode aNode)
 	{
 		Type theType = getTypeOrId(BCIUtils.getSort(aNode.getOpcode()));
@@ -1096,6 +1190,24 @@ public class MethodReplayerGenerator
 		default: throw new RuntimeException("Nooo");
 		}
 
+		s.PUTFIELD(itsTarget.name, theField, theType.getDescriptor());
+		
+		aInsns.insert(aNode, s);
+		aInsns.remove(aNode);
+	}
+	
+	private void processIinc(InsnList aInsns, IincInsnNode aNode)
+	{
+		Type theType = Type.INT_TYPE;
+		String theField = getFieldForVar(aNode.var, theType);
+		
+		SyntaxInsnList s = new SyntaxInsnList(null);
+		
+		s.ALOAD(0); // this
+		s.DUP(); // this, this
+		s.GETFIELD(itsTarget.name, theField, theType.getDescriptor()); // this, var
+		s.pushInt(aNode.incr); // this, var, incr
+		s.IADD(); // this, newvar
 		s.PUTFIELD(itsTarget.name, theField, theType.getDescriptor());
 		
 		aInsns.insert(aNode, s);
@@ -1171,7 +1283,7 @@ public class MethodReplayerGenerator
 		s.add(genSaveStack(theFrame));
 		s.ALOAD(0);
 		s.pushInt(theBlockId);
-		s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, "hold", "(I)V");
+		s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, "checkCast", "(I)V");
 		s.RETURN();
 		
 		// Got value

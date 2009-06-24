@@ -31,28 +31,43 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.replay;
 
-import tod.impl.server.BufferStream;
+import gnu.trove.TDoubleStack;
+import gnu.trove.TFloatStack;
+import gnu.trove.TIntStack;
+import gnu.trove.TLongStack;
+import tod.core.database.structure.ObjectId;
+import zz.utils.ArrayStack;
 
-public class UnmonitoredMethodReplayer extends MethodReplayer
+/**
+ * A stack that natively stores the various JVM primtive types.
+ * @author gpothier
+ */
+public class PrimitiveMultiStack
 {
-	@Override
-	public void processMessage(byte aMessage, BufferStream aBuffer)
-	{
-		throw new IllegalStateException();
-	}
+	private final ArrayStack<ObjectId> itsRefStack = new ArrayStack<ObjectId>();
+	private final TIntStack itsIntStack = new TIntStack();
+	private final TDoubleStack itsDoubleStack = new TDoubleStack();
+	private final TFloatStack itsFloatStack = new TFloatStack();
+	private final TLongStack itsLongStack = new TLongStack();
 
-	@Override
-	public void transferResult(InScopeMethodReplayer aSource)
-	{
-	}
-
-	@Override
-	public void transferResult(BufferStream aBuffer)
-	{
-	}
-
-	@Override
-	public void expectException()
-	{
-	}
+	// Push to stack
+	protected void refPush(ObjectId v) { itsRefStack.push(v); }
+	protected void intPush(int v) { itsIntStack.push(v); }
+	protected void doublePush(double v) { itsDoubleStack.push(v); }
+	protected void floatPush(float v) { itsFloatStack.push(v); }
+	protected void longPush(long v) { itsLongStack.push(v); }
+	
+	// Pop from stack
+	protected ObjectId refPop() { return itsRefStack.pop(); }
+	protected int intPop() { return itsIntStack.pop(); }
+	protected double doublePop() { return itsDoubleStack.pop(); }
+	protected float floatPop() { return itsFloatStack.pop(); }
+	protected long longPop() { return itsLongStack.pop(); }
+	
+	// Peek stack
+	protected ObjectId refPeek() { return itsRefStack.peek(); }
+	protected int intPeek() { return itsIntStack.peek(); }
+	protected double doublePeek() { return itsDoubleStack.peek(); }
+	protected float floatPeek() { return itsFloatStack.peek(); }
+	protected long longPeek() { return itsLongStack.peek(); }
 }

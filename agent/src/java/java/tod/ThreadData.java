@@ -97,6 +97,8 @@ public final class ThreadData
 	private int itsExpectedArgsCount = -1;
 	private int itsAccountToCharge = -1;
 	
+	private int itsMessageCount = 0;
+	
 	private LongDeltaSender itsObjIdSender = new LongDeltaSender();
 	private IntDeltaSender itsBehIdSender = new IntDeltaSender();
 	
@@ -198,18 +200,26 @@ public final class ThreadData
 		return itsScopeStack.pop();
 	}
 	
-	public static void sendMessageType(_ByteBuffer aBuffer, byte aType) 
+	public void sendMessageType(_ByteBuffer aBuffer, byte aType) 
 	{
-		if (AgentDebugFlags.EVENT_LOG) echoMessageType(aType); 
 		aBuffer.put(aType);
 	}
 	
-	public static void echoMessageType(byte aMessage)
+	public void echoMessageType(byte aMessage, long aArg)
 	{
 		_StringBuilder theBuilder = new _StringBuilder();
-		theBuilder.append(Thread.currentThread().getId());
-		theBuilder.append(' ');
+		theBuilder.append(getId());
+		theBuilder.append(" #");
+		itsMessageCount++;
+		theBuilder.append(itsMessageCount);
+		theBuilder.append(": ");
 		theBuilder.append(Message._NAMES[aMessage]);
+		if (aArg >= 0)
+		{
+			theBuilder.append(" (");
+			theBuilder.append(aArg);
+			theBuilder.append(")");
+		}
 		_IO.out(theBuilder.toString());		
 	}
 
@@ -353,6 +363,7 @@ public final class ThreadData
 			itsLastTracedMethodsVersion = theCurrentVersion;
 			
 			msgStart(Message.TRACEDMETHODS_VERSION, 0);
+			if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.TRACEDMETHODS_VERSION, theCurrentVersion); 
 			sendMessageType(itsBuffer, Message.TRACEDMETHODS_VERSION);
 			itsBuffer.putInt(theCurrentVersion);
 			msgStop();
@@ -366,6 +377,7 @@ public final class ThreadData
 	 */
 	private void sendSync(long aTimestamp)
 	{
+		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.SYNC, aTimestamp); 
 		sendMessageType(itsBuffer, Message.SYNC);
 		itsBuffer.putLong(aTimestamp);
 		commitBuffer();
@@ -381,6 +393,7 @@ public final class ThreadData
 		sendRegisteredObjects();
 		
 		msgStart(Message.FIELD_READ, 1);
+		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.FIELD_READ, -1); 
 		sendMessageType(itsBuffer, Message.FIELD_READ);
 		msgStop();
 		
@@ -399,6 +412,7 @@ public final class ThreadData
 		sendRegisteredObjects();
 		
 		msgStart(Message.FIELD_READ_SAME, 0);
+		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.FIELD_READ_SAME, -1); 
 		sendMessageType(itsBuffer, Message.FIELD_READ_SAME);
 		msgStop();
 		
@@ -417,7 +431,25 @@ public final class ThreadData
 		sendRegisteredObjects();
 		
 		msgStart(Message.ARRAY_READ, 1);
+		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.ARRAY_READ, -1); 
 		sendMessageType(itsBuffer, Message.ARRAY_READ);
+		msgStop();
+		
+		commitBuffer();
+		
+		exit();
+	}
+	
+	public void evArrayLength(int aLength)
+	{
+		if (enter()) return;
+		
+		sendRegisteredObjects();
+		
+		msgStart(Message.ARRAY_LENGTH, 0);
+		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.ARRAY_LENGTH, aLength); 
+		sendMessageType(itsBuffer, Message.ARRAY_LENGTH);
+		itsBuffer.putInt(aLength);
 		msgStop();
 		
 		commitBuffer();
@@ -432,6 +464,7 @@ public final class ThreadData
 		msgStart(Message.NEW_ARRAY, 0);
 		
 		checkTimestamp();
+		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.NEW_ARRAY, -1); 
 		sendMessageType(itsBuffer, Message.NEW_ARRAY);
 		sendValue(itsBuffer, aValue);
 		
@@ -451,6 +484,7 @@ public final class ThreadData
 		msgStart(Message.CONSTANT, 0);
 		
 		checkTimestamp();
+		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.CONSTANT, -1); 
 		sendMessageType(itsBuffer, Message.CONSTANT);
 		sendValue(itsBuffer, aValue);
 		
@@ -472,6 +506,7 @@ public final class ThreadData
 		msgStart(Message.OBJECT_INITIALIZED, 0);
 
 		checkTimestamp();
+		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.OBJECT_INITIALIZED, -1); 
 		sendMessageType(itsBuffer, Message.OBJECT_INITIALIZED);
 		sendValue(itsBuffer, aValue);
 
@@ -502,6 +537,7 @@ public final class ThreadData
 		msgStart(Message.EXCEPTION, 0);
 
 		checkTimestamp();
+		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.EXCEPTION, -1); 
 		sendMessageType(itsBuffer, Message.EXCEPTION);
 
 		itsBuffer.putString(aMethodName);
@@ -532,6 +568,7 @@ public final class ThreadData
 		msgStart(Message.HANDLER_REACHED, 0);
 		
 		checkTimestamp();
+		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.HANDLER_REACHED, aLocation); 
 		sendMessageType(itsBuffer, Message.HANDLER_REACHED);
 		itsBuffer.putInt(aLocation);
 		
@@ -551,18 +588,70 @@ public final class ThreadData
 		msgStart(Message.INSCOPE_BEHAVIOR_ENTER, 0);
 
 		checkTimestamp();
-		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.INSCOPE_BEHAVIOR_ENTER); 
+		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.INSCOPE_BEHAVIOR_ENTER, aBehaviorId); 
 		itsBehIdSender.send(itsBuffer, aBehaviorId, Message.INSCOPE_BEHAVIOR_ENTER_DELTA, Message.INSCOPE_BEHAVIOR_ENTER);
 
 		msgStop();
-		
 		commitBuffer();
-		
 		pushInScope();
-		
 		exit();
 	}
 
+	public void evInScopeClinitEnter(int aBehaviorId)
+	{
+		if (enter()) return;
+		
+		sendRegisteredObjects();
+		
+		msgStart(Message.INSCOPE_CLINIT_ENTER, 0);
+		
+		checkTimestamp();
+		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.INSCOPE_CLINIT_ENTER, aBehaviorId);
+		sendMessageType(itsBuffer, Message.INSCOPE_CLINIT_ENTER);
+		itsBuffer.putInt(aBehaviorId);
+		
+		msgStop();
+		commitBuffer();
+		pushInScope();
+		exit();
+	}
+	
+	public void evClassLoaderEnter()
+	{
+		if (enter()) return;
+		
+		sendRegisteredObjects();
+		
+		msgStart(Message.CLASSLOADER_ENTER, 0);
+		
+		checkTimestamp();
+		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.CLASSLOADER_ENTER, -1);
+		sendMessageType(itsBuffer, Message.CLASSLOADER_ENTER);
+
+		msgStop();
+		commitBuffer();
+		pushInScope();
+		exit();
+	}
+	
+	public void evClassLoaderExit()
+	{
+		if (enter()) return;
+		
+		sendRegisteredObjects();
+		
+		msgStart(Message.CLASSLOADER_EXIT, 0);
+		
+		checkTimestamp();
+		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.CLASSLOADER_EXIT, -1);
+		sendMessageType(itsBuffer, Message.CLASSLOADER_EXIT);
+		
+		msgStop();
+		commitBuffer();
+		pushInScope();
+		exit();
+	}
+	
 	/**
 	 * Indicates that behavior enter arguments are going to be sent next.
 	 * Must be sent right after a behavior enter, if needed.
@@ -575,6 +664,7 @@ public final class ThreadData
 		if (enter()) return;
 		
 		msgStart(Message.BEHAVIOR_ENTER_ARGS, aCount);
+		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.BEHAVIOR_ENTER_ARGS, -1); 
 		sendMessageType(itsBuffer, Message.BEHAVIOR_ENTER_ARGS);
 		msgStop();
 		
@@ -679,6 +769,7 @@ public final class ThreadData
 
 		msgStart(Message.CONSTRUCTOR_TARGET, 0);
 		
+		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.CONSTRUCTOR_TARGET, -1); 
 		sendMessageType(itsBuffer, Message.CONSTRUCTOR_TARGET);
 		sendValue(itsBuffer, aTarget);
 		
@@ -708,6 +799,7 @@ public final class ThreadData
 		sendRegisteredObjects();
 		
 		msgStart(Message.INSCOPE_BEHAVIOR_EXIT_EXCEPTION, 0);
+		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.INSCOPE_BEHAVIOR_EXIT_EXCEPTION, -1); 
 		sendMessageType(itsBuffer, Message.INSCOPE_BEHAVIOR_EXIT_EXCEPTION);
 		msgStop();
 		
@@ -728,6 +820,7 @@ public final class ThreadData
 		sendRegisteredObjects();
 		
 		msgStart(Message.OUTOFSCOPE_BEHAVIOR_ENTER, 0);
+		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.OUTOFSCOPE_BEHAVIOR_ENTER, -1); 
 		sendMessageType(itsBuffer, Message.OUTOFSCOPE_BEHAVIOR_ENTER);
 		msgStop();
 		
@@ -748,6 +841,7 @@ public final class ThreadData
 		sendRegisteredObjects();
 		
 		msgStart(Message.OUTOFSCOPE_BEHAVIOR_EXIT_NORMAL, 0);
+		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.OUTOFSCOPE_BEHAVIOR_EXIT_NORMAL, -1); 
 		sendMessageType(itsBuffer, Message.OUTOFSCOPE_BEHAVIOR_EXIT_NORMAL);
 		msgStop();
 		
@@ -766,6 +860,7 @@ public final class ThreadData
 		if (enter()) return;
 		
 		msgStart(Message.OUTOFSCOPE_BEHAVIOR_EXIT_RESULT, 1);
+		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.OUTOFSCOPE_BEHAVIOR_EXIT_RESULT, -1); 
 		sendMessageType(itsBuffer, Message.OUTOFSCOPE_BEHAVIOR_EXIT_RESULT);
 		msgStop();
 		
@@ -782,6 +877,7 @@ public final class ThreadData
 		sendRegisteredObjects();
 		
 		msgStart(Message.OUTOFSCOPE_BEHAVIOR_EXIT_EXCEPTION, 0);
+		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.OUTOFSCOPE_BEHAVIOR_EXIT_EXCEPTION, -1); 
 		sendMessageType(itsBuffer, Message.OUTOFSCOPE_BEHAVIOR_EXIT_EXCEPTION);
 		msgStop();
 		
@@ -819,6 +915,7 @@ public final class ThreadData
 		
 		msgStart(Message.UNMONITORED_BEHAVIOR_CALL_RESULT, 1);
 		checkTimestamp();
+		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.UNMONITORED_BEHAVIOR_CALL_RESULT, -1); 
 		sendMessageType(itsBuffer, Message.UNMONITORED_BEHAVIOR_CALL_RESULT);
 		msgStop();
 		
@@ -840,6 +937,7 @@ public final class ThreadData
 		
 		msgStart(Message.UNMONITORED_BEHAVIOR_CALL_RESULT, 0);
 		checkTimestamp();
+		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.UNMONITORED_BEHAVIOR_CALL_RESULT, -1); 
 		sendMessageType(itsBuffer, Message.UNMONITORED_BEHAVIOR_CALL_RESULT);
 		msgStop();
 		
@@ -887,6 +985,7 @@ public final class ThreadData
 	{
 		if (enter()) return;
 		
+		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.REGISTER_THREAD, aJVMThreadId); 
 		sendMessageType(itsBuffer, Message.REGISTER_THREAD);
 
 		itsBuffer.putLong(aJVMThreadId);
@@ -1040,6 +1139,7 @@ public final class ThreadData
 		int theDataSize = thePacketSize-HEADER_SIZE; 
 	
 		theBuffer.position(0);
+		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.REGISTER_OBJECT, aId); 
 		sendMessageType(theBuffer, Message.REGISTER_OBJECT);
 		theBuffer.putInt(theDataSize); 
 		
@@ -1074,7 +1174,7 @@ public final class ThreadData
 		
 		msgStart(Message.REGISTER_REFOBJECT, 0);
 		
-		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.REGISTER_REFOBJECT); 
+		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.REGISTER_REFOBJECT, aId); 
 		itsObjIdSender.send(itsBuffer, aId, Message.REGISTER_REFOBJECT_DELTA, Message.REGISTER_REFOBJECT);
 		itsBuffer.putInt(theClassId);
 		
@@ -1104,6 +1204,7 @@ public final class ThreadData
 		long theLoaderId = getClassLoaderId(aClass.getClassLoader());
 		
 		msgStart(Message.REGISTER_CLASS, 0);
+		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.REGISTER_CLASS, aClassId); 
 		sendMessageType(itsBuffer, Message.REGISTER_CLASS);
 		
 		itsBuffer.putInt(aClassId);
@@ -1138,6 +1239,7 @@ public final class ThreadData
 		long theLoaderClassId = getClassId(aLoader.getClass());
 		
 		msgStart(Message.REGISTER_CLASSLOADER, 0);
+		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.REGISTER_CLASSLOADER, aLoaderId); 
 		sendMessageType(itsBuffer, Message.REGISTER_CLASSLOADER);
 		
 		itsBuffer.putLong(aLoaderId);

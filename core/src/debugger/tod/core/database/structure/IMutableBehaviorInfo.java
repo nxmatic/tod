@@ -40,7 +40,6 @@ public interface IMutableBehaviorInfo extends IBehaviorInfo, IMutableMemberInfo
 	 */
 	public void setup(
 			boolean aTraced,
-			BehaviorKind aKind,
 			int aCodeSize,
 			LineNumberInfo[] aLineNumberInfos,
 			TagMap aTagMap);

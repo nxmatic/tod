@@ -51,6 +51,7 @@ import tod.core.database.structure.IMutableBehaviorInfo;
 import tod.core.database.structure.IMutableClassInfo;
 import tod.core.database.structure.IMutableStructureDatabase;
 import tod2.access.TODAccessor;
+import tod2.agent.Message;
 import zz.utils.Utils;
 
 /**
@@ -207,10 +208,13 @@ public class ClassInstrumenter
 				aNode.desc, 
 				BCIUtils.isStatic(aNode.access));
 		
-		if (getDatabase().isInScope(itsName)) new MethodInstrumenter_InScope(this, aNode, theBehavior).proceed();
+		if (BCIUtils.CLS_CLASSLOADER.equals(getNode().name) && "loadClassInternal".equals(aNode.name)) 
+		{
+			new MethodInstrumenter_loadClassInternal(this, aNode, theBehavior).proceed();
+		}
+		else if (getDatabase().isInScope(itsName)) new MethodInstrumenter_InScope(this, aNode, theBehavior).proceed();
 		else new MethodInstrumenter_OutOfScope(this, aNode, theBehavior).proceed();
 	}
-	
 	
 	/**
 	 * Replaces the body of {@link TODAccessor#getId(Object)} so that
@@ -249,7 +253,7 @@ public class ClassInstrumenter
 		aNode.instructions = s;
 		aNode.maxStack = theType.getSize();
 	}
-
+	
 	/**
 	 * Adds the $tod$getId method to java.lang.Object
 	 */
