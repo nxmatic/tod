@@ -78,6 +78,9 @@ public class DBSideIOThread
 	{
 		try
 		{
+			Utils.println("Starting replay.");
+			long t0 = System.currentTimeMillis();
+			
 			int thePacketCount = 0;
 			
 			loop:
@@ -96,15 +99,20 @@ public class DBSideIOThread
 				
 				thePacketCount++;
 				
-				if (thePacketCount % 1000 == 0) Utils.println("Processed %d bytes (%d packets)", itsProcessedSize, thePacketCount);
+				if (thePacketCount % 10000 == 0) Utils.println("Processed %d bytes (%d packets)", itsProcessedSize, thePacketCount);
 			}
 			
 			for (ThreadReplayerThread theThread : itsReplayerThreads)
 			{
-				theThread.push(null);
+				if (theThread != null) theThread.push(null);
 			}
+			
+			for (ThreadReplayerThread theThread : itsReplayerThreads) if (theThread != null) theThread.join();
+
+			long t1 = System.currentTimeMillis();
+			Utils.println("Replay took %.3fs", 0.001f*(t1-t0));
 		}
-		catch (IOException e)
+		catch (Exception e)
 		{
 			throw new RuntimeException(e);
 		}
@@ -115,8 +123,7 @@ public class DBSideIOThread
 		ThreadReplayerThread theThread = Utils.listGet(itsReplayerThreads, aThreadId);
 		if (theThread == null)
 		{
-			ThreadReplayer theReplayer = new ThreadReplayer(itsConfig, itsDatabase, itsTmpIdManager);
-			theThread = new ThreadReplayerThread(theReplayer);
+			theThread = new ThreadReplayerThread(itsConfig, itsDatabase, itsTmpIdManager);
 			Utils.listSet(itsReplayerThreads, aThreadId, theThread);
 		}
 		return theThread;
@@ -181,13 +188,23 @@ public class DBSideIOThread
 	
 	private static class ThreadReplayerThread extends Thread
 	{
-		private BufferStream itsStream;
-		private final ThreadReplayer itsReplayer;
+		private final TODConfig itsConfig;
+		private final IStructureDatabase itsDatabase;
+		private final TmpIdManager itsTmpIdManager;
 		
-		public ThreadReplayerThread(ThreadReplayer aReplayer)
+		private BufferStream itsStream;
+		private ThreadReplayer itsReplayer;
+		
+		public ThreadReplayerThread(
+				TODConfig aConfig, 
+				IStructureDatabase aDatabase, 
+				TmpIdManager aTmpIdManager)
 		{
 			super(ThreadReplayerThread.class.getName());
-			itsReplayer = aReplayer;
+			
+			itsConfig = aConfig;
+			itsDatabase = aDatabase;
+			itsTmpIdManager = aTmpIdManager;
 		}
 
 		public void push(byte[] aData)
@@ -196,6 +213,7 @@ public class DBSideIOThread
 			if (itsStream == null)
 			{
 				itsStream = new BufferStream(theBuffer);
+				itsReplayer = new ThreadReplayer(itsConfig, itsDatabase, itsTmpIdManager, itsStream);
 				start();
 			}
 			else
@@ -207,7 +225,7 @@ public class DBSideIOThread
 		@Override
 		public void run()
 		{
-			itsReplayer.replay(itsStream);
+			itsReplayer.replay();
 		}
 	}
 	

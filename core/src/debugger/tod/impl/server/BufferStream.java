@@ -43,6 +43,7 @@ public class BufferStream
 {
 	private _ByteBuffer itsCurrentBuffer;
 	private boolean itsWaiting = false;
+	private boolean itsFinished = false;
 	
 	public BufferStream(_ByteBuffer aBuffer)
 	{
@@ -51,7 +52,8 @@ public class BufferStream
 
 	public final int remaining()
 	{
-		return itsCurrentBuffer != null ? Integer.MAX_VALUE : 0;
+		checkBuffer();
+		return itsFinished ? 0 : Integer.MAX_VALUE;
 	}
 	
 	public final int position()
@@ -61,6 +63,7 @@ public class BufferStream
 	
 	private void checkBuffer()
 	{
+		if (itsFinished) return;
 		if (itsCurrentBuffer == null || itsCurrentBuffer.remaining() == 0)
 		{
 			synchronized (this)
@@ -85,6 +88,7 @@ public class BufferStream
 		{
 			while (! itsWaiting) wait();
 			itsCurrentBuffer = aBuffer;
+			if (itsCurrentBuffer == null) itsFinished = true;
 			itsWaiting = false;
 			notifyAll();
 		}
@@ -104,6 +108,12 @@ public class BufferStream
 	{
 		checkBuffer();
 		return itsCurrentBuffer.get();
+	}
+	
+	public final byte peek()
+	{
+		checkBuffer();
+		return itsCurrentBuffer.peek();
 	}
 	
 	public final char getChar()

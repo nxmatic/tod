@@ -31,6 +31,8 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.replay;
 
+import java.util.Arrays;
+
 import org.objectweb.asm.Type;
 
 import tod.core.database.structure.IBehaviorInfo;
@@ -42,13 +44,42 @@ import tod2.agent.Message;
 import tod2.agent.MonitoringMode;
 import zz.utils.primitive.IntArray;
 
-public abstract class InScopeMethodReplayer extends MethodReplayer
+public abstract class InScopeReplayerFrame extends ReplayerFrame
 {
+	// States
+	private static enum State
+	{
+	S_UNDEFINED, 
+	S_INITIALIZED, // The replayer is ready to start
+	S_WAIT_ARGS, // Waiting for method args
+	S_STARTED, // The replayer has started replaying
+	S_WAIT_FIELD, // Waiting for a field value
+	S_WAIT_ARRAY, // Waiting for an array slot value
+	S_WAIT_ARRAYLENGTH, // Waiting for an array length
+	S_WAIT_NEWARRAY, // Waiting for a new array ref
+	S_WAIT_CST, // Waiting for a class constant (LDC)
+	S_WAIT_EXCEPTION, // Waiting for an exception
+	S_EXCEPTION_THROWN, // An exception was thrown, expect handler or exit
+	S_WAIT_OBJECTINITIALIZED, // Waiting for an object initialized message
+	S_WAIT_CONSTRUCTORTARGET, // Waiting for a constructor target message
+	S_FINISHED_NORMAL, // Execution finished normally
+	S_FINISHED_EXCEPTION, // Execution finished because an exception was thrown
+	S_CALLING_MONITORED, // Processing invocation of monitored code
+	S_CALLING_UNMONITORED, // Processing invocation of unmonitored code
+	S_WAIT_INSCOPE_RESULT, // Waiting for the result of an in-scope call
+	S_WAIT_INSCOPE_CLINIT_RESULT, // Waiting for the result of an in-scope call
+	S_WAIT_OUTOFSCOPE_RESULT, // Waiting for the result of a monitored call
+	S_WAIT_CLASSLOADER_ENTER, 
+	S_WAIT_CLASSLOADER_EXIT, 
+	}	
+	
 	private final String itsName;
 	private final int itsAccess;
 	
 	private final Type[] itsArgTypes;
 	private final Type itsReturnType;
+	
+	private State itsState = State.S_INITIALIZED;
 	
 	private int itsNextBlock = 0;
 	
@@ -64,28 +95,27 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 	
 	private boolean itsExpectObjectInitialized = false;
 	
+	private PostClassloaderAction itsPostClassloaderAction;
+
+	/** For clinit executions */
+	private State itsNextState = null;
+	private Type itsNextExpectedType = null;
+
+	
 	private ObjectId itsRefValue;
-	private boolean itsBooleanValue;
-	private byte itsByteValue;
-	private char itsCharValue;
 	private double itsDoubleValue;
 	private float itsFloatValue;
 	private int itsIntValue;
 	private long itsLongValue;
-	private short itsShortValue;
 
 	private final ObjectId[] itsRefCache;
-	private final boolean[] itsBooleanCache;
-	private final byte[] itsByteCache;
-	private final char[] itsCharCache;
 	private final double[] itsDoubleCache;
 	private final float[] itsFloatCache;
 	private final int[] itsIntCache;
 	private final long[] itsLongCache;
-	private final short[] itsShortCache;
 	
-	private PrimitiveMultiStack itsSaveStack = new PrimitiveMultiStack();
-	private PrimitiveMultiStack itsArgsStack = new PrimitiveMultiStack();
+	private PrimitiveMultiStack itsSaveStack;
+	private PrimitiveMultiStack itsArgsStack;
 	
 	/**
 	 * Block id corresponding to each handler id. Indexed by handler id.
@@ -93,14 +123,9 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 	private final IntArray itsHandlerBlocks = new IntArray();
 	
 	/**
-	 * Data for pending invocation
-	 */
-	private InvocationData itsInvokeData;
-	
-	/**
 	 * @param aCacheCounts "encoded" cache counts.
 	 */
-	protected InScopeMethodReplayer(
+	protected InScopeReplayerFrame(
 			String aName, 
 			int aAccess, 
 			String aDescriptor, 
@@ -113,19 +138,103 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 		itsArgTypes = Type.getArgumentTypes(aDescriptor);
 		itsReturnType = Type.getReturnType(aDescriptor);
 		
+		int theIntCount = aCacheCounts.charAt(Type.INT) 
+				+ aCacheCounts.charAt(Type.BOOLEAN) 
+				+ aCacheCounts.charAt(Type.BYTE) 
+				+ aCacheCounts.charAt(Type.CHAR) 
+				+ aCacheCounts.charAt(Type.SHORT); 
+		
 		itsRefCache = new ObjectId[aCacheCounts.charAt(Type.OBJECT)];
-		itsBooleanCache = new boolean[aCacheCounts.charAt(Type.BOOLEAN)];
-		itsByteCache = new byte[aCacheCounts.charAt(Type.BYTE)];
-		itsCharCache = new char[aCacheCounts.charAt(Type.CHAR)];
 		itsDoubleCache = new double[aCacheCounts.charAt(Type.DOUBLE)];
 		itsFloatCache = new float[aCacheCounts.charAt(Type.FLOAT)];
-		itsIntCache = new int[aCacheCounts.charAt(Type.INT)];
+		itsIntCache = new int[theIntCount];
 		itsLongCache = new long[aCacheCounts.charAt(Type.LONG)];
-		itsShortCache = new short[aCacheCounts.charAt(Type.SHORT)];
 
 		for(int i=0;i<aHandlerBlocks.length();i++) itsHandlerBlocks.set(i, aHandlerBlocks.charAt(i));
 	}
 	
+	@Override
+	public void setup(ThreadReplayer aThreadReplayer, boolean aFromScope)
+	{
+		super.setup(aThreadReplayer, aFromScope);
+		itsSaveStack = aThreadReplayer.getPMS();
+		itsArgsStack = aThreadReplayer.getPMS();
+	}
+	
+	@Override
+	public void dispose(ThreadReplayer aThreadReplayer)
+	{
+		super.dispose(aThreadReplayer);
+		aThreadReplayer.releasePMS(itsSaveStack);
+		itsSaveStack = null;
+		aThreadReplayer.releasePMS(itsArgsStack);
+		itsArgsStack = null;
+	}
+	
+	public State getState()
+	{
+		return itsState;
+	}
+	
+	protected void setState(State aState)
+	{
+		itsState = aState;
+	}
+	
+	protected void allowedState(State aState)
+	{
+		if (itsState != aState) throw new IllegalStateException("Expected "+aState+", but is "+itsState);
+	}
+	
+	protected void allowedStates(State... aStates)
+	{
+		for (State s : aStates) if (itsState == s) return;
+		throw new IllegalStateException("Expected "+Arrays.asList(aStates)+", but is "+itsState);
+	}
+
+	@Override
+	public void processMessage(byte aMessage, BufferStream aBuffer)
+	{
+		switch(aMessage)
+		{
+		case Message.BEHAVIOR_ENTER_ARGS: args(aBuffer); break;
+		case Message.ARRAY_READ: evArrayRead(aBuffer); break;
+		case Message.ARRAY_LENGTH: evArrayLength(aBuffer); break;
+		case Message.CONSTANT: evCst(aBuffer); break;
+		case Message.FIELD_READ: evFieldRead(aBuffer); break;
+		case Message.FIELD_READ_SAME: evFieldRead_Same(); break;
+		case Message.NEW_ARRAY: evNewArray(aBuffer); break;
+		case Message.EXCEPTION: evExceptionGenerated(aBuffer); break;
+		case Message.HANDLER_REACHED: evHandlerReached(aBuffer); break;
+		case Message.INSCOPE_BEHAVIOR_EXIT_EXCEPTION: evExitException(aBuffer); break;
+		
+		case Message.OBJECT_INITIALIZED: 
+			evObjectInitialized(getThreadReplayer().readValue(aBuffer)); 
+			break;
+			
+		case Message.CONSTRUCTOR_TARGET: 
+			evConstructorTarget(getThreadReplayer().readValue(aBuffer)); 
+			break;
+			
+		case Message.INSCOPE_BEHAVIOR_ENTER: 
+			evInScopeBehaviorEnter(getThreadReplayer().getBehIdReceiver().receiveFull(aBuffer)); 
+			break;
+			
+		case Message.INSCOPE_BEHAVIOR_ENTER_DELTA: 
+			evInScopeBehaviorEnter(getThreadReplayer().getBehIdReceiver().receiveDelta(aBuffer)); 
+			break;
+			
+		case Message.OUTOFSCOPE_BEHAVIOR_ENTER: evOutOfScopeBehaviorEnter(); break;
+		case Message.INSCOPE_CLINIT_ENTER: evInScopeClinitEnter(aBuffer.getInt()); break;
+		case Message.OUTOFSCOPE_CLINIT_ENTER: evOutOfScopeClinitEnter(); break;
+		case Message.CLASSLOADER_ENTER: evClassloaderEnter(); break;
+		case Message.OUTOFSCOPE_BEHAVIOR_EXIT_RESULT: evOutOfScopeBehaviorExitResult(aBuffer); break;
+			
+		default: throw new IllegalStateException(""+Message._NAMES[aMessage]);
+		}
+	}
+	
+
 	/**
 	 * Writes the current value (one of the vXxxx fields) into the indicated cache slot
 	 * of the given type.
@@ -139,14 +248,17 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 			itsRefCache[aCacheSlot] = vRef(); 
 			break;
 			
-		case Type.BOOLEAN: itsBooleanCache[aCacheSlot] = vBoolean(); break;
-		case Type.BYTE: itsByteCache[aCacheSlot] = vByte(); break;
-		case Type.CHAR: itsCharCache[aCacheSlot] = vChar(); break;
+		case Type.BOOLEAN: 
+		case Type.BYTE: 
+		case Type.CHAR:
+		case Type.SHORT: 
+		case Type.INT: 
+			itsIntCache[aCacheSlot] = vInt(); 
+			break;
+			
 		case Type.DOUBLE: itsDoubleCache[aCacheSlot] = vDouble(); break;
 		case Type.FLOAT: itsFloatCache[aCacheSlot] = vFloat(); break;
-		case Type.INT: itsIntCache[aCacheSlot] = vInt(); break;
 		case Type.LONG: itsLongCache[aCacheSlot] = vLong(); break;
-		case Type.SHORT: itsShortCache[aCacheSlot] = vShort(); break;
 		default: throw new RuntimeException("Unknown type: "+aType);
 		}
 	}
@@ -166,14 +278,17 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 			vRef(itsRefCache[aCacheSlot]); 
 			break;
 			
-		case Type.BOOLEAN: vBoolean(itsBooleanCache[aCacheSlot]); break;
-		case Type.BYTE: vByte(itsByteCache[aCacheSlot]); break;
-		case Type.CHAR: vChar(itsCharCache[aCacheSlot]); break;
+		case Type.BOOLEAN: 
+		case Type.BYTE: 
+		case Type.CHAR: 
+		case Type.SHORT: 
+		case Type.INT: 
+			vInt(itsIntCache[aCacheSlot]); 
+			break;
+			
 		case Type.DOUBLE: vDouble(itsDoubleCache[aCacheSlot]); break;
 		case Type.FLOAT: vFloat(itsFloatCache[aCacheSlot]); break;
-		case Type.INT: vInt(itsIntCache[aCacheSlot]); break;
 		case Type.LONG: vLong(itsLongCache[aCacheSlot]); break;
-		case Type.SHORT: vShort(itsShortCache[aCacheSlot]); break;
 		default: throw new RuntimeException("Unknown type: "+aType);
 		}
 	}
@@ -185,15 +300,15 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 	{
 		itsExpectedType = null;
 		itsExpectedFieldCacheSlot = -1;
-		setState(S_UNDEFINED);
+		setState(State.S_UNDEFINED);
 		int theNextBlock = itsNextBlock;
 		itsNextBlock = -1;
 		
-		getThreadReplayer().echo("Proceed: %d", theNextBlock);
+		if (ThreadReplayer.ECHO) getThreadReplayer().echo("Proceed: %d", theNextBlock);
 		proceed(theNextBlock);
 	}
 	
-	private void transferArg(InScopeMethodReplayer aParent, Type aType, int aSlot)
+	private void transferArg(InScopeReplayerFrame aParent, Type aType, int aSlot)
 	{
 		switch(aType.getSort())
 		{
@@ -218,8 +333,9 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 	}
 	
 	@Override
-	public void transferResult(InScopeMethodReplayer aSource)
+	public void transferResult(InScopeReplayerFrame aSource)
 	{
+		allowedStates(State.S_WAIT_INSCOPE_CLINIT_RESULT, State.S_WAIT_INSCOPE_RESULT);
 		if (itsExpectObjectInitialized) throw new IllegalStateException();
 		
 		Type theType = aSource.itsReturnType;
@@ -227,11 +343,14 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 		
 		switch(theType.getSort())
 		{
-        case Type.BOOLEAN: vBoolean(aSource.vBoolean()); break;
-        case Type.BYTE: vByte(aSource.vByte()); break;
-        case Type.CHAR: vChar(aSource.vChar()); break;
-        case Type.SHORT: vShort(aSource.vShort()); break;
-		case Type.INT: vInt(aSource.vInt()); break;
+        case Type.BOOLEAN: 
+        case Type.BYTE: 
+        case Type.CHAR: 
+        case Type.SHORT: 
+		case Type.INT: 
+			vInt(aSource.vInt()); 
+			break;
+			
 		case Type.DOUBLE: vDouble(aSource.vDouble()); break;
 		case Type.FLOAT: vFloat(aSource.vFloat()); break;
 		case Type.LONG: vLong(aSource.vLong()); break;
@@ -245,8 +364,16 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 		
 		default: throw new RuntimeException("Unknown type: "+theType);
 		}	
-		
-		next();
+
+		if (itsState == State.S_WAIT_INSCOPE_CLINIT_RESULT)
+		{
+			itsState = itsNextState;
+			itsExpectedType = itsNextExpectedType;
+		}
+		else
+		{
+			next();
+		}
 	}
 	
 	@Override
@@ -259,14 +386,17 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 			sRefPush(getThreadReplayer().readValue(aBuffer)); 
 			break;
 			
-		case Type.BOOLEAN: vBoolean(aBuffer.get() != 0); break;
-		case Type.BYTE: vByte(aBuffer.get()); break;
-		case Type.CHAR: vChar(aBuffer.getChar()); break;
+		case Type.BOOLEAN: 
+		case Type.BYTE: 
+		case Type.CHAR: 
+		case Type.SHORT: 
+		case Type.INT: 
+			vInt(aBuffer.getInt()); 
+			break;
+			
 		case Type.DOUBLE: vDouble(aBuffer.getDouble()); break;
 		case Type.FLOAT: vFloat(aBuffer.getFloat()); break;
-		case Type.INT: vInt(aBuffer.getInt()); break;
 		case Type.LONG: vLong(aBuffer.getLong()); break;
-		case Type.SHORT: vShort(aBuffer.getShort()); break;
 		
 		case Type.VOID: break;
 		
@@ -277,8 +407,8 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 		{
 			if (itsExpectedType.getSort() != Type.VOID) throw new IllegalStateException();
 			itsExpectObjectInitialized = false;
-			getThreadReplayer().echo("expectObjectInitialized");
-			setState(S_WAIT_OBJECTINITIALIZED);
+			if (ThreadReplayer.ECHO) getThreadReplayer().echo("expectObjectInitialized");
+			setState(State.S_WAIT_OBJECTINITIALIZED);
 		}
 		else
 		{
@@ -289,9 +419,9 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 	/**
 	 * Starts the replay of the method, taking arguments from the parent replayer.
 	 */
-	public void startFromScope(InScopeMethodReplayer aParent)
+	public void startFromScope(InScopeReplayerFrame aParent)
 	{
-		allowedState(S_INITIALIZED);
+		allowedState(State.S_INITIALIZED);
 		
 		boolean theStatic = BCIUtils.isStatic(itsAccess);
 		boolean theConstructor = "<init>".equals(itsName);
@@ -321,7 +451,7 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 		}
 
 		itsNextBlock = 0;
-		setState(S_STARTED);
+		setState(State.S_STARTED);
 		next();
 	}
 	
@@ -330,8 +460,8 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 	 */
 	public void startFromOutOfScope()
 	{
-		allowedState(S_INITIALIZED);
-		setState(S_WAIT_ARGS);
+		allowedState(State.S_INITIALIZED);
+		setState(State.S_WAIT_ARGS);
 	}
 	
 	/**
@@ -359,40 +489,12 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 		}
 	}
 	
-	@Override
-	public void processMessage(byte aMessage, BufferStream aBuffer)
-	{
-		switch(aMessage)
-		{
-		case Message.BEHAVIOR_ENTER_ARGS: args(aBuffer); break;
-		case Message.ARRAY_READ: evArrayRead(aBuffer); break;
-		case Message.ARRAY_LENGTH: evArrayLength(aBuffer); break;
-		case Message.CONSTANT: evCst(aBuffer); break;
-		case Message.FIELD_READ: evFieldRead(aBuffer); break;
-		case Message.FIELD_READ_SAME: evFieldRead_Same(); break;
-		case Message.NEW_ARRAY: evNewArray(aBuffer); break;
-		case Message.OBJECT_INITIALIZED: evObjectInitialized(getThreadReplayer().readValue(aBuffer)); break;
-		case Message.CONSTRUCTOR_TARGET: evConstructorTarget(getThreadReplayer().readValue(aBuffer)); break;
-		case Message.EXCEPTION: evExceptionGenerated(aBuffer); break;
-		case Message.HANDLER_REACHED: evHandlerReached(aBuffer); break;
-		case Message.INSCOPE_BEHAVIOR_EXIT_EXCEPTION: evExitException(aBuffer); break;
-			
-		default: throw new IllegalStateException(""+aMessage);
-		}
-	}
-	
-	public void proceed()
-	{
-		allowedState(S_HOLD);
-		next();
-	}
-	
 	/**
 	 * Read the method arguments from the buffer
 	 */
 	public void args(BufferStream aBuffer)
 	{
-		allowedState(S_WAIT_ARGS);
+		allowedState(State.S_WAIT_ARGS);
 		
 		boolean theStatic = BCIUtils.isStatic(itsAccess);
 		boolean theConstructor = "<init>".equals(itsName);
@@ -413,14 +515,15 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 		}
 		
 		itsNextBlock = 0;
-		setState(S_STARTED);
+		setState(State.S_STARTED);
 		next();
 	}
 	
 	
-	public void evFieldRead(BufferStream aBuffer)
+	
+	private void evFieldRead(BufferStream aBuffer)
 	{
-		allowedState(S_WAIT_FIELD);
+		allowedState(State.S_WAIT_FIELD);
 		
 		readValue(itsExpectedType, aBuffer);
 		if (itsExpectedFieldCacheSlot >= 0) storeFieldCache(itsExpectedType, itsExpectedFieldCacheSlot);
@@ -428,9 +531,9 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 		next();
 	}
 	
-	public void evFieldRead_Same()
+	private void evFieldRead_Same()
 	{
-		allowedState(S_WAIT_FIELD);
+		allowedState(State.S_WAIT_FIELD);
 		if (itsExpectedFieldCacheSlot < 0) throw new IllegalStateException();
 		
 		loadFieldCache(itsExpectedType, itsExpectedFieldCacheSlot);
@@ -438,46 +541,46 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 		next();
 	}
 	
-	public void evArrayRead(BufferStream aBuffer)
+	private void evArrayRead(BufferStream aBuffer)
 	{
-		allowedState(S_WAIT_ARRAY);
+		allowedState(State.S_WAIT_ARRAY);
 		readValue(itsExpectedType, aBuffer);
 		next();
 	}
 	
-	public void evArrayLength(BufferStream aBuffer)
+	private void evArrayLength(BufferStream aBuffer)
 	{
-		allowedState(S_WAIT_ARRAYLENGTH);
+		allowedState(State.S_WAIT_ARRAYLENGTH);
 		int theLength = aBuffer.getInt();
 		vInt(theLength);
 		next();
 	}
 	
-	public void evCst(BufferStream aBuffer)
+	private void evCst(BufferStream aBuffer)
 	{
-		allowedState(S_WAIT_CST);
+		allowedState(State.S_WAIT_CST);
 		readValue(BCIUtils.getType(Type.OBJECT), aBuffer);
 		next();
 	}
 	
-	public void evNewArray(BufferStream aBuffer)
+	private void evNewArray(BufferStream aBuffer)
 	{
-		allowedState(S_WAIT_NEWARRAY);
+		allowedState(State.S_WAIT_NEWARRAY);
 		readValue(BCIUtils.getType(Type.OBJECT), aBuffer);
 		next();
 	}
 	
-	public void evObjectInitialized(ObjectId aObject)
+	private void evObjectInitialized(ObjectId aObject)
 	{
-		allowedState(S_WAIT_OBJECTINITIALIZED);
+		allowedState(State.S_WAIT_OBJECTINITIALIZED);
 		ObjectId theTmpId = sRefPeek();
 		getThreadReplayer().getTmpIdManager().associate(theTmpId.getId(), aObject.getId());
 		next();
 	}
 	
-	public void evConstructorTarget(ObjectId aObject)
+	private void evConstructorTarget(ObjectId aObject)
 	{
-		allowedState(S_WAIT_CONSTRUCTORTARGET);
+		allowedState(State.S_WAIT_CONSTRUCTORTARGET);
 		ObjectId theTmpId = lRefGet(0);
 		getThreadReplayer().getTmpIdManager().associate(theTmpId.getId(), aObject.getId());
 		next();
@@ -496,31 +599,94 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 
 	public void evExceptionGenerated(int aBehaviorId, int aBytecodeIndex, ObjectId aException)
 	{
-		setState(S_EXCEPTION_THROWN);
+		setState(State.S_EXCEPTION_THROWN);
 		vRef(aException);
 	}
 	
-	public void evHandlerReached(BufferStream aBuffer)
+	private void evHandlerReached(BufferStream aBuffer)
 	{
-		allowedState(S_EXCEPTION_THROWN);
+		allowedState(State.S_EXCEPTION_THROWN);
 		int theHandlerId = aBuffer.getInt();
 		itsNextBlock = itsHandlerBlocks.get(theHandlerId);
 		next();
 	}
 	
-	public void evExitException(BufferStream aBuffer)
+	private void evExitException(BufferStream aBuffer)
 	{
-		allowedStates(S_EXCEPTION_THROWN);
-		setState(S_FINISHED_EXCEPTION);
+		allowedStates(State.S_EXCEPTION_THROWN);
+		getThreadReplayer().returnException();
+		setState(State.S_FINISHED_EXCEPTION);
+		itsNextBlock = -1;
 	}
 	
-	public void constructorTarget(long aId)
+	private void constructorTarget(long aId)
 	{
 		ObjectId theTmpId = lRefGet(0);
 		getThreadReplayer().getTmpIdManager().associate(theTmpId.getId(), aId);
 		next();
 	}
 
+	private void evInScopeBehaviorEnter(int aBehaviorId)
+	{
+		allowedState(State.S_CALLING_MONITORED);
+		InScopeReplayerFrame theChild = getThreadReplayer().createInScopeReplayer(this, aBehaviorId);
+		getThreadReplayer().pushFrame(theChild);
+		setState(State.S_WAIT_INSCOPE_RESULT);
+		theChild.startFromScope(this);
+	}
+	
+	private void evOutOfScopeBehaviorEnter()
+	{
+		allowedState(State.S_CALLING_MONITORED);
+		EnveloppeReplayerFrame theChild = getThreadReplayer().createEnveloppeReplayer(this);
+		getThreadReplayer().pushFrame(theChild);
+		if (itsExpectedType.getSort() != Type.VOID) setState(State.S_WAIT_OUTOFSCOPE_RESULT);
+		else setState(State.S_STARTED);
+	}
+	
+	private void evInScopeClinitEnter(int aBehaviorId)
+	{
+		allowedState(State.S_CALLING_MONITORED);
+		InScopeReplayerFrame theChild = getThreadReplayer().createInScopeReplayer(this, aBehaviorId);
+		getThreadReplayer().pushFrame(theChild);
+		itsNextState = itsState;
+		setState(State.S_WAIT_INSCOPE_CLINIT_RESULT);
+		itsNextExpectedType = itsExpectedType;
+		itsExpectedType = Type.VOID_TYPE;
+		theChild.startFromScope(this);
+	}
+	
+	private void evOutOfScopeClinitEnter()
+	{
+		allowedState(State.S_CALLING_MONITORED);
+		EnveloppeReplayerFrame theChild = getThreadReplayer().createEnveloppeReplayer(this);
+		getThreadReplayer().pushFrame(theChild);
+		// State is not changed, we are still expecting the actual call
+	}
+	
+	private void evClassloaderEnter()
+	{
+		allowedState(State.S_WAIT_CLASSLOADER_ENTER);
+		ClassloaderWrapperReplayerFrame theChild = getThreadReplayer().createClassloaderReplayer(this);
+		getThreadReplayer().pushFrame(theChild);
+		setState(State.S_WAIT_CLASSLOADER_EXIT);
+	}
+	
+	@Override
+	public void classloaderReturned()
+	{
+		allowedState(State.S_WAIT_CLASSLOADER_EXIT);
+		itsPostClassloaderAction.run();
+		itsPostClassloaderAction = null;
+	}
+	
+	private void evOutOfScopeBehaviorExitResult(BufferStream aBuffer)
+	{
+		allowedState(State.S_WAIT_OUTOFSCOPE_RESULT);
+		readValue(itsExpectedType, aBuffer);
+		next();
+	}
+	
 	/**
 	 * Sets the expected type.
 	 * @param aSort The sort corresponding to the type (see {@link Type}).
@@ -533,8 +699,8 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 	
 	protected void expectField(int aSort, int aNextBlock, int aCacheSlot)
 	{
-		getThreadReplayer().echo("expectField");
-		setState(S_WAIT_FIELD);
+		if (ThreadReplayer.ECHO) getThreadReplayer().echo("expectField");
+		setState(State.S_WAIT_FIELD);
 		itsNextBlock = aNextBlock;
 		itsExpectedFieldCacheSlot = aCacheSlot;
 		expect(aSort);
@@ -542,45 +708,75 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 	
 	protected void expectArray(int aSort, int aNextBlock)
 	{
-		getThreadReplayer().echo("expectArray");
-		setState(S_WAIT_ARRAY);
+		if (ThreadReplayer.ECHO) getThreadReplayer().echo("expectArray");
+		setState(State.S_WAIT_ARRAY);
 		itsNextBlock = aNextBlock;
 		expect(aSort);
 	}
 	
 	protected void expectArrayLength(int aNextBlock)
 	{
-		getThreadReplayer().echo("expectArrayLength");
-		setState(S_WAIT_ARRAYLENGTH);
+		if (ThreadReplayer.ECHO) getThreadReplayer().echo("expectArrayLength");
+		setState(State.S_WAIT_ARRAYLENGTH);
 		itsNextBlock = aNextBlock;
 	}
 	
 	protected void expectCst(int aNextBlock)
 	{
-		getThreadReplayer().echo("expectCst");
-		setState(S_WAIT_CST);
+		if (ThreadReplayer.ECHO) if (ThreadReplayer.ECHO) getThreadReplayer().echo("expectCst");
+		
+		if (getThreadReplayer().peekNextMessage() == Message.CLASSLOADER_ENTER)
+		{
+			setState(State.S_WAIT_CLASSLOADER_ENTER);
+			itsPostClassloaderAction = new PostClassloaderCst(aNextBlock);
+			return;
+		}
+		else
+		{
+			expectCst_postClassloader(aNextBlock);
+		}
+	}
+	
+	protected void expectCst_postClassloader(int aNextBlock)
+	{
+		setState(State.S_WAIT_CST);
 		itsNextBlock = aNextBlock;
 	}
 	
 	protected void expectNewArray(int aNextBlock)
 	{
-		getThreadReplayer().echo("expectNewArray");
-		setState(S_WAIT_NEWARRAY);
+		if (ThreadReplayer.ECHO) getThreadReplayer().echo("expectNewArray");
+		
+		if (getThreadReplayer().peekNextMessage() == Message.CLASSLOADER_ENTER)
+		{
+			setState(State.S_WAIT_CLASSLOADER_ENTER);
+			itsPostClassloaderAction = new PostClassloaderNewArray(aNextBlock);
+			return;
+		}
+		else
+		{
+			expectNewArray_postClassloader(aNextBlock);
+		}
+	}
+
+	protected void expectNewArray_postClassloader(int aNextBlock)
+	{
+		setState(State.S_WAIT_NEWARRAY);
 		itsNextBlock = aNextBlock;
 	}
 	
 	protected void expectConstructorTarget(int aNextBlock)
 	{
-		getThreadReplayer().echo("expectConstructorTarget");
-		setState(S_WAIT_CONSTRUCTORTARGET);
+		if (ThreadReplayer.ECHO) getThreadReplayer().echo("expectConstructorTarget");
+		setState(State.S_WAIT_CONSTRUCTORTARGET);
 		itsNextBlock = aNextBlock;
 	}
 	
 	@Override
 	public void expectException()
 	{
-		getThreadReplayer().echo("expectException");
-		setState(S_WAIT_EXCEPTION);
+		if (ThreadReplayer.ECHO) getThreadReplayer().echo("expectException");
+		setState(State.S_WAIT_EXCEPTION);
 		itsNextBlock = -1;
 	}
 	
@@ -590,7 +786,7 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 	 */
 	public void checkCast(int aNextBlock)
 	{
-		getThreadReplayer().echo("checkCast");
+		if (ThreadReplayer.ECHO) getThreadReplayer().echo("checkCast");
 		if (getThreadReplayer().peekNextMessage() != Message.EXCEPTION)
 		{
 			itsNextBlock = aNextBlock;
@@ -604,7 +800,8 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 	
 	protected void processReturn()
 	{
-		setState(S_FINISHED_NORMAL);
+		getThreadReplayer().returnNormal(this);
+		setState(State.S_FINISHED_NORMAL);
 		itsNextBlock = -1;
 	}
 	
@@ -621,39 +818,31 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 			vRef(getThreadReplayer().readValue(aBuffer)); 
 			break;
 			
-		case Type.BOOLEAN: vBoolean(aBuffer.get() != 0); break;
-		case Type.BYTE: vByte(aBuffer.get()); break;
-		case Type.CHAR: vChar(aBuffer.getChar()); break;
+		case Type.BOOLEAN: vInt(aBuffer.get()); break;
+		case Type.BYTE: vInt(aBuffer.get()); break;
+		case Type.CHAR: vInt(aBuffer.getChar()); break;
+		case Type.SHORT: vInt(aBuffer.getShort()); break;
+		case Type.INT: vInt(aBuffer.getInt()); break;
 		case Type.DOUBLE: vDouble(aBuffer.getDouble()); break;
 		case Type.FLOAT: vFloat(aBuffer.getFloat()); break;
-		case Type.INT: vInt(aBuffer.getInt()); break;
 		case Type.LONG: vLong(aBuffer.getLong()); break;
-		case Type.SHORT: vShort(aBuffer.getShort()); break;
 		default: throw new RuntimeException("Unknown type: "+aType);
 		}
 	}
 	
 	// Get current value
 	protected ObjectId vRef() { return itsRefValue; }
-	protected boolean vBoolean() { return itsBooleanValue; }
-	protected byte vByte() { return itsByteValue; }
-	protected char vChar() { return itsCharValue; }
 	protected double vDouble() { return itsDoubleValue; }
 	protected float vFloat() { return itsFloatValue; }
 	protected int vInt() { return itsIntValue; }
 	protected long vLong() { return itsLongValue; }
-	protected short vShort() { return itsShortValue; }
 
 	// Set current value
 	protected void vRef(ObjectId v) { itsRefValue = v; }
-	protected void vBoolean(boolean v) { itsBooleanValue = v; }
-	protected void vByte(byte v) { itsByteValue = v; }
-	protected void vChar(char v) { itsCharValue = v; }
 	protected void vDouble(double v) { itsDoubleValue = v; }
 	protected void vFloat(float v) { itsFloatValue = v; }
 	protected void vInt(int v) { itsIntValue = v; }
 	protected void vLong(long v) { itsLongValue = v; }
-	protected void vShort(short v) { itsShortValue = v; }
 	
 	// Push to operand stack
 	protected void sRefPush(ObjectId v) { itsSaveStack.refPush(v); }
@@ -700,37 +889,35 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 	{
 		return new ObjectId(getThreadReplayer().getTmpIdManager().nextId());
 	}
-	
-	@Override
-	protected void allowedState(int aState)
-	{
-		super.allowedState(aState);
-		if (itsInvokeData != null && aState != S_INVOKE_PENDING) throw new IllegalStateException();
-	}
 
 	
 	/**
 	 * Processes an invocation
-	 * Actually saves the data for later processing by {@link #proceedInvoke()}.
-	 * This is to allow a {@link Message#TRACEDMETHODS_VERSION} message to
-	 * be processed before the invocation is actually processed
 	 */
 	protected void invoke(int aBehaviorId, int aNextBlock, boolean aExpectObjectInitialized)
 	{
-		itsInvokeData = new InvocationData(aBehaviorId, aNextBlock, aExpectObjectInitialized);
-		setState(S_INVOKE_PENDING);
-		getThreadReplayer().echo("invoke pending: "+aBehaviorId);	
+		getThreadReplayer().processStatelessMessages();
+		
+		// If the next message is a classloader enter, we must process its execution first
+		// because a TRACEDMETHODS_VERSION might come next
+		if (getThreadReplayer().peekNextMessage() == Message.CLASSLOADER_ENTER)
+		{
+			setState(State.S_WAIT_CLASSLOADER_ENTER);
+			itsPostClassloaderAction = new PostClassloaderInvocation(aBehaviorId, aNextBlock, aExpectObjectInitialized);
+			return;
+		}
+		else
+		{
+			invoke_postClassloader(aBehaviorId, aNextBlock, aExpectObjectInitialized);
+		}
 	}
 	
-	public void proceedInvoke()
+	protected void invoke_postClassloader(int aBehaviorId, int aNextBlock, boolean aExpectObjectInitialized)
 	{
-		allowedState(S_INVOKE_PENDING);
-		proceedInvoke(itsInvokeData.behaviorId, itsInvokeData.nextBlock, itsInvokeData.expectObjectInitialized);
-		itsInvokeData = null;
-	}
-	
-	private void proceedInvoke(int aBehaviorId, int aNextBlock, boolean aExpectObjectInitialized)
-	{
+		// If the next message is TRACEDMETHODS_VERSION, process it before going on,
+		// because it might affect the monitoring mode for the call
+		getThreadReplayer().processStatelessMessages();
+		
 		int theMode = getThreadReplayer().getBehaviorMonitoringMode(aBehaviorId);
 		IBehaviorInfo theBehavior = getDatabase().getBehavior(aBehaviorId, true);
 		itsExpectedType = Type.getType(theBehavior.getReturnType().getJvmName());
@@ -739,13 +926,15 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 		{
 		case MonitoringMode.FULL:
 		case MonitoringMode.ENVELOPPE:
-			getThreadReplayer().echo("invoke (monitored): "+theBehavior+" ["+aExpectObjectInitialized+"]");
-			setState(S_CALLING_MONITORED);
+			if (ThreadReplayer.ECHO) getThreadReplayer().echo("invoke (monitored): "+theBehavior+" ["+aExpectObjectInitialized+"]");
+			setState(State.S_CALLING_MONITORED);
 			break;
 			
 		case MonitoringMode.NONE:
-			getThreadReplayer().echo("invoke (unmonitored): "+theBehavior+" ["+aExpectObjectInitialized+"]");
-			setState(S_CALLING_UNMONITORED);
+			if (ThreadReplayer.ECHO) getThreadReplayer().echo("invoke (unmonitored): "+theBehavior+" ["+aExpectObjectInitialized+"]");
+			UnmonitoredReplayerFrame theChild = getThreadReplayer().createUnmonitoredReplayer(this);
+			getThreadReplayer().pushFrame(theChild);
+			setState(State.S_CALLING_UNMONITORED);
 			break;
 			
 		default: throw new RuntimeException("Mode not handled: "+theMode); 
@@ -768,17 +957,60 @@ public abstract class InScopeMethodReplayer extends MethodReplayer
 		return id1.getId() == id2.getId();
 	}
 	
-	private static final class InvocationData
+	private static abstract class PostClassloaderAction
 	{
-		public final int behaviorId;
-		public final int nextBlock;
-		public final boolean expectObjectInitialized;
+		protected abstract void run();
+	}
+	
+	private class PostClassloaderInvocation extends PostClassloaderAction
+	{
+		final int behaviorId;
+		final int nextBlock;
+		final boolean expectObjectInitialized;
 
-		public InvocationData(int aBehaviorId, int aNextBlock, boolean aExpectObjectInitialized)
+		public PostClassloaderInvocation(int aBehaviorId, int aNextBlock, boolean aExpectObjectInitialized)
 		{
 			behaviorId = aBehaviorId;
 			nextBlock = aNextBlock;
 			expectObjectInitialized = aExpectObjectInitialized;
+		}
+		
+		@Override
+		protected void run()
+		{
+			invoke_postClassloader(behaviorId, nextBlock, expectObjectInitialized);
+		}
+	}
+	
+	private class PostClassloaderCst extends PostClassloaderAction
+	{
+		final int nextBlock;
+
+		public PostClassloaderCst(int aNextBlock)
+		{
+			nextBlock = aNextBlock;
+		}
+		
+		@Override
+		protected void run()
+		{
+			expectCst_postClassloader(nextBlock);
+		}
+	}
+	
+	private class PostClassloaderNewArray extends PostClassloaderAction
+	{
+		final int nextBlock;
+		
+		public PostClassloaderNewArray(int aNextBlock)
+		{
+			nextBlock = aNextBlock;
+		}
+		
+		@Override
+		protected void run()
+		{
+			expectNewArray_postClassloader(nextBlock);
 		}
 	}
 }

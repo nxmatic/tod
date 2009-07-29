@@ -66,35 +66,42 @@ public class Message
 	 */
 	public static final byte OUTOFSCOPE_BEHAVIOR_ENTER = 19;
 	
-	public static final byte OUTOFSCOPE_BEHAVIOR_EXIT_NORMAL = 20;
-	public static final byte OUTOFSCOPE_BEHAVIOR_EXIT_EXCEPTION = 21;
-	public static final byte OUTOFSCOPE_BEHAVIOR_EXIT_RESULT = 22;
+	public static final byte OUTOFSCOPE_CLINIT_ENTER = 20;
 	
-	public static final byte UNMONITORED_BEHAVIOR_CALL = 23;
+	public static final byte OUTOFSCOPE_BEHAVIOR_EXIT_NORMAL = 21;
+	public static final byte OUTOFSCOPE_BEHAVIOR_EXIT_EXCEPTION = 22;
+	
+	/**
+	 * Announces the result of an enveloppe-only method. This message is sent
+	 * only if the method was called from scope.
+	 */
+	public static final byte OUTOFSCOPE_BEHAVIOR_EXIT_RESULT = 23;
+	
+	public static final byte UNMONITORED_BEHAVIOR_CALL = 24;
 	
 	/**
 	 * An unmonitored method call returned normally 
 	 */
-	public static final byte UNMONITORED_BEHAVIOR_CALL_RESULT = 24;
+	public static final byte UNMONITORED_BEHAVIOR_CALL_RESULT = 25;
 	
-	public static final byte UNMONITORED_BEHAVIOR_CALL_EXCEPTION = 25;
+	public static final byte UNMONITORED_BEHAVIOR_CALL_EXCEPTION = 26;
 	
-	public static final byte REGISTER_OBJECT = 26;
-	public static final byte REGISTER_OBJECT_DELTA = 27;
-	public static final byte REGISTER_REFOBJECT = 28;
-	public static final byte REGISTER_REFOBJECT_DELTA = 29;
-	public static final byte REGISTER_CLASS = 30;
-	public static final byte REGISTER_CLASSLOADER = 31;
-	public static final byte REGISTER_THREAD = 32;
+	public static final byte REGISTER_OBJECT = 27;
+	public static final byte REGISTER_OBJECT_DELTA = 28;
+	public static final byte REGISTER_REFOBJECT = 29;
+	public static final byte REGISTER_REFOBJECT_DELTA = 30;
+	public static final byte REGISTER_CLASS = 31;
+	public static final byte REGISTER_CLASSLOADER = 32;
+	public static final byte REGISTER_THREAD = 33;
 	
-	public static final byte TRACEDMETHODS_VERSION = 33;
+	public static final byte TRACEDMETHODS_VERSION = 34;
 	
 	/**
 	 * Args: timestamp
 	 */
-	public static final byte SYNC = 34;
+	public static final byte SYNC = 35;
 	
-	public static final int MSG_COUNT = 34;
+	public static final int MSG_COUNT = 35;
 	
 	public static final String[] _NAMES = 
 	{
@@ -118,6 +125,7 @@ public class Message
 		"INSCOPE_BEHAVIOR_EXIT_NORMAL",
 		"INSCOPE_BEHAVIOR_EXIT_EXCEPTION",
 		"OUTOFSCOPE_BEHAVIOR_ENTER",
+		"OUTOFSCOPE_CLINIT_ENTER",
 		"OUTOFSCOPE_BEHAVIOR_EXIT_NORMAL",
 		"OUTOFSCOPE_BEHAVIOR_EXIT_EXCEPTION",
 		"OUTOFSCOPE_BEHAVIOR_EXIT_RESULT",

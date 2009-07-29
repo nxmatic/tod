@@ -32,29 +32,48 @@ Inc. MD5 Message-Digest Algorithm".
 package tod.impl.replay;
 
 import tod.impl.server.BufferStream;
+import tod2.agent.Message;
 
-public class OutOfScopeMethodReplayer extends MethodReplayer
+/**
+ * This is a "dummy" replayer that is only used to wrap an execution of the classloader that
+ * occurs during an invocation. 
+ * @author gpothier
+ */
+public class ClassloaderWrapperReplayerFrame extends UnmonitoredReplayerFrame
 {
 	@Override
 	public void processMessage(byte aMessage, BufferStream aBuffer)
 	{
-		throw new IllegalStateException();
-	}
-
-	@Override
-	public void transferResult(InScopeMethodReplayer aSource)
-	{
-	}
-
-	@Override
-	public void transferResult(BufferStream aBuffer)
-	{
+		switch(aMessage)
+		{
+		case Message.CLASSLOADER_EXIT:
+			getThreadReplayer().returnClassloader();
+			break;
+			
+		default: super.processMessage(aMessage, aBuffer);
+		}
 	}
 
 	@Override
 	public void expectException()
 	{
 	}
+
+	@Override
+	public void transferResult(BufferStream aBuffer)
+	{
+		throw new IllegalStateException();
+	}
+
+	@Override
+	public void transferResult(InScopeReplayerFrame aSource)
+	{
+		throw new IllegalStateException();
+	}
 	
-	
+	@Override
+	public void classloaderReturned()
+	{
+		throw new IllegalStateException();
+	}
 }

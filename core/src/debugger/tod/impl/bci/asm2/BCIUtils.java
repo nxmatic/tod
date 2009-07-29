@@ -43,7 +43,7 @@ import org.objectweb.asm.tree.analysis.BasicVerifier;
 import tod.core.config.ClassSelector;
 import tod.core.database.structure.ObjectId;
 import tod.impl.database.structure.standard.PrimitiveTypeInfo;
-import tod.impl.replay.InScopeMethodReplayer;
+import tod.impl.replay.InScopeReplayerFrame;
 import zz.utils.Utils;
 
 public class BCIUtils implements Opcodes
@@ -66,7 +66,7 @@ public class BCIUtils implements Opcodes
 	public static final String CLS_CLASSLOADER = getJvmClassName(ClassLoader.class);
 	public static final String CLS_OBJECTID = getJvmClassName(ObjectId.class);
 	public static final String DSC_OBJECTID = "L"+CLS_OBJECTID+";";
-	public static final String CLS_REPLAYER = getJvmClassName(InScopeMethodReplayer.class);
+	public static final String CLS_REPLAYER = getJvmClassName(InScopeReplayerFrame.class);
 
 	private static final Type[] TYPE_FOR_SORT = new Type[11];
 	static

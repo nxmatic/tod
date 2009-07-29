@@ -31,28 +31,65 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.replay;
 
+import tod.core.database.structure.IStructureDatabase;
 import tod.impl.server.BufferStream;
+import tod2.agent.Message;
 
-public class UnmonitoredMethodReplayer extends MethodReplayer
+public abstract class ReplayerFrame
 {
-	@Override
-	public void processMessage(byte aMessage, BufferStream aBuffer)
+	private ThreadReplayer itsThreadReplayer;
+	private boolean itsFromScope;
+	
+	/**
+	 * Finishes the setup of this replayer (we don't add these args
+	 * to the constructor to simplify generated code). 
+	 */
+	public void setup(ThreadReplayer aThreadReplayer, boolean aFromScope)
 	{
-		throw new IllegalStateException();
+		itsThreadReplayer = aThreadReplayer;
 	}
-
-	@Override
-	public void transferResult(InScopeMethodReplayer aSource)
+	
+	public void dispose(ThreadReplayer aThreadReplayer)
 	{
 	}
+	
+	public boolean isFromScope()
+	{
+		return itsFromScope;
+	}
+	
+	public ThreadReplayer getThreadReplayer()
+	{
+		return itsThreadReplayer;
+	}
+	
+	public IStructureDatabase getDatabase()
+	{
+		return getThreadReplayer().getDatabase();
+	}
+	
+	public abstract void processMessage(byte aMessage, BufferStream aBuffer);
 
-	@Override
+	/**
+	 * Transfers a value from the source replayer's stack to this replayer's stack.
+	 */
+	public void transferResult(InScopeReplayerFrame aSource)
+	{
+	}
+	
+	/**
+	 * Transfers a value from the input buffer (usually from {@link Message#BEHAVIOR_ENTER_ARGS})
+	 * to this replayer's stack.
+	 */
 	public void transferResult(BufferStream aBuffer)
 	{
 	}
-
-	@Override
+	
 	public void expectException()
+	{
+	}
+	
+	public void classloaderReturned()
 	{
 	}
 }

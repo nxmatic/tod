@@ -166,7 +166,7 @@ void registerTracedMethod(JNIEnv* jni, int tracedMethod)
 	int mode = tracedMethod & 0x3;
 	
 	TracedMethods_setMode->invoke(jni, behaviorId, mode);
-	if (propVerbose>=3) printf("Registered traced method: %d -> %d\n", behaviorId, mode);
+	if (propVerbose>=2) printf("Registered traced method: %d -> %d\n", behaviorId, mode);
 }
 
 /**

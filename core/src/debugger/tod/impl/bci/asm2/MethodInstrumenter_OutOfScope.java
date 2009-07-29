@@ -111,7 +111,10 @@ public class MethodInstrumenter_OutOfScope extends MethodInstrumenter
 				s.ASTORE(getThreadDataVar());
 				
 				// Send event
-				s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evOutOfScopeBehaviorEnter", "()V");
+				s.INVOKEVIRTUAL(
+						BCIUtils.CLS_THREADDATA, 
+						isStaticInitializer() ? "evOutOfScopeClinitEnter" : "evOutOfScopeBehaviorEnter", 
+						"()V");
 				
 				s.GOTO("start");
 			}

@@ -197,7 +197,8 @@ public final class ThreadData
 	
 	private boolean popScope()
 	{
-		return itsScopeStack.pop();
+		boolean thePop = itsScopeStack.pop();
+		return thePop;
 	}
 	
 	public void sendMessageType(_ByteBuffer aBuffer, byte aType) 
@@ -630,7 +631,7 @@ public final class ThreadData
 
 		msgStop();
 		commitBuffer();
-		pushInScope();
+		pushOutOfScope();
 		exit();
 	}
 	
@@ -648,7 +649,7 @@ public final class ThreadData
 		
 		msgStop();
 		commitBuffer();
-		pushInScope();
+		if (popScope()) throw new Error("Unexpected scope state");
 		exit();
 	}
 	
@@ -822,6 +823,24 @@ public final class ThreadData
 		msgStart(Message.OUTOFSCOPE_BEHAVIOR_ENTER, 0);
 		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.OUTOFSCOPE_BEHAVIOR_ENTER, -1); 
 		sendMessageType(itsBuffer, Message.OUTOFSCOPE_BEHAVIOR_ENTER);
+		msgStop();
+		
+		commitBuffer();
+		
+		pushOutOfScope();
+		
+		exit();
+	}
+	
+	public void evOutOfScopeClinitEnter()
+	{
+		if (enter()) return;
+		
+		sendRegisteredObjects();
+		
+		msgStart(Message.OUTOFSCOPE_CLINIT_ENTER, 0);
+		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.OUTOFSCOPE_CLINIT_ENTER, -1); 
+		sendMessageType(itsBuffer, Message.OUTOFSCOPE_CLINIT_ENTER);
 		msgStop();
 		
 		commitBuffer();

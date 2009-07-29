@@ -80,6 +80,12 @@ public class _ByteBuffer
 		return itsBytes[itsPos++];
 	}
 	
+	public final byte peek()
+	{
+		checkRemaining(1);
+		return itsBytes[itsPos];
+	}
+	
 	public final void putChar(char v)
 	{
 		checkRemaining(2);

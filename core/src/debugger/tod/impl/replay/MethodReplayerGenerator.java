@@ -395,7 +395,7 @@ public class MethodReplayerGenerator
 	
 	/**
 	 * Generates a block of code that saves the operand stack into
-	 * the {@link InScopeMethodReplayer}'s stack.
+	 * the {@link InScopeReplayerFrame}'s stack.
 	 * The first aArgCount elements are saved to the arg stack instead of the save stack.
 	 */
 	private InsnList genSaveStack(BCIFrame aFrame, int aArgCount)
@@ -447,7 +447,7 @@ public class MethodReplayerGenerator
 	
 	/**
 	 * Generates a block of code that loads the operand stack from
-	 * the {@link InScopeMethodReplayer}'s stack.
+	 * the {@link InScopeReplayerFrame}'s stack.
 	 * @param aSkip Number of stack slots to skip (counted from the top of the stack).
 	 */
 	private InsnList genLoadStack(BCIFrame aFrame, int aSkip)
@@ -526,7 +526,7 @@ public class MethodReplayerGenerator
 	}
 	
 	/**
-	 * Adds the implementation of the {@link InScopeMethodReplayer#lRefSet(int, ObjectId)}
+	 * Adds the implementation of the {@link InScopeReplayerFrame#lRefSet(int, ObjectId)}
 	 * methods.
 	 */
 	private void addSlotSetters()
@@ -580,7 +580,7 @@ public class MethodReplayerGenerator
 	}
 	
 	/**
-	 * Adds the implementation of the {@link InScopeMethodReplayer#lRefGet(int)}
+	 * Adds the implementation of the {@link InScopeReplayerFrame#lRefGet(int)}
 	 * methods.
 	 */
 	private void addSlotGetters()
@@ -628,7 +628,7 @@ public class MethodReplayerGenerator
 	}
 	
 	/**
-	 * Returns the name of the {@link InScopeMethodReplayer#vBoolean()} method
+	 * Returns the name of the {@link InScopeReplayerFrame#vBoolean()} method
 	 * corresponding to the given type.
 	 */
 	private String valueMethodName(Type aType)
@@ -650,8 +650,8 @@ public class MethodReplayerGenerator
 	}
 	
 	/**
-	 * Returns the base name and descriptor of the {@link InScopeMethodReplayer#sIntPush(int)}
-	 * or {@link InScopeMethodReplayer#aIntPush(int)} push methods
+	 * Returns the base name and descriptor of the {@link InScopeReplayerFrame#sIntPush(int)}
+	 * or {@link InScopeReplayerFrame#aIntPush(int)} push methods
 	 * corresponding to the given type.
 	 */
 	private String[] pushMethodSigBase(Type aType)
@@ -677,7 +677,7 @@ public class MethodReplayerGenerator
 	}
 	
 	/**
-	 * Returns the name and descriptor of the {@link InScopeMethodReplayer#vBoolean()} pop method
+	 * Returns the name and descriptor of the {@link InScopeReplayerFrame#vBoolean()} pop method
 	 * corresponding to the given type.
 	 */
 	private String[] popMethodSig(Type aType)

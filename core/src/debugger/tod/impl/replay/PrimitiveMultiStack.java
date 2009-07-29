@@ -50,6 +50,15 @@ public class PrimitiveMultiStack
 	private final TFloatStack itsFloatStack = new TFloatStack();
 	private final TLongStack itsLongStack = new TLongStack();
 
+	public void clear()
+	{
+		itsRefStack.clear();
+		itsIntStack.clear();
+		itsDoubleStack.clear();
+		itsFloatStack.clear();
+		itsLongStack.clear();
+	}
+	
 	// Push to stack
 	protected void refPush(ObjectId v) { itsRefStack.push(v); }
 	protected void intPush(int v) { itsIntStack.push(v); }
