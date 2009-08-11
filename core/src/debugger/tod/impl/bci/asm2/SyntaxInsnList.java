@@ -992,6 +992,11 @@ public class SyntaxInsnList extends InsnList
 		itsVisitor.visitTableSwitchInsn(min, max, dflt, labels);
 	}
 	
+	public void LOOKUPSWITCH(Label dflt, int[] keys, Label[] labels)
+	{
+		itsVisitor.visitLookupSwitchInsn(dflt, keys, labels);
+	}
+	
 	/*
 	 * Type instructions
 	 */
@@ -1017,7 +1022,14 @@ public class SyntaxInsnList extends InsnList
 	}
 	
 	
+	/*
+	 * IInc instruction
+	 */
 	
+	public void IINC(int aVar, int aIncrement)
+	{
+		itsVisitor.visitIincInsn(aVar, aIncrement);
+	}
 	
 	/**
 	 * Inserts a label corresponding to the given name.

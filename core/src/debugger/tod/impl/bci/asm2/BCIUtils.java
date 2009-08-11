@@ -66,7 +66,6 @@ public class BCIUtils implements Opcodes
 	public static final String CLS_CLASSLOADER = getJvmClassName(ClassLoader.class);
 	public static final String CLS_OBJECTID = getJvmClassName(ObjectId.class);
 	public static final String DSC_OBJECTID = "L"+CLS_OBJECTID+";";
-	public static final String CLS_REPLAYER = getJvmClassName(InScopeReplayerFrame.class);
 
 	private static final Type[] TYPE_FOR_SORT = new Type[11];
 	static

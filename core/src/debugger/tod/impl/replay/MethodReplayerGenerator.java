@@ -75,7 +75,8 @@ import tod.impl.bci.asm2.MethodInfo.BCIFrame;
 public class MethodReplayerGenerator
 {
 	public static final Type TYPE_OBJECTID = Type.getType(ObjectId.class);
-	
+	public static final String CLS_REPLAYER = BCIUtils.getJvmClassName(InScopeReplayerFrame.class);
+
 	private final TODConfig itsConfig;
 	private final IStructureDatabase itsDatabase;
 	private final ClassNode itsTarget;
@@ -134,7 +135,7 @@ public class MethodReplayerGenerator
 		
 		itsTarget = new ClassNode();
 		itsTarget.name = ThreadReplayer.makeReplayerClassName(itsClassNode.name, itsMethodNode.name, itsMethodNode.desc);
-		itsTarget.superName = BCIUtils.CLS_REPLAYER;
+		itsTarget.superName = CLS_REPLAYER;
 		itsTarget.methods.add(itsMethodNode);
 		itsTarget.version = Opcodes.V1_5;
 		itsTarget.access = Opcodes.ACC_PUBLIC;
@@ -265,7 +266,7 @@ public class MethodReplayerGenerator
 		s.LDC(getEncodedFieldCacheCounts());
 		s.LDC(itsEncodedHandlerBlocks);
 		s.INVOKESPECIAL(
-				BCIUtils.CLS_REPLAYER, 
+				CLS_REPLAYER, 
 				"<init>", 
 				"("+BCIUtils.DSC_STRING+"I"+BCIUtils.DSC_STRING+BCIUtils.DSC_STRING+BCIUtils.DSC_STRING+")V");
 		s.RETURN();
@@ -333,7 +334,7 @@ public class MethodReplayerGenerator
 		{
 			SyntaxInsnList s = new SyntaxInsnList(null);
 			s.ALOAD(0);
-			s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, valueMethodName(theType), "()"+theType.getDescriptor());
+			s.INVOKEVIRTUAL(CLS_REPLAYER, valueMethodName(theType), "()"+theType.getDescriptor());
 			
 			aInsns.insert(theHandler, s);
 		}
@@ -425,7 +426,7 @@ public class MethodReplayerGenerator
 			String[] theSig = pushMethodSigBase(theType);
 			if (aArgCount-- > 0) theSig[0] = "a"+theSig[0];
 			else theSig[0] = "s"+theSig[0];				
-			s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, theSig[0], theSig[1]);
+			s.INVOKEVIRTUAL(CLS_REPLAYER, theSig[0], theSig[1]);
 		}
 		
 		return s;
@@ -459,7 +460,7 @@ public class MethodReplayerGenerator
 			Type theType = aFrame.getStack(i).getType();
 			s.ALOAD(0);
 			String[] theSig = popMethodSig(theType);
-			s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, theSig[0], theSig[1]);
+			s.INVOKEVIRTUAL(CLS_REPLAYER, theSig[0], theSig[1]);
 		}
 		
 		return s;
@@ -851,11 +852,11 @@ public class MethodReplayerGenerator
 				
 			default: throw new RuntimeException("Nooo");
 			}
-			s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, valueMethodName(theType), "("+theType.getDescriptor()+")V");
+			s.INVOKEVIRTUAL(CLS_REPLAYER, valueMethodName(theType), "("+theType.getDescriptor()+")V");
 		}
 
 		s.ALOAD(0);
-		s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, "processReturn", "()V");
+		s.INVOKEVIRTUAL(CLS_REPLAYER, "processReturn", "()V");
 		s.RETURN();
 		
 		aInsns.insert(aNode, s);
@@ -867,7 +868,7 @@ public class MethodReplayerGenerator
 		SyntaxInsnList s = new SyntaxInsnList(null);
 		
 		s.ALOAD(0);
-		s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, "expectException", "()V");
+		s.INVOKEVIRTUAL(CLS_REPLAYER, "expectException", "()V");
 		s.RETURN();
 		
 		aInsns.insert(aNode, s);
@@ -914,7 +915,7 @@ public class MethodReplayerGenerator
 			s.pushInt(theBehaviorId);
 			s.pushInt(theBlockId);
 			s.pushInt(theExpectObjectInitialized ? 1 : 0);
-			s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, "invoke", "(IIZ)V");
+			s.INVOKEVIRTUAL(CLS_REPLAYER, "invoke", "(IIZ)V");
 			s.RETURN();
 			
 			// Got result
@@ -924,7 +925,7 @@ public class MethodReplayerGenerator
 			if (theType.getSort() != Type.VOID)
 			{
 				s.ALOAD(0);
-				s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, valueMethodName(theType), "()"+theType.getDescriptor());
+				s.INVOKEVIRTUAL(CLS_REPLAYER, valueMethodName(theType), "()"+theType.getDescriptor());
 			}
 		}
 		
@@ -939,7 +940,7 @@ public class MethodReplayerGenerator
 			s.add(genSaveStack(theFrame2)); 
 			s.ALOAD(0);
 			s.pushInt(theBlockId);
-			s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, "expectConstructorTarget", "(I)V");
+			s.INVOKEVIRTUAL(CLS_REPLAYER, "expectConstructorTarget", "(I)V");
 			s.RETURN();
 			
 			// Got event
@@ -956,7 +957,7 @@ public class MethodReplayerGenerator
 		SyntaxInsnList s = new SyntaxInsnList(null);
 		
 		s.ALOAD(0);
-		s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, "nextTmpId", "()"+BCIUtils.DSC_OBJECTID);
+		s.INVOKEVIRTUAL(CLS_REPLAYER, "nextTmpId", "()"+BCIUtils.DSC_OBJECTID);
 		
 		aInsns.insert(aNode, s);
 		aInsns.remove(aNode);
@@ -977,14 +978,14 @@ public class MethodReplayerGenerator
 		s.add(genSaveStack(theFrame));
 		s.ALOAD(0);
 		s.pushInt(theBlockId);
-		s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, "expectNewArray", "(I)V");
+		s.INVOKEVIRTUAL(CLS_REPLAYER, "expectNewArray", "(I)V");
 		s.RETURN();
 		
 		// Got value
 		s.label(l);
 		s.add(genLoadStack(theFrame, 1));
 		s.ALOAD(0);
-		s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, valueMethodName(theType), "()"+theType.getDescriptor());
+		s.INVOKEVIRTUAL(CLS_REPLAYER, valueMethodName(theType), "()"+theType.getDescriptor());
 		
 		aInsns.insert(aNode, s);
 		aInsns.remove(aNode);
@@ -1010,14 +1011,14 @@ public class MethodReplayerGenerator
 		s.add(genSaveStack(theFrame));
 		s.ALOAD(0);
 		s.pushInt(theBlockId);
-		s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, "expectCst", "(I)V");
+		s.INVOKEVIRTUAL(CLS_REPLAYER, "expectCst", "(I)V");
 		s.RETURN();
 		
 		// Got value
 		s.label(l);
 		s.add(genLoadStack(theFrame));
 		s.ALOAD(0);
-		s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, valueMethodName(theType), "()"+theType.getDescriptor());
+		s.INVOKEVIRTUAL(CLS_REPLAYER, valueMethodName(theType), "()"+theType.getDescriptor());
 		
 		aInsns.insert(aNode, s);
 		aInsns.remove(aNode);
@@ -1030,7 +1031,7 @@ public class MethodReplayerGenerator
 	{
 		SyntaxInsnList s = new SyntaxInsnList(null);
 
-		s.INVOKESTATIC(BCIUtils.CLS_REPLAYER, "cmpId", "("+BCIUtils.DSC_OBJECTID+BCIUtils.DSC_OBJECTID+")Z");
+		s.INVOKESTATIC(CLS_REPLAYER, "cmpId", "("+BCIUtils.DSC_OBJECTID+BCIUtils.DSC_OBJECTID+")Z");
 		switch(aNode.getOpcode())
 		{
 		case Opcodes.IF_ACMPEQ: s.IFtrue(aNode.label.getLabel()); break;
@@ -1060,14 +1061,14 @@ public class MethodReplayerGenerator
 		s.pushInt(theType.getSort());
 		s.pushInt(theBlockId);
 		s.pushInt(getFieldCacheSlot(aNode));
-		s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, "expectField", "(III)V");
+		s.INVOKEVIRTUAL(CLS_REPLAYER, "expectField", "(III)V");
 		s.RETURN();
 		
 		// Got value
 		s.label(l);
 		s.add(genLoadStack(theFrame, 1));
 		s.ALOAD(0);
-		s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, valueMethodName(theType), "()"+theType.getDescriptor());
+		s.INVOKEVIRTUAL(CLS_REPLAYER, valueMethodName(theType), "()"+theType.getDescriptor());
 		
 		aInsns.insert(aNode, s);
 		aInsns.remove(aNode);
@@ -1115,14 +1116,14 @@ public class MethodReplayerGenerator
 		s.ALOAD(0);
 		s.pushInt(theType.getSort());
 		s.pushInt(theBlockId);
-		s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, "expectArray", "(II)V");
+		s.INVOKEVIRTUAL(CLS_REPLAYER, "expectArray", "(II)V");
 		s.RETURN();
 		
 		// Got value
 		s.label(l);
 		s.add(genLoadStack(theFrame, 2));
 		s.ALOAD(0);
-		s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, valueMethodName(theType), "()"+theType.getDescriptor());
+		s.INVOKEVIRTUAL(CLS_REPLAYER, valueMethodName(theType), "()"+theType.getDescriptor());
 		
 		aInsns.insert(aNode, s);
 		aInsns.remove(aNode);
@@ -1142,14 +1143,14 @@ public class MethodReplayerGenerator
 		s.add(genSaveStack(theFrame));
 		s.ALOAD(0);
 		s.pushInt(theBlockId);
-		s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, "expectArrayLength", "(I)V");
+		s.INVOKEVIRTUAL(CLS_REPLAYER, "expectArrayLength", "(I)V");
 		s.RETURN();
 		
 		// Got value
 		s.label(l);
 		s.add(genLoadStack(theFrame, 1));
 		s.ALOAD(0);
-		s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, valueMethodName(theType), "()"+theType.getDescriptor());
+		s.INVOKEVIRTUAL(CLS_REPLAYER, valueMethodName(theType), "()"+theType.getDescriptor());
 		
 		aInsns.insert(aNode, s);
 		aInsns.remove(aNode);
@@ -1259,7 +1260,7 @@ public class MethodReplayerGenerator
 			s.POP(theType);
 			
 			s.ALOAD(0);
-			s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, "expectException", "()V");
+			s.INVOKEVIRTUAL(CLS_REPLAYER, "expectException", "()V");
 			s.RETURN();
 		}
 		
@@ -1283,7 +1284,7 @@ public class MethodReplayerGenerator
 		s.add(genSaveStack(theFrame));
 		s.ALOAD(0);
 		s.pushInt(theBlockId);
-		s.INVOKEVIRTUAL(BCIUtils.CLS_REPLAYER, "checkCast", "(I)V");
+		s.INVOKEVIRTUAL(CLS_REPLAYER, "checkCast", "(I)V");
 		s.RETURN();
 		
 		// Got value
