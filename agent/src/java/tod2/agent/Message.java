@@ -18,6 +18,12 @@ public class Message
 	public static final byte ARRAY_LENGTH = 4;
 	public static final byte NEW_ARRAY = 5;
 	public static final byte CONSTANT = 6;
+	
+	/**
+	 * Emitted after an unmonitored instantiation.
+	 * This is needed because we cannot get the object id before the constructor is called 
+	 * (not allowed by the verifier). 
+	 */
 	public static final byte OBJECT_INITIALIZED = 7;
 	public static final byte EXCEPTION = 8;
 	public static final byte HANDLER_REACHED = 9;
