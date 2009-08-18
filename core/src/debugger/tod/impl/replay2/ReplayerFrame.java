@@ -31,10 +31,107 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.replay2;
 
+import tod.core.database.structure.IStructureDatabase;
 import tod.core.database.structure.ObjectId;
+import tod.impl.replay2.ThreadReplayer.ExceptionInfo;
+import tod.impl.server.BufferStream;
+import tod2.agent.Message;
 
 public abstract class ReplayerFrame
 {
+	private ThreadReplayer itsReplayer;
+	private BufferStream itsStream;
+	private boolean itsFromScope;
+
+	public void setup(ThreadReplayer aReplayer, BufferStream aStream, boolean aFromScope)
+	{
+		itsReplayer = aReplayer;
+		itsStream = aStream;
+		itsFromScope = aFromScope;
+	}
+	
+	public ThreadReplayer getReplayer()
+	{
+		return itsReplayer;
+	}
+	
+	public BufferStream getStream()
+	{
+		return itsStream;
+	}
+	
+	public IStructureDatabase getDatabase()
+	{
+		return getReplayer().getDatabase();
+	}
+	
+	protected byte getNextMessage()
+	{
+		return itsReplayer.getNextMessage();
+	}
+	
+	/**
+	 * Whether the next message will be an exception.
+	 * This method only peeks the next message.
+	 */
+	protected boolean isExceptionNext()
+	{
+		return itsReplayer.peekNextMessage() == Message.EXCEPTION;
+	}
+
+	
+	protected ObjectId readRef()
+	{
+		return itsReplayer.readRef();
+	}
+	
+	protected int readInt()
+	{
+		return itsStream.getInt();
+	}
+	
+	protected boolean readBoolean()
+	{
+		return itsStream.get() != 0;
+	}
+	
+	protected byte readByte()
+	{
+		return itsStream.get();
+	}
+	
+	protected char readChar()
+	{
+		return itsStream.getChar();
+	}
+	
+	protected short readShort()
+	{
+		return itsStream.getShort();
+	}
+	
+	protected float readFloat()
+	{
+		return itsStream.getFloat();
+	}
+	
+	protected long readLong()
+	{
+		return itsStream.getLong();
+	}
+	
+	protected double readDouble()
+	{
+		return itsStream.getDouble();
+	}
+	
+	protected ObjectId readException()
+	{
+		ExceptionInfo theInfo = itsReplayer.readExceptionInfo();
+		// TODO: register exception
+		return theInfo.exception;
+	}
+
 	public void invokeVoid()
 	{
 		throw new UnsupportedOperationException();
@@ -63,10 +160,5 @@ public abstract class ReplayerFrame
 	public double invokeDouble()
 	{
 		throw new UnsupportedOperationException();
-	}
-	
-	protected void invokeVoid_TEMPLATE(ObjectId aTarget, int aArg1, ObjectId aArg2, float aArg3)
-	{
-		
 	}
 }

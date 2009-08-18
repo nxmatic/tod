@@ -85,6 +85,7 @@ public class MethodReplayerGenerator
 	public static final String CLS_REPLAYER = BCIUtils.getJvmClassName(InScopeReplayerFrame.class);
 	public static final String CLS_FRAME = BCIUtils.getJvmClassName(ReplayerFrame.class);
 	public static final String DSC_FRAME = "L"+CLS_FRAME+";";
+	public static final String CLS_HANDLERREACHED = BCIUtils.getJvmClassName(HandlerReachedException.class);
 
 	private final TODConfig itsConfig;
 	private final IStructureDatabase itsDatabase;
@@ -96,12 +97,12 @@ public class MethodReplayerGenerator
 	
 	private final MethodInfo itsMethodInfo;
 	
+	private Label lCodeStart;
+	private Label lCodeEnd;
+	
 	private Type[] itsArgTypes;
 	private Type itsReturnType;
-	
-	private Label lHandlersSwitch = new Label();
-	private Label lGotException = new Label();
-	
+		
 	/**
 	 * A variable slot that can hold a normal or double value.
 	 */
@@ -165,6 +166,7 @@ public class MethodReplayerGenerator
 			case Opcodes.INVOKEINTERFACE:
 				MethodInsnNode theMethodNode = (MethodInsnNode) theNode;
 				int theSize = Type.getArgumentsAndReturnSizes(theMethodNode.desc) >> 2;
+				if (theOpcode != Opcodes.INVOKESTATIC) theSize++;
 				if (theSize > theMax) theMax = theSize;
 				break;
 			}
@@ -186,9 +188,9 @@ public class MethodReplayerGenerator
 	
 	public byte[] generate()
 	{
-		Label lStart = new Label();
-		LabelNode nStart = new LabelNode(lStart);
-		lStart.info = nStart;
+		lCodeStart = new Label();
+		LabelNode nStart = new LabelNode(lCodeStart);
+		lCodeStart.info = nStart;
 		itsMethodNode.instructions.insert(nStart);
 
 		boolean theStatic = BCIUtils.isStatic(itsMethodNode.access);
@@ -202,11 +204,13 @@ public class MethodReplayerGenerator
 		// Modify method
 		processInstructions(itsMethodNode.instructions);
 
+		lCodeEnd = new Label();
+		LabelNode nEnd = new LabelNode(lCodeEnd);
+		lCodeEnd.info = nEnd;
+		itsMethodNode.instructions.add(nEnd);
+		
 		// Process handlers
-		SList s = new SList();
-		addExceptionHandling(s);
-		itsMethodNode.instructions.add(s);
-		itsMethodNode.tryCatchBlocks.clear();
+		addExceptionHandling();
 
 		// Setup infrastructure
 		itsMethodNode.name = "proceed";
@@ -285,36 +289,19 @@ public class MethodReplayerGenerator
 	}
 	
 	/**
-	 * Generates the code that is called when an exception is received (label {@link #lGotException}).
+	 * Generates the handler for {@link HandlerReachedException}.
 	 * Generates a switch statement that takes a handler id (as passed as argument
 	 * of {@link Message#HANDLER_REACHED}) and jumps to the corresponding handler.
 	 */
-	private void addExceptionHandling(SList s)
+	private void addExceptionHandling()
 	{
-		s.label(lGotException);
-		s.INVOKEVIRTUAL(CLS_REPLAYER, "readException", "()V");
+		SList s = new SList();
 		
-		Label lExitWithException = new Label();
-		Label lDefault1 = new Label();
-		Label lEnd = new Label();
+		// Handler for HandlerReachedException
+		Label lHandlerReached = new Label();
+		s.label(lHandlerReached);
 		
-		s.invokeGetNextMessage();
-		s.LOOKUPSWITCH(
-				lDefault1, 
-				new int[] {Message.HANDLER_REACHED, Message.INSCOPE_BEHAVIOR_EXIT_EXCEPTION}, 
-				new Label[] {lHandlersSwitch, lExitWithException});
-		
-		s.label(lExitWithException);
-			// TODO
-			s.GOTO(lEnd);
-		
-		s.label(lDefault1);
-			s.throwRTEx("Unexpected message");
-			
-		s.label(lEnd);
-			// TODO
-
-		s.label(lHandlersSwitch);
+		s.GETFIELD(CLS_HANDLERREACHED, "handlerId", "I");
 		
 		Set<Label> theProcessedLabels = new HashSet<Label>();
 		List<Label> theLabels = new ArrayList<Label>();
@@ -326,10 +313,15 @@ public class MethodReplayerGenerator
 			if (theProcessedLabels.add(theLabel)) theLabels.add(theLabel);
 		}
 		
-		Label lDefault2 = new Label();
-		s.TABLESWITCH(0, theLabels.size()-1, lDefault2, theLabels.toArray(new Label[theLabels.size()]));
-		s.label(lDefault2);
+		Label lDefault = new Label();
+		s.TABLESWITCH(0, theLabels.size()-1, lDefault, theLabels.toArray(new Label[theLabels.size()]));
+		s.label(lDefault);
 		s.throwRTEx("Invalid handler id");
+		
+		itsMethodNode.instructions.add(s);
+		
+		itsMethodNode.tryCatchBlocks.clear();
+		itsMethodNode.visitTryCatchBlock(lCodeStart, lCodeEnd, lHandlerReached, CLS_HANDLERREACHED);
 	}
 	
 	private int getFieldCacheSlot(FieldInsnNode aNode)
@@ -491,11 +483,7 @@ public class MethodReplayerGenerator
 	{
 		SList s = new SList();
 
-		s.invokeGetNextMessage();
-		s.pushInt(Message.EXCEPTION);
-		s.IF_ICMPEQ(lGotException);
-		s.throwRTEx("Expected EXCEPTION");
-		// TODO: maybe do that in a super method
+		s.INVOKEVIRTUAL(CLS_REPLAYER, "expectException", "()V");
 		
 		aInsns.insert(aNode, s);
 		aInsns.remove(aNode);
@@ -531,7 +519,7 @@ public class MethodReplayerGenerator
 		
 		{
 			// Save arguments
-			genSaveArgs(s, theArgTypes);
+			genSaveArgs(s, theArgTypes, theStatic);
 			
 			// Obtain frame
 			s.ALOAD(0);
@@ -539,7 +527,7 @@ public class MethodReplayerGenerator
 			s.INVOKEVIRTUAL(CLS_REPLAYER, "invoke", "(I)"+DSC_FRAME);
 			
 			// Reload arguments
-			genLoadArgs(s, theArgTypes);
+			genLoadArgs(s, theArgTypes, theStatic);
 			
 			// Invoke
 			String[] theSignature = getInvokeMethodSignature(theStatic, theArgTypes, theReturnType);
@@ -561,7 +549,7 @@ public class MethodReplayerGenerator
 		aInsns.remove(aNode);
 	}
 	
-	private void genSaveArgs(SList s, Type[] aArgTypes)
+	private void genSaveArgs(SList s, Type[] aArgTypes, boolean aStatic)
 	{
 		int theSlot = itsSaveArgsSlots;
 		for(int i=aArgTypes.length-1;i>=0;i--)
@@ -570,12 +558,14 @@ public class MethodReplayerGenerator
 			s.ISTORE(theType, theSlot);
 			theSlot += theType.getSize();
 		}
+		if (! aStatic) s.ASTORE(theSlot);
 	}
 	
-	private void genLoadArgs(SList s, Type[] aArgTypes)
+	private void genLoadArgs(SList s, Type[] aArgTypes, boolean aStatic)
 	{
 		int theSlot = itsSaveArgsSlots;
 		for(int i=0;i<aArgTypes.length;i++) theSlot += aArgTypes[i].getSize();
+		if (! aStatic) s.ALOAD(theSlot);
 		for(int i=0;i<aArgTypes.length;i++) 
 		{
 			Type theType = aArgTypes[i];
@@ -661,30 +651,7 @@ public class MethodReplayerGenerator
 		if (! (aNode.cst instanceof Type) && ! (aNode.cst instanceof String)) return;
 		
 		SList s = new SList();
-		
-		Label lCst = new Label();
-		Label lClassLoader = new Label();
-		Label lDefault = new Label();
-		Label lEnd = new Label();
-		
-		s.invokeGetNextMessage();
-		s.LOOKUPSWITCH(
-				lDefault, 
-				new int[] {Message.CONSTANT, Message.CLASSLOADER_ENTER, Message.EXCEPTION}, 
-				new Label[] {lCst, lClassLoader, lGotException});
-		
-		s.label(lCst);
-			s.invokeReadRef();
-			s.GOTO(lEnd);
-		
-		s.label(lClassLoader);
-			s.INVOKEVIRTUAL(CLS_REPLAYER, "invokeClassloader", "()V");
-			s.GOTO(lEnd);
-		
-		s.label(lDefault);
-			s.throwRTEx("Unexpected message");
-			
-		s.label(lEnd);
+		s.INVOKEVIRTUAL(CLS_REPLAYER, "expectConstant", "()"+DSC_OBJECTID);
 		
 		aInsns.insert(aNode, s);
 		aInsns.remove(aNode);
@@ -721,9 +688,9 @@ public class MethodReplayerGenerator
 		Label lFieldValue = new Label();
 		Label lFieldValue_Same = new Label();
 		Label lDefault = new Label();
-		Label lEnd = new Label();
+		Label lEndIf = new Label();
 		
-		s.invokeGetNextMessage();
+		s.INVOKEVIRTUAL(CLS_REPLAYER, "getNextMessage", "()B");
 		s.LOOKUPSWITCH(
 				lDefault, 
 				new int[] {Message.FIELD_READ, Message.FIELD_READ_SAME}, 
@@ -731,13 +698,13 @@ public class MethodReplayerGenerator
 		
 		s.label(lFieldValue);
 			s.invokeRead(theType);
-			s.GOTO(lEnd);
+			s.GOTO(lEndIf);
 		
 		s.label(lFieldValue_Same);
 			if (theCacheSlot != null)
 			{
 				s.ILOAD(theType, theCacheSlot);
-				s.GOTO(lEnd);
+				s.GOTO(lEndIf);
 			}
 			else
 			{
@@ -747,7 +714,7 @@ public class MethodReplayerGenerator
 		s.label(lDefault);
 			s.throwRTEx("Unexpected message");
 			
-		s.label(lEnd);
+		s.label(lEndIf);
 		
 		aInsns.insert(aNode, s);
 		aInsns.remove(aNode);
@@ -786,16 +753,8 @@ public class MethodReplayerGenerator
 		
 		SList s = new SList();
 
-		Label lGotRead = new Label();
-		
-		s.invokeGetNextMessage();
-		s.pushInt(Message.ARRAY_READ);
-		s.IF_ICMPEQ(lGotRead);
-		
-		s.throwRTEx("Unexpected message");
-
-		s.label(lGotRead);
-			s.invokeRead(theType);
+		s.INVOKEVIRTUAL(CLS_REPLAYER, "expectArrayRead", "()V");
+		s.invokeRead(theType);
 		
 		aInsns.insert(aNode, s);
 		aInsns.remove(aNode);
@@ -804,17 +763,7 @@ public class MethodReplayerGenerator
 	private void processArrayLength(InsnList aInsns, InsnNode aNode)
 	{
 		SList s = new SList();
-
-		Label lGotLength = new Label();
-		
-		s.invokeGetNextMessage();
-		s.pushInt(Message.ARRAY_LENGTH);
-		s.IF_ICMPEQ(lGotLength);
-		
-		s.throwRTEx("Unexpected message");
-
-		s.label(lGotLength);
-			s.invokeReadInt();
+		s.INVOKEVIRTUAL(CLS_REPLAYER, "expectArrayLength", "()I");
 		
 		aInsns.insert(aNode, s);
 		aInsns.remove(aNode);
@@ -856,7 +805,7 @@ public class MethodReplayerGenerator
 	{
 		Type theType = BCIUtils.getType(BCIUtils.getSort(aNode.getOpcode()));
 
-		SyntaxInsnList s = new SyntaxInsnList(null);
+		SList s = new SList();
 		Label lNormal = new Label();
 		s.DUP(theType);
 		switch(theType.getSort()) 
@@ -883,7 +832,6 @@ public class MethodReplayerGenerator
 			break;
 		
 		default: throw new RuntimeException("Unexpected type: "+theType);
-
 		}
 		
 		s.IFNE(lNormal);
@@ -902,29 +850,13 @@ public class MethodReplayerGenerator
 		aInsns.insertBefore(aNode, s);
 	}
 	
-	/**
-	 * Put execution on hold until next message is received
-	 */
 	private void processCheckCast(InsnList aInsns, TypeInsnNode aNode)
 	{
 		BCIFrame theFrame = itsMethodInfo.getFrame(aNode);
 		
-		SyntaxInsnList s = new SyntaxInsnList(null);
+		SList s = new SList();
+		s.INVOKEVIRTUAL(CLS_REPLAYER, "checkCast", "()V");
 
-		// Generate block id
-		Label l = new Label();
-		int theBlockId = getBlockId(l);
-		
-		s.add(genSaveStack(theFrame));
-		s.ALOAD(0);
-		s.pushInt(theBlockId);
-		s.INVOKEVIRTUAL(CLS_REPLAYER, "checkCast", "(I)V");
-		s.RETURN();
-		
-		// Got value
-		s.label(l);
-		s.add(genLoadStack(theFrame));
-		
 		aInsns.insert(aNode, s);
 		aInsns.remove(aNode);
 	}
@@ -959,16 +891,6 @@ public class MethodReplayerGenerator
 		{
 			LDC(aMessage);
 			INVOKESTATIC(CLS_REPLAYER, "throwRtEx", "(ILjava/lang/String;)V");
-		}
-		
-		public void invokeGetNextMessage()
-		{
-			INVOKEVIRTUAL(CLS_REPLAYER, "getNextMessage", "()B");
-		}
-
-		public void invokePeekNextMessage()
-		{
-			INVOKEVIRTUAL(CLS_REPLAYER, "peekNextMessage", "()B");
 		}
 		
 		public void invokeReadRef()

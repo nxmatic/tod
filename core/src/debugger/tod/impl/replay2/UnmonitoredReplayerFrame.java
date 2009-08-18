@@ -31,7 +31,181 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.replay2;
 
+import org.objectweb.asm.Type;
+
+import tod.core.database.structure.ObjectId;
+import tod.impl.replay2.ThreadReplayer.ExceptionInfo;
+import tod2.agent.Message;
+
 public class UnmonitoredReplayerFrame extends ReplayerFrame
 {
+	private final Type itsReturnType;
+	
+	private ObjectId itsRefResult;
+	private int itsIntResult;
+	private long itsLongResult;
+	private float itsFloatResult;
+	private double itsDoubleResult;
+	
+	private byte itsLastMessage = -1;
 
+	public UnmonitoredReplayerFrame(Type aReturnType)
+	{
+		itsReturnType = aReturnType;
+	}
+
+	private void replay()
+	{
+		while(true)
+		{
+			byte m = getNextMessage();
+			switch(m)
+			{
+			case Message.EXCEPTION:
+			{
+				readException();
+				break;
+			}
+			
+			case Message.INSCOPE_BEHAVIOR_ENTER: 
+				evInScopeBehaviorEnter(getReplayer().getBehIdReceiver().receiveFull(getStream())); 
+				break;
+				
+			case Message.INSCOPE_BEHAVIOR_ENTER_DELTA: 
+				evInScopeBehaviorEnter(getReplayer().getBehIdReceiver().receiveDelta(getStream())); 
+				break;
+				
+			case Message.OUTOFSCOPE_BEHAVIOR_ENTER: evOutOfScopeBehaviorEnter(); break;
+			case Message.INSCOPE_CLINIT_ENTER: evInScopeClinitEnter(getStream().getInt()); break;
+			case Message.OUTOFSCOPE_CLINIT_ENTER: evOutOfScopeClinitEnter(); break;
+			case Message.CLASSLOADER_ENTER: evClassloaderEnter(); break;
+
+			case Message.UNMONITORED_BEHAVIOR_CALL_RESULT: readResult(); return;
+			case Message.UNMONITORED_BEHAVIOR_CALL_EXCEPTION: throw new BehaviorExitException();
+			case Message.HANDLER_REACHED: throw new HandlerReachedException(readInt());
+			case Message.INSCOPE_BEHAVIOR_EXIT_EXCEPTION: throw new BehaviorExitException();
+			
+			default: throw new RuntimeException("Command not handled: "+Message._NAMES[m]);
+			}
+			
+			itsLastMessage = m;
+		}
+	}
+	
+	private void evInScopeBehaviorEnter(int aBehaviorId)
+	{
+		InScopeReplayerFrame theChild = getReplayer().createInScopeFrame(this, aBehaviorId);
+		theChild.startFromOutOfScope();
+		getReplayer().pushFrame(theChild);
+	}
+	
+	private void evOutOfScopeBehaviorEnter()
+	{
+		EnveloppeReplayerFrame theChild = getReplayer().createEnveloppeFrame(this);
+		getReplayer().pushFrame(theChild);
+	}
+	
+	private void evInScopeClinitEnter(int aBehaviorId)
+	{
+		InScopeReplayerFrame theChild = getReplayer().createInScopeFrame(this, aBehaviorId);
+		theChild.startFromOutOfScope();
+		getReplayer().pushFrame(theChild);
+	}
+	
+	private void evOutOfScopeClinitEnter()
+	{
+		EnveloppeReplayerFrame theChild = getReplayer().createEnveloppeFrame(this);
+		getReplayer().pushFrame(theChild);
+	}
+	
+	private void evClassloaderEnter()
+	{
+		ClassloaderWrapperReplayerFrame theChild = getReplayer().createClassloaderFrame(this);
+		getReplayer().pushFrame(theChild);
+	}
+
+	private void readResult()
+	{
+		switch(itsReturnType.getSort())
+		{
+		case Type.BOOLEAN: 
+			itsIntResult = readBoolean() ? 1 : 0;
+			break;
+			
+		case Type.BYTE:
+			itsIntResult = readByte();
+			break;
+			
+		case Type.CHAR:
+			itsIntResult = readChar();
+			break;
+			
+		case Type.SHORT:
+			itsIntResult = readShort();
+			break;
+			
+		case Type.INT:
+			itsIntResult = readInt();
+			break;
+		
+		case Type.LONG:
+			itsLongResult = readLong();
+			break;
+		
+		case Type.DOUBLE:
+			itsDoubleResult = readDouble();
+			break;
+			
+		case Type.FLOAT:
+			itsFloatResult = readFloat();
+			break;
+			
+		case Type.VOID:
+			break;
+		
+		default: throw new RuntimeException("Unexpected type: "+itsReturnType);
+		}
+	}
+	
+	@Override
+	public double invokeDouble()
+	{
+		replay();
+		return itsDoubleResult;
+	}
+
+	@Override
+	public float invokeFloat()
+	{
+		replay();
+		return itsFloatResult;
+	}
+
+	@Override
+	public int invokeInt()
+	{
+		replay();
+		return itsIntResult;
+	}
+
+	@Override
+	public long invokeLong()
+	{
+		replay();
+		return itsLongResult;
+	}
+
+	@Override
+	public ObjectId invokeRef()
+	{
+		replay();
+		return itsRefResult;
+	}
+
+	@Override
+	public void invokeVoid()
+	{
+		replay();
+	}
+	
 }

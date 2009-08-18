@@ -48,9 +48,6 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 	private final Type[] itsArgTypes;
 	private final Type itsReturnType;
 	
-	private ThreadReplayer itsReplayer;
-	private boolean itsFromScope;
-	private BufferStream itsStream;
 	
 	/**
 	 * @param aCacheCounts "encoded" cache counts.
@@ -67,76 +64,19 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 		itsReturnType = Type.getReturnType(aDescriptor);
 	}
 	
-	public void setup(ThreadReplayer aReplayer, boolean aFromScope)
-	{
-		itsReplayer = aReplayer;
-		itsFromScope = aFromScope;
-	}
-	
-	public ThreadReplayer getReplayer()
-	{
-		return itsReplayer;
-	}
-	
-	public IStructureDatabase getDatabase()
-	{
-		return getReplayer().getDatabase();
-	}
-	
-	
-	protected ObjectId readRef()
-	{
-		return itsReplayer.readRef();
-	}
-	
-	protected int readInt()
-	{
-		return itsStream.getInt();
-	}
-	
-	protected boolean readBoolean()
-	{
-		return itsStream.get() != 0;
-	}
-	
-	protected byte readByte()
-	{
-		return itsStream.get();
-	}
-	
-	protected char readChar()
-	{
-		return itsStream.getChar();
-	}
-	
-	protected short readShort()
-	{
-		return itsStream.getShort();
-	}
-	
-	protected float readFloat()
-	{
-		return itsStream.getFloat();
-	}
-	
-	protected long readLong()
-	{
-		return itsStream.getLong();
-	}
-	
-	protected double readDouble()
-	{
-		return itsStream.getDouble();
-	}
-	
+	@Override
 	protected byte getNextMessage()
 	{
-		return itsReplayer.getNextMessage();
-	}
-	
-	protected byte peekNextMessage()
-	{
-		return itsReplayer.peekNextMessage();
+		byte m = super.getNextMessage();
+		if (m == Message.EXCEPTION)
+		{
+			readException();
+			m = super.getNextMessage();
+			if (m == Message.HANDLER_REACHED) throw new HandlerReachedException(readInt());
+			else if (m == Message.INSCOPE_BEHAVIOR_EXIT_EXCEPTION) throw new BehaviorExitException();
+			else throw new UnexpectedMessageException(m);
+		}
+		return m;
 	}
 	
 	protected ReplayerFrame createClassloaderFrame()
@@ -149,16 +89,52 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 		throw new UnsupportedOperationException();
 	}
 	
-	protected ObjectId readException()
+	protected void expectException()
 	{
-		ExceptionInfo theInfo = itsReplayer.readExceptionInfo();
-		// TODO: register exception
-		return theInfo.exception;
+		byte m = getNextMessage();
+		throw new UnexpectedMessageException(m);
+	}
+	
+	protected ObjectId expectConstant()
+	{
+		while(true)
+		{
+			byte m = getNextMessage();
+			if (m == Message.CONSTANT) return readRef();
+			else if (m == Message.CLASSLOADER_ENTER) invokeClassloader();
+			else throw new UnexpectedMessageException(m);
+		}
+	}
+	
+	/**
+	 * Note: can't read the value here as the type is not static
+	 * (otherwise we would need a switch, not efficient).
+	 */
+	protected void expectArrayRead()
+	{
+		byte m = getNextMessage();
+		if (m == Message.ARRAY_READ) return;
+		else throw new UnexpectedMessageException(m);
+	}
+	
+	protected int expectArrayLength()
+	{
+		byte m = getNextMessage();
+		if (m == Message.ARRAY_LENGTH) return readInt();
+		else throw new UnexpectedMessageException(m);
+	}
+	
+	/**
+	 * Returns normally if the next message is not an exception
+	 */
+	protected void checkCast()
+	{
+		if (isExceptionNext()) expectException();
 	}
 	
 	protected ReplayerFrame invoke(int aBehaviorId)
 	{
-		int theMode = itsReplayer.getBehaviorMonitoringMode(aBehaviorId);
+		int theMode = getReplayer().getBehaviorMonitoringMode(aBehaviorId);
 //		IBehaviorInfo theBehavior = getDatabase().getBehavior(aBehaviorId, true);
 //		Type theExpectedType = Type.getType(theBehavior.getReturnType().getJvmName());
 
@@ -175,15 +151,15 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 				
 			case Message.INSCOPE_CLINIT_ENTER:
 			{
-				int theBehaviorId = itsStream.getInt();
-				InScopeReplayerFrame theReplayer = itsReplayer.createInScopeReplayer(this, theBehaviorId);
+				int theBehaviorId = readInt();
+				InScopeReplayerFrame theReplayer = getReplayer().createInScopeFrame(this, theBehaviorId);
 				theReplayer.invokeVoid();
 				break;
 			}
 				
 			case Message.OUTOFSCOPE_CLINIT_ENTER:
 			{
-				EnveloppeReplayerFrame theReplayer = itsReplayer.createEnveloppeReplayer(this);
+				EnveloppeReplayerFrame theReplayer = getReplayer().createEnveloppeFrame(this);
 				theReplayer.invokeVoid();
 				break;
 			}
@@ -212,20 +188,20 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 		{
 			case Message.INSCOPE_BEHAVIOR_ENTER:
 			{
-				int theBehaviorId = itsReplayer.getBehIdReceiver().receiveFull(itsStream);
-				return itsReplayer.createInScopeReplayer(this, theBehaviorId);
+				int theBehaviorId = getReplayer().getBehIdReceiver().receiveFull(getStream());
+				return getReplayer().createInScopeFrame(this, theBehaviorId);
 			}
 				
 			case Message.INSCOPE_BEHAVIOR_ENTER_DELTA:
 			{
-				int theBehaviorId = itsReplayer.getBehIdReceiver().receiveDelta(itsStream);
-				return itsReplayer.createInScopeReplayer(this, theBehaviorId);
+				int theBehaviorId = getReplayer().getBehIdReceiver().receiveDelta(getStream());
+				return getReplayer().createInScopeFrame(this, theBehaviorId);
 			}
 
 			case Message.OUTOFSCOPE_BEHAVIOR_ENTER:
-				return itsReplayer.createEnveloppeReplayer(this);
+				return getReplayer().createEnveloppeFrame(this);
 				
-			default: throw new IllegalStateException(Message._NAMES[aMessage]);
+			default: throw new UnexpectedMessageException(aMessage);
 			
 		}
 		
@@ -238,25 +214,25 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 	
 	protected ObjectId nextTmpId()
 	{
-		return new ObjectId(itsReplayer.getTmpIdManager().nextId());
+		return new ObjectId(getReplayer().getTmpIdManager().nextId());
 	}
 	
 	protected void waitObjectInitialized(ObjectId aId)
 	{
 		byte theMessage = getNextMessage();
-		if (theMessage != Message.OBJECT_INITIALIZED) throw new IllegalStateException(Message._NAMES[theMessage]);
+		if (theMessage != Message.OBJECT_INITIALIZED) throw new UnexpectedMessageException(theMessage);
 		
-		ObjectId theActualRef = itsReplayer.readRef();
-		itsReplayer.getTmpIdManager().associate(aId.getId(), theActualRef.getId());
+		ObjectId theActualRef = readRef();
+		getReplayer().getTmpIdManager().associate(aId.getId(), theActualRef.getId());
 	}
 	
 	protected void waitConstructorTarget(ObjectId aId)
 	{
 		byte theMessage = getNextMessage();
-		if (theMessage != Message.CONSTRUCTOR_TARGET) throw new IllegalStateException(Message._NAMES[theMessage]);
+		if (theMessage != Message.CONSTRUCTOR_TARGET) throw new UnexpectedMessageException(theMessage);
 		
-		ObjectId theActualRef = itsReplayer.readRef();
-		itsReplayer.getTmpIdManager().associate(aId.getId(), theActualRef.getId());
+		ObjectId theActualRef = readRef();
+		getReplayer().getTmpIdManager().associate(aId.getId(), theActualRef.getId());
 	}
 	
 	protected static boolean cmpId(ObjectId id1, ObjectId id2)
@@ -268,11 +244,11 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 	
 	protected static void throwRtEx(int aArg, String aMessage)
 	{
-		throw new IllegalStateException(aMessage+": "+aArg);
+		throw new RuntimeException(aMessage+": "+aArg);
 	}
 	
 	protected static void throwRtEx(String aMessage)
 	{
-		throw new IllegalStateException(aMessage);
+		throw new RuntimeException(aMessage);
 	}
 }

@@ -35,6 +35,7 @@ import gnu.trove.TByteArrayList;
 
 import org.objectweb.asm.Type;
 
+import tod.core.config.TODConfig;
 import tod.core.database.structure.IStructureDatabase;
 import tod.core.database.structure.ObjectId;
 import tod.core.database.structure.IStructureDatabase.BehaviorMonitoringModeChange;
@@ -53,7 +54,8 @@ public class ThreadReplayer
 {
 	public static final boolean ECHO = false;
 
-	private IStructureDatabase itsDatabase;
+	private final TODConfig itsConfig;
+	private final IStructureDatabase itsDatabase;
 	
 	private int itsMessageCount = 0;
 	private Stack<ReplayerFrame> itsStack = new ArrayStack<ReplayerFrame>();
@@ -70,6 +72,25 @@ public class ThreadReplayer
 	private final TByteArrayList itsMonitoringModes = new TByteArrayList();
 	private int itsCurrentMonitoringModeVersion = 0;
 
+	private ExceptionInfo itsLastException;
+	
+	public ThreadReplayer(
+			TODConfig aConfig, 
+			IStructureDatabase aDatabase, 
+			TmpIdManager aTmpIdManager,
+			BufferStream aBuffer)
+	{
+		itsConfig = aConfig;
+		itsDatabase = aDatabase;
+		itsTmpIdManager = aTmpIdManager;
+		itsStream = aBuffer;
+	}
+	
+	public void replay()
+	{
+		createUnmonitoredFrame(null).invokeVoid();		
+	}
+	
 	public IStructureDatabase getDatabase()
 	{
 		return itsDatabase;
@@ -209,22 +230,22 @@ public class ThreadReplayer
 		// TODO: register
 	}
 	
-	public InScopeReplayerFrame createInScopeReplayer(ReplayerFrame aParent, int aBehaviorId)
+	public InScopeReplayerFrame createInScopeFrame(ReplayerFrame aParent, int aBehaviorId)
 	{
 		throw new UnsupportedOperationException();
 	}
 	
-	public EnveloppeReplayerFrame createEnveloppeReplayer(ReplayerFrame aParent)
+	public EnveloppeReplayerFrame createEnveloppeFrame(ReplayerFrame aParent)
 	{
 		throw new UnsupportedOperationException();
 	}
 	
-	public UnmonitoredReplayerFrame createUnmonitoredReplayer(ReplayerFrame aParent)
+	public UnmonitoredReplayerFrame createUnmonitoredFrame(ReplayerFrame aParent)
 	{
 		throw new UnsupportedOperationException();
 	}
 	
-	public ClassloaderWrapperReplayerFrame createClassloaderReplayer(ReplayerFrame aParent)
+	public ClassloaderWrapperReplayerFrame createClassloaderFrame(ReplayerFrame aParent)
 	{
 		throw new UnsupportedOperationException();
 	}
@@ -271,14 +292,52 @@ public class ThreadReplayer
 		
 		int theBehaviorId = getDatabase().getBehaviorId(theClassName, theMethodName, theMethodSignature);
 
-		return new ExceptionInfo(
+		itsLastException = new ExceptionInfo(
 				theMethodName, 
 				theMethodSignature, 
 				theDeclaringClassSignature,
 				theBehaviorId,
 				theBytecodeIndex, 
 				theException);
+		
+		return itsLastException;
 	}
+	
+	public ExceptionInfo getLastException()
+	{
+		return itsLastException;
+	}
+	
+	public static final String REPLAYER_NAME_PREFIX = "$tod$replayer2$";
+
+	/**
+	 * Returns the JVM name of the replayer class for the given method.
+	 */
+	public static String makeReplayerClassName(String aJvmClassName, String aJvmMethodName, String aDesc)
+	{
+		String theName = aJvmClassName+"_"+aJvmMethodName+"_"+aDesc;
+		StringBuilder theBuilder = new StringBuilder(theName.length());
+		for (int i=0;i<theName.length();i++)
+		{
+			char c = theName.charAt(i);
+			switch(c)
+			{
+			case '/':
+			case '(':
+			case ')':
+			case '<':
+			case '>':
+			case '[':
+			case ';':
+				c = '_';
+				break;
+			}
+			theBuilder.append(c);
+		}
+		return REPLAYER_NAME_PREFIX+theBuilder.toString();
+	}
+	
+
 	
 	public static class ExceptionInfo
 	{

@@ -43,7 +43,7 @@ import java.util.List;
 import tod.core.config.TODConfig;
 import tod.core.database.structure.IStructureDatabase;
 import tod.impl.database.structure.standard.StructureDatabaseUtils;
-import tod.impl.replay.ThreadReplayer;
+import tod.impl.replay2.ThreadReplayer;
 import tod.impl.replay.TmpIdManager;
 import tod2.agent.Message;
 import tod2.agent.io._ByteBuffer;
