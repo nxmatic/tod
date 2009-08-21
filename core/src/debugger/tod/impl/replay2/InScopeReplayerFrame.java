@@ -242,13 +242,4 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 		return id1.getId() == id2.getId();
 	}
 	
-	protected static void throwRtEx(int aArg, String aMessage)
-	{
-		throw new RuntimeException(aMessage+": "+aArg);
-	}
-	
-	protected static void throwRtEx(String aMessage)
-	{
-		throw new RuntimeException(aMessage);
-	}
 }

@@ -31,6 +31,8 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.replay2;
 
+import org.objectweb.asm.Type;
+
 import tod.core.database.structure.IStructureDatabase;
 import tod.core.database.structure.ObjectId;
 import tod.impl.replay2.ThreadReplayer.ExceptionInfo;
@@ -42,12 +44,14 @@ public abstract class ReplayerFrame
 	private ThreadReplayer itsReplayer;
 	private BufferStream itsStream;
 	private boolean itsFromScope;
+	private Type itsReturnType;
 
-	public void setup(ThreadReplayer aReplayer, BufferStream aStream, boolean aFromScope)
+	public void setup(ThreadReplayer aReplayer, BufferStream aStream, boolean aFromScope, Type aReturnType)
 	{
 		itsReplayer = aReplayer;
 		itsStream = aStream;
 		itsFromScope = aFromScope;
+		itsReturnType = aReturnType;
 	}
 	
 	public ThreadReplayer getReplayer()
@@ -58,6 +62,16 @@ public abstract class ReplayerFrame
 	public BufferStream getStream()
 	{
 		return itsStream;
+	}
+	
+	public boolean isFromScope()
+	{
+		return itsFromScope;
+	}
+	
+	public Type getReturnType()
+	{
+		return itsReturnType;
 	}
 	
 	public IStructureDatabase getDatabase()
@@ -161,4 +175,27 @@ public abstract class ReplayerFrame
 	{
 		throw new UnsupportedOperationException();
 	}
+	
+	/**
+	 * Calls the appropriate invoke method, and doesn't return its result
+	 */
+	public void invoke_OOS()
+	{
+	}
+	
+	public static void throwRtEx(int aArg, String aMessage)
+	{
+		throw new RuntimeException(aMessage+": "+aArg);
+	}
+	
+	public static void throwRtEx(String aMessage)
+	{
+		throw new RuntimeException(aMessage);
+	}
+	
+	public static void throwUnsupportedEx()
+	{
+		throw new UnsupportedOperationException();
+	}
+
 }

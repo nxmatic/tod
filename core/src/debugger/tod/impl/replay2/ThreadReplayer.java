@@ -74,6 +74,8 @@ public class ThreadReplayer
 
 	private ExceptionInfo itsLastException;
 	
+	private final ReplayerGenerator itsGenerator;
+	
 	public ThreadReplayer(
 			TODConfig aConfig, 
 			IStructureDatabase aDatabase, 
@@ -84,6 +86,7 @@ public class ThreadReplayer
 		itsDatabase = aDatabase;
 		itsTmpIdManager = aTmpIdManager;
 		itsStream = aBuffer;
+		itsGenerator = new ReplayerGenerator(itsConfig, itsDatabase);
 	}
 	
 	public void replay()
@@ -131,29 +134,52 @@ public class ThreadReplayer
 			switch(theMessage)
 			{
 			case Message.TRACEDMETHODS_VERSION:
+				nextMessage();
 				processTracedMethodsVersion(itsStream.getInt());
 				break;
 				
 			case Message.REGISTER_REFOBJECT:
+				nextMessage();
 				processRegisterRefObject(itsObjIdReceiver.receiveFull(itsStream), itsStream);
 				break;
 				
 			case Message.REGISTER_REFOBJECT_DELTA:
+				nextMessage();
 				processRegisterRefObject(itsObjIdReceiver.receiveDelta(itsStream), itsStream);
 				break;
 				
-			case Message.REGISTER_OBJECT: processRegisterObject(itsStream); break;
-			case Message.REGISTER_OBJECT_DELTA: throw new UnsupportedOperationException();
-			case Message.REGISTER_THREAD: processRegisterThread(itsStream); break;
-			case Message.REGISTER_CLASS: processRegisterClass(itsStream); break;
-			case Message.REGISTER_CLASSLOADER: processRegisterClassLoader(itsStream); break;
-			case Message.SYNC: processSync(itsStream); break;
+			case Message.REGISTER_OBJECT: 
+				nextMessage();
+				processRegisterObject(itsStream); 
+				break;
+				
+			case Message.REGISTER_OBJECT_DELTA: 
+				nextMessage();
+				throw new UnsupportedOperationException();
+				
+			case Message.REGISTER_THREAD: 
+				nextMessage();
+				processRegisterThread(itsStream); 
+				break;
+				
+			case Message.REGISTER_CLASS: 
+				nextMessage();
+				processRegisterClass(itsStream); 
+				break;
+				
+			case Message.REGISTER_CLASSLOADER: 
+				nextMessage();
+				processRegisterClassLoader(itsStream); 
+				break;
+				
+			case Message.SYNC: 
+				nextMessage();
+				processSync(itsStream); 
+				break;
 			
 			default:
 				return;
 			}
-
-			nextMessage();
 		}
 	}
 	
@@ -232,7 +258,9 @@ public class ThreadReplayer
 	
 	public InScopeReplayerFrame createInScopeFrame(ReplayerFrame aParent, int aBehaviorId)
 	{
-		throw new UnsupportedOperationException();
+		InScopeReplayerFrame theFrame = itsGenerator.createInScopeFrame(aBehaviorId);
+		theFrame.setup(this, itsStream, aParent instanceof InScopeReplayerFrame, null);
+		return theFrame;
 	}
 	
 	public EnveloppeReplayerFrame createEnveloppeFrame(ReplayerFrame aParent)
@@ -242,7 +270,9 @@ public class ThreadReplayer
 	
 	public UnmonitoredReplayerFrame createUnmonitoredFrame(ReplayerFrame aParent)
 	{
-		throw new UnsupportedOperationException();
+		UnmonitoredReplayerFrame theFrame = itsGenerator.createUnmonitoredFrame();
+		theFrame.setup(this, itsStream, aParent instanceof InScopeReplayerFrame, null);
+		return theFrame;
 	}
 	
 	public ClassloaderWrapperReplayerFrame createClassloaderFrame(ReplayerFrame aParent)
@@ -307,37 +337,6 @@ public class ThreadReplayer
 	{
 		return itsLastException;
 	}
-	
-	public static final String REPLAYER_NAME_PREFIX = "$tod$replayer2$";
-
-	/**
-	 * Returns the JVM name of the replayer class for the given method.
-	 */
-	public static String makeReplayerClassName(String aJvmClassName, String aJvmMethodName, String aDesc)
-	{
-		String theName = aJvmClassName+"_"+aJvmMethodName+"_"+aDesc;
-		StringBuilder theBuilder = new StringBuilder(theName.length());
-		for (int i=0;i<theName.length();i++)
-		{
-			char c = theName.charAt(i);
-			switch(c)
-			{
-			case '/':
-			case '(':
-			case ')':
-			case '<':
-			case '>':
-			case '[':
-			case ';':
-				c = '_';
-				break;
-			}
-			theBuilder.append(c);
-		}
-		return REPLAYER_NAME_PREFIX+theBuilder.toString();
-	}
-	
-
 	
 	public static class ExceptionInfo
 	{

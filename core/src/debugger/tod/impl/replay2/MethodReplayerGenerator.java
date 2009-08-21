@@ -31,8 +31,9 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.replay2;
 
+import static tod.impl.bci.asm2.BCIUtils.DSC_OBJECTID;
+
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -48,7 +49,6 @@ import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldInsnNode;
-import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.IincInsnNode;
 import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.InsnNode;
@@ -60,9 +60,6 @@ import org.objectweb.asm.tree.MethodNode;
 import org.objectweb.asm.tree.TryCatchBlockNode;
 import org.objectweb.asm.tree.TypeInsnNode;
 import org.objectweb.asm.tree.VarInsnNode;
-import org.python.modules.newmodule;
-import org.python.modules.types;
-import org.python.parser.ast.Slice;
 
 import tod.Util;
 import tod.core.config.TODConfig;
@@ -72,8 +69,6 @@ import tod.core.database.structure.IFieldInfo;
 import tod.core.database.structure.IStructureDatabase;
 import tod.core.database.structure.ObjectId;
 import tod.impl.bci.asm2.BCIUtils;
-import static tod.impl.bci.asm2.BCIUtils.*;
-import tod.impl.bci.asm2.LabelManager;
 import tod.impl.bci.asm2.MethodInfo;
 import tod.impl.bci.asm2.SyntaxInsnList;
 import tod.impl.bci.asm2.MethodInfo.BCIFrame;
@@ -82,7 +77,8 @@ import tod2.agent.Message;
 public class MethodReplayerGenerator
 {
 	public static final Type TYPE_OBJECTID = Type.getType(ObjectId.class);
-	public static final String CLS_REPLAYER = BCIUtils.getJvmClassName(InScopeReplayerFrame.class);
+	public static final String CLS_REPLAYERFRAME = BCIUtils.getJvmClassName(ReplayerFrame.class);
+	public static final String CLS_INSCOPEREPLAYERFRAME = BCIUtils.getJvmClassName(InScopeReplayerFrame.class);
 	public static final String CLS_FRAME = BCIUtils.getJvmClassName(ReplayerFrame.class);
 	public static final String DSC_FRAME = "L"+CLS_FRAME+";";
 	public static final String CLS_HANDLERREACHED = BCIUtils.getJvmClassName(HandlerReachedException.class);
@@ -130,10 +126,11 @@ public class MethodReplayerGenerator
 		
 		itsArgTypes = Type.getArgumentTypes(itsMethodNode.desc);
 		itsReturnType = Type.getReturnType(itsMethodNode.desc);
-		
+		itsStatic = BCIUtils.isStatic(itsMethodNode.access);
+
 		itsTarget = new ClassNode();
-		itsTarget.name = ThreadReplayer.makeReplayerClassName(itsClassNode.name, itsMethodNode.name, itsMethodNode.desc);
-		itsTarget.superName = CLS_REPLAYER;
+		itsTarget.name = ReplayerGenerator.makeReplayerClassName(itsClassNode.name, itsMethodNode.name, itsMethodNode.desc);
+		itsTarget.superName = CLS_INSCOPEREPLAYERFRAME;
 		itsTarget.methods.add(itsMethodNode);
 		itsTarget.version = Opcodes.V1_5;
 		itsTarget.access = Opcodes.ACC_PUBLIC;
@@ -192,14 +189,15 @@ public class MethodReplayerGenerator
 		LabelNode nStart = new LabelNode(lCodeStart);
 		lCodeStart.info = nStart;
 		itsMethodNode.instructions.insert(nStart);
-
-		boolean theStatic = BCIUtils.isStatic(itsMethodNode.access);
 		
-		if (theStatic) itsMethodNode.maxLocals++; // Generated method is not static
+		if (itsStatic) itsMethodNode.maxLocals++; // Generated method is not static
 		itsTmpVar = nextFreeVar(2);
 		
 		// Create constructor
 		addConstructor();
+		
+		// Add OOS invoke method
+		addOutOfScopeInvoke();
 		
 		// Modify method
 		processInstructions(itsMethodNode.instructions);
@@ -213,8 +211,9 @@ public class MethodReplayerGenerator
 		addExceptionHandling();
 
 		// Setup infrastructure
-		itsMethodNode.name = "proceed";
-		itsMethodNode.desc = "(I)V";
+		String[] theSignature = getInvokeMethodSignature(itsStatic, itsArgTypes, itsReturnType);
+		itsMethodNode.name = theSignature[0];
+		itsMethodNode.desc = theSignature[1];
 		itsMethodNode.access = Opcodes.ACC_PROTECTED;
 		itsMethodNode.exceptions = Collections.EMPTY_LIST;
 		
@@ -272,20 +271,61 @@ public class MethodReplayerGenerator
 		theConstructor.maxLocals = 1;
 		theConstructor.tryCatchBlocks = Collections.EMPTY_LIST;
 		
-		SyntaxInsnList s = new SyntaxInsnList(null);
+		SList s = new SList();
 		s.ALOAD(0);
 		s.LDC(itsMethodNode.name);
 		s.pushInt(itsMethodNode.access);
 		s.LDC(itsMethodNode.desc);
 		s.INVOKESPECIAL(
-				CLS_REPLAYER, 
+				CLS_INSCOPEREPLAYERFRAME, 
 				"<init>", 
 				"("+BCIUtils.DSC_STRING+"I"+BCIUtils.DSC_STRING+")V");
 		s.RETURN();
 		
 		theConstructor.instructions = s;
-		
 		itsTarget.methods.add(theConstructor);
+	}
+	
+	/**
+	 * Adds a method that reads arguments from the stream before calling the actual invoke method
+	 */
+	private void addOutOfScopeInvoke()
+	{
+		MethodNode theMethod = new MethodNode();
+
+		String[] theSignature = getInvokeMethodSignature(itsStatic, itsArgTypes, itsReturnType);
+		theMethod.name = "invoke_OOS";
+		theMethod.desc = "()V";
+		theMethod.exceptions = Collections.EMPTY_LIST;
+		theMethod.access = Opcodes.ACC_PUBLIC;
+		theMethod.tryCatchBlocks = Collections.EMPTY_LIST;
+		
+		SList s = new SList();
+		
+		s.ALOAD(0);
+		
+		int theSize = 1;
+		if (! itsStatic)
+		{
+			s.invokeReadRef();
+			theSize++;
+		}
+		
+		for (Type theType : itsArgTypes)
+		{
+			s.invokeRead(theType);
+			theSize += theType.getSize();
+		}
+		
+		s.INVOKEVIRTUAL(itsTarget.name, theSignature[0], theSignature[1]);
+		s.POP();
+		s.RETURN();
+
+		theMethod.maxLocals = 1;
+		theMethod.maxStack = theSize;
+		
+		theMethod.instructions = s;
+		itsTarget.methods.add(theMethod);
 	}
 	
 	/**
@@ -483,7 +523,7 @@ public class MethodReplayerGenerator
 	{
 		SList s = new SList();
 
-		s.INVOKEVIRTUAL(CLS_REPLAYER, "expectException", "()V");
+		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "expectException", "()V");
 		
 		aInsns.insert(aNode, s);
 		aInsns.remove(aNode);
@@ -524,7 +564,7 @@ public class MethodReplayerGenerator
 			// Obtain frame
 			s.ALOAD(0);
 			s.pushInt(theBehaviorId);
-			s.INVOKEVIRTUAL(CLS_REPLAYER, "invoke", "(I)"+DSC_FRAME);
+			s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "invoke", "(I)"+DSC_FRAME);
 			
 			// Reload arguments
 			genLoadArgs(s, theArgTypes, theStatic);
@@ -537,12 +577,12 @@ public class MethodReplayerGenerator
 		if (theExpectObjectInitialized)
 		{
 			s.ALOAD(0);
-			s.INVOKEVIRTUAL(CLS_REPLAYER, "waitObjectInitialized", "()V");
+			s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "waitObjectInitialized", "()V");
 		}
 		else if (theChainingInvocation)
 		{
 			s.ALOAD(0);
-			s.INVOKEVIRTUAL(CLS_REPLAYER, "waitConstructorTarget", "(I)V");
+			s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "waitConstructorTarget", "(I)V");
 		}
 
 		aInsns.insert(aNode, s);
@@ -574,7 +614,7 @@ public class MethodReplayerGenerator
 		}
 	}
 	
-	private String[] getInvokeMethodSignature(boolean aStatic, Type[] aArgTypes, Type aReturnType)
+	public static String[] getInvokeMethodSignature(boolean aStatic, Type[] aArgTypes, Type aReturnType)
 	{
 		List<Type> theArgTypes = new ArrayList<Type>();
 		if (! aStatic) theArgTypes.add(ACTUALTYPE_FOR_SORT[Type.OBJECT]); // First arg is the target
@@ -589,7 +629,7 @@ public class MethodReplayerGenerator
 		};
 	}
 	
-	private static final Type[] ACTUALTYPE_FOR_SORT = new Type[11];
+	public static final Type[] ACTUALTYPE_FOR_SORT = new Type[11];
 	static
 	{
 		ACTUALTYPE_FOR_SORT[Type.OBJECT] = TYPE_OBJECTID;
@@ -606,6 +646,7 @@ public class MethodReplayerGenerator
 	}
 
 	private static final String[] SUFFIX_FOR_SORT = new String[11];
+	private boolean itsStatic;
 	static
 	{
 		SUFFIX_FOR_SORT[Type.OBJECT] = "Ref";
@@ -626,7 +667,7 @@ public class MethodReplayerGenerator
 		SList s = new SList();
 		
 		s.ALOAD(0);
-		s.INVOKEVIRTUAL(CLS_REPLAYER, "nextTmpId", "()"+BCIUtils.DSC_OBJECTID);
+		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "nextTmpId", "()"+BCIUtils.DSC_OBJECTID);
 		
 		aInsns.insert(aNode, s);
 		aInsns.remove(aNode);
@@ -637,7 +678,7 @@ public class MethodReplayerGenerator
 		SList s = new SList();
 		
 		s.ALOAD(0);
-		s.INVOKEVIRTUAL(CLS_REPLAYER, "nextTmpId", "()"+BCIUtils.DSC_OBJECTID);
+		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "nextTmpId", "()"+BCIUtils.DSC_OBJECTID);
 		
 		aInsns.insert(aNode, s);
 		aInsns.remove(aNode);
@@ -651,7 +692,7 @@ public class MethodReplayerGenerator
 		if (! (aNode.cst instanceof Type) && ! (aNode.cst instanceof String)) return;
 		
 		SList s = new SList();
-		s.INVOKEVIRTUAL(CLS_REPLAYER, "expectConstant", "()"+DSC_OBJECTID);
+		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "expectConstant", "()"+DSC_OBJECTID);
 		
 		aInsns.insert(aNode, s);
 		aInsns.remove(aNode);
@@ -665,7 +706,7 @@ public class MethodReplayerGenerator
 	{
 		SList s = new SList();
 
-		s.INVOKESTATIC(CLS_REPLAYER, "cmpId", "("+BCIUtils.DSC_OBJECTID+BCIUtils.DSC_OBJECTID+")Z");
+		s.INVOKESTATIC(CLS_INSCOPEREPLAYERFRAME, "cmpId", "("+BCIUtils.DSC_OBJECTID+BCIUtils.DSC_OBJECTID+")Z");
 		switch(aNode.getOpcode())
 		{
 		case Opcodes.IF_ACMPEQ: s.IFtrue(aNode.label.getLabel()); break;
@@ -690,7 +731,7 @@ public class MethodReplayerGenerator
 		Label lDefault = new Label();
 		Label lEndIf = new Label();
 		
-		s.INVOKEVIRTUAL(CLS_REPLAYER, "getNextMessage", "()B");
+		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "getNextMessage", "()B");
 		s.LOOKUPSWITCH(
 				lDefault, 
 				new int[] {Message.FIELD_READ, Message.FIELD_READ_SAME}, 
@@ -753,7 +794,7 @@ public class MethodReplayerGenerator
 		
 		SList s = new SList();
 
-		s.INVOKEVIRTUAL(CLS_REPLAYER, "expectArrayRead", "()V");
+		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "expectArrayRead", "()V");
 		s.invokeRead(theType);
 		
 		aInsns.insert(aNode, s);
@@ -763,7 +804,7 @@ public class MethodReplayerGenerator
 	private void processArrayLength(InsnList aInsns, InsnNode aNode)
 	{
 		SList s = new SList();
-		s.INVOKEVIRTUAL(CLS_REPLAYER, "expectArrayLength", "()I");
+		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "expectArrayLength", "()I");
 		
 		aInsns.insert(aNode, s);
 		aInsns.remove(aNode);
@@ -842,7 +883,7 @@ public class MethodReplayerGenerator
 			s.POP(theType);
 			
 			s.ALOAD(0);
-			s.INVOKEVIRTUAL(CLS_REPLAYER, "expectException", "()V");
+			s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "expectException", "()V");
 			s.RETURN();
 		}
 		
@@ -855,7 +896,7 @@ public class MethodReplayerGenerator
 		BCIFrame theFrame = itsMethodInfo.getFrame(aNode);
 		
 		SList s = new SList();
-		s.INVOKEVIRTUAL(CLS_REPLAYER, "checkCast", "()V");
+		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "checkCast", "()V");
 
 		aInsns.insert(aNode, s);
 		aInsns.remove(aNode);
@@ -869,91 +910,5 @@ public class MethodReplayerGenerator
 		
 		aInsns.insert(aNode, s);
 		aInsns.remove(aNode);
-	}
-
-	private class SList extends SyntaxInsnList
-	{
-		public SList()
-		{
-			super(null);
-		}
-		
-		public void throwRTEx(String aMessage)
-		{
-			LDC(aMessage);
-			INVOKESTATIC(CLS_REPLAYER, "throwRtEx", "(Ljava/lang/String;)V");
-		}
-
-		/**
-		 * Throws a runtime exception with an int arg that must be on the stack.
-		 */
-		public void throwRTExArg(String aMessage)
-		{
-			LDC(aMessage);
-			INVOKESTATIC(CLS_REPLAYER, "throwRtEx", "(ILjava/lang/String;)V");
-		}
-		
-		public void invokeReadRef()
-		{
-			INVOKEVIRTUAL(CLS_REPLAYER, "readRef", "()"+DSC_OBJECTID);
-		}
-		
-		public void invokeReadInt()
-		{
-			INVOKEVIRTUAL(CLS_REPLAYER, "readInt", "()I");
-		}
-		
-		public void invokeReadBoolean()
-		{
-			INVOKEVIRTUAL(CLS_REPLAYER, "readBoolean", "()Z");
-		}
-		
-		public void invokeReadByte()
-		{
-			INVOKEVIRTUAL(CLS_REPLAYER, "readByte", "()B");
-		}
-		
-		public void invokeReadChar()
-		{
-			INVOKEVIRTUAL(CLS_REPLAYER, "readChar", "()C");
-		}
-		
-		public void invokeReadShort()
-		{
-			INVOKEVIRTUAL(CLS_REPLAYER, "readShort", "()S");
-		}
-		
-		public void invokeReadFloat()
-		{
-			INVOKEVIRTUAL(CLS_REPLAYER, "readFloat", "()F");
-		}
-		
-		public void invokeReadLong()
-		{
-			INVOKEVIRTUAL(CLS_REPLAYER, "readLong", "()J");
-		}
-		
-		public void invokeReadDouble()
-		{
-			INVOKEVIRTUAL(CLS_REPLAYER, "readDouble", "()D");
-		}
-		
-		public void invokeRead(Type aType)
-		{
-			switch(aType.getSort())
-			{
-			case Type.ARRAY:
-			case Type.OBJECT: invokeReadRef(); break;
-			case Type.INT: invokeReadInt(); break;
-			case Type.BOOLEAN: invokeReadBoolean(); break;
-			case Type.BYTE: invokeReadByte(); break;
-			case Type.CHAR: invokeReadChar(); break;
-			case Type.SHORT: invokeReadShort(); break;
-			case Type.FLOAT: invokeReadFloat(); break;
-			case Type.LONG: invokeReadLong(); break;
-			case Type.DOUBLE: invokeReadDouble(); break;
-			default: throw new RuntimeException("Not handled: "+aType);
-			}
-		}
 	}
 }

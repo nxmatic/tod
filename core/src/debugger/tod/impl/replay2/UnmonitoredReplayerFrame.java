@@ -34,13 +34,10 @@ package tod.impl.replay2;
 import org.objectweb.asm.Type;
 
 import tod.core.database.structure.ObjectId;
-import tod.impl.replay2.ThreadReplayer.ExceptionInfo;
 import tod2.agent.Message;
 
 public class UnmonitoredReplayerFrame extends ReplayerFrame
 {
-	private final Type itsReturnType;
-	
 	private ObjectId itsRefResult;
 	private int itsIntResult;
 	private long itsLongResult;
@@ -48,11 +45,6 @@ public class UnmonitoredReplayerFrame extends ReplayerFrame
 	private double itsDoubleResult;
 	
 	private byte itsLastMessage = -1;
-
-	public UnmonitoredReplayerFrame(Type aReturnType)
-	{
-		itsReturnType = aReturnType;
-	}
 
 	private void replay()
 	{
@@ -95,38 +87,36 @@ public class UnmonitoredReplayerFrame extends ReplayerFrame
 	private void evInScopeBehaviorEnter(int aBehaviorId)
 	{
 		InScopeReplayerFrame theChild = getReplayer().createInScopeFrame(this, aBehaviorId);
-		theChild.startFromOutOfScope();
-		getReplayer().pushFrame(theChild);
+		theChild.invoke_OOS();
 	}
 	
 	private void evOutOfScopeBehaviorEnter()
 	{
 		EnveloppeReplayerFrame theChild = getReplayer().createEnveloppeFrame(this);
-		getReplayer().pushFrame(theChild);
+		theChild.invoke_OOS();
 	}
 	
 	private void evInScopeClinitEnter(int aBehaviorId)
 	{
 		InScopeReplayerFrame theChild = getReplayer().createInScopeFrame(this, aBehaviorId);
-		theChild.startFromOutOfScope();
-		getReplayer().pushFrame(theChild);
+		theChild.invokeVoid();
 	}
 	
 	private void evOutOfScopeClinitEnter()
 	{
 		EnveloppeReplayerFrame theChild = getReplayer().createEnveloppeFrame(this);
-		getReplayer().pushFrame(theChild);
+		theChild.invokeVoid();
 	}
 	
 	private void evClassloaderEnter()
 	{
 		ClassloaderWrapperReplayerFrame theChild = getReplayer().createClassloaderFrame(this);
-		getReplayer().pushFrame(theChild);
+		theChild.invokeVoid();
 	}
 
 	private void readResult()
 	{
-		switch(itsReturnType.getSort())
+		switch(getReturnType().getSort())
 		{
 		case Type.BOOLEAN: 
 			itsIntResult = readBoolean() ? 1 : 0;
@@ -163,7 +153,7 @@ public class UnmonitoredReplayerFrame extends ReplayerFrame
 		case Type.VOID:
 			break;
 		
-		default: throw new RuntimeException("Unexpected type: "+itsReturnType);
+		default: throw new RuntimeException("Unexpected type: "+getReturnType());
 		}
 	}
 	

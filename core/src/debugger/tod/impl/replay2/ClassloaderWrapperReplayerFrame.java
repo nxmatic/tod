@@ -31,7 +31,7 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.replay2;
 
-public class ClassloaderWrapperReplayerFrame
+public class ClassloaderWrapperReplayerFrame extends ReplayerFrame
 {
 
 }
