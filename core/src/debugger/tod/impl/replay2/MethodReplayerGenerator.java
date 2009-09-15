@@ -136,10 +136,6 @@ public class MethodReplayerGenerator
 		itsTarget.access = Opcodes.ACC_PUBLIC;
 		
 		itsMethodInfo = new MethodInfo(itsDatabase, itsClassNode, itsMethodNode);
-		int theSlotsCount = itsMethodInfo.setupLocalCacheSlots(itsMethodNode.maxLocals);
-		itsMethodNode.maxLocals += theSlotsCount;
-		
-		itsSaveArgsSlots = nextFreeVar(computeMaxSaveArgsSpace(itsMethodNode.instructions));
 	}
 	
 	/**
@@ -190,7 +186,15 @@ public class MethodReplayerGenerator
 		lCodeStart.info = nStart;
 		itsMethodNode.instructions.insert(nStart);
 		
-		if (itsStatic) itsMethodNode.maxLocals++; // Generated method is not static
+		// If the original method is non-static, the generated method takes the original "this" as a parameter.
+		// If original is static, the generated method takes no parameter, but is no longer static
+		itsMethodNode.maxLocals++; 
+
+		int theSlotsCount = itsMethodInfo.setupLocalCacheSlots(itsMethodNode.maxLocals);
+		itsMethodNode.maxLocals += theSlotsCount;
+		
+		itsSaveArgsSlots = nextFreeVar(computeMaxSaveArgsSpace(itsMethodNode.instructions));
+
 		itsTmpVar = nextFreeVar(2);
 		
 		// Create constructor
@@ -207,8 +211,9 @@ public class MethodReplayerGenerator
 		lCodeEnd.info = nEnd;
 		itsMethodNode.instructions.add(nEnd);
 		
-		// Process handlers
+		// Setup/cleanup/handlers
 		addExceptionHandling();
+		itsMethodNode.instructions.insert(itsMethodInfo.getFieldCacheInitInstructions());
 
 		// Setup infrastructure
 		String[] theSignature = getInvokeMethodSignature(itsStatic, itsArgTypes, itsReturnType);
@@ -303,6 +308,9 @@ public class MethodReplayerGenerator
 		SList s = new SList();
 		
 		s.ALOAD(0);
+		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "waitArgs", "()V");
+		
+		s.ALOAD(0);
 		
 		int theSize = 1;
 		if (! itsStatic)
@@ -318,7 +326,7 @@ public class MethodReplayerGenerator
 		}
 		
 		s.INVOKEVIRTUAL(itsTarget.name, theSignature[0], theSignature[1]);
-		s.POP();
+		if (itsReturnType.getSort() != Type.VOID) s.POP(itsReturnType);
 		s.RETURN();
 
 		theMethod.maxLocals = 1;
@@ -341,22 +349,33 @@ public class MethodReplayerGenerator
 		Label lHandlerReached = new Label();
 		s.label(lHandlerReached);
 		
-		s.GETFIELD(CLS_HANDLERREACHED, "handlerId", "I");
+		int nHandlers = itsMethodNode.tryCatchBlocks.size();
 		
-		Set<Label> theProcessedLabels = new HashSet<Label>();
-		List<Label> theLabels = new ArrayList<Label>();
-
-		for(int i=0;i<itsMethodNode.tryCatchBlocks.size();i++)
+		if (nHandlers > 0)
 		{
-			TryCatchBlockNode theNode = (TryCatchBlockNode) itsMethodNode.tryCatchBlocks.get(i);
-			Label theLabel = theNode.handler.getLabel();
-			if (theProcessedLabels.add(theLabel)) theLabels.add(theLabel);
+			s.GETFIELD(CLS_HANDLERREACHED, "handlerId", "I");
+			
+			Set<Label> theProcessedLabels = new HashSet<Label>();
+			List<Label> theLabels = new ArrayList<Label>();
+			
+			for(int i=0;i<nHandlers;i++)
+			{
+				TryCatchBlockNode theNode = (TryCatchBlockNode) itsMethodNode.tryCatchBlocks.get(i);
+				Label theLabel = theNode.handler.getLabel();
+				if (theProcessedLabels.add(theLabel)) theLabels.add(theLabel);
+			}
+			
+			Label lDefault = new Label();
+			s.TABLESWITCH(0, theLabels.size()-1, lDefault, theLabels.toArray(new Label[theLabels.size()]));
+			s.label(lDefault);
+			s.createRTEx("Invalid handler id");
+			s.ATHROW();
 		}
-		
-		Label lDefault = new Label();
-		s.TABLESWITCH(0, theLabels.size()-1, lDefault, theLabels.toArray(new Label[theLabels.size()]));
-		s.label(lDefault);
-		s.throwRTEx("Invalid handler id");
+		else
+		{
+			s.createRTEx("No handlers in the original method");
+			s.ATHROW();
+		}
 		
 		itsMethodNode.instructions.add(s);
 		
@@ -582,7 +601,8 @@ public class MethodReplayerGenerator
 		else if (theChainingInvocation)
 		{
 			s.ALOAD(0);
-			s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "waitConstructorTarget", "(I)V");
+			s.ALOAD(1); // Original "this" (all original locals are pushed down one slot)
+			s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "waitConstructorTarget", "("+DSC_OBJECTID+")V");
 		}
 
 		aInsns.insert(aNode, s);
@@ -692,6 +712,7 @@ public class MethodReplayerGenerator
 		if (! (aNode.cst instanceof Type) && ! (aNode.cst instanceof String)) return;
 		
 		SList s = new SList();
+		s.ALOAD(0);
 		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "expectConstant", "()"+DSC_OBJECTID);
 		
 		aInsns.insert(aNode, s);
@@ -731,6 +752,7 @@ public class MethodReplayerGenerator
 		Label lDefault = new Label();
 		Label lEndIf = new Label();
 		
+		s.ALOAD(0);
 		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "getNextMessage", "()B");
 		s.LOOKUPSWITCH(
 				lDefault, 
@@ -753,7 +775,8 @@ public class MethodReplayerGenerator
 			}
 			
 		s.label(lDefault);
-			s.throwRTEx("Unexpected message");
+			s.createRTEx("Unexpected message");
+			s.ATHROW();
 			
 		s.label(lEndIf);
 		
@@ -884,7 +907,8 @@ public class MethodReplayerGenerator
 			
 			s.ALOAD(0);
 			s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "expectException", "()V");
-			s.RETURN();
+			s.pushDefaultValue(itsReturnType);
+			s.RETURN(itsReturnType);
 		}
 		
 		s.label(lNormal);

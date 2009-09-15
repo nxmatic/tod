@@ -31,7 +31,27 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.replay2;
 
-public class ClassloaderWrapperReplayerFrame extends ReplayerFrame
+import tod2.agent.Message;
+
+public class ClassloaderWrapperReplayerFrame extends UnmonitoredReplayerFrame
 {
+	@Override
+	protected boolean replay(byte aMessage)
+	{
+		switch(aMessage)
+		{
+		case Message.UNMONITORED_BEHAVIOR_CALL_RESULT:
+		case Message.UNMONITORED_BEHAVIOR_CALL_EXCEPTION:
+		case Message.HANDLER_REACHED:
+		case Message.INSCOPE_BEHAVIOR_EXIT_EXCEPTION:
+			throw new RuntimeException("Command not handled: "+Message._NAMES[aMessage]);
+			
+		case Message.CLASSLOADER_EXIT:
+			return false;
+		
+		default: 
+			return super.replay(aMessage);
+		}
+	}
 
 }

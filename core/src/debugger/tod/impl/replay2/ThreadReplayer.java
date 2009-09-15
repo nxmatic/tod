@@ -52,7 +52,7 @@ import zz.utils.Utils;
 
 public class ThreadReplayer
 {
-	public static final boolean ECHO = false;
+	public static final boolean ECHO = true;
 
 	private final TODConfig itsConfig;
 	private final IStructureDatabase itsDatabase;
@@ -277,7 +277,9 @@ public class ThreadReplayer
 	
 	public ClassloaderWrapperReplayerFrame createClassloaderFrame(ReplayerFrame aParent)
 	{
-		throw new UnsupportedOperationException();
+		ClassloaderWrapperReplayerFrame theFrame = itsGenerator.createClassloaderWrapperFrame();
+		theFrame.setup(this, itsStream, aParent instanceof InScopeReplayerFrame, null);
+		return theFrame;
 	}
 	
 	public IntDeltaReceiver getBehIdReceiver()

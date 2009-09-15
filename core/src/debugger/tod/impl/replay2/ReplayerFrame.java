@@ -183,19 +183,19 @@ public abstract class ReplayerFrame
 	{
 	}
 	
-	public static void throwRtEx(int aArg, String aMessage)
+	public static Exception createRtEx(int aArg, String aMessage)
 	{
-		throw new RuntimeException(aMessage+": "+aArg);
+		return new RuntimeException(aMessage+": "+aArg);
 	}
 	
-	public static void throwRtEx(String aMessage)
+	public static Exception createRtEx(String aMessage)
 	{
-		throw new RuntimeException(aMessage);
+		return new RuntimeException(aMessage);
 	}
 	
-	public static void throwUnsupportedEx()
+	public static Exception createUnsupportedEx()
 	{
-		throw new UnsupportedOperationException();
+		return new UnsupportedOperationException();
 	}
 
 }

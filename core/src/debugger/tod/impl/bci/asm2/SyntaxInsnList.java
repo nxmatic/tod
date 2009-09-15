@@ -207,6 +207,9 @@ public class SyntaxInsnList extends InsnList
         	ACONST_NULL();
         	break;
         	
+        case Type.VOID:
+        	break;
+        	
         default:
             throw new RuntimeException("Not handled: "+aType);
 		}

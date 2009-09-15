@@ -44,44 +44,53 @@ public class UnmonitoredReplayerFrame extends ReplayerFrame
 	private float itsFloatResult;
 	private double itsDoubleResult;
 	
-	private byte itsLastMessage = -1;
-
-	private void replay()
+	protected void replay()
 	{
 		while(true)
 		{
 			byte m = getNextMessage();
-			switch(m)
-			{
-			case Message.EXCEPTION:
-			{
-				readException();
-				break;
-			}
 			
-			case Message.INSCOPE_BEHAVIOR_ENTER: 
-				evInScopeBehaviorEnter(getReplayer().getBehIdReceiver().receiveFull(getStream())); 
-				break;
-				
-			case Message.INSCOPE_BEHAVIOR_ENTER_DELTA: 
-				evInScopeBehaviorEnter(getReplayer().getBehIdReceiver().receiveDelta(getStream())); 
-				break;
-				
-			case Message.OUTOFSCOPE_BEHAVIOR_ENTER: evOutOfScopeBehaviorEnter(); break;
-			case Message.INSCOPE_CLINIT_ENTER: evInScopeClinitEnter(getStream().getInt()); break;
-			case Message.OUTOFSCOPE_CLINIT_ENTER: evOutOfScopeClinitEnter(); break;
-			case Message.CLASSLOADER_ENTER: evClassloaderEnter(); break;
-
-			case Message.UNMONITORED_BEHAVIOR_CALL_RESULT: readResult(); return;
-			case Message.UNMONITORED_BEHAVIOR_CALL_EXCEPTION: throw new BehaviorExitException();
-			case Message.HANDLER_REACHED: throw new HandlerReachedException(readInt());
-			case Message.INSCOPE_BEHAVIOR_EXIT_EXCEPTION: throw new BehaviorExitException();
-			
-			default: throw new RuntimeException("Command not handled: "+Message._NAMES[m]);
-			}
-			
-			itsLastMessage = m;
+			boolean theContinue = replay(m);
+			if (! theContinue) break;
 		}
+	}
+	
+	/**
+	 * Processes an individual message
+	 * @return Wheter to continue or not.
+	 */
+	protected boolean replay(byte aMessage)
+	{
+		switch(aMessage)
+		{
+		case Message.EXCEPTION:
+		{
+			readException();
+			break;
+		}
+		
+		case Message.INSCOPE_BEHAVIOR_ENTER: 
+			evInScopeBehaviorEnter(getReplayer().getBehIdReceiver().receiveFull(getStream())); 
+			break;
+			
+		case Message.INSCOPE_BEHAVIOR_ENTER_DELTA: 
+			evInScopeBehaviorEnter(getReplayer().getBehIdReceiver().receiveDelta(getStream())); 
+			break;
+			
+		case Message.OUTOFSCOPE_BEHAVIOR_ENTER: evOutOfScopeBehaviorEnter(); break;
+		case Message.INSCOPE_CLINIT_ENTER: evInScopeClinitEnter(getStream().getInt()); break;
+		case Message.OUTOFSCOPE_CLINIT_ENTER: evOutOfScopeClinitEnter(); break;
+		case Message.CLASSLOADER_ENTER: evClassloaderEnter(); break;
+
+		case Message.UNMONITORED_BEHAVIOR_CALL_RESULT: readResult(); return false;
+		case Message.UNMONITORED_BEHAVIOR_CALL_EXCEPTION: throw new BehaviorExitException();
+		case Message.HANDLER_REACHED: throw new HandlerReachedException(readInt());
+		case Message.INSCOPE_BEHAVIOR_EXIT_EXCEPTION: throw new BehaviorExitException();
+		
+		default: throw new RuntimeException("Command not handled: "+Message._NAMES[aMessage]);
+		}
+		
+		return true;
 	}
 	
 	private void evInScopeBehaviorEnter(int aBehaviorId)
@@ -99,13 +108,13 @@ public class UnmonitoredReplayerFrame extends ReplayerFrame
 	private void evInScopeClinitEnter(int aBehaviorId)
 	{
 		InScopeReplayerFrame theChild = getReplayer().createInScopeFrame(this, aBehaviorId);
-		theChild.invokeVoid();
+		theChild.invoke_OOS();
 	}
 	
 	private void evOutOfScopeClinitEnter()
 	{
 		EnveloppeReplayerFrame theChild = getReplayer().createEnveloppeFrame(this);
-		theChild.invokeVoid();
+		theChild.invoke_OOS();
 	}
 	
 	private void evClassloaderEnter()

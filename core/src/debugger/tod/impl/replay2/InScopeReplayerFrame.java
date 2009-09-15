@@ -33,10 +33,7 @@ package tod.impl.replay2;
 
 import org.objectweb.asm.Type;
 
-import tod.core.database.structure.IStructureDatabase;
 import tod.core.database.structure.ObjectId;
-import tod.impl.replay2.ThreadReplayer.ExceptionInfo;
-import tod.impl.server.BufferStream;
 import tod2.agent.Message;
 import tod2.agent.MonitoringMode;
 
@@ -79,14 +76,10 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 		return m;
 	}
 	
-	protected ReplayerFrame createClassloaderFrame()
-	{
-		throw new UnsupportedOperationException();
-	}
-	
 	protected void invokeClassloader()
 	{
-		throw new UnsupportedOperationException();
+		ClassloaderWrapperReplayerFrame theChild = getReplayer().createClassloaderFrame(this);
+		theChild.invokeVoid();
 	}
 	
 	protected void expectException()
@@ -202,14 +195,12 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 				return getReplayer().createEnveloppeFrame(this);
 				
 			default: throw new UnexpectedMessageException(aMessage);
-			
 		}
-		
 	}
 	
 	private ReplayerFrame invokeUnmonitored(byte aMessage)
 	{
-		throw new UnsupportedOperationException();
+		return getReplayer().createUnmonitoredFrame(this);
 	}
 	
 	protected ObjectId nextTmpId()
@@ -233,6 +224,15 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 		
 		ObjectId theActualRef = readRef();
 		getReplayer().getTmpIdManager().associate(aId.getId(), theActualRef.getId());
+	}
+	
+	/**
+	 * Checks that the next message is {@link Message#BEHAVIOR_ENTER_ARGS}. 
+	 */
+	protected void waitArgs()
+	{
+		byte theMessage = getNextMessage();
+		if (theMessage != Message.BEHAVIOR_ENTER_ARGS) throw new UnexpectedMessageException(theMessage);
 	}
 	
 	protected static boolean cmpId(ObjectId id1, ObjectId id2)

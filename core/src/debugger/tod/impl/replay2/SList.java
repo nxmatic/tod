@@ -44,63 +44,85 @@ public class SList extends SyntaxInsnList
 		super(null);
 	}
 	
-	public void throwRTEx(String aMessage)
+	/**
+	 * Creates a {@link RuntimeException} with the given message and leaves it on the stack
+	 */
+	public void createRTEx(String aMessage)
 	{
 		LDC(aMessage);
-		INVOKESTATIC(MethodReplayerGenerator.CLS_INSCOPEREPLAYERFRAME, "throwRtEx", "(Ljava/lang/String;)V");
+		INVOKESTATIC(MethodReplayerGenerator.CLS_INSCOPEREPLAYERFRAME, "createRtEx", "(Ljava/lang/String;)Ljava/lang/Exception;");
 	}
 
 	/**
-	 * Throws a runtime exception with an int arg that must be on the stack.
+	 * Creates a {@link UnsupportedOperationException} with the given message and leaves it on the stack
 	 */
-	public void throwRTExArg(String aMessage)
+	public void createUnsupportedEx(String aMessage)
 	{
 		LDC(aMessage);
-		INVOKESTATIC(MethodReplayerGenerator.CLS_INSCOPEREPLAYERFRAME, "throwRtEx", "(ILjava/lang/String;)V");
+		INVOKESTATIC(MethodReplayerGenerator.CLS_INSCOPEREPLAYERFRAME, "createUnsupportedEx", "(Ljava/lang/String;)Ljava/lang/Exception;");
+	}
+	
+	/**
+	 * Creates a runtime exception with an int arg that must be on the stack. Leaves the resulting
+	 * exception on the stack
+	 */
+	public void createRTExArg(String aMessage)
+	{
+		LDC(aMessage);
+		INVOKESTATIC(MethodReplayerGenerator.CLS_INSCOPEREPLAYERFRAME, "createRtEx", "(ILjava/lang/String;)Ljava/lang/Exception;");
 	}
 	
 	public void invokeReadRef()
 	{
+		ALOAD(0);
 		INVOKEVIRTUAL(MethodReplayerGenerator.CLS_INSCOPEREPLAYERFRAME, "readRef", "()"+DSC_OBJECTID);
 	}
 	
 	public void invokeReadInt()
 	{
+		ALOAD(0);
 		INVOKEVIRTUAL(MethodReplayerGenerator.CLS_INSCOPEREPLAYERFRAME, "readInt", "()I");
 	}
 	
 	public void invokeReadBoolean()
 	{
+		ALOAD(0);
 		INVOKEVIRTUAL(MethodReplayerGenerator.CLS_INSCOPEREPLAYERFRAME, "readBoolean", "()Z");
 	}
 	
 	public void invokeReadByte()
 	{
+		ALOAD(0);
 		INVOKEVIRTUAL(MethodReplayerGenerator.CLS_INSCOPEREPLAYERFRAME, "readByte", "()B");
 	}
 	
 	public void invokeReadChar()
 	{
+		ALOAD(0);
 		INVOKEVIRTUAL(MethodReplayerGenerator.CLS_INSCOPEREPLAYERFRAME, "readChar", "()C");
 	}
 	
 	public void invokeReadShort()
 	{
+		ALOAD(0);
 		INVOKEVIRTUAL(MethodReplayerGenerator.CLS_INSCOPEREPLAYERFRAME, "readShort", "()S");
 	}
 	
 	public void invokeReadFloat()
 	{
+		ALOAD(0);
 		INVOKEVIRTUAL(MethodReplayerGenerator.CLS_INSCOPEREPLAYERFRAME, "readFloat", "()F");
 	}
 	
 	public void invokeReadLong()
 	{
+		ALOAD(0);
 		INVOKEVIRTUAL(MethodReplayerGenerator.CLS_INSCOPEREPLAYERFRAME, "readLong", "()J");
 	}
 	
 	public void invokeReadDouble()
 	{
+		ALOAD(0);
 		INVOKEVIRTUAL(MethodReplayerGenerator.CLS_INSCOPEREPLAYERFRAME, "readDouble", "()D");
 	}
 	
