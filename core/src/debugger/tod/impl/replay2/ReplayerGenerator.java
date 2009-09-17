@@ -31,25 +31,10 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.replay2;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 import org.objectweb.asm.ClassReader;
-import org.objectweb.asm.ClassWriter;
-import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
 
@@ -58,16 +43,14 @@ import tod.core.database.browser.LocationUtils;
 import tod.core.database.structure.IBehaviorInfo;
 import tod.core.database.structure.IClassInfo;
 import tod.core.database.structure.IStructureDatabase;
-import tod.impl.bci.asm2.BCIUtils;
 import zz.utils.Utils;
 
 public class ReplayerGenerator
 {
 	private final TODConfig itsConfig;
 	private final IStructureDatabase itsDatabase;
-	private final GeneratorClassLoader itsClassLoader = new GeneratorClassLoader(getClass().getClassLoader());
+	private final ReplayerLoader itsLoader;
 
-	private final Set<MethodDescriptor> itsUsedDescriptors;
 	
 	/**
 	 * The cached replayer classes, indexed by behavior id.
@@ -75,212 +58,13 @@ public class ReplayerGenerator
 	private List<Class<InScopeReplayerFrame>> itsReplayers =
 		new ArrayList<Class<InScopeReplayerFrame>>();
 
-	private Class<UnmonitoredReplayerFrame> itsUnmonitoredReplayerFrameClass;
-	private Class<ClassloaderWrapperReplayerFrame> itsClassloaderWrapperReplayerFrameClass;
-	
-	public ReplayerGenerator(TODConfig aConfig, IStructureDatabase aDatabase)
+	public ReplayerGenerator(ReplayerLoader aLoader, TODConfig aConfig, IStructureDatabase aDatabase)
 	{
+		itsLoader = aLoader;
 		itsConfig = aConfig;
 		itsDatabase = aDatabase;
-		itsUsedDescriptors = getUsedDescriptors(itsDatabase);
-		
-		modifyBaseClasses();
 	}
 
-	/**
-	 * Modifies the base frame classes to add all possible invokeXxxx(...) methods
-	 */
-	private void modifyBaseClasses()
-	{
-		modifyReplayerFrame();
-		modifyUnmonitoredReplayerFrame();
-		modifyClassloaderWrapperReplayerFrame();
-	}
-	
-	private MethodNode createNode(MethodDescriptor aDescriptor)
-	{
-		String[] theSignature = aDescriptor.getSignature();
-		
-		MethodNode theMethodNode = new MethodNode();
-		theMethodNode.name = theSignature[0];
-		theMethodNode.desc = theSignature[1];
-		theMethodNode.exceptions = Collections.EMPTY_LIST;
-		theMethodNode.access = Opcodes.ACC_PUBLIC;
-		theMethodNode.tryCatchBlocks = Collections.EMPTY_LIST;
-
-		return theMethodNode;
-	}
-	
-	private void addClass(ClassNode aClassNode)
-	{
-		ClassWriter theWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
-		aClassNode.accept(theWriter);
-		byte[] theBytecode = theWriter.toByteArray();
-		try
-		{
-			File f = new File("/home/gpothier/tmp/tod/gen/"+aClassNode.name+".class");
-			f.getParentFile().mkdirs();
-			FileOutputStream fos = new FileOutputStream(f);
-			fos.write(theBytecode);
-			fos.flush();
-			fos.close();
-		}
-		catch (FileNotFoundException e)
-		{
-			throw new RuntimeException(e);
-		}
-		catch (IOException e)
-		{
-			throw new RuntimeException(e);
-		}
-		String theName = aClassNode.name.replace('/', '.');
-		itsClassLoader.addClass(theName, theBytecode);
-	}
-	
-	/**
-	 * Create all methods with a body that throws {@link UnsupportedOperationException}.
-	 */
-	private void modifyReplayerFrame()
-	{
-		ClassNode theClassNode = getOriginalClass(BCIUtils.getJvmClassName(ReplayerFrame.class));
-		
-		for (MethodDescriptor theDescriptor : itsUsedDescriptors)
-		{
-			if (theDescriptor.itsArgSorts.length == 0) continue; // The methods with no args are already implemented in original source.
-			MethodNode theMethodNode = createNode(theDescriptor);
-			theMethodNode.maxStack = 0;
-			theMethodNode.maxLocals = 1;
-			
-			SList s = new SList();
-			s.createUnsupportedEx("ReplayerGenerator.modifyReplayerFrame");
-			s.ATHROW();
-			
-			theMethodNode.instructions = s;
-			theClassNode.methods.add(theMethodNode);
-		}
-
-		addClass(theClassNode);
-	}
-	
-	private void modifyUnmonitoredReplayerFrame()
-	{
-		itsUnmonitoredReplayerFrameClass = modifyUnmonitoredReplayerFrame(UnmonitoredReplayerFrame.class);
-	}
-	
-	private void modifyClassloaderWrapperReplayerFrame()
-	{
-		itsClassloaderWrapperReplayerFrameClass = modifyUnmonitoredReplayerFrame(ClassloaderWrapperReplayerFrame.class);
-	}
-	
-	/**
-	 * Override all the methods so that they all invoke {@link UnmonitoredReplayerFrame#replay()} and
-	 * return the appropriate result.
-	 */
-	private Class modifyUnmonitoredReplayerFrame(Class aClass)
-	{
-		String theClassName = BCIUtils.getJvmClassName(aClass);
-		ClassNode theClassNode = getOriginalClass(theClassName);
-		
-		for (MethodDescriptor theDescriptor : itsUsedDescriptors)
-		{
-			if (theDescriptor.itsArgSorts.length == 0) continue; // The methods with no args are already implemented in original source.
-			MethodNode theMethodNode = createNode(theDescriptor);
-			theMethodNode.maxStack = 0;
-			theMethodNode.maxLocals = 1;
-			
-			SList s = new SList();
-			s.ALOAD(0);
-			s.INVOKEVIRTUAL(theClassName, "replay", "()V");
-			
-			s.ALOAD(0);
-			switch(theDescriptor.getReturnSort())
-			{
-			case Type.OBJECT:
-			case Type.ARRAY:
-				s.GETFIELD(theClassName, "itsRefResult", MethodReplayerGenerator.TYPE_OBJECTID.getDescriptor());
-				s.ARETURN();
-				
-			case Type.BOOLEAN:
-			case Type.BYTE:
-			case Type.CHAR:
-			case Type.SHORT:
-			case Type.INT: 
-				s.GETFIELD(theClassName, "itsIntResult", "I");
-				s.IRETURN();
-				break;
-			
-			case Type.LONG:
-				s.GETFIELD(theClassName, "itsLongResult", "J");
-				s.LRETURN();
-				break;
-			
-			case Type.DOUBLE:
-				s.GETFIELD(theClassName, "itsDoubleResult", "D");
-				s.DRETURN();
-				break;
-				
-			case Type.FLOAT:
-				s.GETFIELD(theClassName, "itsFloatResult", "F");
-				s.FRETURN();
-				break;
-				
-			case Type.VOID:
-				s.RETURN();
-				break;
-
-			
-			default: throw new RuntimeException("Unexpected type: "+theDescriptor.getReturnSort());
-			}
-			
-			theMethodNode.instructions = s;
-			theClassNode.methods.add(theMethodNode);
-		}
-
-		addClass(theClassNode);
-		try
-		{
-			return itsClassLoader.loadClass(theClassName.replace('/', '.'));
-		}
-		catch (ClassNotFoundException e)
-		{
-			throw new RuntimeException(e);
-		}
-	}
-	
-	/**
-	 * Returns a set of all descriptors that are used by methods in the given database
-	 */
-	private Set<MethodDescriptor> getUsedDescriptors(IStructureDatabase aDatabase)
-	{
-		Set<MethodDescriptor> theResult = new HashSet<MethodDescriptor>();
-		IBehaviorInfo[] theBehaviors = aDatabase.getBehaviors();
-		for (IBehaviorInfo theBehavior : theBehaviors)
-		{
-			String theSignature = theBehavior.getSignature();
-			Type theReturnType = Type.getReturnType(theSignature);
-			Type[] theArgumentTypes = Type.getArgumentTypes(theSignature);
-			theResult.add(new MethodDescriptor(theBehavior.isStatic(), theReturnType, theArgumentTypes));
-		}
-		
-		return theResult;
-	}
-	
-	private ClassNode getOriginalClass(String aClassName)
-	{
-		try
-		{
-			InputStream theStream = getClass().getResourceAsStream("/"+aClassName+".class");
-			ClassNode theClassNode = new ClassNode();
-			ClassReader theReader = new ClassReader(theStream);
-			theReader.accept(theClassNode, 0);
-			
-			return theClassNode;
-		}
-		catch (IOException e)
-		{
-			throw new RuntimeException(e);
-		}
-	}
 	
 	public static final String REPLAYER_NAME_PREFIX = "$tod$replayer2$";
 
@@ -351,11 +135,11 @@ public class ReplayerGenerator
 					theMethodName, 
 					theMethodDesc).replace('/', '.');
 			
-			itsClassLoader.addClass(theReplayerName, theReplayerBytecode);
+			itsLoader.addClass(theReplayerName, theReplayerBytecode);
 			
 			try
 			{
-				theReplayerClass = itsClassLoader.loadClass(theReplayerName).asSubclass(InScopeReplayerFrame.class);
+				theReplayerClass = itsLoader.loadClass(theReplayerName).asSubclass(InScopeReplayerFrame.class);
 			}
 			catch (ClassNotFoundException e)
 			{
@@ -385,145 +169,11 @@ public class ReplayerGenerator
 
 	public UnmonitoredReplayerFrame createUnmonitoredFrame()
 	{
-		try
-		{
-			return itsUnmonitoredReplayerFrameClass.newInstance();
-		}
-		catch (Exception e)
-		{
-			throw new RuntimeException(e);
-		}
-		
+		return new UnmonitoredReplayerFrame();
 	}
 	
 	public ClassloaderWrapperReplayerFrame createClassloaderWrapperFrame()
 	{
-		try
-		{
-			return itsClassloaderWrapperReplayerFrameClass.newInstance();
-		}
-		catch (Exception e)
-		{
-			throw new RuntimeException(e);
-		}
-		
+		return new ClassloaderWrapperReplayerFrame();
 	}
-	
-	
-	/**
-	 * Represents a method descriptor (argument types).
-	 * Properly implements equals and hashCode.
-	 * @author gpothier
-	 */
-	private static class MethodDescriptor
-	{
-		private final boolean itsStatic;
-		private final byte[] itsArgSorts;
-		private final byte itsReturnSort;
-		private String[] itsSignature;
-		
-		public MethodDescriptor(boolean aStatic, Type aReturnType, Type... aArgTypes)
-		{
-			itsStatic = aStatic;
-			itsReturnSort = getSort(aReturnType);
-			
-			itsArgSorts = new byte[aArgTypes.length];
-			for(int i=0;i<aArgTypes.length;i++) itsArgSorts[i] = getSort(aArgTypes[i]);
-		}
-		
-		public byte getReturnSort()
-		{
-			return itsReturnSort;
-		}
-		
-		private static byte getSort(Type aType)
-		{
-			int theSort = MethodReplayerGenerator.ACTUALTYPE_FOR_SORT[aType.getSort()].getSort();
-			assert theSort <= Byte.MAX_VALUE;
-			return (byte) theSort;
-		}
-		
-		/**
-		 * Returns the signature for the generated method corresponding to this descriptor.
-		 */
-		public String[] getSignature()
-		{
-			if (itsSignature == null)
-			{
-				Type theReturnType = MethodReplayerGenerator.ACTUALTYPE_FOR_SORT[itsReturnSort];
-				int theStaticInc = itsStatic ? 0 : 1;
-				Type[] theArgTypes = new Type[itsArgSorts.length+theStaticInc];
-				if (! itsStatic) theArgTypes[0] = MethodReplayerGenerator.TYPE_OBJECTID;
-				for(int i=theStaticInc;i<theArgTypes.length;i++) theArgTypes[i] = 
-					MethodReplayerGenerator.ACTUALTYPE_FOR_SORT[itsArgSorts[i-theStaticInc]];
-				itsSignature = MethodReplayerGenerator.getInvokeMethodSignature(itsStatic, theArgTypes, theReturnType);
-			}
-			return itsSignature;
-		}
-
-		@Override
-		public int hashCode()
-		{
-			final int prime = 31;
-			int result = 1;
-			result = prime * result + Arrays.hashCode(itsArgSorts);
-			result = prime * result + itsReturnSort;
-			result = prime * result + (itsStatic ? 1231 : 1237);
-			return result;
-		}
-
-		@Override
-		public boolean equals(Object obj)
-		{
-			if (this == obj) return true;
-			if (obj == null) return false;
-			if (getClass() != obj.getClass()) return false;
-			MethodDescriptor other = (MethodDescriptor) obj;
-			if (!Arrays.equals(itsArgSorts, other.itsArgSorts)) return false;
-			if (itsReturnSort != other.itsReturnSort) return false;
-			if (itsStatic != other.itsStatic) return false;
-			return true;
-		}
-
-
-		@Override
-		public String toString()
-		{
-			String[] theSignature = getSignature();
-			return theSignature[0]+theSignature[1];
-		}
-	}
-	
-	private class GeneratorClassLoader extends ClassLoader
-	{
-		private final ClassLoader itsParent;
-		private final Map<String, byte[]> itsClassesMap = new HashMap<String, byte[]>();
-
-		public GeneratorClassLoader(ClassLoader aParent)
-		{
-			itsParent = aParent;
-		}
-		
-		public void addClass(String aName, byte[] aBytecode)
-		{
-			itsClassesMap.put(aName, aBytecode);
-		}
-
-		@Override
-		public Class loadClass(String aName) throws ClassNotFoundException
-		{
-			byte[] theBytecode = itsClassesMap.get(aName);
-			if (theBytecode != null) 
-			{
-				System.out.println("Loading (def): "+aName);
-				return super.defineClass(aName, theBytecode, 0, theBytecode.length);
-			}
-			else 
-			{
-				System.out.println("Loading (par): "+aName);
-				return itsParent.loadClass(aName);
-			}
-		}
-	}
-
 }

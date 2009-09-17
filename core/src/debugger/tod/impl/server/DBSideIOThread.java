@@ -43,6 +43,7 @@ import java.util.List;
 import tod.core.config.TODConfig;
 import tod.core.database.structure.IStructureDatabase;
 import tod.impl.database.structure.standard.StructureDatabaseUtils;
+import tod.impl.replay2.ReplayerWrapper;
 import tod.impl.replay2.ThreadReplayer;
 import tod.impl.replay.TmpIdManager;
 import tod2.agent.Message;
@@ -193,7 +194,7 @@ public class DBSideIOThread
 		private final TmpIdManager itsTmpIdManager;
 		
 		private BufferStream itsStream;
-		private ThreadReplayer itsReplayer;
+		private ReplayerWrapper itsReplayer;
 		
 		public ThreadReplayerThread(
 				TODConfig aConfig, 
@@ -213,7 +214,7 @@ public class DBSideIOThread
 			if (itsStream == null)
 			{
 				itsStream = new BufferStream(theBuffer);
-				itsReplayer = new ThreadReplayer(itsConfig, itsDatabase, itsTmpIdManager, itsStream);
+				itsReplayer = new ReplayerWrapper(itsConfig, itsDatabase, itsTmpIdManager, itsStream);
 				start();
 			}
 			else

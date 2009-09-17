@@ -31,12 +31,19 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.replay2;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
 import gnu.trove.TByteArrayList;
 
 import org.objectweb.asm.Type;
 
 import tod.core.config.TODConfig;
+import tod.core.database.browser.LocationUtils;
+import tod.core.database.structure.IBehaviorInfo;
 import tod.core.database.structure.IStructureDatabase;
+import tod.core.database.structure.ITypeInfo;
 import tod.core.database.structure.ObjectId;
 import tod.core.database.structure.IStructureDatabase.BehaviorMonitoringModeChange;
 import tod.impl.replay.IntDeltaReceiver;
@@ -71,12 +78,15 @@ public class ThreadReplayer
 	 */
 	private final TByteArrayList itsMonitoringModes = new TByteArrayList();
 	private int itsCurrentMonitoringModeVersion = 0;
+	
+	private final List<Type> itsBehaviorReturnTypes = new ArrayList<Type>();
 
 	private ExceptionInfo itsLastException;
 	
 	private final ReplayerGenerator itsGenerator;
 	
 	public ThreadReplayer(
+			ReplayerLoader aLoader,
 			TODConfig aConfig, 
 			IStructureDatabase aDatabase, 
 			TmpIdManager aTmpIdManager,
@@ -86,12 +96,13 @@ public class ThreadReplayer
 		itsDatabase = aDatabase;
 		itsTmpIdManager = aTmpIdManager;
 		itsStream = aBuffer;
-		itsGenerator = new ReplayerGenerator(itsConfig, itsDatabase);
+		itsGenerator = new ReplayerGenerator(aLoader, itsConfig, itsDatabase);
 	}
 	
 	public void replay()
 	{
-		createUnmonitoredFrame(null).invokeVoid();		
+		System.out.println("ReplayerFrame: "+Arrays.asList(ReplayerFrame.class.getDeclaredMethods()));
+		createUnmonitoredFrame(null, null).invokeVoid();		
 	}
 	
 	public IStructureDatabase getDatabase()
@@ -115,7 +126,7 @@ public class ThreadReplayer
 	private byte nextMessage()
 	{
 		byte theMessage = itsStream.get();
-		if (ECHO) echo("Message: %s [#%d @%d]", Message._NAMES[theMessage], itsMessageCount, itsStream.position());
+		if (ECHO) echo("Message: %s [#%d @%d]", Message._NAMES[theMessage], itsMessageCount++, itsStream.position());
 		return theMessage;
 	}
 	
@@ -205,6 +216,20 @@ public class ThreadReplayer
 		else return itsMonitoringModes.getQuick(aBehaviorId);
 	}
 	
+	public Type getBehaviorReturnType(int aBehaviorId)
+	{
+		Type theType = Utils.listGet(itsBehaviorReturnTypes, aBehaviorId);
+		if (theType == null)
+		{
+			IBehaviorInfo theBehavior = getDatabase().getBehavior(aBehaviorId, true);
+			String theSignature = theBehavior.getSignature();
+			theType = Type.getReturnType(theSignature);
+			Utils.listSet(itsBehaviorReturnTypes, aBehaviorId, theType);
+		}
+		
+		return theType;
+	}
+	
 	private void processRegisterObject(BufferStream aBuffer)
 	{
 		int theDataSize = aBuffer.getInt();
@@ -268,10 +293,10 @@ public class ThreadReplayer
 		throw new UnsupportedOperationException();
 	}
 	
-	public UnmonitoredReplayerFrame createUnmonitoredFrame(ReplayerFrame aParent)
+	public UnmonitoredReplayerFrame createUnmonitoredFrame(ReplayerFrame aParent, Type aReturnType)
 	{
 		UnmonitoredReplayerFrame theFrame = itsGenerator.createUnmonitoredFrame();
-		theFrame.setup(this, itsStream, aParent instanceof InScopeReplayerFrame, null);
+		theFrame.setup(this, itsStream, aParent instanceof InScopeReplayerFrame, aReturnType);
 		return theFrame;
 	}
 	

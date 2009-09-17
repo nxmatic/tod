@@ -84,6 +84,11 @@ public abstract class ReplayerFrame
 		return itsReplayer.getNextMessage();
 	}
 	
+	protected byte peekNextMessage()
+	{
+		return itsReplayer.peekNextMessage();
+	}
+	
 	/**
 	 * Whether the next message will be an exception.
 	 * This method only peeks the next message.

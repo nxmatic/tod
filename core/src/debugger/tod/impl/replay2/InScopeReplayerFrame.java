@@ -61,18 +61,28 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 		itsReturnType = Type.getReturnType(aDescriptor);
 	}
 	
+	private void processException()
+	{
+		readException();
+		byte m = super.getNextMessage();
+		if (m == Message.HANDLER_REACHED) throw new HandlerReachedException(readInt());
+		else if (m == Message.INSCOPE_BEHAVIOR_EXIT_EXCEPTION) throw new BehaviorExitException();
+		else throw new UnexpectedMessageException(m);
+	}
+	
 	@Override
 	protected byte getNextMessage()
 	{
 		byte m = super.getNextMessage();
-		if (m == Message.EXCEPTION)
-		{
-			readException();
-			m = super.getNextMessage();
-			if (m == Message.HANDLER_REACHED) throw new HandlerReachedException(readInt());
-			else if (m == Message.INSCOPE_BEHAVIOR_EXIT_EXCEPTION) throw new BehaviorExitException();
-			else throw new UnexpectedMessageException(m);
-		}
+		if (m == Message.EXCEPTION) processException();
+		return m;
+	}
+	
+	@Override
+	protected byte peekNextMessage()
+	{
+		byte m = super.peekNextMessage();
+		if (m == Message.EXCEPTION) processException();
 		return m;
 	}
 	
@@ -135,15 +145,17 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 		loop:
 		while(true)
 		{
-			theMessage = getNextMessage();
+			theMessage = peekNextMessage();
 			switch(theMessage)
 			{
 			case Message.CLASSLOADER_ENTER:
+				getNextMessage();
 				invokeClassloader();
 				break;
 				
 			case Message.INSCOPE_CLINIT_ENTER:
 			{
+				getNextMessage();
 				int theBehaviorId = readInt();
 				InScopeReplayerFrame theReplayer = getReplayer().createInScopeFrame(this, theBehaviorId);
 				theReplayer.invokeVoid();
@@ -152,6 +164,7 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 				
 			case Message.OUTOFSCOPE_CLINIT_ENTER:
 			{
+				getNextMessage();
 				EnveloppeReplayerFrame theReplayer = getReplayer().createEnveloppeFrame(this);
 				theReplayer.invokeVoid();
 				break;
@@ -168,7 +181,7 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 			return invokeMonitored(theMessage);
 			
 		case MonitoringMode.NONE:
-			return invokeUnmonitored(theMessage);
+			return invokeUnmonitored(theMessage, aBehaviorId);
 			
 		default:
 			throw new RuntimeException("Not handled: "+theMode);
@@ -181,26 +194,29 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 		{
 			case Message.INSCOPE_BEHAVIOR_ENTER:
 			{
+				getNextMessage();
 				int theBehaviorId = getReplayer().getBehIdReceiver().receiveFull(getStream());
 				return getReplayer().createInScopeFrame(this, theBehaviorId);
 			}
 				
 			case Message.INSCOPE_BEHAVIOR_ENTER_DELTA:
 			{
+				getNextMessage();
 				int theBehaviorId = getReplayer().getBehIdReceiver().receiveDelta(getStream());
 				return getReplayer().createInScopeFrame(this, theBehaviorId);
 			}
 
 			case Message.OUTOFSCOPE_BEHAVIOR_ENTER:
+				getNextMessage();
 				return getReplayer().createEnveloppeFrame(this);
 				
 			default: throw new UnexpectedMessageException(aMessage);
 		}
 	}
 	
-	private ReplayerFrame invokeUnmonitored(byte aMessage)
+	private ReplayerFrame invokeUnmonitored(byte aMessage, int aBehaviorId)
 	{
-		return getReplayer().createUnmonitoredFrame(this);
+		return getReplayer().createUnmonitoredFrame(this, getReplayer().getBehaviorReturnType(aBehaviorId));
 	}
 	
 	protected ObjectId nextTmpId()
