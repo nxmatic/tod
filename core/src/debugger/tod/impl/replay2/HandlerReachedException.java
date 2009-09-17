@@ -31,6 +31,7 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.replay2;
 
+import tod.core.database.structure.ObjectId;
 import tod2.agent.Message;
 
 /**
@@ -38,12 +39,15 @@ import tod2.agent.Message;
  * that proper dispatch can be performed.
  * @author gpothier
  */
+@SuppressWarnings("serial")
 public class HandlerReachedException extends RuntimeException
 {
+	public final ObjectId exception;
 	public final int handlerId;
 
-	public HandlerReachedException(int aHandlerId)
+	public HandlerReachedException(ObjectId aException, int aHandlerId)
 	{
+		exception = aException;
 		handlerId = aHandlerId;
 	}
 }

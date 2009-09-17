@@ -36,6 +36,7 @@ import org.objectweb.asm.Type;
 import tod.core.database.structure.ObjectId;
 import tod2.agent.Message;
 import tod2.agent.MonitoringMode;
+import zz.utils.Utils;
 
 public abstract class InScopeReplayerFrame extends ReplayerFrame
 {
@@ -54,6 +55,7 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 			int aAccess, 
 			String aDescriptor)
 	{
+		System.out.println("InScopeReplayerFrame.InScopeReplayerFrame(): "+aName);
 		itsName = aName;
 		itsAccess = aAccess;
 		
@@ -63,9 +65,9 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 	
 	private void processException()
 	{
-		readException();
+		ObjectId theException = readException();
 		byte m = super.getNextMessage();
-		if (m == Message.HANDLER_REACHED) throw new HandlerReachedException(readInt());
+		if (m == Message.HANDLER_REACHED) throw new HandlerReachedException(theException, readInt());
 		else if (m == Message.INSCOPE_BEHAVIOR_EXIT_EXCEPTION) throw new BehaviorExitException();
 		else throw new UnexpectedMessageException(m);
 	}
@@ -137,10 +139,6 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 	
 	protected ReplayerFrame invoke(int aBehaviorId)
 	{
-		int theMode = getReplayer().getBehaviorMonitoringMode(aBehaviorId);
-//		IBehaviorInfo theBehavior = getDatabase().getBehavior(aBehaviorId, true);
-//		Type theExpectedType = Type.getType(theBehavior.getReturnType().getJvmName());
-
 		byte theMessage = -1;
 		loop:
 		while(true)
@@ -174,6 +172,14 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 			}
 		}
 		
+		int theMode = getReplayer().getBehaviorMonitoringMode(aBehaviorId);
+		Utils.println(
+				"InScopeReplayerFrame.invoke(): [%s] (%d) %s", 
+				MonitoringMode.toString(theMode), 
+				aBehaviorId,
+				getReplayer().getDatabase().getBehavior(aBehaviorId, true));
+		
+
 		switch(theMode)
 		{
 		case MonitoringMode.FULL:

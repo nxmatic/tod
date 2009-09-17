@@ -224,6 +224,7 @@ public class ThreadReplayer
 			IBehaviorInfo theBehavior = getDatabase().getBehavior(aBehaviorId, true);
 			String theSignature = theBehavior.getSignature();
 			theType = Type.getReturnType(theSignature);
+			theType = MethodReplayerGenerator.getActualType(theType);
 			Utils.listSet(itsBehaviorReturnTypes, aBehaviorId, theType);
 		}
 		

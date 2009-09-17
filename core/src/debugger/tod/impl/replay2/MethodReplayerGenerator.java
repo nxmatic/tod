@@ -353,6 +353,9 @@ public class MethodReplayerGenerator
 		
 		if (nHandlers > 0)
 		{
+			s.DUP();
+			s.GETFIELD(CLS_HANDLERREACHED, "exception", BCIUtils.DSC_OBJECTID);
+			s.SWAP();
 			s.GETFIELD(CLS_HANDLERREACHED, "handlerId", "I");
 			
 			Set<Label> theProcessedLabels = new HashSet<Label>();
@@ -638,15 +641,23 @@ public class MethodReplayerGenerator
 	{
 		List<Type> theArgTypes = new ArrayList<Type>();
 		if (! aStatic) theArgTypes.add(ACTUALTYPE_FOR_SORT[Type.OBJECT]); // First arg is the target
-		for (Type theType : aArgTypes) theArgTypes.add(ACTUALTYPE_FOR_SORT[theType.getSort()]);
+		for (Type theType : aArgTypes) theArgTypes.add(getActualType(theType));
 		
 		return new String[] {
 				"invoke"+SUFFIX_FOR_SORT[aReturnType.getSort()],
 				Type.getMethodDescriptor(
-						ACTUALTYPE_FOR_SORT[aReturnType.getSort()], 
+						getActualType(aReturnType), 
 						theArgTypes.toArray(new Type[theArgTypes.size()]))
 						
 		};
+	}
+	
+	/**
+	 * Returns the actual type to use for the given type (all refs are folded into ObjectId)
+	 */
+	public static Type getActualType(Type aType)
+	{
+		return ACTUALTYPE_FOR_SORT[aType.getSort()];
 	}
 	
 	public static final Type[] ACTUALTYPE_FOR_SORT = new Type[11];

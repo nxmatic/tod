@@ -44,6 +44,9 @@ public class UnmonitoredReplayerFrame extends ReplayerFrame
 	private float itsFloatResult;
 	private double itsDoubleResult;
 	
+	private byte itsLastMessage;
+	private ObjectId itsLastException;
+	
 	protected void replay()
 	{
 		while(true)
@@ -65,7 +68,7 @@ public class UnmonitoredReplayerFrame extends ReplayerFrame
 		{
 		case Message.EXCEPTION:
 		{
-			readException();
+			itsLastException = readException();
 			break;
 		}
 		
@@ -84,11 +87,17 @@ public class UnmonitoredReplayerFrame extends ReplayerFrame
 
 		case Message.UNMONITORED_BEHAVIOR_CALL_RESULT: readResult(); return false;
 		case Message.UNMONITORED_BEHAVIOR_CALL_EXCEPTION: throw new BehaviorExitException();
-		case Message.HANDLER_REACHED: throw new HandlerReachedException(readInt());
+		
+		case Message.HANDLER_REACHED:
+			if (itsLastMessage != Message.EXCEPTION) throw new IllegalStateException();
+			throw new HandlerReachedException(itsLastException, readInt());
+			
 		case Message.INSCOPE_BEHAVIOR_EXIT_EXCEPTION: throw new BehaviorExitException();
 		
 		default: throw new RuntimeException("Command not handled: "+Message._NAMES[aMessage]);
 		}
+	
+		itsLastMessage = aMessage;
 		
 		return true;
 	}
@@ -158,6 +167,9 @@ public class UnmonitoredReplayerFrame extends ReplayerFrame
 		case Type.FLOAT:
 			itsFloatResult = readFloat();
 			break;
+			
+		case Type.OBJECT:
+			itsRefResult = readRef();
 			
 		case Type.VOID:
 			break;

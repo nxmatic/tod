@@ -337,7 +337,7 @@ public class ReplayerWrapper
 		
 		private static byte getSort(Type aType)
 		{
-			int theSort = MethodReplayerGenerator.ACTUALTYPE_FOR_SORT[aType.getSort()].getSort();
+			int theSort = MethodReplayerGenerator.getActualType(aType).getSort();
 			assert theSort <= Byte.MAX_VALUE;
 			return (byte) theSort;
 		}
@@ -350,11 +350,9 @@ public class ReplayerWrapper
 			if (itsSignature == null)
 			{
 				Type theReturnType = MethodReplayerGenerator.ACTUALTYPE_FOR_SORT[itsReturnSort];
-				int theStaticInc = itsStatic ? 0 : 1;
-				Type[] theArgTypes = new Type[itsArgSorts.length+theStaticInc];
-				if (! itsStatic) theArgTypes[0] = MethodReplayerGenerator.TYPE_OBJECTID;
-				for(int i=theStaticInc;i<theArgTypes.length;i++) theArgTypes[i] = 
-					MethodReplayerGenerator.ACTUALTYPE_FOR_SORT[itsArgSorts[i-theStaticInc]];
+				Type[] theArgTypes = new Type[itsArgSorts.length];
+				for(int i=0;i<theArgTypes.length;i++) theArgTypes[i] = 
+					MethodReplayerGenerator.ACTUALTYPE_FOR_SORT[itsArgSorts[i]];
 				itsSignature = MethodReplayerGenerator.getInvokeMethodSignature(itsStatic, theArgTypes, theReturnType);
 			}
 			return itsSignature;
