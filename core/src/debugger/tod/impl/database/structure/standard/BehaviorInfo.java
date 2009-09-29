@@ -85,7 +85,7 @@ public class BehaviorInfo extends MemberInfo implements IMutableBehaviorInfo
 		
 		if ("<init>".equals(getName())) itsBehaviourKind = BehaviorKind.CONSTRUCTOR;
 		else if ("<clinit>".equals(getName())) itsBehaviourKind = BehaviorKind.STATIC_INIT;
-		else if (isStatic()) itsBehaviourKind = BehaviorKind.STATIC_METHOD;
+		else if (aStatic) itsBehaviourKind = BehaviorKind.STATIC_METHOD;
 		else itsBehaviourKind = BehaviorKind.METHOD;
 		
 //		System.out.println(String.format(

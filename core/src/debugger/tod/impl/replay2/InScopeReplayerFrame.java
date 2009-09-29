@@ -55,7 +55,7 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 			int aAccess, 
 			String aDescriptor)
 	{
-		System.out.println("InScopeReplayerFrame.InScopeReplayerFrame(): "+aName);
+		if (ThreadReplayer.ECHO) System.out.println("InScopeReplayerFrame.InScopeReplayerFrame(): "+aName);
 		itsName = aName;
 		itsAccess = aAccess;
 		
@@ -91,7 +91,7 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 	protected void invokeClassloader()
 	{
 		ClassloaderWrapperReplayerFrame theChild = getReplayer().createClassloaderFrame(this);
-		theChild.invokeVoid();
+		theChild.invoke_OOS();
 	}
 	
 	protected void expectException()
@@ -110,6 +110,19 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 			else throw new UnexpectedMessageException(m);
 		}
 	}
+	
+	protected ObjectId expectNewArray()
+	{
+		while(true)
+		{
+			byte m = getNextMessage();
+			if (m == Message.NEW_ARRAY) return readRef();
+			else if (m == Message.CLASSLOADER_ENTER) invokeClassloader();
+			else throw new UnexpectedMessageException(m);
+		}
+	}
+	
+
 	
 	/**
 	 * Note: can't read the value here as the type is not static
@@ -156,15 +169,15 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 				getNextMessage();
 				int theBehaviorId = readInt();
 				InScopeReplayerFrame theReplayer = getReplayer().createInScopeFrame(this, theBehaviorId);
-				theReplayer.invokeVoid();
+				theReplayer.invokeVoid_S();
 				break;
 			}
 				
 			case Message.OUTOFSCOPE_CLINIT_ENTER:
 			{
 				getNextMessage();
-				EnveloppeReplayerFrame theReplayer = getReplayer().createEnveloppeFrame(this);
-				theReplayer.invokeVoid();
+				EnveloppeReplayerFrame theReplayer = getReplayer().createEnveloppeFrame(this, null);
+				theReplayer.invokeVoid_S();
 				break;
 			}
 			
@@ -173,7 +186,7 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 		}
 		
 		int theMode = getReplayer().getBehaviorMonitoringMode(aBehaviorId);
-		Utils.println(
+		if (ThreadReplayer.ECHO) Utils.println(
 				"InScopeReplayerFrame.invoke(): [%s] (%d) %s", 
 				MonitoringMode.toString(theMode), 
 				aBehaviorId,
@@ -184,7 +197,7 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 		{
 		case MonitoringMode.FULL:
 		case MonitoringMode.ENVELOPPE:
-			return invokeMonitored(theMessage);
+			return invokeMonitored(theMessage, aBehaviorId);
 			
 		case MonitoringMode.NONE:
 			return invokeUnmonitored(theMessage, aBehaviorId);
@@ -194,7 +207,7 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 		}
 	}
 	
-	private ReplayerFrame invokeMonitored(byte aMessage)
+	private ReplayerFrame invokeMonitored(byte aMessage, int aBehaviorId)
 	{
 		switch(aMessage)
 		{
@@ -214,7 +227,7 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 
 			case Message.OUTOFSCOPE_BEHAVIOR_ENTER:
 				getNextMessage();
-				return getReplayer().createEnveloppeFrame(this);
+				return getReplayer().createEnveloppeFrame(this, getReplayer().getBehaviorReturnType(aBehaviorId));
 				
 			default: throw new UnexpectedMessageException(aMessage);
 		}

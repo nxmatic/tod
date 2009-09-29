@@ -22,9 +22,13 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 */
 package java.tod;
 
+import java.tod.io._IO;
 import java.tod.util._BitSet;
 import java.tod.util._ByteArray;
+import java.tod.util._StringBuilder;
 
+import tod2.agent.AgentDebugFlags;
+import tod2.agent.Message;
 import tod2.agent.MonitoringMode;
 
 /**
@@ -60,9 +64,20 @@ public class TracedMethods
 		{
 			if (tracedA == null) tracedA = new _ByteArray(16384);
 			tracedA.set(aId, (byte) aMode);
+			if (AgentDebugFlags.EVENT_LOG) echoSetMode(aId, aMode);
 		}
 		
 		version++;
+	}
+	
+	private static void echoSetMode(int aId, int aMode)
+	{
+		_StringBuilder theBuilder = new _StringBuilder();
+		theBuilder.append("Set mode: ");
+		theBuilder.append(aId);
+		theBuilder.append(" -> ");
+		theBuilder.append(aMode);
+		_IO.out(theBuilder.toString());	
 	}
 	
 	/**

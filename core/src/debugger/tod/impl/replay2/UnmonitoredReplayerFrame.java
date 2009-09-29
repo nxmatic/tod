@@ -92,7 +92,7 @@ public class UnmonitoredReplayerFrame extends ReplayerFrame
 			if (itsLastMessage != Message.EXCEPTION) throw new IllegalStateException();
 			throw new HandlerReachedException(itsLastException, readInt());
 			
-		case Message.INSCOPE_BEHAVIOR_EXIT_EXCEPTION: throw new BehaviorExitException();
+		case Message.INSCOPE_BEHAVIOR_EXIT_EXCEPTION: throw new BehaviorExitException(); 
 		
 		default: throw new RuntimeException("Command not handled: "+Message._NAMES[aMessage]);
 		}
@@ -110,7 +110,7 @@ public class UnmonitoredReplayerFrame extends ReplayerFrame
 	
 	private void evOutOfScopeBehaviorEnter()
 	{
-		EnveloppeReplayerFrame theChild = getReplayer().createEnveloppeFrame(this);
+		EnveloppeReplayerFrame theChild = getReplayer().createEnveloppeFrame(this, null);
 		theChild.invoke_OOS();
 	}
 	
@@ -122,17 +122,17 @@ public class UnmonitoredReplayerFrame extends ReplayerFrame
 	
 	private void evOutOfScopeClinitEnter()
 	{
-		EnveloppeReplayerFrame theChild = getReplayer().createEnveloppeFrame(this);
+		EnveloppeReplayerFrame theChild = getReplayer().createEnveloppeFrame(this, null);
 		theChild.invoke_OOS();
 	}
 	
 	private void evClassloaderEnter()
 	{
 		ClassloaderWrapperReplayerFrame theChild = getReplayer().createClassloaderFrame(this);
-		theChild.invokeVoid();
+		theChild.invoke_OOS();
 	}
 
-	private void readResult()
+	protected void readResult()
 	{
 		switch(getReturnType().getSort())
 		{
@@ -178,45 +178,81 @@ public class UnmonitoredReplayerFrame extends ReplayerFrame
 		}
 	}
 	
-	@Override
 	public double invokeDouble()
 	{
 		replay();
 		return itsDoubleResult;
 	}
 
-	@Override
+	public double invokeDouble_S()
+	{
+		replay();
+		return itsDoubleResult;
+	}
+	
 	public float invokeFloat()
 	{
 		replay();
 		return itsFloatResult;
 	}
 
-	@Override
+	public float invokeFloat_S()
+	{
+		replay();
+		return itsFloatResult;
+	}
+	
 	public int invokeInt()
 	{
 		replay();
 		return itsIntResult;
 	}
 
-	@Override
+	public int invokeInt_S()
+	{
+		replay();
+		return itsIntResult;
+	}
+	
 	public long invokeLong()
 	{
 		replay();
 		return itsLongResult;
 	}
 
-	@Override
+	public long invokeLong_S()
+	{
+		replay();
+		return itsLongResult;
+	}
+	
 	public ObjectId invokeRef()
 	{
 		replay();
 		return itsRefResult;
 	}
 
-	@Override
+	public ObjectId invokeRef_S()
+	{
+		replay();
+		return itsRefResult;
+	}
+	
 	public void invokeVoid()
 	{
 		replay();
 	}
 	
+	@Override
+	public void invokeVoid_S()
+	{
+		replay();
+	}
+	
+	@Override
+	public void invoke_OOS()
+	{
+		replay();
+	}
+
 }

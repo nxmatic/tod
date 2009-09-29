@@ -50,7 +50,7 @@ public class SList extends SyntaxInsnList
 	public void createRTEx(String aMessage)
 	{
 		LDC(aMessage);
-		INVOKESTATIC(MethodReplayerGenerator.CLS_INSCOPEREPLAYERFRAME, "createRtEx", "(Ljava/lang/String;)Ljava/lang/Exception;");
+		INVOKESTATIC(MethodReplayerGenerator.CLS_REPLAYERFRAME, "createRtEx", "(Ljava/lang/String;)Ljava/lang/Exception;");
 	}
 
 	/**
@@ -59,7 +59,7 @@ public class SList extends SyntaxInsnList
 	public void createUnsupportedEx(String aMessage)
 	{
 		LDC(aMessage);
-		INVOKESTATIC(MethodReplayerGenerator.CLS_INSCOPEREPLAYERFRAME, "createUnsupportedEx", "(Ljava/lang/String;)Ljava/lang/Exception;");
+		INVOKESTATIC(MethodReplayerGenerator.CLS_REPLAYERFRAME, "createUnsupportedEx", "(Ljava/lang/String;)Ljava/lang/Exception;");
 	}
 	
 	/**
@@ -69,7 +69,7 @@ public class SList extends SyntaxInsnList
 	public void createRTExArg(String aMessage)
 	{
 		LDC(aMessage);
-		INVOKESTATIC(MethodReplayerGenerator.CLS_INSCOPEREPLAYERFRAME, "createRtEx", "(ILjava/lang/String;)Ljava/lang/Exception;");
+		INVOKESTATIC(MethodReplayerGenerator.CLS_REPLAYERFRAME, "createRtEx", "(ILjava/lang/String;)Ljava/lang/Exception;");
 	}
 	
 	public void invokeReadRef()

@@ -29,44 +29,100 @@ POSSIBILITY OF SUCH DAMAGE.
 Parts of this work rely on the MD5 algorithm "derived from the RSA Data Security, 
 Inc. MD5 Message-Digest Algorithm".
 */
-package tod.impl.replay2;
+package tod.experiments.bench;
 
-import com.sun.xml.internal.ws.org.objectweb.asm.Type;
+import tod.BenchBase;
+import tod.BenchBase.BenchResults;
 
-import tod2.agent.Message;
-
-public class EnveloppeReplayerFrame extends UnmonitoredReplayerFrame
+public class SpreadCondition
 {
-	@Override
-	protected boolean replay(byte aMessage)
+	private static final int N = 1000000;
+	private static volatile boolean B = "true".startsWith("t");
+	
+	public static void main(String[] args)
 	{
-		switch(aMessage)
+		int k = 0;
+		for(int i=0;i<N;i++) k+=foo1(0, B);
+		BenchResults b0 = BenchBase.benchmark(new Runnable()
 		{
-		case Message.UNMONITORED_BEHAVIOR_CALL_RESULT:
-		case Message.UNMONITORED_BEHAVIOR_CALL_EXCEPTION:
-		case Message.HANDLER_REACHED:
-		case Message.INSCOPE_BEHAVIOR_EXIT_EXCEPTION:
-			throw new RuntimeException("Command not handled: "+Message._NAMES[aMessage]);
-			
-		case Message.OUTOFSCOPE_BEHAVIOR_EXIT_NORMAL:
-			checkResult();
-			return false;
-			
-		case Message.OUTOFSCOPE_BEHAVIOR_EXIT_EXCEPTION:
-			throw new BehaviorExitException();
+			public void run()
+			{
+				int k = 0;
+				for(int i=0;i<N;i++) k+=foo1(0, B);
+			}
+		});
+		System.out.println(b0);
+	
+		k = 0;
+		for(int i=0;i<N;i++) k+=foo2(0);
+		BenchResults b1 = BenchBase.benchmark(new Runnable()
+		{
+			public void run()
+			{
+				int k = 0;
+				for(int i=0;i<N;i++) k+=foo2(0);
+			}
+		});
+		System.out.println(b1);
 		
-		default: 
-			return super.replay(aMessage);
-		}
+		System.out.println(l);
 	}
-
-	private void checkResult()
+	
+	public static int foo1(int i, boolean b)
 	{
-		if (isFromScope() && getReturnType().getSort() != Type.VOID)
+		int j = i*2;
+		for(int k=0;k<1000;k++)
 		{
-			byte m = getNextMessage();
-			if (m != Message.OUTOFSCOPE_BEHAVIOR_EXIT_RESULT) throw new IllegalStateException();
-			readResult();
+			if (b) log();
+			j = bar2(i, j);
+			if (b) log();
+			i = bar1(j);
+			if (b) log();
+			j = bar2(i, j);
+			if (b) log();
+			i = bar1(j);
+			if (b) log();
+			j = bar2(i, j);
+			if (b) log();
+			i = bar1(j);
+			if (b) log();
+			j = bar2(i, j);
+			if (b) log();
+			i = bar1(j);
+			if (b) log();
+			j = bar2(i, j);
+			if (b) log();
+			i = bar1(j);
+			if (b) log();
 		}
-	}	
+		return i+j;
+	}
+	
+	public static int foo2(int i)
+	{
+		int j = i*2;
+		for(int k=0;k<1000;k++)
+		{
+			j = bar2(i, j);
+			i = bar1(j);
+		}
+		return i+j;
+	}
+	
+	public static int bar1(int i)
+	{
+		return i*4;
+	}
+	
+	public static int bar2(int i, int j)
+	{
+		return i*j-2;
+	}
+	
+	private static int l = 0;
+	
+	public static void log()
+	{
+		l++;
+	}
 }

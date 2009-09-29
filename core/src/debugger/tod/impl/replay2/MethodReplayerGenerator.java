@@ -130,6 +130,7 @@ public class MethodReplayerGenerator
 
 		itsTarget = new ClassNode();
 		itsTarget.name = ReplayerGenerator.makeReplayerClassName(itsClassNode.name, itsMethodNode.name, itsMethodNode.desc);
+		itsTarget.sourceFile = itsTarget.name+".class";
 		itsTarget.superName = CLS_INSCOPEREPLAYERFRAME;
 		itsTarget.methods.add(itsMethodNode);
 		itsTarget.version = Opcodes.V1_5;
@@ -242,7 +243,7 @@ public class MethodReplayerGenerator
 			e.printStackTrace();
 		}
 		
-		BCIUtils.writeClass(getConfig().get(TODConfig.CLASS_CACHE_PATH)+"/replayer", itsTarget, theBytecode);
+		BCIUtils.writeClass("/home/gpothier/tmp/tod/replayer", itsTarget, theBytecode);
 		return theBytecode;
 	}
 	
@@ -598,8 +599,10 @@ public class MethodReplayerGenerator
 		
 		if (theExpectObjectInitialized)
 		{
+			s.DUP();
 			s.ALOAD(0);
-			s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "waitObjectInitialized", "()V");
+			s.SWAP();
+			s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "waitObjectInitialized", "("+DSC_OBJECTID+")V");
 		}
 		else if (theChainingInvocation)
 		{
@@ -644,7 +647,7 @@ public class MethodReplayerGenerator
 		for (Type theType : aArgTypes) theArgTypes.add(getActualType(theType));
 		
 		return new String[] {
-				"invoke"+SUFFIX_FOR_SORT[aReturnType.getSort()],
+				"invoke"+SUFFIX_FOR_SORT[aReturnType.getSort()]+(aStatic ? "_S" : ""),
 				Type.getMethodDescriptor(
 						getActualType(aReturnType), 
 						theArgTypes.toArray(new Type[theArgTypes.size()]))
@@ -709,7 +712,7 @@ public class MethodReplayerGenerator
 		SList s = new SList();
 		
 		s.ALOAD(0);
-		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "nextTmpId", "()"+BCIUtils.DSC_OBJECTID);
+		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "expectNewArray", "()"+BCIUtils.DSC_OBJECTID);
 		
 		aInsns.insert(aNode, s);
 		aInsns.remove(aNode);
@@ -763,6 +766,8 @@ public class MethodReplayerGenerator
 		Label lDefault = new Label();
 		Label lEndIf = new Label();
 		
+		if (aNode.getOpcode() != Opcodes.GETSTATIC) s.POP(); // Pop target
+		
 		s.ALOAD(0);
 		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "getNextMessage", "()B");
 		s.LOOKUPSWITCH(
@@ -772,6 +777,11 @@ public class MethodReplayerGenerator
 		
 		s.label(lFieldValue);
 			s.invokeRead(theType);
+			if (theCacheSlot != null)
+			{
+				s.DUP(theType);
+				s.ISTORE(theType, theCacheSlot);
+			}
 			s.GOTO(lEndIf);
 		
 		s.label(lFieldValue_Same);
@@ -828,6 +838,9 @@ public class MethodReplayerGenerator
 		
 		SList s = new SList();
 
+		s.POP(); // Pop index
+		s.POP(); // Pop target
+		s.ALOAD(0);
 		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "expectArrayRead", "()V");
 		s.invokeRead(theType);
 		
@@ -838,6 +851,9 @@ public class MethodReplayerGenerator
 	private void processArrayLength(InsnList aInsns, InsnNode aNode)
 	{
 		SList s = new SList();
+
+		s.POP(); // Pop target
+		s.ALOAD(0);
 		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "expectArrayLength", "()I");
 		
 		aInsns.insert(aNode, s);

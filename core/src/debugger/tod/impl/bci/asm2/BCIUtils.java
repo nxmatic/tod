@@ -419,7 +419,6 @@ public class BCIUtils implements Opcodes
 		try
 		{
 			File theDir = new File(aRoot);
-			theDir = new File(theDir, "err");
 			theDir.mkdirs();
 
 			File theFile = new File(theDir, aNode.name.replace('/', '.') + ".class");

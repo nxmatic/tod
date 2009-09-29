@@ -155,6 +155,8 @@ public class ReplayerGenerator
 	
 	public InScopeReplayerFrame createInScopeFrame(int aBehaviorId)
 	{
+		IBehaviorInfo theBehavior = itsDatabase.getBehavior(aBehaviorId, true);
+		if (ThreadReplayer.ECHO) System.out.println("ReplayerGenerator.createInScopeFrame(): "+theBehavior);
 		Class<InScopeReplayerFrame> theClass = getReplayerClass(aBehaviorId);
 		try
 		{
@@ -170,6 +172,11 @@ public class ReplayerGenerator
 	public UnmonitoredReplayerFrame createUnmonitoredFrame()
 	{
 		return new UnmonitoredReplayerFrame();
+	}
+	
+	public EnveloppeReplayerFrame createEnveloppeFrame()
+	{
+		return new EnveloppeReplayerFrame();
 	}
 	
 	public ClassloaderWrapperReplayerFrame createClassloaderWrapperFrame()

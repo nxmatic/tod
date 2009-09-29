@@ -173,7 +173,11 @@ public class ReplayerWrapper
 		
 		for (MethodDescriptor theDescriptor : aUsedDescriptors)
 		{
-			if (theDescriptor.itsArgSorts.length == 0 && theDescriptor.itsStatic) continue; // The methods with no args are already implemented in original source.
+			// Filter out methods already present in source
+			if (theDescriptor.itsStatic
+					&& theDescriptor.itsArgSorts.length == 0 
+					&& theDescriptor.itsReturnSort == Type.VOID) continue;
+			
 			MethodNode theMethodNode = createNode(theDescriptor);
 			theMethodNode.maxStack = 0;
 			theMethodNode.maxLocals = 1;

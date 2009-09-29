@@ -161,7 +161,7 @@ public class ClassInstrumenter
 		}
 		catch(Exception e)
 		{
-			BCIUtils.writeClass(getInstrumenter().getConfig().get(TODConfig.CLASS_CACHE_PATH), getNode(), theBytecode);
+			BCIUtils.writeClass(getInstrumenter().getConfig().get(TODConfig.CLASS_CACHE_PATH)+"/err", getNode(), theBytecode);
 			System.err.println("Class "+getNode().name+" failed check. Writing out bytecode.");
 			e.printStackTrace();
 		}

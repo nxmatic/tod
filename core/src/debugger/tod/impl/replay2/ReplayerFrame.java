@@ -151,32 +151,7 @@ public abstract class ReplayerFrame
 		return theInfo.exception;
 	}
 
-	public void invokeVoid()
-	{
-		throw new UnsupportedOperationException();
-	}
-	
-	public ObjectId invokeRef()
-	{
-		throw new UnsupportedOperationException();
-	}
-	
-	public int invokeInt()
-	{
-		throw new UnsupportedOperationException();
-	}
-	
-	public float invokeFloat()
-	{
-		throw new UnsupportedOperationException();
-	}
-	
-	public long invokeLong()
-	{
-		throw new UnsupportedOperationException();
-	}
-	
-	public double invokeDouble()
+	public void invokeVoid_S()
 	{
 		throw new UnsupportedOperationException();
 	}
@@ -186,6 +161,7 @@ public abstract class ReplayerFrame
 	 */
 	public void invoke_OOS()
 	{
+		throw new UnsupportedOperationException("Should be overridden: "+this);
 	}
 	
 	public static Exception createRtEx(int aArg, String aMessage)
@@ -203,4 +179,9 @@ public abstract class ReplayerFrame
 		return new UnsupportedOperationException();
 	}
 
+	public static Exception createUnsupportedEx(String aMessage)
+	{
+		return new UnsupportedOperationException(aMessage);
+	}
+	
 }

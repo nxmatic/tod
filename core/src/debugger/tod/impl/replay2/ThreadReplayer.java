@@ -31,19 +31,17 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.replay2;
 
+import gnu.trove.TByteArrayList;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import gnu.trove.TByteArrayList;
-
 import org.objectweb.asm.Type;
 
 import tod.core.config.TODConfig;
-import tod.core.database.browser.LocationUtils;
 import tod.core.database.structure.IBehaviorInfo;
 import tod.core.database.structure.IStructureDatabase;
-import tod.core.database.structure.ITypeInfo;
 import tod.core.database.structure.ObjectId;
 import tod.core.database.structure.IStructureDatabase.BehaviorMonitoringModeChange;
 import tod.impl.replay.IntDeltaReceiver;
@@ -59,7 +57,7 @@ import zz.utils.Utils;
 
 public class ThreadReplayer
 {
-	public static final boolean ECHO = true;
+	public static final boolean ECHO = false;
 
 	private final TODConfig itsConfig;
 	private final IStructureDatabase itsDatabase;
@@ -102,7 +100,7 @@ public class ThreadReplayer
 	public void replay()
 	{
 		System.out.println("ReplayerFrame: "+Arrays.asList(ReplayerFrame.class.getDeclaredMethods()));
-		createUnmonitoredFrame(null, null).invokeVoid();		
+		createUnmonitoredFrame(null, null).invoke_OOS();		
 	}
 	
 	public IStructureDatabase getDatabase()
@@ -201,6 +199,7 @@ public class ThreadReplayer
 			BehaviorMonitoringModeChange theChange = itsDatabase.getBehaviorMonitoringModeChange(i);
 			while (itsMonitoringModes.size() <= theChange.behaviorId) itsMonitoringModes.add((byte) 0);
 			itsMonitoringModes.set(theChange.behaviorId, (byte) theChange.mode);
+			if (ThreadReplayer.ECHO) System.out.println("Mode changed: "+theChange.behaviorId+" -> "+MonitoringMode.toString(theChange.mode));
 		}
 		
 		itsCurrentMonitoringModeVersion = aVersion;
@@ -289,9 +288,11 @@ public class ThreadReplayer
 		return theFrame;
 	}
 	
-	public EnveloppeReplayerFrame createEnveloppeFrame(ReplayerFrame aParent)
+	public EnveloppeReplayerFrame createEnveloppeFrame(ReplayerFrame aParent, Type aReturnType)
 	{
-		throw new UnsupportedOperationException();
+		EnveloppeReplayerFrame theFrame = itsGenerator.createEnveloppeFrame();
+		theFrame.setup(this, itsStream, aParent instanceof InScopeReplayerFrame, aReturnType);
+		return theFrame;
 	}
 	
 	public UnmonitoredReplayerFrame createUnmonitoredFrame(ReplayerFrame aParent, Type aReturnType)
