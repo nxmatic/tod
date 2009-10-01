@@ -79,6 +79,11 @@ public abstract class ReplayerFrame
 		return getReplayer().getDatabase();
 	}
 	
+	protected boolean hasMoreMessages()
+	{
+		return itsReplayer.hasMoreMessages();
+	}
+	
 	protected byte getNextMessage()
 	{
 		return itsReplayer.getNextMessage();

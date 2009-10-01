@@ -48,7 +48,7 @@ public class DebugFlags
 	 * If this flag is true, the database just swallows everything that is sent to
 	 * it without even interpreting it.
 	 */
-	public static final boolean SWALLOW = ConfigUtils.readBoolean("swallow", false); 
+	public static final boolean SWALLOW = ConfigUtils.readBoolean("swallow", true); 
 	
 	/**
 	 * Causes the {@link EventInterpreter} to ignore all events

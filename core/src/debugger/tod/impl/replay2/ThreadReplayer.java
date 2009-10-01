@@ -99,8 +99,10 @@ public class ThreadReplayer
 	
 	public void replay()
 	{
-		System.out.println("ReplayerFrame: "+Arrays.asList(ReplayerFrame.class.getDeclaredMethods()));
-		createUnmonitoredFrame(null, null).invoke_OOS();		
+		UnmonitoredReplayerFrame theRootFrame = createUnmonitoredFrame(null, null);
+		theRootFrame.setRootFrame(true);
+		theRootFrame.invoke_OOS();		
+		System.out.println("ThreadReplayer.replay()");
 	}
 	
 	public IStructureDatabase getDatabase()
@@ -119,6 +121,11 @@ public class ThreadReplayer
 	{
 		processStatelessMessages();
 		return nextMessage();
+	}
+	
+	public boolean hasMoreMessages()
+	{
+		return itsStream.remaining() > 0;
 	}
 	
 	private byte nextMessage()

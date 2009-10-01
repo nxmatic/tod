@@ -40,13 +40,11 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
 
-import sun.misc.URLClassPath;
 import tod.core.config.TODConfig;
 import tod.core.database.structure.IStructureDatabase;
 import tod.impl.database.structure.standard.StructureDatabaseUtils;
-import tod.impl.replay2.ReplayerWrapper;
-import tod.impl.replay2.ThreadReplayer;
 import tod.impl.replay.TmpIdManager;
+import tod.impl.replay2.ReplayerWrapper;
 import tod2.agent.Message;
 import tod2.agent.io._ByteBuffer;
 import zz.utils.Utils;
@@ -68,12 +66,22 @@ public class DBSideIOThread
 	
 	private long itsProcessedSize = 0;
 	
+	private ArrayList<_ByteBuffer> itsBufferPool = new ArrayList<_ByteBuffer>();
+	
 	public DBSideIOThread(TODConfig aConfig, IStructureDatabase aDatabase, InputStream aIn, OutputStream aOut)
 	{
 		itsConfig = aConfig;
 		itsDatabase = aDatabase;
 		itsIn = aIn;
 		itsOut = aOut;
+		
+		for(int i=0;i<4;i++) itsBufferPool.add(createBuffer());
+	}
+	
+	private static _ByteBuffer createBuffer()
+	{
+		byte[] theData = new byte[4096];
+		return _ByteBuffer.wrap(theData);		
 	}
 
 	public void run()
@@ -133,15 +141,17 @@ public class DBSideIOThread
 	
 	private void readFully(byte[] aBuffer) throws IOException
 	{
-		int l = aBuffer.length;
+		readFully(aBuffer, aBuffer.length);
+	}
+	
+	private void readFully(byte[] aBuffer, int aCount) throws IOException
+	{
+		int l = aCount;
 		int c = 0;
 		while(c < l) 
 		{
 			int r = itsIn.read(aBuffer, c, l-c);
-			if (r == -1)
-			{
-				throw new EOFException();
-			}
+			if (r == -1) throw new EOFException();
 			c += r;
 		}
 	}
@@ -151,10 +161,13 @@ public class DBSideIOThread
 		int theThreadId = _ByteBuffer.getIntL(itsIn);
 		int theLength = _ByteBuffer.getIntL(itsIn);
 		
-		byte[] theBuffer = new byte[theLength];
-		readFully(theBuffer);
+		_ByteBuffer theBuffer = ! itsBufferPool.isEmpty() ? itsBufferPool.remove(itsBufferPool.size()-1) : createBuffer();
+		readFully(theBuffer.array(), theLength);
+		theBuffer.position(0);
+		theBuffer.limit(theLength);
 		
-		getReplayerThread(theThreadId).push(theBuffer);
+		theBuffer = getReplayerThread(theThreadId).push(theBuffer);
+		if (theBuffer != null) itsBufferPool.add(theBuffer);
 		
 		itsProcessedSize += 8 + theLength;
 	}
@@ -190,6 +203,8 @@ public class DBSideIOThread
 	
 	private static class ThreadReplayerThread extends Thread
 	{
+		private static int T = 1;
+		
 		private final TODConfig itsConfig;
 		private final IStructureDatabase itsDatabase;
 		private final TmpIdManager itsTmpIdManager;
@@ -202,25 +217,25 @@ public class DBSideIOThread
 				IStructureDatabase aDatabase, 
 				TmpIdManager aTmpIdManager)
 		{
-			super(ThreadReplayerThread.class.getName());
+			super(ThreadReplayerThread.class.getName()+(T++));
 			
 			itsConfig = aConfig;
 			itsDatabase = aDatabase;
 			itsTmpIdManager = aTmpIdManager;
 		}
 
-		public void push(byte[] aData)
+		public _ByteBuffer push(_ByteBuffer aBuffer)
 		{
-			_ByteBuffer theBuffer = aData != null ? _ByteBuffer.wrap(aData) : null;
 			if (itsStream == null)
 			{
-				itsStream = new BufferStream(theBuffer);
+				itsStream = new BufferStream(aBuffer);
 				itsReplayer = new ReplayerWrapper(itsConfig, itsDatabase, itsTmpIdManager, itsStream);
 				start();
+				return null;
 			}
 			else
 			{
-				itsStream.pushBuffer(theBuffer);
+				return itsStream.pushBuffer(aBuffer);
 			}
 		}
 		

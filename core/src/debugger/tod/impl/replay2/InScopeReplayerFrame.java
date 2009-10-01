@@ -40,27 +40,23 @@ import zz.utils.Utils;
 
 public abstract class InScopeReplayerFrame extends ReplayerFrame
 {
-	private final String itsName;
-	private final int itsAccess;
+	private String itsName;
+	private int itsAccess;
 	
-	private final Type[] itsArgTypes;
-	private final Type itsReturnType;
+	private Type[] itsArgTypes;
+	private Type itsReturnType;	
 	
+	protected InScopeReplayerFrame()
+	{
+	}
 	
-	/**
-	 * @param aCacheCounts "encoded" cache counts.
-	 */
-	protected InScopeReplayerFrame(
-			String aName, 
-			int aAccess, 
-			String aDescriptor)
+	public void setSignature(String aName, int aAccess, Type[] aArgTypes, Type aReturnType)
 	{
 		if (ThreadReplayer.ECHO) System.out.println("InScopeReplayerFrame.InScopeReplayerFrame(): "+aName);
 		itsName = aName;
 		itsAccess = aAccess;
-		
-		itsArgTypes = Type.getArgumentTypes(aDescriptor);
-		itsReturnType = Type.getReturnType(aDescriptor);
+		itsArgTypes = aArgTypes;
+		itsReturnType = aReturnType;
 	}
 	
 	private void processException()
@@ -276,5 +272,43 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 		if (id1 == null || id2 == null) return false;
 		return id1.getId() == id2.getId();
 	}
-	
+
+	/**
+	 * A factory that creates a particular (generated) subclass of {@link InScopeReplayerFrame}.
+	 * @author gpothier
+	 */
+	public static abstract class Factory
+	{
+		private String itsName;
+		private int itsAccess;
+		private Type[] itsArgTypes;
+		private Type itsReturnType;
+
+		public void setSignature(String aName, int aAccess, String aDescriptor)
+		{
+			itsName = aName;
+			itsAccess = aAccess;
+			itsArgTypes = Type.getArgumentTypes(aDescriptor);
+			itsReturnType = Type.getReturnType(aDescriptor);
+		}
+
+		public Type[] getArgTypes()
+		{
+			return itsArgTypes;
+		}
+		
+		public Type getReturnType()
+		{
+			return itsReturnType;
+		}
+		
+		public InScopeReplayerFrame create()
+		{
+			InScopeReplayerFrame theFrame = create0();
+			theFrame.setSignature(itsName, itsAccess, itsArgTypes, itsReturnType);
+			return theFrame;
+		}
+		
+		protected abstract InScopeReplayerFrame create0();
+	}
 }

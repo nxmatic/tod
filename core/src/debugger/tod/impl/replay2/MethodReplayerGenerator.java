@@ -273,19 +273,13 @@ public class MethodReplayerGenerator
 		theConstructor.desc = "()V";
 		theConstructor.exceptions = Collections.EMPTY_LIST;
 		theConstructor.access = Opcodes.ACC_PUBLIC;
-		theConstructor.maxStack = 6;
+		theConstructor.maxStack = 1;
 		theConstructor.maxLocals = 1;
 		theConstructor.tryCatchBlocks = Collections.EMPTY_LIST;
 		
 		SList s = new SList();
 		s.ALOAD(0);
-		s.LDC(itsMethodNode.name);
-		s.pushInt(itsMethodNode.access);
-		s.LDC(itsMethodNode.desc);
-		s.INVOKESPECIAL(
-				CLS_INSCOPEREPLAYERFRAME, 
-				"<init>", 
-				"("+BCIUtils.DSC_STRING+"I"+BCIUtils.DSC_STRING+")V");
+		s.INVOKESPECIAL(CLS_INSCOPEREPLAYERFRAME, "<init>", "()V");
 		s.RETURN();
 		
 		theConstructor.instructions = s;
@@ -763,18 +757,28 @@ public class MethodReplayerGenerator
 
 		Label lFieldValue = new Label();
 		Label lFieldValue_Same = new Label();
-		Label lDefault = new Label();
+		Label lError = new Label();
 		Label lEndIf = new Label();
 		
 		if (aNode.getOpcode() != Opcodes.GETSTATIC) s.POP(); // Pop target
 		
 		s.ALOAD(0);
 		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "getNextMessage", "()B");
-		s.LOOKUPSWITCH(
-				lDefault, 
-				new int[] {Message.FIELD_READ, Message.FIELD_READ_SAME}, 
-				new Label[] {lFieldValue, lFieldValue_Same});
+		s.ISTORE(itsTmpVar);
 		
+		s.ILOAD(itsTmpVar);
+		s.pushInt(Message.FIELD_READ);
+		s.IF_ICMPEQ(lFieldValue);
+		s.ILOAD(itsTmpVar);
+		s.pushInt(Message.FIELD_READ_SAME);
+		s.IF_ICMPEQ(lFieldValue_Same);
+		
+		// Bad message
+		s.label(lError);
+			s.createRTEx("Unexpected message");
+			s.ATHROW();
+		
+		// FIELD_READ
 		s.label(lFieldValue);
 			s.invokeRead(theType);
 			if (theCacheSlot != null)
@@ -784,20 +788,16 @@ public class MethodReplayerGenerator
 			}
 			s.GOTO(lEndIf);
 		
+		// FIELD_READ_SAME
 		s.label(lFieldValue_Same);
 			if (theCacheSlot != null)
 			{
 				s.ILOAD(theType, theCacheSlot);
-				s.GOTO(lEndIf);
 			}
 			else
 			{
-				s.GOTO(lDefault);
+				s.GOTO(lError);
 			}
-			
-		s.label(lDefault);
-			s.createRTEx("Unexpected message");
-			s.ATHROW();
 			
 		s.label(lEndIf);
 		

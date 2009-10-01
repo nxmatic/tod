@@ -47,9 +47,16 @@ public class UnmonitoredReplayerFrame extends ReplayerFrame
 	private byte itsLastMessage;
 	private ObjectId itsLastException;
 	
+	private boolean itsRootFrame;
+	
+	public void setRootFrame(boolean aRootFrame)
+	{
+		itsRootFrame = aRootFrame;
+	}
+	
 	protected void replay()
 	{
-		while(true)
+		while(! itsRootFrame || hasMoreMessages())
 		{
 			byte m = getNextMessage();
 			

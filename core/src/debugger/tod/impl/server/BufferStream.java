@@ -41,13 +41,64 @@ import tod2.agent.io._ByteBuffer;
  */
 public class BufferStream 
 {
+	private _ByteBuffer itsOldBuffer;
 	private _ByteBuffer itsCurrentBuffer;
-	private boolean itsWaiting = false;
+	private volatile _ByteBuffer itsNextBuffer;
 	private boolean itsFinished = false;
 	
 	public BufferStream(_ByteBuffer aBuffer)
 	{
 		itsCurrentBuffer = aBuffer;
+	}
+
+	private void checkBuffer()
+	{
+		if (itsCurrentBuffer == null || itsCurrentBuffer.remaining() == 0)
+		{
+			_ByteBuffer theOld = itsCurrentBuffer; // Do not put into itsOldBuffer yet in case there is already an old buffer
+			itsCurrentBuffer = getNextBuffer();
+			itsOldBuffer = theOld;
+		}
+	}
+	
+	private synchronized _ByteBuffer getNextBuffer()
+	{
+		if (itsFinished) return null;
+		try
+		{
+			while (itsNextBuffer == null) wait();
+		}
+		catch (InterruptedException e)
+		{
+			throw new RuntimeException(e);
+		}
+
+		_ByteBuffer theBuffer = itsNextBuffer;
+		itsNextBuffer = null;
+		notifyAll();
+		return theBuffer;
+	}
+	
+	/**
+	 * Makes a new source buffer available to the stream. 
+	 * @return The previous buffer
+	 */
+	synchronized _ByteBuffer pushBuffer(_ByteBuffer aBuffer)
+	{
+		try
+		{
+			while (itsNextBuffer != null) wait();
+			itsNextBuffer = aBuffer;
+			if (aBuffer == null) itsFinished = true;
+			notifyAll();
+			_ByteBuffer theOldBuffer = itsOldBuffer;
+			itsOldBuffer = null;
+			return theOldBuffer;
+		}
+		catch (InterruptedException e)
+		{
+			throw new RuntimeException(e);
+		}
 	}
 
 	public final int remaining()
@@ -59,44 +110,7 @@ public class BufferStream
 	public final int position()
 	{
 		return itsCurrentBuffer.position();
-	}
-	
-	private void checkBuffer()
-	{
-		if (itsFinished) return;
-		if (itsCurrentBuffer == null || itsCurrentBuffer.remaining() == 0)
-		{
-			synchronized (this)
-			{
-				try
-				{
-					itsWaiting = true;
-					notifyAll();
-					while (itsWaiting) wait();
-				}
-				catch (InterruptedException e)
-				{
-					throw new RuntimeException(e);
-				}
-			}
-		}
-	}
-	
-	synchronized void pushBuffer(_ByteBuffer aBuffer)
-	{
-		try
-		{
-			while (! itsWaiting) wait();
-			itsCurrentBuffer = aBuffer;
-			if (itsCurrentBuffer == null) itsFinished = true;
-			itsWaiting = false;
-			notifyAll();
-		}
-		catch (InterruptedException e)
-		{
-			throw new RuntimeException(e);
-		}
-	}
+	}	
 	
 	public final void get(byte[] aBuffer, int aOffset, int aLength)
 	{

@@ -32,17 +32,23 @@ Inc. MD5 Message-Digest Algorithm".
 package tod.impl.replay2;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
+import org.python.modules.newmodule;
 
 import tod.core.config.TODConfig;
 import tod.core.database.browser.LocationUtils;
 import tod.core.database.structure.IBehaviorInfo;
 import tod.core.database.structure.IClassInfo;
 import tod.core.database.structure.IStructureDatabase;
+import tod.impl.bci.asm2.BCIUtils;
+import tod.impl.replay2.InScopeReplayerFrame.Factory;
 import zz.utils.Utils;
 
 public class ReplayerGenerator
@@ -53,10 +59,9 @@ public class ReplayerGenerator
 
 	
 	/**
-	 * The cached replayer classes, indexed by behavior id.
+	 * The cached replayer class factories, indexed by behavior id.
 	 */
-	private List<Class<InScopeReplayerFrame>> itsReplayers =
-		new ArrayList<Class<InScopeReplayerFrame>>();
+	private List<InScopeReplayerFrame.Factory> itsInScopeFrameFactories = new ArrayList<InScopeReplayerFrame.Factory>();
 
 	public ReplayerGenerator(ReplayerLoader aLoader, TODConfig aConfig, IStructureDatabase aDatabase)
 	{
@@ -100,10 +105,10 @@ public class ReplayerGenerator
 	/**
 	 * Returns the replayer class used to replay the given behavior.
 	 */
-	public Class<InScopeReplayerFrame> getReplayerClass(int aBehaviorId)
+	public InScopeReplayerFrame.Factory getReplayerFactory(int aBehaviorId)
 	{
-		Class theReplayerClass = Utils.listGet(itsReplayers, aBehaviorId);
-		if (theReplayerClass != null) return theReplayerClass;
+		InScopeReplayerFrame.Factory theFactory = Utils.listGet(itsInScopeFrameFactories, aBehaviorId);
+		if (theFactory != null) return theFactory;
 
 		// Replayer class for this behavior not found 
 		// Create replayers for all the behaviors in the class.
@@ -130,43 +135,96 @@ public class ReplayerGenerator
 			
 			byte[] theReplayerBytecode = theGenerator.generate();
 			
-			String theReplayerName = makeReplayerClassName(
+			String theFrameClassJVMName = makeReplayerClassName(
 					theClassNode.name, 
 					theMethodName, 
-					theMethodDesc).replace('/', '.');
+					theMethodDesc);
 			
-			itsLoader.addClass(theReplayerName, theReplayerBytecode);
+			String theFrameClassName = theFrameClassJVMName.replace('/', '.');
 			
-			try
-			{
-				theReplayerClass = itsLoader.loadClass(theReplayerName).asSubclass(InScopeReplayerFrame.class);
-			}
-			catch (ClassNotFoundException e)
-			{
-				throw new RuntimeException(e);
-			}
-			
+			itsLoader.addClass(theFrameClassName, theReplayerBytecode);
+						
+			theFactory = createFactory(theFrameClassJVMName);
+			theFactory.setSignature(theMethodName, theMethodNode.access, theMethodDesc);
 			theBehavior = LocationUtils.getBehavior(itsDatabase, theClass, theMethodName, theMethodDesc, false);
-			Utils.listSet(itsReplayers, theBehavior.getId(), theReplayerClass);
+			Utils.listSet(itsInScopeFrameFactories, theBehavior.getId(), theFactory);
 		}
 		
-		return Utils.listGet(itsReplayers, aBehaviorId);
+		return Utils.listGet(itsInScopeFrameFactories, aBehaviorId);
+	}
+	
+	private InScopeReplayerFrame.Factory createFactory(String aFrameClassJVMName) 
+	{
+		ClassNode classNode = new ClassNode();
+		classNode.name = aFrameClassJVMName+"_Factory";
+		classNode.sourceFile = classNode.name+".class";
+		classNode.superName = BCIUtils.getJvmClassName(InScopeReplayerFrame.Factory.class);
+		classNode.version = Opcodes.V1_5;
+		classNode.access = Opcodes.ACC_PUBLIC;
+
+		// Generate constructor
+		MethodNode theConstructor = new MethodNode();
+		theConstructor.name = "<init>";
+		theConstructor.desc = "()V";
+		theConstructor.exceptions = Collections.EMPTY_LIST;
+		theConstructor.access = Opcodes.ACC_PUBLIC;
+		theConstructor.maxStack = 1;
+		theConstructor.maxLocals = 1;
+		theConstructor.tryCatchBlocks = Collections.EMPTY_LIST;
+		
+		SList s = new SList();
+		s.ALOAD(0);
+		s.INVOKESPECIAL(classNode.superName, "<init>", "()V");
+		s.RETURN();
+		
+		theConstructor.instructions = s;
+		classNode.methods.add(theConstructor);
+		
+		// Generate create method
+		MethodNode theMethod = new MethodNode();
+		theMethod.name = "create0";
+		theMethod.desc = "()L"+BCIUtils.getJvmClassName(InScopeReplayerFrame.class)+";";
+		theMethod.exceptions = Collections.EMPTY_LIST;
+		theMethod.access = Opcodes.ACC_PUBLIC;
+		theMethod.maxStack = 1;
+		theMethod.maxLocals = 1;
+		theMethod.tryCatchBlocks = Collections.EMPTY_LIST;
+
+		s = new SList();
+		s.NEW(aFrameClassJVMName);
+		s.DUP();
+		s.INVOKESPECIAL(aFrameClassJVMName, "<init>", "()V");
+		s.ARETURN();
+
+		theMethod.instructions = s;
+		classNode.methods.add(theMethod);
+		
+		// Generate bytecode
+		ClassWriter theWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+		classNode.accept(theWriter);
+		
+		byte[] theBytecode = theWriter.toByteArray();
+
+		String theFactoryClassName = classNode.name.replace('/', '.');
+		itsLoader.addClass(theFactoryClassName, theBytecode);
+
+		try
+		{
+			Class cls = itsLoader.loadClass(theFactoryClassName);
+			return (Factory) cls.newInstance();
+		}
+		catch (Exception e)
+		{
+			throw new RuntimeException(e);
+		}
 	}
 	
 	public InScopeReplayerFrame createInScopeFrame(int aBehaviorId)
 	{
 		IBehaviorInfo theBehavior = itsDatabase.getBehavior(aBehaviorId, true);
 		if (ThreadReplayer.ECHO) System.out.println("ReplayerGenerator.createInScopeFrame(): "+theBehavior);
-		Class<InScopeReplayerFrame> theClass = getReplayerClass(aBehaviorId);
-		try
-		{
-			return theClass.newInstance();
-		}
-		catch (Exception e)
-		{
-			throw new RuntimeException(e);
-		}
-
+		InScopeReplayerFrame.Factory theFactory = getReplayerFactory(aBehaviorId);
+		return theFactory.create();
 	}
 
 	public UnmonitoredReplayerFrame createUnmonitoredFrame()
