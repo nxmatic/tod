@@ -25,17 +25,24 @@ package tod.impl.bci.asm2;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.ListIterator;
 
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.InsnNode;
 import org.objectweb.asm.tree.IntInsnNode;
+import org.objectweb.asm.tree.LabelNode;
 import org.objectweb.asm.tree.LdcInsnNode;
+import org.objectweb.asm.tree.LocalVariableNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
+import org.objectweb.asm.tree.TryCatchBlockNode;
 import org.objectweb.asm.tree.analysis.Analyzer;
 import org.objectweb.asm.tree.analysis.AnalyzerException;
 import org.objectweb.asm.tree.analysis.BasicVerifier;
@@ -43,7 +50,6 @@ import org.objectweb.asm.tree.analysis.BasicVerifier;
 import tod.core.config.ClassSelector;
 import tod.core.database.structure.ObjectId;
 import tod.impl.database.structure.standard.PrimitiveTypeInfo;
-import tod.impl.replay.InScopeReplayerFrame;
 import zz.utils.Utils;
 
 public class BCIUtils implements Opcodes
@@ -443,4 +449,104 @@ public class BCIUtils implements Opcodes
 		s.INVOKESPECIAL("java/lang/RuntimeException", "<init>", "(Ljava/lang/String;)V");
 		s.ATHROW();
 	}
+	
+	public static MethodNode cloneMethod(MethodNode aNode)
+	{
+		MethodNode theClone = new MethodNode();
+		if (aNode.annotationDefault != null) throw new UnsupportedOperationException();
+		if (aNode.invisibleAnnotations != null) throw new UnsupportedOperationException();
+		if (aNode.invisibleParameterAnnotations != null) throw new UnsupportedOperationException();
+		if (aNode.visibleAnnotations != null) throw new UnsupportedOperationException();
+		if (aNode.visibleParameterAnnotations != null) throw new UnsupportedOperationException();
+
+		theClone.name = aNode.name;
+		theClone.signature = aNode.signature;
+		theClone.access = aNode.access;
+		theClone.desc = aNode.desc;
+		theClone.exceptions = cloneList(aNode.exceptions);
+		theClone.attrs = cloneList(aNode.attrs);
+		theClone.maxLocals = aNode.maxLocals;
+		theClone.maxStack = aNode.maxStack;
+		
+		ClonerMap theMap = new ClonerMap();
+		theClone.instructions = cloneInstructions(theMap, aNode.instructions);
+		theClone.localVariables = cloneLocalVariables(theMap, aNode.localVariables);
+		theClone.tryCatchBlocks = cloneTryCatchBlocks(theMap, aNode.tryCatchBlocks);
+		
+		return theClone;
+	}
+	
+	private static List cloneList(List aList)
+	{
+		if (aList == null) return null;
+		if (aList instanceof ArrayList)
+		{
+			ArrayList theList = (ArrayList) aList;
+			return (List) theList.clone();
+		}
+		else throw new IllegalArgumentException();
+	}
+	
+	private static InsnList cloneInstructions(ClonerMap aMap, InsnList aList)
+	{
+		InsnList theClone = new InsnList();
+		AbstractInsnNode theNode = aList.getFirst();
+		while(theNode != null)
+		{
+			theClone.add(theNode.clone(aMap));
+			theNode = theNode.getNext();
+		}
+		
+		return theClone;
+	}
+	
+	private static List<LocalVariableNode> cloneLocalVariables(ClonerMap aMap, List<LocalVariableNode> aList)
+	{
+		List<LocalVariableNode> theListClone = new ArrayList<LocalVariableNode>();
+		for (LocalVariableNode theNode : aList)
+		{
+			theListClone.add(new LocalVariableNode(
+					theNode.name, 
+					theNode.desc, 
+					theNode.signature, 
+					aMap.get(theNode.start), 
+					aMap.get(theNode.end), 
+					theNode.index));
+		}
+		
+		return theListClone;
+	}
+	
+	private static List<TryCatchBlockNode> cloneTryCatchBlocks(ClonerMap aMap, List<TryCatchBlockNode> aList)
+	{
+		List<TryCatchBlockNode> theListClone = new ArrayList<TryCatchBlockNode>();
+		for (TryCatchBlockNode theNode : aList)
+		{
+			theListClone.add(new TryCatchBlockNode(
+					aMap.get(theNode.start),
+					aMap.get(theNode.end),
+					aMap.get(theNode.handler),
+					theNode.type));
+		}
+		
+		return theListClone;
+	}
+	
+	private static class ClonerMap extends HashMap<LabelNode, LabelNode>
+	{
+		@Override
+		public LabelNode get(Object aKey)
+		{
+			LabelNode theNode = super.get(aKey);
+			
+			if (theNode == null)
+			{
+				theNode = new LabelNode();
+				put((LabelNode) aKey, theNode);
+			}
+			
+			return theNode;
+		}
+	}
+
 }

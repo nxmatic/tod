@@ -171,7 +171,7 @@ public abstract class MethodInstrumenter
 	public abstract void proceed();
 	
 	/**
-	 * Sends a value of a given type through {@link ThreadData}
+	 * Generates code that sends a value of a given type through {@link ThreadData}
 	 * @param aIndex The local variable slot to take the value from.
 	 * @param aType The type of the value
 	 */

@@ -33,6 +33,7 @@ package tod.impl.bci.asm2;
 
 import java.util.ListIterator;
 
+import org.objectweb.asm.Label;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
@@ -49,7 +50,7 @@ import tod2.agent.Message;
  */
 public class MethodInstrumenter_loadClassInternal extends MethodInstrumenter
 {
-	private LabelManager itsLabelManager = new LabelManager();
+	private Label lExit = new Label();
 	
 	public MethodInstrumenter_loadClassInternal(ClassInstrumenter aClassInstrumenter, MethodNode aNode, IMutableBehaviorInfo aBehavior)
 	{
@@ -60,7 +61,11 @@ public class MethodInstrumenter_loadClassInternal extends MethodInstrumenter
 	@Override
 	public void proceed()
 	{
-		SyntaxInsnList s = new SyntaxInsnList(itsLabelManager);
+		SyntaxInsnList s = new SyntaxInsnList();
+		
+		Label lStart = new Label();
+		Label lEnd = new Label();
+		Label lFinally = new Label();
 
 		// Insert entry instructions
 		{
@@ -74,7 +79,7 @@ public class MethodInstrumenter_loadClassInternal extends MethodInstrumenter
 			s.ISTORE(getTraceEnabledVar());
 			
 			// Check monitoring mode
-			s.IFfalse("start");
+			s.IFfalse(lStart);
 			
 			// Monitoring enabled
 			{
@@ -86,48 +91,50 @@ public class MethodInstrumenter_loadClassInternal extends MethodInstrumenter
 				// Send event
 				s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evClassLoaderEnter", "()V");
 				
-				s.GOTO("start");
+				s.GOTO(lStart);
 			}
 		}
 		
 		// Insert exit instructions (every return statement is replaced by a GOTO to this block)
 		{
-			s.label("exit");
+			s.label(lExit);
 			
 			// Check monitoring mode
+			Label lReturn = new Label();
 			s.ILOAD(getTraceEnabledVar());
-			s.IFfalse("return");
+			s.IFfalse(lReturn);
 
 			// Monitoring active, send event
 			s.ALOAD(getThreadDataVar());
 			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evClassLoaderExit", "()V");				
 
-			s.label("return");
+			s.label(lReturn);
 			s.RETURN(Type.getReturnType(getNode().desc));
 		}
 		
 		// Insert finally instructions
 		{
-			s.label("finally");
+			s.label(lFinally);
 			
 			// Check monitoring mode
+			Label lThrow = new Label();
 			s.ILOAD(getTraceEnabledVar());
-			s.IFfalse("throw");
+			s.IFfalse(lThrow);
 			
 			s.ALOAD(getThreadDataVar());
 			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evClassLoaderExit", "()V");
 
-			s.label("throw");
+			s.label(lThrow);
 			s.ATHROW();
 		}
 
-		s.label("start");
+		s.label(lStart);
 		
 		processInstructions(getNode().instructions);
 		
 		getNode().instructions.insert(s);
-		getNode().visitLabel(s.getLabel("end"));
-		getNode().visitTryCatchBlock(s.getLabel("start"), s.getLabel("end"), s.getLabel("finally"), null);
+		getNode().visitLabel(lEnd);
+		getNode().visitTryCatchBlock(lStart, lEnd, lFinally, null);
 	}
 	
 	private void processInstructions(InsnList aInsns)
@@ -139,9 +146,9 @@ public class MethodInstrumenter_loadClassInternal extends MethodInstrumenter
 			int theOpcode = theNode.getOpcode();
 			if (theOpcode >= Opcodes.IRETURN && theOpcode <= Opcodes.RETURN)
 			{
-				SyntaxInsnList s = new SyntaxInsnList(itsLabelManager);
+				SyntaxInsnList s = new SyntaxInsnList();
 				
-				s.GOTO("exit");
+				s.GOTO(lExit);
 				
 				aInsns.insert(theNode, s);
 				aInsns.remove(theNode);

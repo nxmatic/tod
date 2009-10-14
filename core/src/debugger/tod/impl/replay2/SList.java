@@ -41,7 +41,7 @@ public class SList extends SyntaxInsnList
 {
 	public SList()
 	{
-		super(null);
+		super();
 	}
 	
 	/**

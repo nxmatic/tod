@@ -32,7 +32,6 @@ Inc. MD5 Message-Digest Algorithm".
 package tod.impl.bci.asm2;
 
 import java.util.HashSet;
-import java.util.List;
 import java.util.ListIterator;
 import java.util.Set;
 
@@ -51,6 +50,7 @@ import org.objectweb.asm.tree.TryCatchBlockNode;
 import tod.Util;
 import tod.core.database.structure.IMutableBehaviorInfo;
 import tod.core.database.structure.IMutableClassInfo;
+import tod.impl.replay2.SList;
 
 /**
  * Instruments in-scope methods.
@@ -58,8 +58,6 @@ import tod.core.database.structure.IMutableClassInfo;
  */
 public class MethodInstrumenter_InScope extends MethodInstrumenter
 {
-	private LabelManager itsLabelManager = new LabelManager();
-
 	/**
 	 * A boolean that indicates if the method was called from in-scope code.
 	 */
@@ -71,6 +69,8 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 	private int itsTmpValueVar;
 	
 	private MethodInfo itsMethodInfo;
+	
+	private Label lExit = new Label();
 
 	public MethodInstrumenter_InScope(ClassInstrumenter aClassInstrumenter, MethodNode aNode, IMutableBehaviorInfo aBehavior)
 	{
@@ -92,13 +92,34 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		
 		itsMethodInfo = new MethodInfo(getDatabase(), getClassNode(), getNode());
 		int theSlotsCount = itsMethodInfo.setupLocalCacheSlots(getNode().maxLocals);
-		getNode().maxLocals += theSlotsCount;
+		getNode().maxLocals += theSlotsCount;			
 		
 		// Save original handlers
 		TryCatchBlockNode[] theHandlers = (TryCatchBlockNode[]) getNode().tryCatchBlocks.toArray(new TryCatchBlockNode[getNode().tryCatchBlocks.size()]);
 
-		SyntaxInsnList s = new SyntaxInsnList(itsLabelManager);
+		SyntaxInsnList s = new SyntaxInsnList();
+		
+		Label lStart = new Label();
+		Label lFinally = new Label();
+		Label lEnd = new Label();
+		Label lActive = new Label();
+		
+		// Create activation checking code
+		s.pushInt(getBehavior().getId()); 
+		s.INVOKESTATIC(BCIUtils.CLS_TRACEDMETHODS, "traceFull", "(I)Z");
+		s.IFtrue(lActive);
 
+		{
+			// Tracing not active
+			MethodNode theClone = BCIUtils.cloneMethod(getNode());
+			s.add(theClone.instructions);
+			getNode().tryCatchBlocks.addAll(theClone.tryCatchBlocks);
+			getNode().localVariables.addAll(theClone.localVariables);
+		}
+
+
+		s.label(lActive);
+			
 		// Insert entry instructions
 		{
 			// Set ThreadData var to null for verifier to work
@@ -107,83 +128,68 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 			
 			s.add(itsMethodInfo.getFieldCacheInitInstructions());
 			
-			// Store the monitoring mode for the behavior in a local
-			s.pushInt(getBehavior().getId()); 
-			s.INVOKESTATIC(BCIUtils.CLS_TRACEDMETHODS, "traceFull", "(I)Z");
-			s.DUP();
-			s.ISTORE(getTraceEnabledVar());
-			
-			// Check monitoring mode
-			s.IFfalse("start");
-			
-			// Monitoring enabled
-			{
-				// Store ThreadData object
-				s.INVOKESTATIC(BCIUtils.CLS_EVENTCOLLECTOR, "_getThreadData", "()"+BCIUtils.DSC_THREADDATA); // ThD
-				s.DUP(); // ThD ThD
-				s.DUP(); // ThD ThD ThD
-				s.ASTORE(getThreadDataVar()); // ThD ThD
+			// Store ThreadData object
+			s.INVOKESTATIC(BCIUtils.CLS_EVENTCOLLECTOR, "_getThreadData", "()"+BCIUtils.DSC_THREADDATA); // ThD
+			s.DUP(); // ThD ThD
+			s.DUP(); // ThD ThD ThD
+			s.ASTORE(getThreadDataVar()); // ThD ThD
 
-				// Store inScope 
-				s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "isInScope", "()Z"); // ThD, inScope
-				s.ISTORE(itsFromScopeVar); // ThD
-				
-				// Send event
-				s.pushInt(getBehavior().getId()); // ThD, BId 
-				s.INVOKEVIRTUAL(
-						BCIUtils.CLS_THREADDATA, 
-						isStaticInitializer() ? "evInScopeClinitEnter" : "evInScopeBehaviorEnter", 
-						"(I)V");
-				
-				//Check if we must send args
-				s.ILOAD(itsFromScopeVar);
-				s.IFtrue("afterSendArgs");
-				sendEnterArgs(s);
-				s.label("afterSendArgs");
-				
-				s.GOTO("start");
-			}
+			// Store inScope 
+			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "isInScope", "()Z"); // ThD, inScope
+			s.ISTORE(itsFromScopeVar); // ThD
+			
+			// Send event
+			s.pushInt(getBehavior().getId()); // ThD, BId 
+			s.INVOKEVIRTUAL(
+					BCIUtils.CLS_THREADDATA, 
+					isStaticInitializer() ? "evInScopeClinitEnter" : "evInScopeBehaviorEnter", 
+					"(I)V");
+			
+			//Check if we must send args
+			Label lAfterSendArgs = new Label();
+			s.ILOAD(itsFromScopeVar);
+			s.IFtrue(lAfterSendArgs);
+			sendEnterArgs(s);
+			s.label(lAfterSendArgs);
+			
+			s.GOTO(lStart);
 		}
 		
 		// Insert exit instructions (every return statement is replaced by a GOTO to this block)
 		{
-			s.label("exit");
-			
-			// Check monitoring mode
-			s.ILOAD(getTraceEnabledVar());
-			s.IFfalse("return");
+			s.label(lExit);
 			
 			s.ALOAD(getThreadDataVar());
 			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evInScopeBehaviorExit_Normal", "()V");
-			
-			s.label("return");
+
 			s.RETURN(Type.getReturnType(getNode().desc));
 		}
 		
 		// Insert finally instructions
 		{
-			s.label("finally");
-			
-			// Check monitoring mode
-			s.ILOAD(getTraceEnabledVar());
-			s.IFfalse("throw");
+			s.label(lFinally);
 			
 			s.ALOAD(getThreadDataVar());
 			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evInScopeBehaviorExit_Exception", "()V");
 
-			s.label("throw");
 			s.ATHROW();
 		}
 
-		s.label("start");
+		s.label(lStart);
 		
 		processInstructions(getNode().instructions);
 		processHandlers(theHandlers);
 		
 		getNode().instructions.insert(s);
-		getNode().visitLabel(s.getLabel("end"));
+		getNode().visitLabel(lEnd);
 		getNode().visitInsn(Opcodes.NOP);
-		getNode().visitTryCatchBlock(s.getLabel("start"), s.getLabel("end"), s.getLabel("finally"), null);
+		getNode().visitTryCatchBlock(lStart, lEnd, lFinally, null);
+	}
+	
+	@Override
+	protected int getTraceEnabledVar()
+	{
+		throw new UnsupportedOperationException();
 	}
 
 	/**
@@ -227,18 +233,10 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 			if (theProcessedLabels.add(theLabel)) 
 			{
 				// Add event emission code
-				SyntaxInsnList s = new SyntaxInsnList(null);
-				Label l = new Label();
-
-				s.ILOAD(getTraceEnabledVar());
-				s.IFfalse(l);
-				{
-					s.ALOAD(getThreadDataVar());
-					s.pushInt(theId);
-					s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evHandlerReached", "(I)V");
-				}
-				
-				s.label(l);
+				SyntaxInsnList s = new SyntaxInsnList();
+				s.ALOAD(getThreadDataVar());
+				s.pushInt(theId);
+				s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evHandlerReached", "(I)V");
 				
 				getNode().instructions.insert(theNode.handler, s);
 				
@@ -315,9 +313,9 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 	
 	private void processReturn(InsnList aInsns, InsnNode aNode)
 	{
-		SyntaxInsnList s = new SyntaxInsnList(itsLabelManager);
+		SyntaxInsnList s = new SyntaxInsnList();
 		
-		s.GOTO("exit");
+		s.GOTO(lExit);
 		
 		aInsns.insert(aNode, s);
 		aInsns.remove(aNode);
@@ -340,48 +338,26 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 	
 	private void processInvoke(InsnList aInsns, MethodInsnNode aNode)
 	{
-		// We are going to create three paths, each using a clone of the original instruction:
-		// - Trace disabled
-		// - Trace enabled, monitored call
-		// - Trace enabled, unmonitored call
-		MethodInsnNode theTraceDisabledClone = (MethodInsnNode) aNode.clone(null);
+		SyntaxInsnList s = new SyntaxInsnList();
 		
-		SyntaxInsnList s = new SyntaxInsnList(itsLabelManager);
-		Label lTrDisabled = new Label(); // Trace disabled path
-		Label lEnd = new Label(); 
+		Label lCheckChaining = new Label();
 		
-		s.ILOAD(getTraceEnabledVar());
-		s.IFfalse(lTrDisabled);
+		// For constructor calls scope is resolved statically
+		if (BCIUtils.isConstructorCall(aNode)) 
+			processInvoke_TraceEnabled_Constructor(s, aNode, lCheckChaining);
+		else 
+			processInvoke_TraceEnabled_Method(s, aNode, lCheckChaining);
+		
+		s.label(lCheckChaining);
+		
+		if (itsMethodInfo.isChainingInvocation(aNode))
 		{
-			// Trace enabled
-			Label lCheckChaining = new Label();
-			
-			// For constructor calls scope is resolved statically
-			if (BCIUtils.isConstructorCall(aNode)) 
-				processInvoke_TraceEnabled_Constructor(s, aNode, lCheckChaining);
-			else 
-				processInvoke_TraceEnabled_Method(s, aNode, lCheckChaining);
-			
-			s.label(lCheckChaining);
-			
-			if (itsMethodInfo.isChainingInvocation(aNode))
-			{
-				// Send deferred target
-				s.ALOAD(getThreadDataVar());
-				s.ALOAD(0);
-				s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "sendConstructorTarget", "("+BCIUtils.DSC_OBJECT+")V");
-			}
-
-			s.GOTO(lEnd);
-		}
-		s.label(lTrDisabled);
-		{
-			// trace is disabled
-			s.add(theTraceDisabledClone);
+			// Send deferred target
+			s.ALOAD(getThreadDataVar());
+			s.ALOAD(0);
+			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "sendConstructorTarget", "("+BCIUtils.DSC_OBJECT+")V");
 		}
 
-		s.label(lEnd);
-		
 		aInsns.insert(aNode, s);
 		aInsns.remove(aNode);
 	}
@@ -511,118 +487,103 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 	
 	private void processNewArray(InsnList aInsns, AbstractInsnNode aNode)
 	{
-		SyntaxInsnList s = new SyntaxInsnList(itsLabelManager);
-		Label l = new Label();
-
-		s.ILOAD(getTraceEnabledVar());
-		s.IFfalse(l);
-		{
-			s.DUP();
-			s.ALOAD(getThreadDataVar());
-			s.SWAP();
-			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evNewArray", "("+BCIUtils.DSC_OBJECT+")V");
-		}
-		
-		s.label(l);
+		SyntaxInsnList s = new SyntaxInsnList();
+		s.DUP();
+		s.ALOAD(getThreadDataVar());
+		s.SWAP();
+		s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evNewArray", "("+BCIUtils.DSC_OBJECT+")V");
 		
 		aInsns.insert(aNode, s);
 	}
 
 	private void processGetField(InsnList aInsns, FieldInsnNode aNode)
 	{
-		SyntaxInsnList s = new SyntaxInsnList(itsLabelManager);
-		Label l = new Label();
+		SyntaxInsnList s = new SyntaxInsnList();
 		Label lSameValue = new Label();
 		Label lEndIf = new Label();
 		
 		Type theType = Type.getType(aNode.desc);
 
-		s.ILOAD(getTraceEnabledVar());
-		s.IFfalse(l);
+		s.ISTORE(theType, itsTmpValueVar);
+		
+		s.ALOAD(getThreadDataVar()); 
+
+		
+		Integer theCacheSlot = itsMethodInfo.getCacheSlot(aNode);
+		if (theCacheSlot != null)
 		{
-			s.ISTORE(theType, itsTmpValueVar);
-			
-			s.ALOAD(getThreadDataVar()); 
-
-			
-			Integer theCacheSlot = itsMethodInfo.getCacheSlot(aNode);
-			if (theCacheSlot != null)
-			{
-				// Check if value is the same as before
-				s.ILOAD(theType, itsTmpValueVar);
-				s.ILOAD(theType, theCacheSlot);
-				
-				switch(theType.getSort())
-				{
-		        case Type.BOOLEAN:
-		        case Type.BYTE:
-		        case Type.CHAR:
-		        case Type.SHORT:
-		        case Type.INT:
-		        	s.IF_ICMPEQ(lSameValue);
-		        	break;
-		        	
-		        case Type.FLOAT:
-		        	s.FCMPL();
-		        	s.IFEQ(lSameValue);
-		        	break;
-		        	
-		        case Type.LONG:
-		        	s.LCMP();
-		        	s.IFEQ(lSameValue);
-		        	break;
-		        	
-		        case Type.DOUBLE:
-		        	s.DCMPL();
-		        	s.IFEQ(lSameValue);
-		        	break;
-
-		        case Type.OBJECT:
-		        case Type.ARRAY:
-		        	s.IF_ACMPEQ(lSameValue);
-		        	break;
-		        	
-		        default:
-		            throw new RuntimeException("Not handled: "+theType);
-				}
-
-			}
-			
-			// Value not equal to cached value
-			{
-				s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evFieldRead", "()V"); 
-				sendValue(s, itsTmpValueVar, theType);
-			}
-			
-			if (theCacheSlot != null)
-			{
-				// Update cache
-				s.ILOAD(theType, itsTmpValueVar);
-				s.ISTORE(theType, theCacheSlot);
-
-				s.GOTO(lEndIf);
-				
-				s.label(lSameValue);
-				
-				// Same value as cached
-				{
-					s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evFieldRead_Same", "()V");
-				}
-				
-				s.label(lEndIf);
-			}
-			
+			// Check if value is the same as before
 			s.ILOAD(theType, itsTmpValueVar);
+			s.ILOAD(theType, theCacheSlot);
+			
+			switch(theType.getSort())
+			{
+	        case Type.BOOLEAN:
+	        case Type.BYTE:
+	        case Type.CHAR:
+	        case Type.SHORT:
+	        case Type.INT:
+	        	s.IF_ICMPEQ(lSameValue);
+	        	break;
+	        	
+	        case Type.FLOAT:
+	        	s.FCMPL();
+	        	s.IFEQ(lSameValue);
+	        	break;
+	        	
+	        case Type.LONG:
+	        	s.LCMP();
+	        	s.IFEQ(lSameValue);
+	        	break;
+	        	
+	        case Type.DOUBLE:
+	        	s.DCMPL();
+	        	s.IFEQ(lSameValue);
+	        	break;
+
+	        case Type.OBJECT:
+	        case Type.ARRAY:
+	        	s.IF_ACMPEQ(lSameValue);
+	        	break;
+	        	
+	        default:
+	            throw new RuntimeException("Not handled: "+theType);
+			}
+
 		}
 		
-		s.label(l);
+		// Value not equal to cached value
+		{
+			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evFieldRead", "()V"); 
+			sendValue(s, itsTmpValueVar, theType);
+		}
+		
+		if (theCacheSlot != null)
+		{
+			// Update cache
+			s.ILOAD(theType, itsTmpValueVar);
+			s.ISTORE(theType, theCacheSlot);
+
+			s.GOTO(lEndIf);
+			
+			s.label(lSameValue);
+			
+			// Same value as cached
+			{
+				s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evFieldRead_Same", "()V");
+			}
+			
+			s.label(lEndIf);
+		}
+		
+		s.ILOAD(theType, itsTmpValueVar);
 		
 		aInsns.insert(aNode, s);
 	}
 
 	private void processPutField(InsnList aInsns, FieldInsnNode aNode)
 	{
-		SyntaxInsnList s = new SyntaxInsnList(itsLabelManager);
+		SyntaxInsnList s = new SyntaxInsnList();
 		Type theType = Type.getType(aNode.desc);
 		
 		Integer theCacheSlot = itsMethodInfo.getCacheSlot(aNode);
@@ -638,41 +599,27 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 	
 	private void processGetArray(InsnList aInsns, InsnNode aNode)
 	{
-		SyntaxInsnList s = new SyntaxInsnList(itsLabelManager);
-		Label l = new Label();
+		SyntaxInsnList s = new SyntaxInsnList();
 		Type theType = BCIUtils.getType(BCIUtils.getSort(aNode.getOpcode()));
 
-		s.ILOAD(getTraceEnabledVar());
-		s.IFfalse(l);
-		{
-			s.ALOAD(getThreadDataVar()); 
-			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evArrayRead", "()V"); 
-			
-			s.ISTORE(theType, itsTmpValueVar);
-			sendValue(s, itsTmpValueVar, theType);
-			s.ILOAD(theType, itsTmpValueVar);
-		}
+		s.ALOAD(getThreadDataVar()); 
+		s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evArrayRead", "()V"); 
 		
-		s.label(l);
+		s.ISTORE(theType, itsTmpValueVar);
+		sendValue(s, itsTmpValueVar, theType);
+		s.ILOAD(theType, itsTmpValueVar);
 		
 		aInsns.insert(aNode, s);
 	}
 
 	private void processArrayLength(InsnList aInsns, InsnNode aNode)
 	{
-		SyntaxInsnList s = new SyntaxInsnList(itsLabelManager);
-		Label l = new Label();
-		
-		s.ILOAD(getTraceEnabledVar());
-		s.IFfalse(l);
-		{
-			s.DUP();
-			s.ALOAD(getThreadDataVar());
-			s.SWAP();
-			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evArrayLength", "(I)V"); 
-		}
-		
-		s.label(l);
+		SyntaxInsnList s = new SyntaxInsnList();
+
+		s.DUP();
+		s.ALOAD(getThreadDataVar());
+		s.SWAP();
+		s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evArrayLength", "(I)V"); 
 		
 		aInsns.insert(aNode, s);
 	}
@@ -684,22 +631,13 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 	{
 		if (! (aNode.cst instanceof Type) && ! (aNode.cst instanceof String)) return;
 		
-		SyntaxInsnList s = new SyntaxInsnList(null);
-		Label l = new Label();
-		
-		s.ILOAD(getTraceEnabledVar());
-		s.IFfalse(l);
-		{
-			s.DUP();
-			s.ALOAD(getThreadDataVar());
-			s.SWAP();
-			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evCst", "("+BCIUtils.DSC_OBJECT+")V");
-		}
-		
-		s.label(l);
+		SyntaxInsnList s = new SyntaxInsnList();
+
+		s.DUP();
+		s.ALOAD(getThreadDataVar());
+		s.SWAP();
+		s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evCst", "("+BCIUtils.DSC_OBJECT+")V");
 		
 		aInsns.insert(aNode, s);
 	}
-	
-
 }

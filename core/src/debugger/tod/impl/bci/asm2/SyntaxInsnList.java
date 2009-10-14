@@ -49,22 +49,15 @@ import com.sun.org.apache.bcel.internal.generic.ICONST;
  */
 public class SyntaxInsnList extends InsnList
 {
-	private final LabelManager itsLabelManager;
 	private final MethodVisitor itsVisitor;
 	
-	public SyntaxInsnList(LabelManager aLabelManager)
+	public SyntaxInsnList()
 	{
-		itsLabelManager = aLabelManager;
 		MethodNode theNode = new MethodNode();
 		theNode.instructions = this;
 		itsVisitor = theNode;
 	}
 	
-	public Label getLabel(String label)
-	{
-		return itsLabelManager.getLabel(label);
-	}
-
 	/**
 	 * Generates the bytecode that pushes the given value onto the stack
 	 */
@@ -818,22 +811,9 @@ public class SyntaxInsnList extends InsnList
 	/**
 	 * Same as IFEQ
 	 */
-	public void IFfalse(String label)
-	{
-		IFEQ(label);
-	}
-	
-	/**
-	 * Same as IFEQ
-	 */
 	public void IFfalse(Label label)
 	{
 		IFEQ(label);
-	}
-	
-	public void IFEQ(String label) 
-	{
-		itsVisitor.visitJumpInsn(Opcodes.IFEQ, getLabel(label));
 	}
 	
 	public void IFEQ(Label label) 
@@ -844,87 +824,19 @@ public class SyntaxInsnList extends InsnList
 	/**
 	 * Same as IFNE
 	 */
-	public void IFtrue(String label)
-	{
-		IFNE(label);
-	}
-	
-	/**
-	 * Same as IFNE
-	 */
 	public void IFtrue(Label label)
 	{
 		IFNE(label);
 	}
 	
-	public void IFNE(String label) 
-	{
-		itsVisitor.visitJumpInsn(Opcodes.IFNE, getLabel(label));
-	}
-		
 	public void IFNE(Label label) 
 	{
 		itsVisitor.visitJumpInsn(Opcodes.IFNE, label);
 	}
-	
-	public void IFLT(String label) 
-	{
-		itsVisitor.visitJumpInsn(Opcodes.IFLT, getLabel(label));
-	}
-	
-	public void IFGE(String label) 
-	{
-		itsVisitor.visitJumpInsn(Opcodes.IFGE, getLabel(label));
-	}
-	
-	public void IFGT(String label) 
-	{
-		itsVisitor.visitJumpInsn(Opcodes.IFGT, getLabel(label));
-	}
-	
-	public void IFLE(String label) 
-	{
-		itsVisitor.visitJumpInsn(Opcodes.IFLE, getLabel(label));
-	}
-	
-	public void IF_ICMPEQ(String label) 
-	{
-		itsVisitor.visitJumpInsn(Opcodes.IF_ICMPEQ, getLabel(label));
-	}
-	
+		
 	public void IF_ICMPEQ(Label label) 
 	{
 		itsVisitor.visitJumpInsn(Opcodes.IF_ICMPEQ, label);
-	}
-	
-	public void IF_ICMPNE(String label) 
-	{
-		itsVisitor.visitJumpInsn(Opcodes.IF_ICMPNE, getLabel(label));
-	}
-	
-	public void IF_ICMPLT(String label) 
-	{
-		itsVisitor.visitJumpInsn(Opcodes.IF_ICMPLT, getLabel(label));
-	}
-	
-	public void IF_ICMPGE(String label) 
-	{
-		itsVisitor.visitJumpInsn(Opcodes.IF_ICMPGE, getLabel(label));
-	}
-	
-	public void IF_ICMPGT(String label) 
-	{
-		itsVisitor.visitJumpInsn(Opcodes.IF_ICMPGT, getLabel(label));
-	}
-	
-	public void IF_ICMPLE(String label) 
-	{
-		itsVisitor.visitJumpInsn(Opcodes.IF_ICMPLE, getLabel(label));
-	}
-	
-	public void IF_ACMPEQ(String label) 
-	{
-		itsVisitor.visitJumpInsn(Opcodes.IF_ACMPEQ, getLabel(label));
 	}
 	
 	public void IF_ACMPEQ(Label label) 
@@ -932,37 +844,11 @@ public class SyntaxInsnList extends InsnList
 		itsVisitor.visitJumpInsn(Opcodes.IF_ACMPEQ, label);
 	}
 	
-	public void IF_ACMPNE(String label) 
-	{
-		itsVisitor.visitJumpInsn(Opcodes.IF_ACMPNE, getLabel(label));
-	}
-	
-	public void GOTO(String label) 
-	{
-		itsVisitor.visitJumpInsn(Opcodes.GOTO, getLabel(label));
-	}
-	
 	public void GOTO(Label label) 
 	{
 		itsVisitor.visitJumpInsn(Opcodes.GOTO, label);
 	}
 	
-	public void JSR(String label) 
-	{
-		itsVisitor.visitJumpInsn(Opcodes.JSR, getLabel(label));
-	}
-	
-	public void IFNULL(String label) 
-	{
-		itsVisitor.visitJumpInsn(Opcodes.IFNULL, getLabel(label));
-	}
-	
-	public void IFNONNULL(String label) 
-	{
-		itsVisitor.visitJumpInsn(Opcodes.IFNONNULL, getLabel(label));
-	}
-
-
 	/*
 	 * Field instructions
 	 */
@@ -1032,17 +918,6 @@ public class SyntaxInsnList extends InsnList
 	public void IINC(int aVar, int aIncrement)
 	{
 		itsVisitor.visitIincInsn(aVar, aIncrement);
-	}
-	
-	/**
-	 * Inserts a label corresponding to the given name.
-	 * The {@link LabelManager} is used to retrieve the actual label.
-	 */
-	public Label label(String label)
-	{
-		Label theLabel = getLabel(label);
-		label(theLabel);
-		return theLabel;
 	}
 	
 	public void label(Label label)

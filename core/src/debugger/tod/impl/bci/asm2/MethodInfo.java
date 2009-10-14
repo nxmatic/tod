@@ -175,7 +175,7 @@ public class MethodInfo
 		int theSlotCount = 0;
 		
 		// Set up the final structure
-		SyntaxInsnList s = new SyntaxInsnList(null);
+		SyntaxInsnList s = new SyntaxInsnList();
 		Iterator<Map.Entry<IFieldInfo, List<FieldInsnNode>>> theIterator = itsAccessMap.entrySet().iterator();
 		while(theIterator.hasNext())
 		{

@@ -245,7 +245,7 @@ public class ClassInstrumenter
 	{
 		Type theType = Type.getType(aDescriptor);
 		
-		SyntaxInsnList s = new SyntaxInsnList(null);
+		SyntaxInsnList s = new SyntaxInsnList();
 		s.ALOAD(0);
 		s.INVOKEVIRTUAL(aOwner, aName, "()"+theType.getDescriptor());
 		s.IRETURN(theType);
@@ -263,7 +263,7 @@ public class ClassInstrumenter
 		theGetter.maxStack = 2;
 		theGetter.maxLocals = 1;
 		
-		SyntaxInsnList s = new SyntaxInsnList(null);
+		SyntaxInsnList s = new SyntaxInsnList();
 		
 		s.ALOAD(0);
 		s.INVOKESTATIC("java/tod/ObjectIdentity", "get", "("+BCIUtils.DSC_OBJECT+")J");
@@ -295,7 +295,7 @@ public class ClassInstrumenter
 		theGetter.maxStack = 6;
 		theGetter.maxLocals = 1;
 		
-		SyntaxInsnList s = new SyntaxInsnList(null);
+		SyntaxInsnList s = new SyntaxInsnList();
 		Label lReturn = new Label();
 		Label lUnlock = new Label();
 		
@@ -363,7 +363,7 @@ public class ClassInstrumenter
 		theGetter.maxStack = 6;
 		theGetter.maxLocals = 1;
 		
-		SyntaxInsnList s = new SyntaxInsnList(null);
+		SyntaxInsnList s = new SyntaxInsnList();
 		Label lReturn = new Label();
 		Label lUnlock = new Label();
 		
@@ -423,7 +423,7 @@ public class ClassInstrumenter
 		theGetter.maxStack = theType.getSize();
 		theGetter.maxLocals = 1;
 		
-		SyntaxInsnList s = new SyntaxInsnList(null);
+		SyntaxInsnList s = new SyntaxInsnList();
 		
 		s.ALOAD(0);
 		s.GETFIELD(aOwner, aFieldName, aValueDesc);
