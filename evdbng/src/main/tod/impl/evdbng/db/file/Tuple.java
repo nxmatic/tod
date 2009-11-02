@@ -22,8 +22,6 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.evdbng.db.file;
 
-import tod.impl.evdbng.db.file.PagedFile.Page;
-import tod.impl.evdbng.db.file.PagedFile.PageIOStream;
 
 /**
  * A tuple is a kind of record of a fixed length (determined by

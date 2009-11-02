@@ -22,7 +22,7 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.evdbng.db.file;
 
-import tod.impl.evdbng.db.file.PagedFile.PageIOStream;
+import tod.impl.evdbng.db.file.Page.PageIOStream;
 import tod.impl.evdbng.db.file.TupleBuffer.InternalTupleBuffer;
 import tod.impl.evdbng.db.file.TupleBuffer.ObjectPointerTupleBuffer;
 import tod.impl.evdbng.db.file.TupleBuffer.ObjectRefTupleBuffer;

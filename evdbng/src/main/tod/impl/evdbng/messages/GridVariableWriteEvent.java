@@ -36,7 +36,7 @@ import tod.impl.dbgrid.messages.MessageType;
 import tod.impl.evdbng.SplittedConditionHandler;
 import tod.impl.evdbng.db.Indexes;
 import tod.impl.evdbng.db.RoleIndexSet;
-import tod.impl.evdbng.db.file.PagedFile.PageIOStream;
+import tod.impl.evdbng.db.file.Page.PageIOStream;
 
 public class GridVariableWriteEvent extends GridEventNG
 {

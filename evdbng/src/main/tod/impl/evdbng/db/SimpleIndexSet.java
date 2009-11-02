@@ -28,7 +28,7 @@ import tod.impl.evdbng.db.file.BTree;
 import tod.impl.evdbng.db.file.PagedFile;
 import tod.impl.evdbng.db.file.SimpleTree;
 import tod.impl.evdbng.db.file.SimpleTuple;
-import tod.impl.evdbng.db.file.PagedFile.PageIOStream;
+import tod.impl.evdbng.db.file.Page.PageIOStream;
 
 public class SimpleIndexSet extends IndexSet<SimpleTuple> 
 {

@@ -43,7 +43,7 @@ public class TestObjectsDatabase
 	{
 		File theFile = new File("objects.bin");
 		theFile.delete();
-		PagedFile thePagedFile = new PagedFile(theFile);
+		PagedFile thePagedFile = PagedFile.create(theFile, false);
 		
 		TODConfig theConfig = new TODConfig();
 		StructureDatabase theStructureDatabase = StructureDatabase.create(theConfig);

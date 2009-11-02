@@ -38,7 +38,6 @@ import tod.impl.evdbng.db.file.SequenceTree;
 import tod.impl.evdbng.db.file.SimpleTree;
 import tod.impl.evdbng.db.file.Tuple;
 import tod.impl.evdbng.db.file.TupleFinder.NoMatch;
-import zz.utils.bit.BitUtils;
 import zz.utils.monitoring.AggregationType;
 import zz.utils.monitoring.Monitor;
 import zz.utils.monitoring.Probe;

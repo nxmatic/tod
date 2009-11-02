@@ -35,9 +35,9 @@ import tod.impl.evdbng.db.file.ObjectPointerTree;
 import tod.impl.evdbng.db.file.ObjectPointerTuple;
 import tod.impl.evdbng.db.file.ObjectRefTree;
 import tod.impl.evdbng.db.file.ObjectRefTuple;
+import tod.impl.evdbng.db.file.Page;
 import tod.impl.evdbng.db.file.PagedFile;
-import tod.impl.evdbng.db.file.PagedFile.Page;
-import tod.impl.evdbng.db.file.PagedFile.PageIOStream;
+import tod.impl.evdbng.db.file.Page.PageIOStream;
 import zz.utils.monitoring.Monitor;
 
 /**

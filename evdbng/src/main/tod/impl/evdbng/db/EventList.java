@@ -27,10 +27,10 @@ import java.util.Iterator;
 import tod.core.database.structure.IStructureDatabase;
 import tod.impl.evdbng.DebuggerGridConfigNG;
 import tod.impl.evdbng.db.DBExecutor.DBTask;
+import tod.impl.evdbng.db.file.Page;
 import tod.impl.evdbng.db.file.PagedFile;
 import tod.impl.evdbng.db.file.SequenceTree;
-import tod.impl.evdbng.db.file.PagedFile.Page;
-import tod.impl.evdbng.db.file.PagedFile.PageIOStream;
+import tod.impl.evdbng.db.file.Page.PageIOStream;
 import tod.impl.evdbng.db.file.TupleFinder.NoMatch;
 import tod.impl.evdbng.messages.GridEventNG;
 import zz.utils.monitoring.AggregationType;
@@ -204,7 +204,7 @@ public class EventList implements IEventList
 		// Tuple positions start at 0, but page ids start at 1.
 		int thePageId = (int) itsEventIdTree.getTuplePosition(aId, NoMatch.BEFORE) + 1;
 		
-		PagedFile.Page thePage = itsEventsFile.get(thePageId);
+		Page thePage = itsEventsFile.get(thePageId);
 		PageIOStream theStream = thePage.asIOStream();
 		int theFirstEventId = theStream.readInt();
 		

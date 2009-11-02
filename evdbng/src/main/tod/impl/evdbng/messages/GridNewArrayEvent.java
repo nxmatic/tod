@@ -30,15 +30,13 @@ import tod.core.database.event.ILogEvent;
 import tod.core.database.structure.IArrayTypeInfo;
 import tod.core.database.structure.IStructureDatabase;
 import tod.core.database.structure.ITypeInfo;
-import tod.impl.common.event.InstanceOfEvent;
 import tod.impl.common.event.NewArrayEvent;
 import tod.impl.dbgrid.GridLogBrowser;
-import tod.impl.dbgrid.event.InstantiationEvent;
 import tod.impl.dbgrid.messages.MessageType;
 import tod.impl.evdbng.SplittedConditionHandler;
 import tod.impl.evdbng.db.Indexes;
 import tod.impl.evdbng.db.RoleIndexSet;
-import tod.impl.evdbng.db.file.PagedFile.PageIOStream;
+import tod.impl.evdbng.db.file.Page.PageIOStream;
 
 public class GridNewArrayEvent extends GridEventNG
 {

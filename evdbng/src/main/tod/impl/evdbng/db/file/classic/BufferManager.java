@@ -20,7 +20,7 @@ MA 02111-1307 USA
 Parts of this work rely on the MD5 algorithm "derived from the 
 RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 */
-package tod.impl.evdbng.db.file;
+package tod.impl.evdbng.db.file.classic;
 
 import static tod.impl.evdbng.DebuggerGridConfigNG.*;
 
@@ -35,7 +35,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import tod.impl.evdbng.DebuggerGridConfigNG;
-import tod.impl.evdbng.db.file.PagedFile.Page;
+import tod.impl.evdbng.db.file.classic.ClassicPagedFile.FilePage;
 import zz.utils.Utils;
 import zz.utils.list.NakedLinkedList;
 import zz.utils.list.NakedLinkedList.Entry;
@@ -45,7 +45,7 @@ import zz.utils.monitoring.Probe;
 import zz.utils.primitive.FixedIntStack;
 
 /**
- * Manages the shared buffer of {@link PagedFile}s.
+ * Manages the shared buffer of {@link ClassicPagedFile}s.
  * @author gpothier
  */
 public class BufferManager
@@ -70,7 +70,7 @@ public class BufferManager
 	/**
 	 * The page attached to each buffer.
 	 */
-	private final Page[] itsAttachedPages;
+	private final FilePage[] itsAttachedPages;
 	
 	private long itsReadCount = 0;
 	private long itsWriteCount = 0;
@@ -95,7 +95,7 @@ public class BufferManager
 		}
 		itsBuffer.order(ByteOrder.nativeOrder());
 		
-		itsAttachedPages = new Page[itsBufferCount];
+		itsAttachedPages = new FilePage[itsBufferCount];
 		
 		itsPageReplacementAlgorithm = new LRUAlgorithm(itsBufferCount);
 		
@@ -143,7 +143,7 @@ public class BufferManager
 	 * Frees the specified buffer, saves it to the file if dirty, and notifies the attached
 	 * page.
 	 * @return Whether the operation succeeded. The operation fails if the page or its 
-	 * {@link PagedFile} is in use in another thread.
+	 * {@link ClassicPagedFile} is in use in another thread.
 	 */
 	private boolean freeBuffer(int aBufferId)
 	{		
@@ -151,7 +151,7 @@ public class BufferManager
 		{
 			itsLock.lock();
 
-			Page thePage = itsAttachedPages[aBufferId];
+			FilePage thePage = itsAttachedPages[aBufferId];
 			if (thePage == null) return true; // already free.
 
 			// If the page is being used, don't free the buffer (yes, this happens)
@@ -195,7 +195,7 @@ public class BufferManager
 	/**
 	 * Creates a new page.
 	 */
-	public Page create(PagedFile aFile, int aPageId)
+	public FilePage create(ClassicPagedFile aFile, int aPageId)
 	{
 		try
 		{
@@ -206,7 +206,7 @@ public class BufferManager
 			LongBuffer theLongBuffer = thePageData.asLongBuffer();
 			for (int i=0;i<itsPageSize/8;i++) theLongBuffer.put(0);
 			
-			Page thePage = aFile.new Page(theBufferId, aPageId);
+			FilePage thePage = aFile.new FilePage(theBufferId, aPageId);
 			assert itsAttachedPages[theBufferId] == null;
 			itsAttachedPages[theBufferId] = thePage;
 			
@@ -241,7 +241,7 @@ public class BufferManager
 	/**
 	 * Flushed all the buffers that pertain to the given file.
 	 */
-	public void flush(PagedFile aFile)
+	public void flush(ClassicPagedFile aFile)
 	{
 		try
 		{
@@ -249,7 +249,7 @@ public class BufferManager
 
 			for (int i=0;i<itsBufferCount;i++)
 			{
-				Page thePage = itsAttachedPages[i];
+				FilePage thePage = itsAttachedPages[i];
 				if (thePage != null && thePage.getFile() == aFile) freeBuffer(i);
 			}
 		}
@@ -262,13 +262,13 @@ public class BufferManager
 	/**
 	 * Invalidates all the pages of the specified file.
 	 */
-	public void invalidatePages(PagedFile aFile)
+	public void invalidatePages(ClassicPagedFile aFile)
 	{
 		try
 		{
 			itsLock.lock();
 
-			for (Page thePage : itsAttachedPages) 
+			for (FilePage thePage : itsAttachedPages) 
 			{
 				if (thePage != null && thePage.getFile() == aFile) thePage.invalidate();
 			}
@@ -283,7 +283,7 @@ public class BufferManager
 	/**
 	 * Reloads a page from the disk. It is assumed that no buffer already holds this page.
 	 */
-	void loadPage(Page aPage)
+	void loadPage(FilePage aPage)
 	{
 		while (! aPage.getFile().tryLock())
 		{
@@ -320,7 +320,7 @@ public class BufferManager
 	 * This is optional, not calling it has no adverse effects, and the effect of calling
 	 * it is a potiential increase in efficiency.
 	 */
-	public void free(Page aPage)
+	public void free(FilePage aPage)
 	{
 		int theBufferId = aPage.getBufferId();
 		if (theBufferId != -1) itsPageReplacementAlgorithm.free(theBufferId);
@@ -328,7 +328,7 @@ public class BufferManager
 	
 	private void printBuffer(
 			String aLabel, 
-			Page aPage, 
+			FilePage aPage, 
 			int thePhysicalPageId,
 			int aBufferId)
 	{
@@ -363,7 +363,7 @@ public class BufferManager
 	 * @param aPhysPageId Physical id of the page (location on disk), 
 	 * might be different from the logical page id stored in the Page.
 	 */
-	public void write(Page aPage, int aPhysPageId)
+	public void write(FilePage aPage, int aPhysPageId)
 	{
 		try
 		{
@@ -400,7 +400,7 @@ public class BufferManager
 	 * Reads a page to the disk
 	 * @param aPhysPageId Id of the page on disk
 	 */
-	public void read(Page aPage, int aPhysPageId, int aBufferId)
+	public void read(FilePage aPage, int aPhysPageId, int aBufferId)
 	{
 		try
 		{

@@ -24,7 +24,7 @@ package tod.impl.evdbng.db.file;
 
 import tod.core.DebugFlags;
 import tod.impl.dbgrid.db.ObjectsDatabase;
-import tod.impl.evdbng.db.file.PagedFile.PageIOStream;
+import tod.impl.evdbng.db.file.Page.PageIOStream;
 
 /**
  * A {@link BTree} of object pointers for the {@link ObjectsDatabase}.

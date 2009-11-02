@@ -30,7 +30,7 @@ import tod.impl.dbgrid.messages.GridEvent;
 import tod.impl.dbgrid.messages.MessageType;
 import tod.impl.evdbng.db.Indexes;
 import tod.impl.evdbng.db.RoleIndexSet;
-import tod.impl.evdbng.db.file.PagedFile.PageIOStream;
+import tod.impl.evdbng.db.file.Page.PageIOStream;
 import zz.utils.bit.BitStruct;
 
 public abstract class GridEventNG extends GridEvent

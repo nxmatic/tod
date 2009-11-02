@@ -61,7 +61,7 @@ public class TestBTree
 		testKeyMaker(theLastIndex);
 		
 		File theFile = new File("test.bin");
-		SequenceTree theTimestampTree = new SequenceTree("test", new PagedFile(theFile));
+		SequenceTree theTimestampTree = new SequenceTree("test", PagedFile.create(theFile, false));
 		
 		for (int i = theFirstIndex; i<=theLastIndex ; i++)
 		{
@@ -94,7 +94,7 @@ public class TestBTree
 		testKeyMaker(theLastIndex);
 		
 		File theFile = new File("test.bin");
-		SimpleTree theSimpleTree = new SimpleTree("test", new PagedFile(theFile));
+		SimpleTree theSimpleTree = new SimpleTree("test", PagedFile.create(theFile, false));
 		
 		for (int i = theFirstIndex; i<=theLastIndex ; i++)
 		{
@@ -122,7 +122,7 @@ public class TestBTree
 		testKeyMaker(theLastIndex);
 		
 		File theFile = new File("test.bin");
-		RoleTree theRoleTree = new RoleTree("test", new PagedFile(theFile));
+		RoleTree theRoleTree = new RoleTree("test", PagedFile.create(theFile, false));
 		
 		for (int i = theFirstIndex; i<=theLastIndex ; i++)
 		{

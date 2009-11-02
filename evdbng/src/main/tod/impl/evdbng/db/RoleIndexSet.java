@@ -30,7 +30,7 @@ import tod.impl.evdbng.db.file.BTree;
 import tod.impl.evdbng.db.file.PagedFile;
 import tod.impl.evdbng.db.file.RoleTree;
 import tod.impl.evdbng.db.file.RoleTuple;
-import tod.impl.evdbng.db.file.PagedFile.PageIOStream;
+import tod.impl.evdbng.db.file.Page.PageIOStream;
 
 /**
  * An index set where index tuples have associated roles

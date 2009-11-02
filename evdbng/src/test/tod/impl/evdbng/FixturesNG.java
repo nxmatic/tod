@@ -43,7 +43,7 @@ import tod.impl.evdbng.db.EventList;
 import tod.impl.evdbng.db.file.PagedFile;
 import tod.impl.evdbng.db.file.RoleTree;
 import tod.impl.evdbng.db.file.SimpleTree;
-import tod.impl.evdbng.db.file.PagedFile.PageIOStream;
+import tod.impl.evdbng.db.file.Page.PageIOStream;
 import tod.impl.evdbng.messages.GridEventNG;
 import tod.impl.evdbng.queries.EventCondition;
 import tod.impl.evdbng.test.TimestampGenerator;
@@ -60,7 +60,7 @@ public class FixturesNG
 	
 	public static PageIOStream createPageIOStream()
 	{
-		PagedFile theFile = new PagedFile(new File("test"+Math.random()+".bin"));
+		PagedFile theFile = PagedFile.create(new File("test"+Math.random()+".bin"), false);
 		return theFile.create().asIOStream();
 	}
 

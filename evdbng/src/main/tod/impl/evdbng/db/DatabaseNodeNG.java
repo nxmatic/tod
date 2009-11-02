@@ -48,8 +48,7 @@ public class DatabaseNodeNG extends DatabaseNode
 	protected ObjectsDatabase createObjectsDatabase(File aDirectory, String aName)
 	{
 		File theFile = new File(aDirectory, "objects-"+aName+".bin");
-		theFile.delete();
-		PagedFile thePagedFile = new PagedFile(theFile);
+		PagedFile thePagedFile = PagedFile.create(theFile, true);
 		return new ObjectsDatabaseNG(getStructureDatabase(), thePagedFile, thePagedFile);
 	}
 
