@@ -54,7 +54,6 @@ import tod.core.config.TODConfig;
 import tod.core.database.structure.IBehaviorInfo;
 import tod.core.database.structure.IStructureDatabase;
 import tod.impl.bci.asm2.BCIUtils;
-import tod.impl.replay.TmpIdManager;
 import tod.impl.server.BufferStream;
 
 /**

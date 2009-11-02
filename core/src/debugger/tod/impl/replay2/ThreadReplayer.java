@@ -34,7 +34,6 @@ package tod.impl.replay2;
 import gnu.trove.TByteArrayList;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 import org.objectweb.asm.Type;
@@ -44,9 +43,6 @@ import tod.core.database.structure.IBehaviorInfo;
 import tod.core.database.structure.IStructureDatabase;
 import tod.core.database.structure.ObjectId;
 import tod.core.database.structure.IStructureDatabase.BehaviorMonitoringModeChange;
-import tod.impl.replay.IntDeltaReceiver;
-import tod.impl.replay.LongDeltaReceiver;
-import tod.impl.replay.TmpIdManager;
 import tod.impl.server.BufferStream;
 import tod2.agent.Message;
 import tod2.agent.MonitoringMode;

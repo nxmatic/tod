@@ -29,67 +29,40 @@ POSSIBILITY OF SUCH DAMAGE.
 Parts of this work rely on the MD5 algorithm "derived from the RSA Data Security, 
 Inc. MD5 Message-Digest Algorithm".
 */
-package tod.impl.replay;
+package tod.impl.replay2;
 
-import tod.core.database.structure.IStructureDatabase;
-import tod.impl.server.BufferStream;
-import tod2.agent.Message;
+import gnu.trove.TLongLongHashMap;
 
-public abstract class ReplayerFrame
+/**
+ * Creates and manages temporary ids.
+ * Temporary ids are used when an operation produces an object but we cannot
+ * determine its actual id yet. For instance, the NEW bytecode produces an uninitialized
+ * object, of which we cannot obtain the id (because of the verifier).
+ * @author gpothier
+ */
+public class TmpIdManager
 {
-	private ThreadReplayer itsThreadReplayer;
-	private boolean itsFromScope;
+	/**
+	 * Maps temporary ids to definitive ids.
+	 */
+	private final TLongLongHashMap itsTmpIdsMap = new TLongLongHashMap();
+	
+	private long itsNextId = 2; // We use even ids. Odd ids are created by the agent
+	
+	public synchronized long nextId()
+	{
+		long theId = itsNextId;
+		itsNextId += 2;
+		return theId;
+	}
 	
 	/**
-	 * Finishes the setup of this replayer (we don't add these args
-	 * to the constructor to simplify generated code). 
+	 * Associates a temporary id with the corresponding real one, once the relation is known.
 	 */
-	public void setup(ThreadReplayer aThreadReplayer, boolean aFromScope)
+	public synchronized void associate(long aTmpId, long aRealId)
 	{
-		itsThreadReplayer = aThreadReplayer;
+		itsTmpIdsMap.put(aTmpId, aRealId);
 	}
-	
-	public void dispose(ThreadReplayer aThreadReplayer)
-	{
-	}
-	
-	public boolean isFromScope()
-	{
-		return itsFromScope;
-	}
-	
-	public ThreadReplayer getThreadReplayer()
-	{
-		return itsThreadReplayer;
-	}
-	
-	public IStructureDatabase getDatabase()
-	{
-		return getThreadReplayer().getDatabase();
-	}
-	
-	public abstract void processMessage(byte aMessage, BufferStream aBuffer);
 
-	/**
-	 * Transfers a value from the source replayer's stack to this replayer's stack.
-	 */
-	public void transferResult(InScopeReplayerFrame aSource)
-	{
-	}
-	
-	/**
-	 * Transfers a value from the input buffer (usually from {@link Message#BEHAVIOR_ENTER_ARGS})
-	 * to this replayer's stack.
-	 */
-	public void transferResult(BufferStream aBuffer)
-	{
-	}
-	
-	public void expectException()
-	{
-	}
-	
-	public void classloaderReturned()
-	{
-	}
+
 }

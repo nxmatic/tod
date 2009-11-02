@@ -70,7 +70,6 @@ import tod.core.database.structure.IStructureDatabase;
 import tod.core.database.structure.ObjectId;
 import tod.impl.bci.asm2.BCIUtils;
 import tod.impl.bci.asm2.MethodInfo;
-import tod.impl.bci.asm2.SyntaxInsnList;
 import tod.impl.bci.asm2.MethodInfo.BCIFrame;
 import tod2.agent.Message;
 
@@ -956,7 +955,7 @@ public class MethodReplayerGenerator
 	
 	private void processMonitor(InsnList aInsns, InsnNode aNode)
 	{
-		SyntaxInsnList s = new SyntaxInsnList(null);
+		SList s = new SList();
 		s.POP();
 		
 		aInsns.insert(aNode, s);
