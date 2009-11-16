@@ -472,11 +472,11 @@ public abstract class BTree<T extends Tuple>
 	 */
 	public TupleBuffer getPageTupleBuffer(Page aPage, int aLevel)
 	{
-		TupleBuffer theTupleBuffer = aPage.getTupleBuffer();
+		TupleBuffer theTupleBuffer = (TupleBuffer) aPage.getDecodedPage();
 		if (theTupleBuffer != null) return theTupleBuffer;
 		
 		theTupleBuffer = decompress(aPage, aLevel);
-		aPage.setTupleBuffer(theTupleBuffer);
+		aPage.setDecodedPage(theTupleBuffer);
 		
 		return theTupleBuffer;
 	}

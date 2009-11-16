@@ -5,9 +5,9 @@ import java.lang.ref.WeakReference;
 public abstract class Page
 {
 	/**
-	 * Can keep a cache of decompressed tuples.
+	 * Can keep a cache of the decompressed/decoded page
 	 */
-	private WeakReference<TupleBuffer<?>> itsTupleBuffer;
+	private WeakReference<Object> itsDecodedPage;
 	
 	/**
 	 * Logical page id.
@@ -35,19 +35,21 @@ public abstract class Page
 	public abstract void free();
 
 	/**
-	 * Returns the cached tuple buffer, if present.
+	 * Returns the cached decoded page, if present.
 	 */
-	public TupleBuffer<?> getTupleBuffer()
+	public Object getDecodedPage()
 	{
-		return itsTupleBuffer != null ? itsTupleBuffer.get() : null;
+		return itsDecodedPage != null ? itsDecodedPage.get() : null;
 	}
 	
 	/**
-	 * Caches a tuple buffer in this page (weakly referenced).
+	 * Caches a decoded version of the page (weakly referenced).
+	 * Clients should know the semantics of this particular page and attach the correct
+	 * decoded info.
 	 */
-	public void setTupleBuffer(TupleBuffer<?> aTupleBuffer)
+	public void setDecodedPage(Object aDecodedPage)
 	{
-		itsTupleBuffer = aTupleBuffer != null ? new WeakReference<TupleBuffer<?>>(aTupleBuffer) : null;
+		itsDecodedPage = aDecodedPage != null ? new WeakReference<Object>(aDecodedPage) : null;
 	}
 	
 	public abstract boolean readBoolean(int aPosition);
@@ -66,6 +68,7 @@ public abstract class Page
 	public abstract void writeBS(int aPosition, int aByte, int aShort);
 	public abstract void writeBI(int aPosition, int aByte, int aInt);
 	public abstract void writeBL(int aPosition, int aByte, long aLong);
+	public abstract void writeSSSI(int aPosition, short aShort1, short aShort2, short aShort3, int aInt);
 	public abstract void writeInternalTupleData(int aPosition, int aPageId, long aTupleCount);
 	
 	public abstract int getPageSize();
@@ -257,6 +260,12 @@ public abstract class Page
 		{
 			itsPage.writeBL(getPos(), aByte, aLong);
 			skip(9);
+		}
+		
+		public void writeSSSI(short aShort1, short aShort2, short aShort3, int aInt)
+		{
+			itsPage.writeSSSI(getPos(), aShort1, aShort2, aShort3, aInt);
+			skip(10);
 		}
 
 		public static int internalTupleDataSize()
@@ -581,18 +590,18 @@ public abstract class Page
 		 */
 		private void checkSpace(int aSpace)
 		{
-			assert aSpace < itsFile.getPageSize()-2*PageIOStream.pagePointerSize();
+			assert aSpace < PagedFile.PAGE_SIZE-2*PageIOStream.pagePointerSize();
 			if (itsCurrentStream.remaining()-2*PageIOStream.pagePointerSize() >= aSpace) return;
 			
 			Page theNewPage = itsFile.create();
 			
 			// Write next page id on current page
-			itsCurrentStream.setPos(itsFile.getPageSize()-PageIOStream.pagePointerSize());
+			itsCurrentStream.setPos(PagedFile.PAGE_SIZE-PageIOStream.pagePointerSize());
 			itsCurrentStream.writePagePointer(theNewPage.getPageId());
 			
 			// Write previous page id on next page
 			PageIOStream theNewStruct = theNewPage.asIOStream();
-			theNewStruct.setPos(itsFile.getPageSize()-2*PageIOStream.pagePointerSize());
+			theNewStruct.setPos(PagedFile.PAGE_SIZE-2*PageIOStream.pagePointerSize());
 			int theOldPageId = itsCurrentStream.getPage().getPageId();
 			theNewStruct.writePagePointer(theOldPageId);
 			

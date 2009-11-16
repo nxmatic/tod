@@ -50,8 +50,6 @@ public class ClassicPagedFile extends PagedFile
 	private final File itsFile;
 	private FileChannel itsChannel;
 	
-	private final int itsPageSize;
-	
 	/**
 	 * Number of pages currently in the file. 
 	 */
@@ -80,8 +78,6 @@ public class ClassicPagedFile extends PagedFile
 	public ClassicPagedFile(File aFile)
 	{
 		itsFile = aFile;
-		itsPageSize = itsBufferManager.getPageSize();
-		
 		clear();
 	}
 	
@@ -100,15 +96,6 @@ public class ClassicPagedFile extends PagedFile
 		return itsLock.tryLock();
 	}
 
-	/**
-	 * Page size, in bytes.
-	 */
-	@Override
-	public int getPageSize()
-	{
-		return itsPageSize;
-	}
-	
 	@Override
 	public long getPagesCount()
 	{
@@ -332,7 +319,7 @@ public class ClassicPagedFile extends PagedFile
 		{
 			super(aPageId);
 			itsBufferId = aBufferId;
-			itsStartPos = itsBufferId * itsPageSize;
+			itsStartPos = itsBufferId * PAGE_SIZE;
 		}
 		
 		void lock()
@@ -388,7 +375,7 @@ public class ClassicPagedFile extends PagedFile
 
 				assert itsBufferId == -1;
 				itsBufferId = aBufferId;
-				itsStartPos = itsBufferId * itsPageSize;
+				itsStartPos = itsBufferId * PAGE_SIZE;
 				itsDirty = false;
 			}
 			finally
@@ -404,7 +391,7 @@ public class ClassicPagedFile extends PagedFile
 		{
 			itsDirty = true;
 			use(aBufferId);
-			setTupleBuffer(null); // TODO: Maybe necessary to have some way to invalidate the tuple buffer itself
+			setDecodedPage(null); // TODO: Maybe necessary to have some way to invalidate the tuple buffer itself
 		}
 		
 		public boolean isDirty()
@@ -481,7 +468,7 @@ public class ClassicPagedFile extends PagedFile
 			{
 				lock();
 
-				assert aPosition+1 <= itsPageSize;
+				assert aPosition+1 <= PAGE_SIZE;
 
 				getValidBufferId();
 				int thePos = itsStartPos + aPosition;
@@ -501,7 +488,7 @@ public class ClassicPagedFile extends PagedFile
 			{
 				lock();
 
-				assert aPosition+1 <= itsPageSize;
+				assert aPosition+1 <= PAGE_SIZE;
 
 				int theBufferId = getValidBufferId();
 				int thePos = itsStartPos + aPosition;
@@ -522,7 +509,7 @@ public class ClassicPagedFile extends PagedFile
 			{
 				lock();
 
-				assert aPosition+aCount <= itsPageSize;
+				assert aPosition+aCount <= PAGE_SIZE;
 
 				getValidBufferId();
 				int thePos = itsStartPos + aPosition;
@@ -544,7 +531,7 @@ public class ClassicPagedFile extends PagedFile
 			{
 				lock();
 
-				assert aPosition+aCount <= itsPageSize;
+				assert aPosition+aCount <= PAGE_SIZE;
 
 				int theBufferId = getValidBufferId();
 				int thePos = itsStartPos + aPosition;
@@ -567,7 +554,7 @@ public class ClassicPagedFile extends PagedFile
 			{
 				lock();
 
-				assert aPosition+1 <= itsPageSize;
+				assert aPosition+1 <= PAGE_SIZE;
 
 				getValidBufferId();
 				int thePos = itsStartPos + aPosition;
@@ -587,7 +574,7 @@ public class ClassicPagedFile extends PagedFile
 			{
 				lock();
 
-				assert aPosition+1 <= itsPageSize;
+				assert aPosition+1 <= PAGE_SIZE;
 
 				int theBufferId = getValidBufferId();
 				int thePos = itsStartPos + aPosition;
@@ -608,7 +595,7 @@ public class ClassicPagedFile extends PagedFile
 			{
 				lock();
 
-				assert aPosition+2 <= itsPageSize;
+				assert aPosition+2 <= PAGE_SIZE;
 
 				getValidBufferId();
 				int thePos = itsStartPos + aPosition;
@@ -628,7 +615,7 @@ public class ClassicPagedFile extends PagedFile
 			{
 				lock();
 
-				assert aPosition+2 <= itsPageSize;
+				assert aPosition+2 <= PAGE_SIZE;
 
 				int theBufferId = getValidBufferId();
 				int thePos = itsStartPos + aPosition;
@@ -649,7 +636,7 @@ public class ClassicPagedFile extends PagedFile
 			{
 				lock();
 
-				assert aPosition+4 <= itsPageSize;
+				assert aPosition+4 <= PAGE_SIZE;
 
 				getValidBufferId();
 				int thePos = itsStartPos + aPosition;
@@ -669,7 +656,7 @@ public class ClassicPagedFile extends PagedFile
 			{
 				lock();
 
-				assert aPosition+4 <= itsPageSize;
+				assert aPosition+4 <= PAGE_SIZE;
 
 				int theBufferId = getValidBufferId();
 				int thePos = itsStartPos + aPosition;
@@ -690,7 +677,7 @@ public class ClassicPagedFile extends PagedFile
 			{
 				lock();
 
-				assert aPosition+8 <= itsPageSize;
+				assert aPosition+8 <= PAGE_SIZE;
 
 				getValidBufferId();
 				int thePos = itsStartPos + aPosition;
@@ -710,7 +697,7 @@ public class ClassicPagedFile extends PagedFile
 			{
 				lock();
 
-				assert aPosition+8 <= itsPageSize;
+				assert aPosition+8 <= PAGE_SIZE;
 				
 				int theBufferId = getValidBufferId();
 				int thePos = itsStartPos + aPosition;
@@ -731,7 +718,7 @@ public class ClassicPagedFile extends PagedFile
 			{
 				lock();
 
-				assert aPosition+2 <= itsPageSize;
+				assert aPosition+2 <= PAGE_SIZE;
 				
 				int theBufferId = getValidBufferId();
 				int thePos = itsStartPos + aPosition;
@@ -753,7 +740,7 @@ public class ClassicPagedFile extends PagedFile
 			{
 				lock();
 
-				assert aPosition+3 <= itsPageSize;
+				assert aPosition+3 <= PAGE_SIZE;
 				
 				int theBufferId = getValidBufferId();
 				int thePos = itsStartPos + aPosition;
@@ -775,7 +762,7 @@ public class ClassicPagedFile extends PagedFile
 			{
 				lock();
 
-				assert aPosition+5 <= itsPageSize;
+				assert aPosition+5 <= PAGE_SIZE;
 				
 				int theBufferId = getValidBufferId();
 				int thePos = itsStartPos + aPosition;
@@ -797,7 +784,7 @@ public class ClassicPagedFile extends PagedFile
 			{
 				lock();
 
-				assert aPosition+9 <= itsPageSize;
+				assert aPosition+9 <= PAGE_SIZE;
 				
 				int theBufferId = getValidBufferId();
 				int thePos = itsStartPos + aPosition;
@@ -812,10 +799,35 @@ public class ClassicPagedFile extends PagedFile
 			}
 		}
 		
+		
+		@Override
+		public void writeSSSI(int aPosition, short aShort1, short aShort2, short aShort3, int aInt)
+		{
+			try
+			{
+				lock();
+
+				assert aPosition+10 <= PAGE_SIZE;
+				
+				int theBufferId = getValidBufferId();
+				int thePos = itsStartPos + aPosition;
+				
+				getBuffer().putShort(thePos, aShort1);
+				getBuffer().putShort(thePos+2, aShort2);
+				getBuffer().putShort(thePos+4, aShort3);
+				getBuffer().putInt(thePos+6, aInt);
+				modified(theBufferId);
+			}
+			finally
+			{
+				unlock();
+			}
+		}
+
 		@Override
 		public void writeInternalTupleData(int aPosition, int aPageId, long aTupleCount)
 		{
-			assert aPosition+PageIOStream.internalTupleDataSize() <= itsPageSize;
+			assert aPosition+PageIOStream.internalTupleDataSize() <= PAGE_SIZE;
 			
 			int theBufferId = getValidBufferId();
 			int thePos = itsStartPos + aPosition;
@@ -829,7 +841,7 @@ public class ClassicPagedFile extends PagedFile
 		@Override
 		public int getPageSize()
 		{
-			return itsPageSize;
+			return PAGE_SIZE;
 		}
 		
 		@Override

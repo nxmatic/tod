@@ -2,6 +2,7 @@ package tod.impl.evdbng.db.file;
 
 import java.io.File;
 
+import tod.impl.evdbng.DebuggerGridConfigNG;
 import tod.impl.evdbng.db.file.classic.ClassicPagedFile;
 import zz.utils.monitoring.AggregationType;
 import zz.utils.monitoring.Monitor;
@@ -9,6 +10,8 @@ import zz.utils.monitoring.Probe;
 
 public abstract class PagedFile
 {
+	public static final int PAGE_SIZE = DebuggerGridConfigNG.DB_PAGE_SIZE;
+	
 	private long itsReadCount = 0;
 	private long itsWriteCount = 0;
 	private long itsLastAccessedPage = -1;
@@ -31,11 +34,6 @@ public abstract class PagedFile
 	}
 	
 	/**
-	 * Page size, in bytes.
-	 */
-	public abstract int getPageSize();
-	
-	/**
 	 * Returns the number of allocated pages.
 	 */
 	@Probe(key = "file page count", aggr = AggregationType.SUM)
@@ -47,7 +45,7 @@ public abstract class PagedFile
 	@Probe(key = "file storage", aggr = AggregationType.SUM)
 	public long getStorageSpace()
 	{
-		return getPagesCount() * getPageSize();
+		return getPagesCount() * PAGE_SIZE;
 	}
 	
 	/**
@@ -59,13 +57,13 @@ public abstract class PagedFile
 	@Probe(key = "file written bytes", aggr = AggregationType.SUM)
 	public long getWrittenBytes()
 	{
-		return itsWriteCount * getPageSize();
+		return itsWriteCount * PAGE_SIZE;
 	}
 
 	@Probe(key = "file read bytes", aggr = AggregationType.SUM)
 	public long getReadBytes()
 	{
-		return itsReadCount * getPageSize();
+		return itsReadCount * PAGE_SIZE;
 	}
 	
 	@Probe(key = "file written pages", aggr = AggregationType.SUM)
