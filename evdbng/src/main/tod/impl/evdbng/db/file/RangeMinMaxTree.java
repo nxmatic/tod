@@ -8,7 +8,6 @@ import tod.impl.evdbng.db.file.Page.PageIOStream;
  * Succinct representation of a tree, based on the SODA'10 paper
  * of Sadakane and Navarro (http://www.dcc.uchile.cl/~gnavarro/publ.html).
  * 
- * This structure can store a tree of n <= w^c nodes.
  * @author gpothier
  */
 public class RangeMinMaxTree
@@ -16,6 +15,12 @@ public class RangeMinMaxTree
 	private final PagedFile itsFile;
 	private static final int BITS_PER_PAGE = PAGE_SIZE*8;
 	private static final int MAX_LEVELS = 5;
+	
+	/**
+	 * Size in bytes of each tuple (for all levels except 0).
+	 * 3 shorts for e, m and M, and one int for page pointer.
+	 */
+	private static final int TUPLE_BYTES = 10; 
 	
 	/**
 	 * The integer MASKS[i] has the (32-i)th bit set and all other bits are 0.
@@ -46,6 +51,9 @@ public class RangeMinMaxTree
 		itsLevels[0] = itsFile.create().asIOStream();
 	}
 	
+	/**
+	 * Writes an open parenthesis (start of a node)
+	 */
 	public void open()
 	{
 		itsCurrentPacket |= itsCurrentPacketMask;
@@ -57,6 +65,9 @@ public class RangeMinMaxTree
 		if (itsCurrentPacketMask == 0) writePacket();
 	}
 	
+	/**
+	 * Writes a close parenthesis (end of a node)
+	 */
 	public void close()
 	{
 		itsCurrentPacketMask >>>= 1;
@@ -82,11 +93,10 @@ public class RangeMinMaxTree
 		commitLevel(0);
 	}
 	
-	private boolean isShort(int aValue)
-	{
-		return aValue >= Short.MIN_VALUE && aValue <= Short.MAX_VALUE;
-	}
-	
+	/**
+	 * Commits (= finishes) a page at the indicated level.
+	 * This outputs a tuple at the above level, and recursively commits the above page if needed. 
+	 */
 	private void commitLevel(int l)
 	{
 		assert isShort(itsCurrentSum);
@@ -104,11 +114,16 @@ public class RangeMinMaxTree
 		}
 		
 		stream.writeSSSI((short) itsCurrentSum, (short) itsCurrentMin[l], (short) itsCurrentMax[l], itsLevels[l].getPage().getPageId());
-		if (stream.remaining() < 10) commitLevel(l+1);
+		if (stream.remaining() < TUPLE_BYTES) commitLevel(l+1);
 		
 		itsLevels[l] = itsFile.create().asIOStream();
 		
-		itsCurrentMin[l] = itsCurrentMax[l] = 0;
+		itsCurrentMin[l] = itsCurrentMax[l] = itsCurrentSum;
+	}
+	
+	private boolean isShort(int aValue)
+	{
+		return aValue >= Short.MIN_VALUE && aValue <= Short.MAX_VALUE;
 	}
 	
 	/**
@@ -128,7 +143,8 @@ public class RangeMinMaxTree
 	}
 	
 	/**
-	 * Retrives a packet from a leaf node, checking if the requested packet is the current packet
+	 * Retrives a packet from a leaf node.
+	 * This method properly checks if the requested packet is the current packet.
 	 */
 	private int getPacket(Page aPage, int aNumber)
 	{
@@ -138,7 +154,6 @@ public class RangeMinMaxTree
 			if (itsLevels[0].getPos() == aNumber*4) return itsCurrentPacket;
 		}
 		return aPage.readInt(aNumber*4);
-		
 	}
 	
 	/**
@@ -154,32 +169,52 @@ public class RangeMinMaxTree
 		}
 		else
 		{
-			long sPage = n/(PAGE_SIZE/10);
-			int offset = (int) n%(PAGE_SIZE/10);
-			Page parent = getNthPage(sPage, aLevel+1);
+			long parentPage = n/(PAGE_SIZE/TUPLE_BYTES);
+			int offset = (int) n%(PAGE_SIZE/TUPLE_BYTES);
+			Page parent = getNthPage(parentPage, aLevel+1);
 			
 			if (parent.getPageId() == up.getPage().getPageId())
 			{
 				// We might be trying to access the current page
-				if (up.getPos() == offset*10) return itsLevels[aLevel].getPage();
+				if (up.getPos() == offset*TUPLE_BYTES) return itsLevels[aLevel].getPage();
 			}
 			
-			int id = parent.readInt(offset*10 + 6);
+			int id = parent.readInt(offset*TUPLE_BYTES + 6);
 			return itsFile.get(id);
 		}
 	}
 	
-	public void fwdsearch_π()
+	// G[i] = sum(0, i)
+	// The kth leftmost leaf of the tree stores the sub-vector[lk, rk]
+	// e[k] = sum(0, rk)
+	// m[k] = e[k-1] + rmq(lk, rk)
+	// M[k] = e[k-1] + RMQ(lk, rk)
+	private void fwdsearch_π(long i, int d)
+	{
+		// Index of the leaf containing i
+		long k = i/BITS_PER_PAGE;
+		int offset = (int) (i%BITS_PER_PAGE);
+		
+		Page leaf = getNthPage(k, 0);
+		
+		long parentPage = k/(PAGE_SIZE/TUPLE_BYTES);
+		Page parent = getNthPage(parentPage, 1);
+		
+		// Check if the result is in the current page
+		
+		
+		
+		// Compute the global target value we seek: d' = G[i-1]+d = e[k] - sum(π, i, rk) + d
+		int d_ = 2;
+		
+	}
+	
+	private void fwdsearch_ψ()
 	{
 		
 	}
 	
-	public void fwdsearch_ψ()
-	{
-		
-	}
-	
-	public void fwdsearch_Φ()
+	private void fwdsearch_Φ()
 	{
 		
 	}
