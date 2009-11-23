@@ -237,7 +237,7 @@ public class EventList implements IEventList
 	
 	public int getPageSize()
 	{
-		return itsEventsFile.getPageSize();
+		return PagedFile.PAGE_SIZE;
 	}
 	
 	@Probe(key = "event pages", aggr = AggregationType.SUM)

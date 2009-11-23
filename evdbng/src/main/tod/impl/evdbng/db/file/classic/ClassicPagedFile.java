@@ -839,12 +839,6 @@ public class ClassicPagedFile extends PagedFile
 
 		
 		@Override
-		public int getPageSize()
-		{
-			return PAGE_SIZE;
-		}
-		
-		@Override
 		public String toString()
 		{
 			return "Page (pid: "+getPageId()+", bid: "+itsBufferId+")" + super.toString();

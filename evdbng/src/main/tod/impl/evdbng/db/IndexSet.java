@@ -106,7 +106,7 @@ public abstract class IndexSet<T extends Tuple>
 		itsIndexes = new ArrayList<Entry<BTreeWrapper<T>>>();
 		
 		// Init discarded index page directory.
-		itsIndexesPerPage = aFile.getPageSize()/BTree.getSerializedSize();
+		itsIndexesPerPage = PagedFile.PAGE_SIZE/BTree.getSerializedSize();
 		itsIndexPages = new IntArray();
 		
 		Monitor.getInstance().register(this);

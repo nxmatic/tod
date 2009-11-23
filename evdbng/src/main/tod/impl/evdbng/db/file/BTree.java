@@ -328,7 +328,7 @@ public abstract class BTree<T extends Tuple>
 	{
 		PageIOStream theStream = aPage.asIOStream();
 		
-		theStream.setPos(itsFile.getPageSize()-PageIOStream.pagePointerSize()*2);
+		theStream.setPos(PagedFile.PAGE_SIZE-PageIOStream.pagePointerSize()*2);
 		int thePreviousPagePointer = theStream.readPagePointer();
 		int theNextPagePointer = theStream.readPagePointer();
 		
@@ -341,7 +341,7 @@ public abstract class BTree<T extends Tuple>
 		{
 			long theTupleCount = theStream.readLong();
 			theBuffer = itsTupleBufferFactory.create(
-					itsFile.getPageSize(), 
+					PagedFile.PAGE_SIZE, 
 					thePreviousPagePointer, 
 					theNextPagePointer);
 			//TODO set the tuple count (tuple count is accessible from parent 
@@ -351,7 +351,7 @@ public abstract class BTree<T extends Tuple>
 		{
 			// Internal tuples record the page pointer and the number of tuples below (for counts)
 			theBuffer = TupleBufferFactory.INTERNAL.create(
-					itsFile.getPageSize(), 
+					PagedFile.PAGE_SIZE, 
 					thePreviousPagePointer, 
 					theNextPagePointer);
 		}

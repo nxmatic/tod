@@ -201,10 +201,10 @@ public class TestMinMaxTree
 		
 		for(int i=0;i<size;i++)
 		{
-//			if (i < 1) continue;
+//			if (i < 0) continue;
 			for(int v=-size-1;v<=size+1;v++)
 			{
-				if (v<0) continue;
+//				if (v<0) continue;
 				int ref = fwdsearch(bits, size, π, i, v);
 				long test;
 				try

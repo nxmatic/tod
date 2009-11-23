@@ -270,11 +270,13 @@ public class RangeMinMaxTree
 			{
 				int min = page.readShort(j*TUPLE_BYTES + TUPLE_OFFSET_MIN);
 				int max = page.readShort(j*TUPLE_BYTES + TUPLE_OFFSET_MAX);
+				int childId = page.readInt(j*TUPLE_BYTES + TUPLE_OFFSET_PTR);
+				if (childId == 0) return -1;
+				
 				if (isBetween(d_, min, max)) 
 				{
 					level--;
 					kInc /= TUPLES_PER_PAGE;
-					int childId = page.readInt(j*TUPLE_BYTES + TUPLE_OFFSET_PTR);
 					page = itsFile.get(childId);
 					break up;
 				}
@@ -314,7 +316,7 @@ public class RangeMinMaxTree
 		}
 		
 		// Check leaf page
-		result = fwdsearch_π(leaf, 0, d_-lastSum);
+		result = fwdsearch_π(page, 0, d_-lastSum);
 		if (result >= 0) return (k*BITS_PER_PAGE)+result;
 		else throw new RuntimeException("Internal error");
 	}
