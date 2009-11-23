@@ -321,39 +321,151 @@ public class RangeMinMaxTree
 		else throw new RuntimeException("Internal error");
 	}
 	
-	/**
-	 * See {@link #position_π(int, int)}
-	 */
-	private static final byte[] TABLE_POSITION_π = CREATE_TABLE_POSITION_π();
+	// For unit tests
+	long _test_bwdsearch_π(long i, int d)
+	{
+		return bwdsearch_π(i, d);
+	}
+
+	private long bwdsearch_π(long i, int d)
+	{
+		// Index of the leaf containing i
+		long k = i/BITS_PER_PAGE;
+		int offset = (int) (i%BITS_PER_PAGE);
+		
+		Page leaf = getNthPage(k, 0);
+		int sum;
+		
+		// Search within the page (note: we perform the search regardless of the value of d
+		// because we also need to compute the sum).
+		int result = bwdsearch_π(leaf, offset, d);
+		if (result >= 0) return (k*BITS_PER_PAGE)+result;
+		else sum = (result << 1) >> 1;
+		
+		if (itsLevels[1] == null || k == 0) return -1;
+		
+		// Not in the same page, we must walk the tree
+		
+		long km1 = k-1;
+		long parentPageNumber = km1/TUPLES_PER_PAGE;
+		int parentTupleNumber = (int) (km1%TUPLES_PER_PAGE);
+		Page page = getNthPage(parentPageNumber, 1);
+		
+		int e_km1 = page.readShort(parentTupleNumber*TUPLE_BYTES + TUPLE_OFFSET_SUM); 
+		
+		// Compute the global target value we seek: d' = e[k-1] + sum(π, lk, i) - d
+		int d_ = e_km1+sum-d;
+		
+		// Walk up the tree
+		
+		int lastSum = e_km1;
+		
+		int level = 1;
+		long kDec = 1;
+		k -= kDec;
+		up:
+			while(true)
+			{
+				// Check the tuples of the current page
+				for(int j=parentTupleNumber;j>=0;j--)
+				{
+					int min = page.readShort(j*TUPLE_BYTES + TUPLE_OFFSET_MIN);
+					int max = page.readShort(j*TUPLE_BYTES + TUPLE_OFFSET_MAX);
+					int childId = page.readInt(j*TUPLE_BYTES + TUPLE_OFFSET_PTR);
+					if (childId == 0) return -1;
+					
+					if (isBetween(d_, min, max)) 
+					{
+						level--;
+						kDec /= TUPLES_PER_PAGE;
+						page = itsFile.get(childId);
+						break up;
+					}
+					lastSum = page.readShort(j*TUPLE_BYTES + TUPLE_OFFSET_SUM);
+					k -= kDec;
+					if (k < 0) return -1;
+				}
+				
+				level++;
+				kDec *= TUPLES_PER_PAGE;
+				if (itsLevels[level] == null) return -1;
+				
+				long newParentNumber = parentPageNumber/TUPLES_PER_PAGE;
+				int newTupleNumber = (int) (parentPageNumber%TUPLES_PER_PAGE);
+				parentPageNumber = newParentNumber;
+				parentTupleNumber = newTupleNumber;
+				page = getNthPage(parentPageNumber, level);
+			}
+		
+		// Walk down the tree
+		while(level > 0)
+		{
+			for(int j=TUPLES_PER_PAGE-1;j>=0;j--)
+			{
+				int min = page.readShort(j*TUPLE_BYTES + TUPLE_OFFSET_MIN);
+				int max = page.readShort(j*TUPLE_BYTES + TUPLE_OFFSET_MAX);
+				if (isBetween(d_, min, max)) 
+				{
+					level--;
+					kDec /= TUPLES_PER_PAGE;
+					int childId = page.readInt(j*TUPLE_BYTES + TUPLE_OFFSET_PTR);
+					page = itsFile.get(childId);
+					break;
+				}
+				lastSum = page.readShort(j*TUPLE_BYTES + TUPLE_OFFSET_SUM);
+				k -= kDec;
+			}
+		}
+		
+		// Check leaf page
+		result = bwdsearch_π(page, BITS_PER_PAGE-1, d_-lastSum);
+		if (result >= 0) return ((k+1)*BITS_PER_PAGE)-result;
+		else throw new RuntimeException("Internal error");
+	}
 	
-	private static int TABLE_POSITION_π_index(int aData, int aStart, int aValue)
+	/**
+	 * See {@link #fwdpos_π(int, int)}
+	 */
+	private static final byte[] TABLE_FWDPOS_π = new byte[256*8*18];
+	private static final byte[] TABLE_BWDPOS_π = new byte[256*8*18];
+	
+	static
+	{
+		// 256 possible data values
+		// 8 possible starting positions
+		// 17 possible target values + 1 for total byte sum
+		for(int v=-8;v<=9;v++) for (int s=0;s<8;s++) for (int d=0;d<256;d++)
+		{
+			TABLE_FWDPOS_π[fwdpos_π_tableIndex(d, s, v)] = precalculate_fwdpos_π(d, s, v);
+			TABLE_BWDPOS_π[bwdpos_π_tableIndex(d, s, v)] = precalculate_bwdpos_π(d, s, v);
+		}
+	}
+	
+	private static int fwdpos_π_tableIndex(int aData, int aStart, int aValue)
 	{
 		int v = aValue+8;
 		return (aStart*18 + v)*256 + aData;
 	}
 	
-	private static int TABLE_POSITION_π_index0(int aData, int aValue)
+	private static int fwdpos_π_tableIndex0(int aData, int aValue)
 	{
 		int v = aValue+8;
 		return v*256 + aData;
 	}
 	
-	private static byte[] CREATE_TABLE_POSITION_π()
+	private static int bwdpos_π_tableIndex(int aData, int aStart, int aValue)
 	{
-		// 256 possible data values
-		// 8 possible starting positions
-		// 17 possible target values + 1 for total byte sum
-		byte[] table = new byte[256*8*18];
-		
-		for(int v=-8;v<=9;v++) for (int s=0;s<8;s++) for (int d=0;d<256;d++)
-		{
-			table[TABLE_POSITION_π_index(d, s, v)] = precalculate_position_π(d, s, v);
-		}
-		
-		return table;
+		int v = aValue+8;
+		return ((7-aStart)*18 + v)*256 + aData;
 	}
 	
-	private static byte precalculate_position_π(int aData, int aStart, int aValue)
+	private static int bwdpos_π_tableIndex7(int aData, int aValue)
+	{
+		int v = aValue+8;
+		return v*256 + aData;
+	}
+	
+	private static byte precalculate_fwdpos_π(int aData, int aStart, int aValue)
 	{
 		assert isBetween(aStart, 0, 7);
 		
@@ -369,23 +481,58 @@ public class RangeMinMaxTree
 		return (byte) (0x80 | sum);
 	}
 	
+	private static byte precalculate_bwdpos_π(int aData, int aStart, int aValue)
+	{
+		assert isBetween(aStart, 0, 7);
+		
+		int sum = 0;
+		int mask = 1 << (7-aStart);
+		for(int i=aStart;i>=0;i--)
+		{
+			boolean bit = (aData & mask) != 0;
+			sum += bit ? 1 : -1;
+			if (sum == aValue) return (byte) (aStart-i);
+			mask <<= 1;
+		}
+		return (byte) (0x80 | sum);
+	}
+	
 	/**
 	 * Indicates in which position of the given data byte the sum of
 	 * function π, starting at the specified position, reaches the specified value. 
 	 * @param aData The data byte: 0..255
 	 * @param aStart The starting position of the sum: 0..7 (0 is the MSB)
-	 * @param aValue The searched value: anything, but only -8..8 can provide a position
+	 * @param aValue The searched value: -8..9 (9 means we ask the sum)
 	 * @return Positive or 0 means the position (relative to aStart), 
 	 * otherwise returns 0x80 | sum until the end of the byte
 	 */
-	private byte position_π(int aData, int aStart, int aValue)
+	private byte fwdpos_π(int aData, int aStart, int aValue)
 	{
-		return TABLE_POSITION_π[TABLE_POSITION_π_index(aData, aStart, aValue)];
+		return TABLE_FWDPOS_π[fwdpos_π_tableIndex(aData, aStart, aValue)];
 	}
 	
-	private byte position_π(int aData, int aValue)
+	private byte fwdpos_π(int aData, int aValue)
 	{
-		return TABLE_POSITION_π[TABLE_POSITION_π_index0(aData, aValue)];
+		return TABLE_FWDPOS_π[fwdpos_π_tableIndex0(aData, aValue)];
+	}
+	
+	/**
+	 * Indicates in which position of the given data byte the sum of
+	 * function π, starting backward at the specified position, reaches the specified value. 
+	 * @param aData The data byte: 0..255
+	 * @param aStart The starting position of the sum: 0..7 (0 is the MSB)
+	 * @param aValue The searched value: -8..9 (9 means we ask the sum)
+	 * @return Positive or 0 means the position (relative to aStart), 
+	 * otherwise returns 0x80 | sum until the end of the byte.
+	 */
+	private byte bwdpos_π(int aData, int aStart, int aValue)
+	{
+		return TABLE_BWDPOS_π[bwdpos_π_tableIndex(aData, aStart, aValue)];
+	}
+	
+	private byte bwdpos_π(int aData, int aValue)
+	{
+		return TABLE_BWDPOS_π[bwdpos_π_tableIndex7(aData, aValue)];
 	}
 	
 	private static int getByte(int aData, int aByteNumber)
@@ -424,10 +571,10 @@ public class RangeMinMaxTree
 		int byteNumber = packetOffset/8;
 		int byteOffset = packetOffset%8;
 
-		if (byteOffset > 0)
+		if (byteOffset != 0)
 		{
 			// Check if the answer might be in the remaining portion of the first byte
-			byte pos = position_π(
+			byte pos = fwdpos_π(
 					getByte(packet, byteNumber), 
 					byteOffset, 
 					isBetween(d, -8, 8) ? d : 9);
@@ -452,7 +599,7 @@ public class RangeMinMaxTree
 				packet = getPacket(aPage, packetNumber);
 			}
 			
-			byte pos = position_π(getByte(packet, byteNumber), isBetween(d, -8, 8) ? d : 9);
+			byte pos = fwdpos_π(getByte(packet, byteNumber), isBetween(d, -8, 8) ? d : 9);
 			if (pos >= 0) return i+pos;
 			else
 			{
@@ -464,6 +611,68 @@ public class RangeMinMaxTree
 		}
 	}
 
+	// For unit tests
+	int _test_bwdsearch_π(Page aPage, int i, int d)
+	{
+		itsLevels[0].setPos(-1);
+		return bwdsearch_π(aPage, i, d);
+	}
+	
+	/**
+	 * Symmetric of fwdsearch_π
+	 */
+	private int bwdsearch_π(Page aPage, int i, int d)
+	{
+		int originalTarget = d;
+		
+		int packetNumber = i/32;
+		int packetOffset = i%32;
+		
+		int packet = getPacket(aPage, packetNumber);
+		
+		int byteNumber = packetOffset/8;
+		int byteOffset = packetOffset%8;
+		
+		if (byteOffset != 7)
+		{
+			// Check if the answer might be in the remaining portion of the first byte
+			byte pos = bwdpos_π(
+					getByte(packet, byteNumber), 
+					byteOffset, 
+					isBetween(d, -8, 8) ? d : 9);
+			
+			if (pos >= 0) return i-pos;
+			else
+			{
+				pos = (byte) ((byte) (pos << 1) >> 1);
+				d -= pos;
+				i -= byteOffset+1;
+				byteNumber--;
+			}
+		}
+		
+		while(true)
+		{
+			if (byteNumber == -1)
+			{
+				byteNumber = 3;
+				packetNumber--;
+				if (packetNumber < 0) return 0x80000000 | (originalTarget-d);
+				packet = getPacket(aPage, packetNumber);
+			}
+			
+			byte pos = bwdpos_π(getByte(packet, byteNumber), isBetween(d, -8, 8) ? d : 9);
+			if (pos >= 0) return i-pos;
+			else
+			{
+				pos = (byte) ((byte) (pos << 1) >> 1);
+				d -= pos;
+				i -= 8;
+				byteNumber--;
+			}
+		}
+	}
+	
 	
 	private void fwdsearch_ψ()
 	{

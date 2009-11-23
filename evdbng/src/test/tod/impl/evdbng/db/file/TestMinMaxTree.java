@@ -12,7 +12,6 @@ import org.junit.Test;
 
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 import tod.BenchBase;
-import tod.impl.evdbng.DebuggerGridConfigNG;
 
 /**
  * Tests for the {@link RangeMinMaxTree}.
@@ -113,7 +112,7 @@ public class TestMinMaxTree
 	}
 	
 //	@Test
-	public void testFwdSearch_SamePage()
+	public void testSearch_SamePage()
 	{
 		PagedFile file = PagedFile.create(FILE, true);
 		RangeMinMaxTree tree = new RangeMinMaxTree(file);
@@ -149,19 +148,37 @@ public class TestMinMaxTree
 		toPage(bits, page);
 		for(int i=0;i<size;i++)
 		{
+//			if (i < 8) continue;
 			for(int v=-size-1;v<=size+1;v++)
 			{
-				int ref = fwdsearch(bits, size, π, i, v);
-				int test = tree._test_fwdsearch_π(page, i, v);
-				
-				Assert.assertEquals("("+i+", "+v+")", ref, test);
+//				if (v < 2) continue;
+				try
+				{
+					int ref;
+					int test;
+					
+					// Forward search
+					ref = fwdsearch(bits, size, π, i, v);
+					test = tree._test_fwdsearch_π(page, i, v);
+					Assert.assertEquals("("+i+", "+v+")", ref, test);
+					
+					// Backward search
+					ref = bwdsearch(bits, π, i, v);
+					test = tree._test_bwdsearch_π(page, i, v);
+					Assert.assertEquals("("+i+", "+v+")", ref, test);
+				}
+				catch (Throwable e)
+				{
+					e.printStackTrace();
+					Assert.fail("("+i+", "+v+")");
+				}
 			}
 			System.out.println(i);
 		}
 	}
 	
 	@Test
-	public void testFwdSearch()
+	public void testSearch()
 	{
 		BitSet bits = new BitSet();
 
@@ -201,15 +218,24 @@ public class TestMinMaxTree
 		
 		for(int i=0;i<size;i++)
 		{
-//			if (i < 0) continue;
+			if (i < 256) continue;
 			for(int v=-size-1;v<=size+1;v++)
 			{
-//				if (v<0) continue;
-				int ref = fwdsearch(bits, size, π, i, v);
-				long test;
+				if (v < 2) continue;
 				try
 				{
+					int ref;
+					long test;
+					
+					// Forward search
+					ref = fwdsearch(bits, size, π, i, v);
 					test = tree._test_fwdsearch_π(i, v);
+					if (ref < 0) Assert.assertTrue("("+i+", "+v+")", test == -1);
+					else Assert.assertEquals("("+i+", "+v+")", ref, test);
+
+					// Backward search
+					ref = bwdsearch(bits, π, i, v);
+					test = tree._test_bwdsearch_π(i, v);
 					if (ref < 0) Assert.assertTrue("("+i+", "+v+")", test == -1);
 					else Assert.assertEquals("("+i+", "+v+")", ref, test);
 				}
@@ -235,6 +261,20 @@ public class TestMinMaxTree
 			if (sum == d) return i;
 			
 			i++;
+		}
+		return 0x80000000 | sum;
+	}
+	
+	private static int bwdsearch(BitSet aBitSet, Func g, int i, int d)
+	{
+		int sum = 0;
+		while(i >= 0)
+		{
+			boolean bit = aBitSet.get(i);
+			sum += g.apply(bit);
+			if (sum == d) return i;
+			
+			i--;
 		}
 		return 0x80000000 | sum;
 	}
