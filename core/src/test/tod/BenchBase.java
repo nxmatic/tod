@@ -70,6 +70,12 @@ public class BenchBase
 		return new BenchResults(t1-t0, c1-c0, u1-u0);
 	}
 	
+	public static void printBench(String aText, Runnable aRunnable)
+	{
+		BenchResults theResults = benchmark(aRunnable);
+		System.out.println(aText+": "+theResults);
+	}
+	
 	public static class BenchResults
 	{
 		/**

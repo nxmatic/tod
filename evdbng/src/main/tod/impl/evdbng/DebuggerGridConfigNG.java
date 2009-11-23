@@ -87,7 +87,7 @@ public class DebuggerGridConfigNG
 	/**
 	 * Size of file pages in the database
 	 */
-	public static final int DB_PAGE_SIZE = 4096;
+	public static final int DB_PAGE_SIZE = 32;//4096;
 	
 	/**
 	 * Average event size.

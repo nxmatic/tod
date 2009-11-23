@@ -71,8 +71,6 @@ public abstract class Page
 	public abstract void writeSSSI(int aPosition, short aShort1, short aShort2, short aShort3, int aInt);
 	public abstract void writeInternalTupleData(int aPosition, int aPageId, long aTupleCount);
 	
-	public abstract int getPageSize();
-	
 	public PageIOStream asIOStream()
 	{
 		return new PageIOStream(this);
@@ -83,7 +81,7 @@ public abstract class Page
 	{
 		StringBuilder theBuilder = new StringBuilder("[\n");
 		PageIOStream theBitStruct = asIOStream();
-		for (int i=0;i<getPageSize()/16;i++)
+		for (int i=0;i<PagedFile.PAGE_SIZE/16;i++)
 		{
 			theBuilder.append("  ("+i*16+") | ");
 			
@@ -518,7 +516,7 @@ public abstract class Page
 		public void setPos(int aPos)
 		{
 			itsPosition = aPos;
-			assert itsPosition <= itsPage.getPageSize();
+			assert itsPosition <= PagedFile.PAGE_SIZE;
 		}
 		
 		public void rewind()
@@ -536,7 +534,7 @@ public abstract class Page
 		 */
 		public int size()
 		{
-			return itsPage.getPageSize();
+			return PagedFile.PAGE_SIZE;
 		}
 		
 		/**
