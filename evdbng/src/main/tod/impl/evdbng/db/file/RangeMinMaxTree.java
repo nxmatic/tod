@@ -354,6 +354,8 @@ public class RangeMinMaxTree
 		int e_km1 = page.readShort(parentTupleNumber*TUPLE_BYTES + TUPLE_OFFSET_SUM); 
 		
 		// Compute the global target value we seek: d' = e[k-1] + sum(π, lk, i) - d
+		// Note that this gives the bit just to the left of the one we seek.
+		// We assume there is a "virtual" bit at position -1, and sum(-1, -1) = 0
 		int d_ = e_km1+sum-d;
 		
 		// Walk up the tree
@@ -374,6 +376,8 @@ public class RangeMinMaxTree
 					int childId = page.readInt(j*TUPLE_BYTES + TUPLE_OFFSET_PTR);
 					if (childId == 0) return -1;
 					
+					lastSum = page.readShort(j*TUPLE_BYTES + TUPLE_OFFSET_SUM);
+					
 					if (isBetween(d_, min, max)) 
 					{
 						level--;
@@ -381,17 +385,21 @@ public class RangeMinMaxTree
 						page = itsFile.get(childId);
 						break up;
 					}
-					lastSum = page.readShort(j*TUPLE_BYTES + TUPLE_OFFSET_SUM);
+					
 					k -= kDec;
-					if (k < 0) return -1;
+					if (k < 0) 
+					{
+						if (d_ == 0) return 0;
+						else return -1;
+					}
 				}
-				
+
 				level++;
 				kDec *= TUPLES_PER_PAGE;
 				if (itsLevels[level] == null) return -1;
 				
-				long newParentNumber = parentPageNumber/TUPLES_PER_PAGE;
-				int newTupleNumber = (int) (parentPageNumber%TUPLES_PER_PAGE);
+				long newParentNumber = (parentPageNumber-1)/TUPLES_PER_PAGE;
+				int newTupleNumber = (int) ((parentPageNumber-1)%TUPLES_PER_PAGE);
 				parentPageNumber = newParentNumber;
 				parentTupleNumber = newTupleNumber;
 				page = getNthPage(parentPageNumber, level);
@@ -404,6 +412,7 @@ public class RangeMinMaxTree
 			{
 				int min = page.readShort(j*TUPLE_BYTES + TUPLE_OFFSET_MIN);
 				int max = page.readShort(j*TUPLE_BYTES + TUPLE_OFFSET_MAX);
+				lastSum = page.readShort(j*TUPLE_BYTES + TUPLE_OFFSET_SUM);
 				if (isBetween(d_, min, max)) 
 				{
 					level--;
@@ -412,14 +421,15 @@ public class RangeMinMaxTree
 					page = itsFile.get(childId);
 					break;
 				}
-				lastSum = page.readShort(j*TUPLE_BYTES + TUPLE_OFFSET_SUM);
 				k -= kDec;
 			}
 		}
+
+		if (lastSum-d_ == 0) return (k+1)*BITS_PER_PAGE;
 		
 		// Check leaf page
-		result = bwdsearch_π(page, BITS_PER_PAGE-1, d_-lastSum);
-		if (result >= 0) return ((k+1)*BITS_PER_PAGE)-result;
+		result = bwdsearch_π(page, BITS_PER_PAGE-1, lastSum-d_);
+		if (result >= 0) return (k*BITS_PER_PAGE)+result;
 		else throw new RuntimeException("Internal error");
 	}
 	

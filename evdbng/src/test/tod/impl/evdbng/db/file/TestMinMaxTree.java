@@ -23,7 +23,7 @@ public class TestMinMaxTree
 {
 	private static final File FILE = new File("test-rmmt.bin");
 	
-	//@Test
+	@Test
 	public void testGet()
 	{
 		RangeMinMaxTree tree = new RangeMinMaxTree(PagedFile.create(FILE, true));
@@ -111,7 +111,7 @@ public class TestMinMaxTree
 		});
 	}
 	
-//	@Test
+	@Test
 	public void testSearch_SamePage()
 	{
 		PagedFile file = PagedFile.create(FILE, true);
@@ -218,10 +218,8 @@ public class TestMinMaxTree
 		
 		for(int i=0;i<size;i++)
 		{
-			if (i < 256) continue;
 			for(int v=-size-1;v<=size+1;v++)
 			{
-				if (v < 2) continue;
 				try
 				{
 					int ref;
