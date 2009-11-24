@@ -97,6 +97,65 @@ public class RangeMinMaxTree
 		if (itsCurrentPacketMask == 0) writePacket();
 	}
 	
+	public boolean isLeaf(long i)
+	{
+		return isClose(i+1);
+	}
+	
+	public long parent(long i)
+	{
+		return enclose(i);
+	}
+	
+	public long firstChild(long i)
+	{
+		if (isLeaf(i)) return -1;
+		else return i+1;
+	}
+	
+	public long nextSibling(long i)
+	{
+		long s = findclose(i)+1;
+		if (isClose(s)) return -1;
+		else return s;
+	}
+	
+	public long prevSibling(long i)
+	{
+		if (isOpen(i-1)) return -1;
+		else return findopen(i-1);
+	}
+	
+	public long subtreeSize(long i)
+	{
+		return (findclose(i)-i+1)/2;
+	}
+	
+	private boolean isOpen(long i)
+	{
+		return get(i) == true;
+	}
+	
+	private boolean isClose(long i)
+	{
+		return get(i) == false;
+	}
+	
+	private long findclose(long i)
+	{
+		return fwdsearch_π(i, 0);
+	}
+	
+	private long findopen(long i)
+	{
+		return bwdsearch_π(i, 0);
+	}
+	
+	private long enclose(long i)
+	{
+		return bwdsearch_π(i, 2);
+	}
+	
 	private void writePacket()
 	{
 		PageIOStream stream = itsLevels[0];
