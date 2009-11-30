@@ -38,11 +38,14 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import tod.core.config.TODConfig;
 import tod.core.database.structure.IStructureDatabase;
 import tod.impl.database.structure.standard.StructureDatabaseUtils;
+import tod.impl.replay2.EventCollector;
 import tod.impl.replay2.ReplayerWrapper;
 import tod.impl.replay2.TmpIdManager;
 import tod2.agent.Message;
@@ -53,7 +56,7 @@ import zz.utils.Utils;
  * The class that handles the traffic from the debugged VM.
  * @author gpothier
  */
-public class DBSideIOThread
+public abstract class DBSideIOThread
 {
 	private final TODConfig itsConfig;
 	private final IStructureDatabase itsDatabase;
@@ -128,12 +131,15 @@ public class DBSideIOThread
 		}
 	}
 	
+	protected abstract EventCollector createCollector(int aThreadId);
+	
 	private ThreadReplayerThread getReplayerThread(int aThreadId)
 	{
 		ThreadReplayerThread theThread = Utils.listGet(itsReplayerThreads, aThreadId);
 		if (theThread == null)
 		{
-			theThread = new ThreadReplayerThread(itsConfig, itsDatabase, itsTmpIdManager);
+			EventCollector theCollector = createCollector(aThreadId);
+			theThread = new ThreadReplayerThread(itsConfig, itsDatabase, theCollector, itsTmpIdManager);
 			Utils.listSet(itsReplayerThreads, aThreadId, theThread);
 		}
 		return theThread;
@@ -190,8 +196,24 @@ public class DBSideIOThread
 			
 			IStructureDatabase theDatabase = StructureDatabaseUtils.loadDatabase(theDbFile);
 			
-			DBSideIOThread theIOThread = new DBSideIOThread(theConfig, theDatabase, new FileInputStream(theEventsFile), null);
+			final Map<Integer, EventCollector> theCollectors = new HashMap<Integer, EventCollector>();  
+			
+			DBSideIOThread theIOThread = new DBSideIOThread(theConfig, theDatabase, new FileInputStream(theEventsFile), null)
+			{
+				@Override
+				protected EventCollector createCollector(int aThreadId)
+				{
+					EventCollector theCollector = new ObjectAccessDistributionEventCollector();
+					theCollectors.put(aThreadId, theCollector);
+					return theCollector;
+				}
+			};
 			theIOThread.run();
+			
+			for(Map.Entry<Integer, EventCollector> theEntry : theCollectors.entrySet())
+			{
+				System.out.println(theEntry.getKey() + ": " + theEntry.getValue());
+			}
 		}
 		catch (Throwable e)
 		{
@@ -207,6 +229,7 @@ public class DBSideIOThread
 		
 		private final TODConfig itsConfig;
 		private final IStructureDatabase itsDatabase;
+		private final EventCollector itsCollector;
 		private final TmpIdManager itsTmpIdManager;
 		
 		private BufferStream itsStream;
@@ -214,13 +237,16 @@ public class DBSideIOThread
 		
 		public ThreadReplayerThread(
 				TODConfig aConfig, 
-				IStructureDatabase aDatabase, 
+				IStructureDatabase aDatabase,
+				EventCollector aCollector,
 				TmpIdManager aTmpIdManager)
 		{
 			super(ThreadReplayerThread.class.getName()+(T++));
+			setDaemon(true);
 			
 			itsConfig = aConfig;
 			itsDatabase = aDatabase;
+			itsCollector = aCollector;
 			itsTmpIdManager = aTmpIdManager;
 		}
 
@@ -229,7 +255,7 @@ public class DBSideIOThread
 			if (itsStream == null)
 			{
 				itsStream = new BufferStream(aBuffer);
-				itsReplayer = new ReplayerWrapper(itsConfig, itsDatabase, itsTmpIdManager, itsStream);
+				itsReplayer = new ReplayerWrapper(itsConfig, itsDatabase, itsCollector, itsTmpIdManager, itsStream);
 				start();
 				return null;
 			}

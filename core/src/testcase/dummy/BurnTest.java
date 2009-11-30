@@ -32,7 +32,7 @@ import tod.BenchBase.BenchResults;
 public class BurnTest
 {
 	private static int rndSeed = 1234598;
-	private static final int N = 100000;
+	private static final int N = 1000;
 	private static Node root;
 	
 	public static void main(String[] args)

@@ -29,66 +29,83 @@ POSSIBILITY OF SUCH DAMAGE.
 Parts of this work rely on the MD5 algorithm "derived from the RSA Data Security, 
 Inc. MD5 Message-Digest Algorithm".
 */
-package tod.impl.replay2;
+package tod.impl.server;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.HashMap;
-import java.util.Map;
+import tod.core.database.structure.ObjectId;
+import tod.impl.replay2.EventCollector;
 
-import zz.utils.Utils;
-
-public class ReplayerLoader extends ClassLoader
+public class CounterEventCollector extends EventCollector
 {
-	private final ClassLoader itsParent;
-	private final Map<String, byte[]> itsClassesMap = new HashMap<String, byte[]>();
+	private long itsCount = 0;
 
-	public ReplayerLoader(ClassLoader aParent)
+	public long getCount()
 	{
-		itsParent = aParent;
-	}
-	
-	public void addClass(String aName, byte[] aBytecode)
-	{
-		itsClassesMap.put(aName, aBytecode);
-	}
-
-	private boolean shouldLoad(String aName)
-	{
-		return aName.startsWith("tod.impl.replay2.") 
-			&& ! aName.equals(getClass().getName())
-			&& ! aName.equals(TmpIdManager.class.getName())
-			&& ! aName.equals(EventCollector.class.getName());
+		return itsCount;
 	}
 	
 	@Override
-	public Class loadClass(String aName) throws ClassNotFoundException
+	public void fieldRead(ObjectId aTarget, int aFieldId, double aValue)
 	{
-		byte[] theBytecode = itsClassesMap.get(aName);
-		if (theBytecode == null && shouldLoad(aName)) theBytecode = getClassBytecode(aName.replace('.', '/'));
-		
-		if (theBytecode != null) 
-		{
-			return super.defineClass(aName, theBytecode, 0, theBytecode.length);
-		}
-		else 
-		{
-			return itsParent.loadClass(aName);
-		}
+		itsCount++;
 	}
-	
-	public static byte[] getClassBytecode(String aClassName)
-	{
-		try
-		{
-			InputStream theStream = ReplayerLoader.class.getResourceAsStream("/"+aClassName+".class");
-			return Utils.readInputStream_byte(theStream);
-		}
-		catch (IOException e)
-		{
-			throw new RuntimeException(e);
-		}
-	}
-	
 
+	@Override
+	public void fieldRead(ObjectId aTarget, int aFieldId, float aValue)
+	{
+		itsCount++;
+	}
+
+	@Override
+	public void fieldRead(ObjectId aTarget, int aFieldId, int aValue)
+	{
+		itsCount++;
+	}
+
+	@Override
+	public void fieldRead(ObjectId aTarget, int aFieldId, long aValue)
+	{
+		itsCount++;
+	}
+
+	@Override
+	public void fieldRead(ObjectId aTarget, int aFieldId, ObjectId aValue)
+	{
+		itsCount++;
+	}
+
+	@Override
+	public void fieldWrite(ObjectId aTarget, int aFieldId, double aValue)
+	{
+		itsCount++;
+	}
+
+	@Override
+	public void fieldWrite(ObjectId aTarget, int aFieldId, float aValue)
+	{
+		itsCount++;
+	}
+
+	@Override
+	public void fieldWrite(ObjectId aTarget, int aFieldId, int aValue)
+	{
+		itsCount++;
+	}
+
+	@Override
+	public void fieldWrite(ObjectId aTarget, int aFieldId, long aValue)
+	{
+		itsCount++;
+	}
+
+	@Override
+	public void fieldWrite(ObjectId aTarget, int aFieldId, ObjectId aValue)
+	{
+		itsCount++;
+	}
+	
+	@Override
+	public String toString()
+	{
+		return "Count: "+itsCount;
+	}
 }

@@ -641,4 +641,15 @@ public class TODConfig extends PublicCloneable implements Serializable
 		return theConfig;
 	}
 
+	/**
+	 * This is a hack to allow debugging the database with TOD.
+	 * Without this, the collector port passed to the native agent
+	 * is always the same as the one the server tries to listen to.
+	 */
+	public int getPort()
+	{
+		return ConfigUtils.readInt("debug-server-port", get(TODConfig.COLLECTOR_PORT));
+	}
+	
+
 }

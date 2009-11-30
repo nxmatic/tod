@@ -71,15 +71,17 @@ import tod.core.database.structure.ObjectId;
 import tod.impl.bci.asm2.BCIUtils;
 import tod.impl.bci.asm2.MethodInfo;
 import tod.impl.bci.asm2.MethodInfo.BCIFrame;
+import tod.impl.database.structure.standard.StructureDatabaseUtils;
 import tod2.agent.Message;
 
 public class MethodReplayerGenerator
 {
 	public static final Type TYPE_OBJECTID = Type.getType(ObjectId.class);
 	public static final String CLS_REPLAYERFRAME = BCIUtils.getJvmClassName(ReplayerFrame.class);
+	public static final String DSC_REPLAYERFRAME = "L"+CLS_REPLAYERFRAME+";";
+	public static final String CLS_EVENTCOLLECTOR = BCIUtils.getJvmClassName(EventCollector.class);
+	public static final String DSC_EVENTCOLLECTOR = "L"+CLS_EVENTCOLLECTOR+";";
 	public static final String CLS_INSCOPEREPLAYERFRAME = BCIUtils.getJvmClassName(InScopeReplayerFrame.class);
-	public static final String CLS_FRAME = BCIUtils.getJvmClassName(ReplayerFrame.class);
-	public static final String DSC_FRAME = "L"+CLS_FRAME+";";
 	public static final String CLS_HANDLERREACHED = BCIUtils.getJvmClassName(HandlerReachedException.class);
 
 	private final TODConfig itsConfig;
@@ -102,6 +104,12 @@ public class MethodReplayerGenerator
 	 * A variable slot that can hold a normal or double value.
 	 */
 	private int itsTmpVar;
+	
+	/**
+	 * A temporary variable used to store the target of operations.
+	 */
+	private int itsTmpTargetVar;
+	private int itsTmpValueVar;
 	
 	private int itsSaveArgsSlots;
 	
@@ -196,6 +204,8 @@ public class MethodReplayerGenerator
 		itsSaveArgsSlots = nextFreeVar(computeMaxSaveArgsSpace(itsMethodNode.instructions));
 
 		itsTmpVar = nextFreeVar(2);
+		itsTmpTargetVar = nextFreeVar(1);
+		itsTmpValueVar = nextFreeVar(2);
 		
 		// Create constructor
 		addConstructor();
@@ -403,6 +413,15 @@ public class MethodReplayerGenerator
 		return theVar;
 	}
 	
+	/**
+	 * Generates the bytecode that pushes the current collector on the stack.
+	 */
+	private static void pushCollector(SList s)
+	{
+		s.ALOAD(0);
+		s.INVOKEVIRTUAL(CLS_REPLAYERFRAME, "getCollector", "()"+DSC_EVENTCOLLECTOR);
+	}
+	
 	private void processInstructions(InsnList aInsns)
 	{
 		ListIterator<AbstractInsnNode> theIterator = aInsns.iterator();
@@ -580,14 +599,14 @@ public class MethodReplayerGenerator
 			// Obtain frame
 			s.ALOAD(0);
 			s.pushInt(theBehaviorId);
-			s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "invoke", "(I)"+DSC_FRAME);
+			s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "invoke", "(I)"+DSC_REPLAYERFRAME);
 			
 			// Reload arguments
 			genLoadArgs(s, theArgTypes, theStatic);
 			
 			// Invoke
 			String[] theSignature = getInvokeMethodSignature(theStatic, theArgTypes, theReturnType);
-			s.INVOKEVIRTUAL(CLS_FRAME, theSignature[0], theSignature[1]);
+			s.INVOKEVIRTUAL(CLS_REPLAYERFRAME, theSignature[0], theSignature[1]);
 		}
 		
 		if (theExpectObjectInitialized)
@@ -759,7 +778,8 @@ public class MethodReplayerGenerator
 		Label lError = new Label();
 		Label lEndIf = new Label();
 		
-		if (aNode.getOpcode() != Opcodes.GETSTATIC) s.POP(); // Pop target
+		if (aNode.getOpcode() == Opcodes.GETSTATIC) s.ACONST_NULL(); // Push "null" target
+		s.ASTORE(itsTmpTargetVar); // Store target
 		
 		s.ALOAD(0);
 		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "getNextMessage", "()B");
@@ -799,6 +819,18 @@ public class MethodReplayerGenerator
 			}
 			
 		s.label(lEndIf);
+
+		s.ISTORE(theType, itsTmpValueVar);
+		
+		// Register event
+		pushCollector(s);
+		
+		s.ALOAD(itsTmpTargetVar);
+		s.LDC(StructureDatabaseUtils.getFieldId(itsDatabase, aNode.owner, aNode.name));
+		s.ILOAD(theType, itsTmpValueVar);
+		s.INVOKEVIRTUAL(CLS_EVENTCOLLECTOR, "fieldRead", "("+DSC_OBJECTID+"I"+getActualType(theType).getDescriptor()+")V");
+		
+		s.ILOAD(theType, itsTmpValueVar);		
 		
 		aInsns.insert(aNode, s);
 		aInsns.remove(aNode);
@@ -809,8 +841,17 @@ public class MethodReplayerGenerator
 		Type theType = getTypeOrId(Type.getType(aNode.desc).getSort());
 		
 		SList s = new SList();
-		s.POP(theType); // Pop value
-		if (aNode.getOpcode() != Opcodes.PUTSTATIC) s.POP(); // Pop target
+		s.ISTORE(theType, itsTmpValueVar);
+		if (aNode.getOpcode() == Opcodes.PUTSTATIC) s.ACONST_NULL(); // Push "null" target
+		s.ASTORE(itsTmpTargetVar); // Store target
+		
+		// Register event
+		pushCollector(s);
+		
+		s.ALOAD(itsTmpTargetVar);
+		s.LDC(StructureDatabaseUtils.getFieldId(itsDatabase, aNode.owner, aNode.name));
+		s.ILOAD(theType, itsTmpValueVar);
+		s.INVOKEVIRTUAL(CLS_EVENTCOLLECTOR, "fieldWrite", "("+DSC_OBJECTID+"I"+getActualType(theType).getDescriptor()+")V");
 		
 		aInsns.insert(aNode, s);
 		aInsns.remove(aNode);

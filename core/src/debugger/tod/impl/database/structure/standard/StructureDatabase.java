@@ -135,6 +135,11 @@ implements Serializable, IShareableStructureDatabase
 		itsMethodGroupManager = new MethodGroupManager(this);
 	}
 	
+	private static String transformClassName(String aName)
+	{
+		return aName.replace('.', '/');
+	}
+	
 	private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException
 	{
 		in.defaultReadObject();
@@ -273,6 +278,7 @@ implements Serializable, IShareableStructureDatabase
 
 	public IClassInfo getClass(String aName, String aChecksum, boolean aFailIfAbsent)
 	{
+		aName = transformClassName(aName);
 		ClassNameInfo theClassNameInfo = itsClassNameInfos.get(aName);
 		if (theClassNameInfo == null && itsFile != null)
 		{
@@ -289,6 +295,7 @@ implements Serializable, IShareableStructureDatabase
 
 	public ClassInfo getClass(String aName, boolean aFailIfAbsent)
 	{
+		aName = transformClassName(aName);
 		ClassNameInfo theClassNameInfo = itsClassNameInfos.get(aName);
 		if (theClassNameInfo == null) 
 		{
@@ -300,6 +307,7 @@ implements Serializable, IShareableStructureDatabase
 
 	public ClassInfo[] getClasses(String aName)
 	{
+		aName = transformClassName(aName);
 		ClassNameInfo theClassNameInfo = itsClassNameInfos.get(aName);
 		if (theClassNameInfo == null) 
 		{
@@ -323,19 +331,21 @@ implements Serializable, IShareableStructureDatabase
 		for (Listener theListener : itsListeners) theListener.classAdded(aClass);
 	}
 	
-	protected ClassNameInfo getClassNameInfo(String aClassName)
+	protected ClassNameInfo getClassNameInfo(String aName)
 	{
-		ClassNameInfo theClassNameInfo = itsClassNameInfos.get(aClassName);
+		aName = transformClassName(aName);
+		ClassNameInfo theClassNameInfo = itsClassNameInfos.get(aName);
 		if (theClassNameInfo == null)
 		{
 			theClassNameInfo = new ClassNameInfo();
-			itsClassNameInfos.put(aClassName, theClassNameInfo);
+			itsClassNameInfos.put(aName, theClassNameInfo);
 		}
 		return theClassNameInfo;
 	}
 	
 	public ClassInfo getNewClass(String aName)
 	{
+		aName = transformClassName(aName);
 		ClassInfo theClass = getClass(aName, false);
 		if (theClass == null)
 		{
@@ -348,6 +358,7 @@ implements Serializable, IShareableStructureDatabase
 	
 	public ClassInfo addClass(int aId, String aName)
 	{
+		aName = transformClassName(aName);
 		ClassInfo theClass = getClass(aId, false);
 		if (theClass != null)
 		{
@@ -442,6 +453,7 @@ implements Serializable, IShareableStructureDatabase
 			boolean aCreateIfAbsent, 
 			boolean aFailIfAbsent)
 	{
+		aName = transformClassName(aName);
 		Type theType = Type.getType(aName);
 		switch(theType.getSort())
 		{

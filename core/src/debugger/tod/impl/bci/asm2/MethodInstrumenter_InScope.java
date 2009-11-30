@@ -50,7 +50,6 @@ import org.objectweb.asm.tree.TryCatchBlockNode;
 import tod.Util;
 import tod.core.database.structure.IMutableBehaviorInfo;
 import tod.core.database.structure.IMutableClassInfo;
-import tod.impl.replay2.SList;
 
 /**
  * Instruments in-scope methods.
@@ -422,7 +421,7 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evUnmonitoredBehaviorException", "()V");
 		s.ATHROW();
 		
-		getNode().visitTryCatchBlock(lHnStart, lHnEnd, lHandler, null);
+		getNode().visitTryCoioioiatchBlock(lHnStart, lHnEnd, lHandler, null);
 	}
 
 	private void processInvoke_TraceEnabled_Constructor(

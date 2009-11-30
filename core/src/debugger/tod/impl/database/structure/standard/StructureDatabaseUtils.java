@@ -26,6 +26,8 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 
+import tod.core.database.structure.IClassInfo;
+import tod.core.database.structure.IFieldInfo;
 import tod.core.database.structure.IMutableBehaviorInfo;
 import tod.core.database.structure.IMutableClassInfo;
 import tod.core.database.structure.IMutableStructureDatabase;
@@ -58,6 +60,17 @@ public class StructureDatabaseUtils
 		// but for now I don't know how to do it correctly (and it does not really matter).
 		IMutableBehaviorInfo theBehavior = theClass.getNewBehavior(aMethodName, aMethodSignature, false);
 		return theBehavior.getId();
+	}
+	
+	public static int getFieldId(
+			IStructureDatabase aStructureDatabase, 
+			String aClassName, 
+			String aFieldName)
+	{
+		IClassInfo theClass = aStructureDatabase.getClass(aClassName, true);
+		IFieldInfo theField = theClass.getField(aFieldName);
+		if (theField == null) throw new RuntimeException("Field not found: "+aClassName+"."+aFieldName);
+		return theField.getId();
 	}
 	
 	/**

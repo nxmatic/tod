@@ -108,11 +108,11 @@ public class TracedMethods
 		if (! AgentReady.CAPTURE_ENABLED) return false;
 		switch(getMode(aId))
 		{
-		case MonitoringMode.FULL: throw new Error("Mode cannot be FULL");
-		case MonitoringMode.SPECIAL: throw new Error("Mode cannot be SPCIAL");
+		case MonitoringMode.FULL: throw new TODError("Mode cannot be FULL");
+		case MonitoringMode.SPECIAL: throw new TODError("Mode cannot be SPCIAL");
 		case MonitoringMode.NONE: return false;
 		case MonitoringMode.ENVELOPPE: return true;
-		default: throw new Error("Invalid mode");
+		default: throw new TODError("Invalid mode");
 		}
 	}
 	
@@ -126,11 +126,11 @@ public class TracedMethods
 		if (! AgentReady.CAPTURE_ENABLED) return false;
 		switch(getMode(aId))
 		{
-		case MonitoringMode.ENVELOPPE: throw new Error("Mode cannot be ENVELOPPE");
-		case MonitoringMode.SPECIAL: throw new Error("Mode cannot be SPCIAL");
+		case MonitoringMode.ENVELOPPE: throw new TODError("Mode cannot be ENVELOPPE");
+		case MonitoringMode.SPECIAL: throw new TODError("Mode cannot be SPCIAL");
 		case MonitoringMode.NONE: return false;
 		case MonitoringMode.FULL: return true;
-		default: throw new Error("Invalid mode");
+		default: throw new TODError("Invalid mode");
 		}
 	}
 	
@@ -147,7 +147,7 @@ public class TracedMethods
 		case MonitoringMode.ENVELOPPE: 
 		case MonitoringMode.SPECIAL: return false;
 		case MonitoringMode.NONE: return true;
-		default: throw new Error("Invalid mode");
+		default: throw new TODError("Invalid mode");
 		}
 	}
 

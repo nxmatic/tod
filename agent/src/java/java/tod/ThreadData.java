@@ -188,16 +188,19 @@ public final class ThreadData
 	private void pushInScope()
 	{
 		itsScopeStack.push(true);
+		if (AgentDebugFlags.EVENT_LOG) echoPushScope(true);
 	}
 	
 	private void pushOutOfScope()
 	{
 		itsScopeStack.push(false);
+		if (AgentDebugFlags.EVENT_LOG) echoPushScope(false);
 	}
 	
 	private boolean popScope()
 	{
 		boolean thePop = itsScopeStack.pop();
+		if (AgentDebugFlags.EVENT_LOG) echoPopScope(thePop);
 		return thePop;
 	}
 	
@@ -223,7 +226,25 @@ public final class ThreadData
 		}
 		_IO.out(theBuilder.toString());		
 	}
+	
+	public void echoPushScope(boolean aInScope)
+	{
+		_StringBuilder theBuilder = new _StringBuilder();
+		theBuilder.append(getId());
+		theBuilder.append(" >>>");
+		theBuilder.append(aInScope ? "In" : "Out");
+		_IO.out(theBuilder.toString());
+	}
 
+	public void echoPopScope(boolean aInScope)
+	{
+		_StringBuilder theBuilder = new _StringBuilder();
+		theBuilder.append(getId());
+		theBuilder.append(" <<<");
+		theBuilder.append(aInScope ? "In" : "Out");
+		_IO.out(theBuilder.toString());
+	}
+	
 	private static void sendValueType(_ByteBuffer aBuffer, byte aType) 
 	{
 		aBuffer.put(aType);
@@ -649,7 +670,7 @@ public final class ThreadData
 		
 		msgStop();
 		commitBuffer();
-		if (popScope()) throw new Error("Unexpected scope state");
+		if (popScope()) throw new TODError("Unexpected scope state");
 		exit();
 	}
 	
@@ -786,9 +807,10 @@ public final class ThreadData
 		if (enter()) return;
 		
 		msgStart(Message.INSCOPE_BEHAVIOR_EXIT_NORMAL, 0);
+		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.INSCOPE_BEHAVIOR_EXIT_NORMAL, -1); 
 		msgStop();
 		
-		if (! popScope()) throw new Error("Unexpected scope state");
+		if (! popScope()) throw new TODError("Unexpected scope state");
 		
 		exit();
 	}
@@ -806,7 +828,7 @@ public final class ThreadData
 		
 		commitBuffer();
 		
-		if (! popScope()) throw new Error("Unexpected scope state");
+		if (! popScope()) throw new TODError("Unexpected scope state");
 		
 		exit();
 	}
@@ -866,7 +888,7 @@ public final class ThreadData
 		
 		commitBuffer();
 
-		if (popScope()) throw new Error("Unexpected scope state");
+		if (popScope()) throw new TODError("Unexpected scope state");
 		
 		exit();
 	}
@@ -902,7 +924,7 @@ public final class ThreadData
 		
 		commitBuffer();
 		
-		if (popScope()) throw new Error("Unexpected scope state");
+		if (popScope()) throw new TODError("Unexpected scope state");
 		
 		exit();
 	}
@@ -916,6 +938,7 @@ public final class ThreadData
 		if (enter()) return;
 		
 		msgStart(Message.UNMONITORED_BEHAVIOR_CALL, 0);
+		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.UNMONITORED_BEHAVIOR_CALL, -1); 
 		msgStop();
 		pushOutOfScope();
 		
@@ -940,7 +963,7 @@ public final class ThreadData
 		
 		commitBuffer();
 		
-		if (popScope()) throw new Error("Unexpected scope state");
+		if (popScope()) throw new TODError("Unexpected scope state");
 		
 		exit();
 	}
@@ -962,7 +985,7 @@ public final class ThreadData
 		
 		commitBuffer();
 		
-		if (popScope()) throw new Error("Unexpected scope state");
+		if (popScope()) throw new TODError("Unexpected scope state");
 		
 		exit();
 	}
@@ -975,8 +998,9 @@ public final class ThreadData
 		if (enter()) return;
 		
 		msgStart(Message.UNMONITORED_BEHAVIOR_CALL_EXCEPTION, 0);
+		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.UNMONITORED_BEHAVIOR_CALL_EXCEPTION, -1); 
 		msgStop();
-		if (popScope()) throw new Error("Unexpected scope state");
+		if (popScope()) throw new TODError("Unexpected scope state");
 		
 		exit();
 	}

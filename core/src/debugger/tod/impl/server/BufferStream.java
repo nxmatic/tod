@@ -66,7 +66,7 @@ public class BufferStream
 		if (itsFinished) return null;
 		try
 		{
-			while (itsNextBuffer == null) wait();
+			while (itsNextBuffer == null && ! itsFinished) wait();
 		}
 		catch (InterruptedException e)
 		{

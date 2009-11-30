@@ -69,6 +69,7 @@ public class ReplayerWrapper
 	public ReplayerWrapper(
 			TODConfig aConfig, 
 			IStructureDatabase aDatabase, 
+			EventCollector aCollector,
 			TmpIdManager aTmpIdManager,
 			BufferStream aBuffer)
 	{
@@ -81,10 +82,11 @@ public class ReplayerWrapper
 					ReplayerLoader.class, 
 					TODConfig.class, 
 					IStructureDatabase.class, 
+					EventCollector.class,
 					TmpIdManager.class, 
 					BufferStream.class);
 			
-			itsReplayer = theConstructor.newInstance(itsLoader, aConfig, aDatabase, aTmpIdManager, aBuffer);
+			itsReplayer = theConstructor.newInstance(itsLoader, aConfig, aDatabase, aCollector, aTmpIdManager, aBuffer);
 		}
 		catch (Exception e)
 		{

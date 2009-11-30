@@ -79,15 +79,19 @@ public class ThreadReplayer
 	
 	private final ReplayerGenerator itsGenerator;
 	
+	private final EventCollector itsCollector;
+	
 	public ThreadReplayer(
 			ReplayerLoader aLoader,
 			TODConfig aConfig, 
 			IStructureDatabase aDatabase, 
+			EventCollector aCollector,
 			TmpIdManager aTmpIdManager,
 			BufferStream aBuffer)
 	{
 		itsConfig = aConfig;
 		itsDatabase = aDatabase;
+		itsCollector = aCollector;
 		itsTmpIdManager = aTmpIdManager;
 		itsStream = aBuffer;
 		itsGenerator = new ReplayerGenerator(aLoader, itsConfig, itsDatabase);
@@ -106,6 +110,10 @@ public class ThreadReplayer
 		return itsDatabase;
 	}
 	
+	public EventCollector getCollector()
+	{
+		return itsCollector;
+	}
 	
 	public final void echo(String aText, Object... aArgs)
 	{

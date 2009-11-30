@@ -50,6 +50,7 @@ import tod.core.database.structure.IClassInfo;
 import tod.core.database.structure.IMutableBehaviorInfo;
 import tod.core.database.structure.IMutableClassInfo;
 import tod.core.database.structure.IMutableStructureDatabase;
+import tod.core.database.structure.ITypeInfo;
 import tod2.access.TODAccessor;
 import tod2.agent.Message;
 import zz.utils.Utils;
@@ -191,6 +192,13 @@ public class ClassInstrumenter
 		
 		// Process each method
 		for(MethodNode theNode : (List<MethodNode>) itsNode.methods) processMethod(theNode);
+		
+		// Ensure all the fields are added
+		for(FieldNode theNode : (List<FieldNode>) itsNode.fields) 
+		{
+			ITypeInfo theType = getDatabase().getNewType(theNode.desc);
+			itsClassInfo.getNewField(theNode.name, theType, BCIUtils.isStatic(theNode.access));
+		}
 
 		// Add infrastructure
 		if (! itsInterface

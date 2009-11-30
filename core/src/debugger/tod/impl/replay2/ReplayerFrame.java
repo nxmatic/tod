@@ -45,7 +45,7 @@ public abstract class ReplayerFrame
 	private BufferStream itsStream;
 	private boolean itsFromScope;
 	private Type itsReturnType;
-
+	
 	public void setup(ThreadReplayer aReplayer, BufferStream aStream, boolean aFromScope, Type aReturnType)
 	{
 		itsReplayer = aReplayer;
@@ -57,6 +57,11 @@ public abstract class ReplayerFrame
 	public ThreadReplayer getReplayer()
 	{
 		return itsReplayer;
+	}
+	
+	public EventCollector getCollector()
+	{
+		return getReplayer().getCollector();
 	}
 	
 	public BufferStream getStream()

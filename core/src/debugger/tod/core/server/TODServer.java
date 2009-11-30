@@ -50,20 +50,10 @@ public abstract class TODServer extends Server
 	
 	public TODServer(TODConfig aConfig)
 	{
-		super(getPort(aConfig), DebugFlags.TOD_SERVER_DAEMON);
+		super(aConfig.getPort(), DebugFlags.TOD_SERVER_DAEMON);
 		TODUtils.logf(0, "TODServer on port: %d", getPort());
 
 		itsConfig = aConfig;
-	}
-	
-	/**
-	 * This is a hack to allow debugging the database with TOD.
-	 * Without this, the collector port passed to the native agent
-	 * is always the same as the one the server tries to listen to.
-	 */
-	private static int getPort(TODConfig aConfig)
-	{
-		return ConfigUtils.readInt("debug-server-port", aConfig.get(TODConfig.COLLECTOR_PORT));
 	}
 	
 	public void setConfig(TODConfig aConfig)
