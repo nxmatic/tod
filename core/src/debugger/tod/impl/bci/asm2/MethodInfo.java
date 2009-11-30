@@ -51,6 +51,7 @@ import org.objectweb.asm.tree.LookupSwitchInsnNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
 import org.objectweb.asm.tree.TableSwitchInsnNode;
+import org.objectweb.asm.tree.TypeInsnNode;
 import org.objectweb.asm.tree.VarInsnNode;
 import org.objectweb.asm.tree.analysis.Analyzer;
 import org.objectweb.asm.tree.analysis.AnalyzerException;
@@ -58,7 +59,6 @@ import org.objectweb.asm.tree.analysis.BasicInterpreter;
 import org.objectweb.asm.tree.analysis.BasicValue;
 import org.objectweb.asm.tree.analysis.Frame;
 import org.objectweb.asm.tree.analysis.Interpreter;
-import org.objectweb.asm.tree.analysis.SmallSet;
 import org.objectweb.asm.tree.analysis.SourceInterpreter;
 import org.objectweb.asm.tree.analysis.SourceValue;
 import org.objectweb.asm.tree.analysis.Value;
@@ -111,6 +111,14 @@ public class MethodInfo
 	 * For constructors, the invocation instructions that corresponds to constructor chaining.
 	 */
 	private MethodInsnNode itsChainingInvocation;
+	
+	/**
+	 * Maps non-chanining constructor invocation to the corresponding
+	 * {@link NewInvokeLink}, which indicates the corresponding NEW instruction and nesting level. 
+	 */
+	private Map<MethodInsnNode, NewInvokeLink> itsNewInvokeLinks;
+	
+	private int itsMaxNewInvokeNesting = 0;
 
 	public MethodInfo(IStructureDatabase aDatabase, ClassNode aClassNode, MethodNode aMethodNode)
 	{
@@ -120,6 +128,7 @@ public class MethodInfo
 		setupFrames();
 		mapSelfAccesses();
 		setupChainingInvocation();
+		setupNewInvokeLinks();
 	}
 
 	public ClassNode getClassNode()
@@ -163,7 +172,16 @@ public class MethodInfo
 		if (! BCIUtils.isConstructorCall(aNode)) return false;
 		else return !isChainingInvocation(aNode);
 	}
+
+	public NewInvokeLink getNewInvokeLink(MethodInsnNode aNode)
+	{
+		return itsNewInvokeLinks.get(aNode);
+	}
 	
+	public int getMaxNewInvokeNesting()
+	{
+		return itsMaxNewInvokeNesting;
+	}
 
 	/**
 	 * Allocates local variable slots for field caches.
@@ -470,7 +488,43 @@ public class MethodInfo
 		return isALOAD0(aValue.getInsns().iterator().next()); 
 	}
 	
-
+	private static boolean isNEW(AbstractInsnNode aNode)
+	{
+		return aNode.getOpcode() == Opcodes.NEW;
+	}
+	
+	private static boolean isDUP(AbstractInsnNode aNode)
+	{
+		return aNode.getOpcode() == Opcodes.DUP;
+	}
+	
+	private TypeInsnNode getNewInsn(BCIValue aValue)
+	{
+		if (aValue.getInsns().size() != 1) return null;
+		AbstractInsnNode theNode = aValue.getInsns().iterator().next();
+		if (isNEW(theNode)) return (TypeInsnNode) theNode;
+		else if (isDUP(theNode))
+		{
+			BCIFrame theFrame = getFrame(theNode);
+			BCIValue theSource = theFrame.getStack(theFrame.getStackSize()-1);
+			return getNewInsn(theSource);
+		}
+		else return null;
+	}
+	
+	/**
+	 * Counts the number of NEW instructions between the given instructions, excluded.
+	 */
+	private int countNews(AbstractInsnNode aStart, AbstractInsnNode aEnd)
+	{
+		int theCount = 0;
+		if (aStart != aEnd)
+		{
+			while ((aStart = aStart.getNext()) != aEnd) if (isNEW(aStart)) theCount++;
+		}
+		return theCount;
+	}
+	
 	/**
 	 * For constructors, looks for the invoke instruction that corresponds to constructor
 	 * chaining, if any (the only case there is none is for java.lang.Object);
@@ -498,6 +552,40 @@ public class MethodInfo
 		if (! BCIUtils.CLS_OBJECT.equals(getClassNode().name) && isConstructor() && itsChainingInvocation == null) 
 			throwRTEx("Should have constructor chaining");
 
+	}
+	
+	/**
+	 * For each non-chaining constructor invocation, determines which NEW opcode produced the target,
+	 * as well as nesting level (eg. NEW NEW INVOKE INVOKE, first NEW is level 0, second NEW is level 1). 
+	 */
+	private void setupNewInvokeLinks()
+	{
+		itsNewInvokeLinks = new HashMap<MethodInsnNode, NewInvokeLink>();
+		
+		ListIterator<AbstractInsnNode> theIterator = getMethodNode().instructions.iterator();
+		while(theIterator.hasNext()) 
+		{
+			AbstractInsnNode theNode = theIterator.next();
+			
+			if (BCIUtils.isConstructorCall(theNode) && ! isChainingInvocation((MethodInsnNode) theNode))
+			{
+				MethodInsnNode theInvokeNode = (MethodInsnNode) theNode;
+				BCIFrame theFrame = getFrame(theNode);
+				int theArgCount = Type.getArgumentTypes(theInvokeNode.desc).length;
+				
+				// Check if the target of the call is "this"
+				BCIValue theThis = theFrame.getStack(theFrame.getStackSize()-theArgCount-1);
+				TypeInsnNode theNew = getNewInsn(theThis);
+				
+				if (theNew != null)
+				{
+					int theNesting = countNews(theNew, theNode);
+					itsMaxNewInvokeNesting = Math.max(itsMaxNewInvokeNesting, theNesting);
+					NewInvokeLink theLink = new NewInvokeLink(theNew, theNesting);
+					itsNewInvokeLinks.put(theInvokeNode, theLink);
+				}
+			}
+		}
 	}
 	
 	private void throwRTEx(String aMessage)
@@ -756,5 +844,25 @@ public class MethodInfo
 		}
 	}
 
+	public static class NewInvokeLink
+	{
+		private TypeInsnNode itsNewInsn;
+		private int itsNestingLevel;
 
+		public NewInvokeLink(TypeInsnNode aNewInsn, int aNestingLevel)
+		{
+			itsNewInsn = aNewInsn;
+			itsNestingLevel = aNestingLevel;
+		}
+
+		public TypeInsnNode getNewInsn()
+		{
+			return itsNewInsn;
+		}
+
+		public int getNestingLevel()
+		{
+			return itsNestingLevel;
+		}
+	}
 }

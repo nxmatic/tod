@@ -42,6 +42,7 @@ import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.FieldInsnNode;
 import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.InsnNode;
+import org.objectweb.asm.tree.LabelNode;
 import org.objectweb.asm.tree.LdcInsnNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
@@ -50,6 +51,8 @@ import org.objectweb.asm.tree.TryCatchBlockNode;
 import tod.Util;
 import tod.core.database.structure.IMutableBehaviorInfo;
 import tod.core.database.structure.IMutableClassInfo;
+import tod.impl.bci.asm2.MethodInfo.NewInvokeLink;
+import tod.impl.replay2.SList;
 
 /**
  * Instruments in-scope methods.
@@ -67,6 +70,11 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 	 */
 	private int itsTmpValueVar;
 	
+	/**
+	 * Temporarily holds the target of constructor calls
+	 */
+	private int[] itsTmpTargetVars;
+	
 	private MethodInfo itsMethodInfo;
 	
 	private Label lExit = new Label();
@@ -80,6 +88,7 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		
 		itsFromScopeVar = nextFreeVar(1);
 		itsTmpValueVar = nextFreeVar(2);
+		
 		getNode().maxStack += 3; // This is the max we add to the stack
 	}
 	
@@ -92,6 +101,9 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		itsMethodInfo = new MethodInfo(getDatabase(), getClassNode(), getNode());
 		int theSlotsCount = itsMethodInfo.setupLocalCacheSlots(getNode().maxLocals);
 		getNode().maxLocals += theSlotsCount;			
+		
+		itsTmpTargetVars = new int[itsMethodInfo.getMaxNewInvokeNesting()+1];
+		for (int i=0;i<itsTmpTargetVars.length;i++) itsTmpTargetVars[i] = nextFreeVar(1);
 		
 		// Save original handlers
 		TryCatchBlockNode[] theHandlers = (TryCatchBlockNode[]) getNode().tryCatchBlocks.toArray(new TryCatchBlockNode[getNode().tryCatchBlocks.size()]);
@@ -176,7 +188,7 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 
 		s.label(lStart);
 		
-		processInstructions(getNode().instructions);
+		processInstructions();
 		processHandlers(theHandlers);
 		
 		getNode().instructions.insert(s);
@@ -245,9 +257,31 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		}
 	}
 	
-	private void processInstructions(InsnList aInsns)
+	private InsnList getInstructions()
 	{
-		ListIterator<AbstractInsnNode> theIterator = aInsns.iterator();
+		return getNode().instructions;
+	}
+	
+	private void replace(AbstractInsnNode aNode, InsnList aList)
+	{
+		InsnList theInstructions = getInstructions();
+		theInstructions.insert(aNode, aList);
+		theInstructions.remove(aNode);
+	}
+	
+	private void insertAfter(AbstractInsnNode aNode, InsnList aList)
+	{
+		getInstructions().insert(aNode, aList);
+	}
+	
+	private void insertBefore(AbstractInsnNode aNode, InsnList aList)
+	{
+		getInstructions().insertBefore(aNode, aList);
+	}
+	
+	private void processInstructions()
+	{
+		ListIterator<AbstractInsnNode> theIterator = getInstructions().iterator();
 		while(theIterator.hasNext()) 
 		{
 			AbstractInsnNode theNode = theIterator.next();
@@ -262,25 +296,25 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 			case Opcodes.DRETURN:
 			case Opcodes.ARETURN:
 			case Opcodes.RETURN:
-				processReturn(aInsns, (InsnNode) theNode);
+				processReturn((InsnNode) theNode);
 				break;
 				
 			case Opcodes.INVOKEVIRTUAL:
 			case Opcodes.INVOKESPECIAL:
 			case Opcodes.INVOKESTATIC:
 			case Opcodes.INVOKEINTERFACE:
-				processInvoke(aInsns, (MethodInsnNode) theNode);
+				processInvoke((MethodInsnNode) theNode);
 				break;
 
 			case Opcodes.NEWARRAY:
 			case Opcodes.ANEWARRAY:
 			case Opcodes.MULTIANEWARRAY:
-				processNewArray(aInsns, theNode);
+				processNewArray(theNode);
 				break;
 				
 			case Opcodes.GETFIELD:
 			case Opcodes.GETSTATIC:
-				processGetField(aInsns, (FieldInsnNode) theNode);
+				processGetField((FieldInsnNode) theNode);
 				break;
 				
 //			case Opcodes.PUTFIELD:
@@ -296,28 +330,26 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 			case Opcodes.BALOAD:
 			case Opcodes.CALOAD:
 			case Opcodes.SALOAD:
-				processGetArray(aInsns, (InsnNode) theNode);
+				processGetArray((InsnNode) theNode);
 				break;
 				
 			case Opcodes.ARRAYLENGTH:
-				processArrayLength(aInsns, (InsnNode) theNode);
+				processArrayLength((InsnNode) theNode);
 				break;
 				
 			case Opcodes.LDC:
-				processLdc(aInsns, (LdcInsnNode) theNode);
+				processLdc((LdcInsnNode) theNode);
 				break;
 			}
 		}
 	}
 	
-	private void processReturn(InsnList aInsns, InsnNode aNode)
+	private void processReturn(InsnNode aNode)
 	{
 		SyntaxInsnList s = new SyntaxInsnList();
-		
 		s.GOTO(lExit);
 		
-		aInsns.insert(aNode, s);
-		aInsns.remove(aNode);
+		replace(aNode, s);
 	}
 
 	private boolean isCalleeInScope(MethodInsnNode aNode)
@@ -335,7 +367,7 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		return theBehavior.getId();
 	}
 	
-	private void processInvoke(InsnList aInsns, MethodInsnNode aNode)
+	private void processInvoke(MethodInsnNode aNode)
 	{
 		SyntaxInsnList s = new SyntaxInsnList();
 		
@@ -357,8 +389,32 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "sendConstructorTarget", "("+BCIUtils.DSC_OBJECT+")V");
 		}
 
-		aInsns.insert(aNode, s);
-		aInsns.remove(aNode);
+		replace(aNode, s);
+	}
+
+	/** Copied from MethodNode */
+	private LabelNode getLabelNode(final Label l)
+	{
+		if (!(l.info instanceof LabelNode))
+		{
+			l.info = new LabelNode(l);
+		}
+		return (LabelNode) l.info;
+	}
+	
+	/** Copied from MethodNode */
+	private void visitTryCatchBlock(
+			MethodNode node,
+			final Label start,
+			final Label end,
+			final Label handler,
+			final String type)
+	{
+		node.tryCatchBlocks.add(0, new TryCatchBlockNode(
+				getLabelNode(start),
+				getLabelNode(end),
+				getLabelNode(handler),
+				type));
 	}
 	
 	private void processInvoke_TraceEnabled_Method(
@@ -421,7 +477,7 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evUnmonitoredBehaviorException", "()V");
 		s.ATHROW();
 		
-		getNode().visitTryCoioioiatchBlock(lHnStart, lHnEnd, lHandler, null);
+		visitTryCatchBlock(getNode(), lHnStart, lHnEnd, lHandler, null);
 	}
 
 	private void processInvoke_TraceEnabled_Constructor(
@@ -453,6 +509,18 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 			s.ALOAD(getThreadDataVar());
 			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evUnmonitoredBehaviorCall", "()V");
 			
+			NewInvokeLink theNewInvokeLink = null;
+			if (! itsMethodInfo.isChainingInvocation(aNode))
+			{
+				// Save target
+				theNewInvokeLink = itsMethodInfo.getNewInvokeLink(aNode);
+				SyntaxInsnList s2 = new SyntaxInsnList();
+				s2.DUP();
+				s2.ASTORE(itsTmpTargetVars[theNewInvokeLink.getNestingLevel()]);
+				insertAfter(theNewInvokeLink.getNewInsn(), s2);
+			}
+			
+			
 			// call
 			s.label(lHnStart);
 			s.add(theUnmonitoredClone);
@@ -464,9 +532,8 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 			// Send object initialized
 			if (! itsMethodInfo.isChainingInvocation(aNode))
 			{
-				s.DUP(); // Note that this relies on standard compiler behavior (NEW followed by DUP)
 				s.ALOAD(getThreadDataVar());
-				s.SWAP();
+				s.ALOAD(itsTmpTargetVars[theNewInvokeLink.getNestingLevel()]);
 				s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evObjectInitialized", "("+BCIUtils.DSC_OBJECT+")V");
 			}
 			
@@ -479,12 +546,12 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evUnmonitoredBehaviorException", "()V");
 			s.ATHROW();
 			
-			getNode().visitTryCatchBlock(lHnStart, lHnEnd, lHandler, null);
+			visitTryCatchBlock(getNode(), lHnStart, lHnEnd, lHandler, null);
 		}
 		
 	}
 	
-	private void processNewArray(InsnList aInsns, AbstractInsnNode aNode)
+	private void processNewArray(AbstractInsnNode aNode)
 	{
 		SyntaxInsnList s = new SyntaxInsnList();
 		s.DUP();
@@ -492,10 +559,10 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		s.SWAP();
 		s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evNewArray", "("+BCIUtils.DSC_OBJECT+")V");
 		
-		aInsns.insert(aNode, s);
+		insertAfter(aNode, s);
 	}
 
-	private void processGetField(InsnList aInsns, FieldInsnNode aNode)
+	private void processGetField(FieldInsnNode aNode)
 	{
 		SyntaxInsnList s = new SyntaxInsnList();
 		Label lSameValue = new Label();
@@ -577,10 +644,10 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		
 		s.ILOAD(theType, itsTmpValueVar);
 		
-		aInsns.insert(aNode, s);
+		insertAfter(aNode, s);
 	}
 
-	private void processPutField(InsnList aInsns, FieldInsnNode aNode)
+	private void processPutField(FieldInsnNode aNode)
 	{
 		SyntaxInsnList s = new SyntaxInsnList();
 		Type theType = Type.getType(aNode.desc);
@@ -593,10 +660,10 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 			s.ISTORE(theType, theCacheSlot);
 		}
 			
-		aInsns.insertBefore(aNode, s);
+		insertBefore(aNode, s);
 	}
 	
-	private void processGetArray(InsnList aInsns, InsnNode aNode)
+	private void processGetArray(InsnNode aNode)
 	{
 		SyntaxInsnList s = new SyntaxInsnList();
 		Type theType = BCIUtils.getType(BCIUtils.getSort(aNode.getOpcode()));
@@ -608,10 +675,10 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		sendValue(s, itsTmpValueVar, theType);
 		s.ILOAD(theType, itsTmpValueVar);
 		
-		aInsns.insert(aNode, s);
+		insertAfter(aNode, s);
 	}
 
-	private void processArrayLength(InsnList aInsns, InsnNode aNode)
+	private void processArrayLength(InsnNode aNode)
 	{
 		SyntaxInsnList s = new SyntaxInsnList();
 
@@ -620,13 +687,13 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		s.SWAP();
 		s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evArrayLength", "(I)V"); 
 		
-		aInsns.insert(aNode, s);
+		insertAfter(aNode, s);
 	}
 	
 	/**
 	 * LDC of class constant can throw an exception
 	 */
-	private void processLdc(InsnList aInsns, LdcInsnNode aNode)
+	private void processLdc(LdcInsnNode aNode)
 	{
 		if (! (aNode.cst instanceof Type) && ! (aNode.cst instanceof String)) return;
 		
@@ -637,6 +704,6 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		s.SWAP();
 		s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evCst", "("+BCIUtils.DSC_OBJECT+")V");
 		
-		aInsns.insert(aNode, s);
+		insertAfter(aNode, s);
 	}
 }

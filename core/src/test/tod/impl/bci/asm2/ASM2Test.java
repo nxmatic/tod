@@ -73,7 +73,19 @@ public class ASM2Test
 //		instrument(theDatabase, theInstrumenter, "bin/tod/test/bci/asm2/outofscope/Fun3.class");
 //	}
 	
-	@Test
+	@Test 
+	public void testEclipse() throws Exception
+	{
+		TODConfig theConfig = new TODConfig();
+		theConfig.set(TODConfig.SCOPE_TRACE_FILTER, "[+org.eclipse.**]");
+		StructureDatabase theDatabase = StructureDatabase.create(theConfig);
+		ASMInstrumenter2 theInstrumenter = new ASMInstrumenter2(theConfig, theDatabase);
+		
+		instrument(theDatabase, theInstrumenter, "/home/gpothier/tmp/tod/eclipse/Main.class");
+		
+	}
+	
+//	@Test
 	public void testJavac() throws Exception
 	{
 		TODConfig theConfig = new TODConfig();
