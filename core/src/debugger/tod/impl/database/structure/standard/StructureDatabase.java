@@ -131,6 +131,7 @@ implements Serializable, IShareableStructureDatabase
 		itsTraceSelector = parseWorkingSet(itsConfig.get(TODConfig.SCOPE_TRACE_FILTER));
 		itsGlobalSelector = parseWorkingSet(itsConfig.get(TODConfig.SCOPE_GLOBAL_FILTER));
 		itsIdSelector = parseWorkingSet(itsConfig.get(TODConfig.SCOPE_ID_FILTER));
+		System.out.println("SCOPE_ID_FILTER: "+itsConfig.get(TODConfig.SCOPE_ID_FILTER));
 		
 		itsMethodGroupManager = new MethodGroupManager(this);
 	}

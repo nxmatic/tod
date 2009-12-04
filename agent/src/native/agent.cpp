@@ -212,7 +212,10 @@ void agentClassFileLoadHook(
 	
 	if (! CAPTURE_STARTED)
 	{
-		if (! startsWith(name, "java/") && ! startsWith(name, "sun/") && ! startsWith(name, "tod/"))
+		if (! startsWith(name, "java/") 
+			&& ! startsWith(name, "javax/")
+			&& ! startsWith(name, "sun/") 
+			&& ! startsWith(name, "tod/"))
 		{
 			printf("[TOD] Starting capture (%s).\n", name);
 			fflush(stdout);
@@ -395,7 +398,7 @@ void agentInit(
 	char* aPropCachePath,
 	char* aPropClientName)
 {
-	printf("Loading TOD agent - v4.0\n");
+	printf("Loading TOD agent - v4.0.4\n");
 
 	if (aPropVerbose)
 	{

@@ -102,6 +102,14 @@ public class TODConfig extends PublicCloneable implements Serializable
 					"Defines the path where the instrumenter stores instrumented classes.",
 					HOME + File.separatorChar + "tmp" + File.separatorChar + "tod" + File.separatorChar + "classCache");
 
+	public static final StringItem BAD_CLASSES_PATH =
+		new StringItem(
+				ConfigLevel.NORMAL,
+				"bas-classes-path",
+				"Instrumenter - bad classes path",
+				"Defines the path where the instrumenter stores classes that could not be instrumented.",
+				HOME + File.separatorChar + "tmp" + File.separatorChar + "tod" + File.separatorChar + "badClasses");
+	
 	public static final BooleanItem AGENT_CAPTURE_EXCEPTIONS =
 			new BooleanItem(
 					ConfigLevel.DEBUG,
@@ -155,7 +163,7 @@ public class TODConfig extends PublicCloneable implements Serializable
 				"Scope - object id filter",
 				"Filter for classes to which TOD can add an Object Id field. "
 				+ "Classes that do no pass this filter are not structurally modified.",
-				ConfigUtils.readString("id-filter", "[-java.lang.Object -java.lang.String]"));
+				ConfigUtils.readString("id-filter", "[-java.lang.Object -java.lang.String -java.lang.Number -java.lang.Boolean]"));
 	
 	public static final StringItem CLIENT_NAME =
 			new StringItem(

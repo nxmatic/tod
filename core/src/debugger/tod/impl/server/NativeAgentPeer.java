@@ -26,6 +26,7 @@ package tod.impl.server;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -97,6 +98,8 @@ public abstract class NativeAgentPeer extends SocketThread
 	 */
 	private File itsStoreClassesDir;
 	
+	private File itsBadClassesDir;
+	
 
 	/**
 	 * Starts a peer that uses an already connected socket.
@@ -116,6 +119,9 @@ public abstract class NativeAgentPeer extends SocketThread
 		// Check that the class cache path exists.
 		itsStoreClassesDir = new File(itsConfig.get(TODConfig.CLASS_CACHE_PATH));
 		itsStoreClassesDir.mkdirs();
+		
+		itsBadClassesDir = new File(itsConfig.get(TODConfig.BAD_CLASSES_PATH));
+		itsBadClassesDir.mkdirs();
 		
 		start();
 	}
@@ -248,6 +254,17 @@ public abstract class NativeAgentPeer extends SocketThread
 	protected abstract void processFlush();
 
 
+	private void storeClass(File aBase, String aName, byte[] aBytecode) throws IOException
+	{
+		File theFile = new File (aBase, aName+".class");
+		theFile.getParentFile().mkdirs();
+		theFile.createNewFile();
+		FileOutputStream theFileOutputStream = new FileOutputStream(theFile);
+		theFileOutputStream.write(aBytecode);
+		theFileOutputStream.flush();
+		theFileOutputStream.close();
+	}
+	
 	/**
 	 * Processes an INSTRUMENT_CLASS command sent by the agent.
 	 * @param aInstrumenter The instrumenter that will do the BCI of the class
@@ -261,21 +278,31 @@ public abstract class NativeAgentPeer extends SocketThread
 	{
 		String theClassName = aInputStream.readUTF();
 		int theLength = aInputStream.readInt();
-		byte[] theBytecode = new byte[theLength];
-		aInputStream.readFully(theBytecode);
-		
-		if (DebugFlags.INSTRUMENTER_LOG) System.out.println("Instrumenting "+theClassName+"... ");
 		InstrumentedClass theInstrumentedClass = null;
 		Throwable theError = null;
-		try
+		
+		if (theLength > 0)
 		{
-			theInstrumentedClass = aInstrumenter.instrumentClass(theClassName, theBytecode, itsUseJava14);
+			byte[] theBytecode = new byte[theLength];
+			aInputStream.readFully(theBytecode);
+			
+			if (DebugFlags.INSTRUMENTER_LOG) System.out.println("Instrumenting "+theClassName+"... ");
+			try
+			{
+				theInstrumentedClass = aInstrumenter.instrumentClass(theClassName, theBytecode, itsUseJava14);
+			}
+			catch (Throwable e)
+			{
+				storeClass(itsBadClassesDir, theClassName, theBytecode);
+				
+				System.err.println("Error during instrumentation of "+theClassName+", reporting to client: ");
+				e.printStackTrace();
+				theError = e;
+			}
 		}
-		catch (Throwable e)
+		else
 		{
-			System.err.println("Error during instrumentation of "+theClassName+", reporting to client: ");
-			e.printStackTrace();
-			theError = e;
+			System.err.println("[TOD] Warning: empty class: "+theClassName);
 		}
 
 		if (theInstrumentedClass != null)
@@ -284,15 +311,8 @@ public abstract class NativeAgentPeer extends SocketThread
 			
 			if (itsStoreClassesDir != null)
 			{
-				File theFile = new File (itsStoreClassesDir, theClassName+".class");
-				theFile.getParentFile().mkdirs();
-				theFile.createNewFile();
-				FileOutputStream theFileOutputStream = new FileOutputStream(theFile);
-				theFileOutputStream.write(theInstrumentedClass.bytecode);
-				theFileOutputStream.flush();
-				theFileOutputStream.close();
-				
-				if (DebugFlags.INSTRUMENTER_LOG) System.out.println("Written class to "+theFile);
+				storeClass(itsStoreClassesDir, theClassName, theInstrumentedClass.bytecode);
+				if (DebugFlags.INSTRUMENTER_LOG) System.out.println("Written class to "+itsStoreClassesDir);
 			}
 			
 			// Write out instrumented bytecode
@@ -318,7 +338,7 @@ public abstract class NativeAgentPeer extends SocketThread
 		}
 		else
 		{
-			System.out.println("Not instrumented");
+			System.out.println("Not instrumented: "+theClassName);
 			aOutputStream.writeInt(0);
 		}
 		

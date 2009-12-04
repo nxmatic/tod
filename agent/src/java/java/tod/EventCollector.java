@@ -185,7 +185,7 @@ public final class EventCollector
 		
 		if (theCurrentThread.getName().startsWith("[TOD]"))
 		{
-			throw new TODError("POlop");
+			throw new TODError(theCurrentThread.getName());
 		}
 		
 		return theThreadData;

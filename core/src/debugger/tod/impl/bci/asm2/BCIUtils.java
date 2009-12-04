@@ -33,6 +33,7 @@ import java.util.ListIterator;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
+import org.objectweb.asm.tree.AnnotationNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.InsnNode;
@@ -453,11 +454,8 @@ public class BCIUtils implements Opcodes
 	public static MethodNode cloneMethod(MethodNode aNode)
 	{
 		MethodNode theClone = new MethodNode();
+		
 		if (aNode.annotationDefault != null) throw new UnsupportedOperationException();
-		if (aNode.invisibleAnnotations != null) throw new UnsupportedOperationException();
-		if (aNode.invisibleParameterAnnotations != null) throw new UnsupportedOperationException();
-		if (aNode.visibleAnnotations != null) throw new UnsupportedOperationException();
-		if (aNode.visibleParameterAnnotations != null) throw new UnsupportedOperationException();
 
 		theClone.name = aNode.name;
 		theClone.signature = aNode.signature;
@@ -472,6 +470,11 @@ public class BCIUtils implements Opcodes
 		theClone.instructions = cloneInstructions(theMap, aNode.instructions);
 		theClone.localVariables = cloneLocalVariables(theMap, aNode.localVariables);
 		theClone.tryCatchBlocks = cloneTryCatchBlocks(theMap, aNode.tryCatchBlocks);
+		
+		theClone.invisibleAnnotations = cloneList(aNode.invisibleAnnotations);
+		theClone.invisibleParameterAnnotations = cloneAnnotations(aNode.invisibleParameterAnnotations);
+		theClone.visibleAnnotations = cloneList(aNode.visibleAnnotations);
+		theClone.visibleParameterAnnotations = cloneAnnotations(aNode.visibleParameterAnnotations);
 		
 		return theClone;
 	}
@@ -497,6 +500,14 @@ public class BCIUtils implements Opcodes
 			theNode = theNode.getNext();
 		}
 		
+		return theClone;
+	}
+	
+	private static List<AnnotationNode>[] cloneAnnotations(List<AnnotationNode>[] aLists)
+	{
+		if (aLists == null) return null;
+		List<AnnotationNode>[] theClone = new List[aLists.length];
+		for(int i=0;i<theClone.length;i++) theClone[i] = cloneList(aLists[i]);
 		return theClone;
 	}
 	

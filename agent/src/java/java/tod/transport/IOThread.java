@@ -36,6 +36,7 @@ import java.tod.util._ArrayList;
 import java.tod.util._StringBuilder;
 import java.tod.util._SyncRingBuffer;
 
+import tod2.access.TODAccessor;
 import tod2.agent.AgentDebugFlags;
 import tod2.agent.Command;
 import tod2.agent.Message;
@@ -247,7 +248,7 @@ public class IOThread extends Thread
 
 		if (AgentDebugFlags.COLLECT_PROFILE) 
 		{
-			itsBytesSent += 1+8+4+aPacket.string.length()*2;
+			itsBytesSent += 1+8+4+TODAccessor.getStringCount(aPacket.string)*2;
 			itsPacketsSent++;
 		}
 	}

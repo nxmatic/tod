@@ -125,6 +125,10 @@ public class MethodInfo
 		itsDatabase = aDatabase;
 		itsClassNode = aClassNode;
 		itsMethodNode = aMethodNode;
+		if ("setSecurityPolicy".equals(aMethodNode.name))
+		{
+			System.out.println("MethodInfo.MethodInfo()");
+		}
 		setupFrames();
 		mapSelfAccesses();
 		setupChainingInvocation();
@@ -493,23 +497,61 @@ public class MethodInfo
 		return aNode.getOpcode() == Opcodes.NEW;
 	}
 	
-	private static boolean isDUP(AbstractInsnNode aNode)
-	{
-		return aNode.getOpcode() == Opcodes.DUP;
-	}
 	
-	private TypeInsnNode getNewInsn(BCIValue aValue)
+	/**
+	 * Retrieves the NEW instruction that produced the value at the specified slot
+	 * of the given frame. This method also walks through DUPs, SWAPs and DUP_X1.
+	 * @param aSlot 1 means the top of the stack
+	 * @return
+	 */
+	private TypeInsnNode getNewInsn(BCIFrame aFrame, int aSlot)
 	{
-		if (aValue.getInsns().size() != 1) return null;
-		AbstractInsnNode theNode = aValue.getInsns().iterator().next();
-		if (isNEW(theNode)) return (TypeInsnNode) theNode;
-		else if (isDUP(theNode))
+		BCIFrame theCurrentFrame = aFrame;
+		int theCurrentSlot = aSlot;
+		while(true)
 		{
-			BCIFrame theFrame = getFrame(theNode);
-			BCIValue theSource = theFrame.getStack(theFrame.getStackSize()-1);
-			return getNewInsn(theSource);
+			BCIValue theValue = theCurrentFrame.getStack(theCurrentFrame.getStackSize()-theCurrentSlot);
+			
+			if (theValue.getInsns().size() != 1) throw new RuntimeException("More than one source");
+			AbstractInsnNode theNode = theValue.getInsns().iterator().next();
+			
+			if (isNEW(theNode)) return (TypeInsnNode) theNode;
+			
+			BCIFrame theNewFrame = getFrame(theNode);
+			int theNewSlot = theCurrentSlot - (theCurrentFrame.getStackSize() - theNewFrame.getStackSize());
+			int theOpcode = theNode.getOpcode();
+			
+			switch(theOpcode)
+			{
+			case Opcodes.DUP:
+				theNewSlot = 1;
+				break;
+				
+			case Opcodes.SWAP:
+				switch(theNewSlot)
+				{
+				case 1: theNewSlot = 2; break;
+				case 2: theNewSlot = 1; break;
+				default: throw new RuntimeException(""+theCurrentSlot);
+				}
+				break;
+				
+			case Opcodes.DUP_X1:
+				switch(theNewSlot)
+				{
+				case 1: 
+				case 3: theNewSlot = 1; break;
+				default: throw new RuntimeException(""+theCurrentSlot);
+				}
+				break;
+				
+			default:
+				throw new RuntimeException("Don't know what to do: "+theOpcode);
+			}
+			
+			theCurrentFrame = theNewFrame;
+			theCurrentSlot = theNewSlot;
 		}
-		else return null;
 	}
 	
 	/**
@@ -574,8 +616,7 @@ public class MethodInfo
 				int theArgCount = Type.getArgumentTypes(theInvokeNode.desc).length;
 				
 				// Check if the target of the call is "this"
-				BCIValue theThis = theFrame.getStack(theFrame.getStackSize()-theArgCount-1);
-				TypeInsnNode theNew = getNewInsn(theThis);
+				TypeInsnNode theNew = getNewInsn(theFrame, theArgCount+1);
 				
 				if (theNew != null)
 				{

@@ -15,16 +15,28 @@ public class TODAccessor
 		throw new Error("This code is supposed to be replaced by the instrumenter.");
 	}
 	
+	/**
+	 * Returns the backing character array of the string.
+	 * @see String#value
+	 */
 	public static char[] getStringChars(String aString)
 	{
 		throw new Error("This code is supposed to be replaced by the instrumenter.");		
 	}
 	
+	/**
+	 * Returns the offset of the given string in its backing array.
+	 * @see String#offset
+	 */
 	public static int getStringOffset(String aString)
 	{
 		throw new Error("This code is supposed to be replaced by the instrumenter.");		
 	}
 	
+	/**
+	 * Returns the number of characters in the string.
+	 * @see String#count
+	 */
 	public static int getStringCount(String aString)
 	{
 		throw new Error("This code is supposed to be replaced by the instrumenter.");		
