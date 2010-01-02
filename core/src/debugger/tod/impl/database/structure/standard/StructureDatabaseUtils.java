@@ -40,15 +40,6 @@ import zz.utils.Utils;
  */
 public class StructureDatabaseUtils
 {
-	public static ThreadLocal<Boolean> SAVING = new ThreadLocal<Boolean>()
-	{
-		@Override
-		protected Boolean initialValue()
-		{
-			return false;
-		}
-	};
-	
 	public static int getBehaviorId(
 			IMutableStructureDatabase aStructureDatabase, 
 			String aClassName, 
@@ -73,40 +64,5 @@ public class StructureDatabaseUtils
 		return theField.getId();
 	}
 	
-	/**
-	 * Saves the given database to file.
-	 * This method ensures that some of the transient fields (in eg {@link BehaviorInfo}) are saved. 
-	 */
-	public static void saveDatabase(IStructureDatabase aStructureDatabase, File aFile) throws IOException
-	{
-		try
-		{
-			SAVING.set(true);
-			Utils.writeObject(aStructureDatabase, aFile);
-		}
-		finally
-		{
-			SAVING.set(true);
-		}
-	}
-	
-	public static StructureDatabase loadDatabase(File aFile) throws IOException
-	{
-		try
-		{
-			StructureDatabase theDatabase = (StructureDatabase) Utils.readObject(aFile);
-			theDatabase.reown();
-			return theDatabase;
-		}
-		catch (ClassNotFoundException e)
-		{
-			throw new RuntimeException(e);
-		}
-	}
-	
-	static boolean isSaving()
-	{
-		return SAVING.get();
-	}
 
 }

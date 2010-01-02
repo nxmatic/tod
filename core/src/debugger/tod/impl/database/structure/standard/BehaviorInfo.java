@@ -51,7 +51,7 @@ public class BehaviorInfo extends MemberInfo implements IMutableBehaviorInfo
 	private BehaviorKind itsBehaviourKind;
 	private HasTrace itsHasTrace = HasTrace.UNKNOWN;
 	
-	private final String itsSignature;
+//	private final String itsSignature;
 	private final ITypeInfo[] itsArgumentTypes;
 	private final ITypeInfo itsReturnType;
 
@@ -79,7 +79,7 @@ public class BehaviorInfo extends MemberInfo implements IMutableBehaviorInfo
 			ITypeInfo aReturnType)
 	{
 		super(aDatabase, aId, aType, aName, aStatic);
-		itsSignature = aSignature;
+//		itsSignature = aSignature;
 		itsArgumentTypes = aArgumentTypes;
 		itsReturnType = aReturnType;
 		
@@ -99,7 +99,7 @@ public class BehaviorInfo extends MemberInfo implements IMutableBehaviorInfo
 	private void writeObject(ObjectOutputStream out) throws IOException
 	{
 		out.defaultWriteObject();
-		if (StructureDatabaseUtils.isSaving())
+		if (StructureDatabase.isSaving())
 		{
 			out.writeBoolean(true);
 			out.writeObject(itsLineNumberTable);
@@ -171,7 +171,12 @@ public class BehaviorInfo extends MemberInfo implements IMutableBehaviorInfo
 	
 	public String getSignature()
 	{
-		return itsSignature;
+//		return itsSignature;
+		StringBuilder theBuilder = new StringBuilder("(");
+		for(ITypeInfo theType : getArgumentTypes()) theBuilder.append(theType.getJvmName());
+		theBuilder.append(")");
+		theBuilder.append(getReturnType().getJvmName());
+		return theBuilder.toString();
 	}
 
 	public ITypeInfo getReturnType()

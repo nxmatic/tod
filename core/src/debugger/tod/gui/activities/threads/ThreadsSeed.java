@@ -40,12 +40,12 @@ public class ThreadsSeed extends ActivitySeed
 	/**
 	 * Start of the displayed range.
 	 */
-	private IRWProperty<Long> pRangeStart = new SimpleRWProperty<Long>(this);
+	private IRWProperty<Long> pRangeStart = new SimpleRWProperty<Long>();
 	
 	/**
 	 * End of the displayed range.
 	 */
-	private IRWProperty<Long> pRangeEnd = new SimpleRWProperty<Long>(this);
+	private IRWProperty<Long> pRangeEnd = new SimpleRWProperty<Long>();
 
 	public ThreadsSeed(ILogBrowser aLog)
 	{

@@ -44,7 +44,7 @@ import java.util.Map;
 
 import tod.core.config.TODConfig;
 import tod.core.database.structure.IStructureDatabase;
-import tod.impl.database.structure.standard.StructureDatabaseUtils;
+import tod.impl.database.structure.standard.StructureDatabase;
 import tod.impl.replay2.EventCollector;
 import tod.impl.replay2.ReplayerWrapper;
 import tod.impl.replay2.TmpIdManager;
@@ -194,7 +194,7 @@ public abstract class DBSideIOThread
 			File theEventsFile = new File(theConfig.get(TODConfig.DB_RAW_EVENTS_DIR)+"/events.raw");
 			File theDbFile = new File(theConfig.get(TODConfig.DB_RAW_EVENTS_DIR)+"/db.raw");
 			
-			IStructureDatabase theDatabase = StructureDatabaseUtils.loadDatabase(theDbFile);
+			IStructureDatabase theDatabase = StructureDatabase.create(theConfig, theDbFile);
 			
 			final Map<Integer, EventCollector> theCollectors = new HashMap<Integer, EventCollector>();  
 			

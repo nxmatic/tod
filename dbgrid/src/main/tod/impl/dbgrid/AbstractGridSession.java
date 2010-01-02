@@ -42,7 +42,7 @@ public abstract class AbstractGridSession extends AbstractSession
 	private boolean itsUpdatingCapture = false;
 	
 	private final IRWProperty<Boolean> pCaptureEnabled = 
-		new SimpleRWProperty<Boolean>(this, getConfig().get(TODConfig.AGENT_CAPTURE_AT_START))
+		new SimpleRWProperty<Boolean>(getConfig().get(TODConfig.AGENT_CAPTURE_AT_START))
 		{
 			@Override
 			protected Object canChange(Boolean aOldValue, Boolean aNewValue)

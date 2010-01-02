@@ -71,7 +71,7 @@ public class Disassembler
 		MethodNode theMethodNode = null;
 		ClassReader cr = null;
 		
-		byte[] theBytecode = theClass.getBytecode();
+		byte[] theBytecode = theClass.getBytecode().instrumented;
 		if (theBytecode != null)
 		{
 			cr = new ClassReader(theBytecode);

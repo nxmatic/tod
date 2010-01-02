@@ -23,12 +23,9 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 package tod.gui.activities.structure;
 
 import java.awt.BorderLayout;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.util.ArrayList;
 import java.util.List;
 
-import javax.swing.JCheckBox;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
@@ -45,7 +42,6 @@ import tod.gui.GUIUtils;
 import zz.utils.properties.IRWProperty;
 import zz.utils.properties.SimpleRWProperty;
 import zz.utils.ui.PropertyEditor;
-import zz.utils.ui.StackLayout;
 
 /**
  * This panel displays the disassembled bytecode of a behavior.
@@ -99,7 +95,7 @@ public class DisassemblyPanel extends JPanel
 	private JTable itsTable;
 	private JLabel itsTitleLabel;
 
-	private IRWProperty<Boolean> pShowTODInstructions = new SimpleRWProperty<Boolean>(this, false)
+	private IRWProperty<Boolean> pShowTODInstructions = new SimpleRWProperty<Boolean>(false)
 	{
 		@Override
 		protected void changed(Boolean aOldValue, Boolean aNewValue)

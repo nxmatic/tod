@@ -25,6 +25,7 @@ package tod.impl.database.structure.standard;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -43,8 +44,6 @@ import tod.core.database.structure.IMutableFieldInfo;
 import tod.core.database.structure.IShareableStructureDatabase;
 import tod.core.database.structure.ITypeInfo;
 import tod.core.database.structure.ILocationInfo.ISerializableLocationInfo;
-import tod.core.database.structure.IStructureDatabase.LineNumberInfo;
-import tod.core.database.structure.IStructureDatabase.LocalVariableInfo;
 import tod.impl.database.structure.standard.StructureDatabase.ClassNameInfo;
 import zz.utils.Utils;
 
@@ -63,14 +62,9 @@ implements IMutableClassInfo, ISerializableLocationInfo
 	private boolean itsHasBytecode = false;
 	
 	/**
-	 * Instrumented bytecode
+	 * Instrumented  and original bytecode
 	 */
-	private transient byte[] itsBytecode;
-	
-	/**
-	 * Original (non-instrumented) bytecode.
-	 */
-	private transient byte[] itsOriginalBytecode;
+	private transient WeakReference<Bytecode> itsBytecode;
 	
 	private boolean itsHasSMAP = false;
 	private transient String itsSMAP;
@@ -126,11 +120,9 @@ implements IMutableClassInfo, ISerializableLocationInfo
 	private void writeObject(ObjectOutputStream out) throws IOException
 	{
 		out.defaultWriteObject();
-		if (StructureDatabaseUtils.isSaving())
+		if (StructureDatabase.isSaving())
 		{
 			out.writeBoolean(true);
-			out.writeObject(itsBytecode);
-			out.writeObject(itsOriginalBytecode);
 			out.writeObject(itsFieldsMap);
 			out.writeObject(itsBehaviorsMap);
 		}
@@ -145,8 +137,6 @@ implements IMutableClassInfo, ISerializableLocationInfo
 		in.defaultReadObject();
 		if (in.readBoolean())
 		{
-			itsBytecode = (byte[]) in.readObject();
-			itsOriginalBytecode = (byte[]) in.readObject();
 			itsFieldsMap = (Map<String, IMutableFieldInfo>) in.readObject();
 			itsBehaviorsMap = (Map<String, IMutableBehaviorInfo>) in.readObject();
 		}
@@ -183,44 +173,41 @@ implements IMutableClassInfo, ISerializableLocationInfo
 		fireClassChanged();
 	}
 	
-	byte[] _getBytecode()
+	Bytecode _getBytecode()
 	{
-		return itsBytecode;
+		return itsBytecode != null ? itsBytecode.get() : null;
 	}
 	
-	byte[] _getOriginalBytecode()
+	public Bytecode getBytecode()
 	{
-		return itsOriginalBytecode;
-	}
-	
-	public byte[] getBytecode()
-	{
-		if (itsBytecode == null && itsHasBytecode)
+		Bytecode theBytecode = _getBytecode();
+		if (itsHasBytecode && theBytecode == null)
 		{
-			assert ! isOriginal();
-			itsBytecode = getDatabase()._getClassBytecode(getId());
+			theBytecode = getDatabase()._getClassBytecode(getId());
+			itsBytecode = new WeakReference<Bytecode>(theBytecode);
 		}
-		return itsBytecode;
+		return theBytecode;
 	}
 	
-	public byte[] getOriginalBytecode()
-	{
-		if (itsOriginalBytecode == null && itsHasBytecode)
-		{
-			assert ! isOriginal();
-			itsOriginalBytecode = getDatabase()._getClassOriginalBytecode(getId());
-		}
-		return itsOriginalBytecode;
-	}
-	
-
-	public void setBytecode(byte[] aBytecode, byte[] aOriginalBytecode)
+	public void setBytecode(byte[] aInstrumentedBytecode, byte[] aOriginalBytecode)
 	{
 		assert isOriginal();
-		assert (aBytecode == null) == (aOriginalBytecode == null);
-		itsBytecode = aBytecode;
-		itsOriginalBytecode = aOriginalBytecode;
-		itsHasBytecode = itsBytecode != null;
+		assert (aInstrumentedBytecode == null) == (aOriginalBytecode == null);
+		itsHasBytecode = aInstrumentedBytecode != null;
+		
+		if (itsHasBytecode) 
+		{
+			itsBytecode = new WeakReference<Bytecode>(new Bytecode(aOriginalBytecode, aInstrumentedBytecode));
+			getStructureDatabase().registerBytecode(getId(), aInstrumentedBytecode, aOriginalBytecode);
+		}
+	}
+	
+	protected void _setBytecode(byte[] aInstrumentedBytecode, byte[] aOriginalBytecode)
+	{
+		assert isOriginal();
+		assert itsHasBytecode;
+		assert _getBytecode() == null;
+		itsBytecode = new WeakReference<Bytecode>(new Bytecode(aOriginalBytecode, aInstrumentedBytecode));
 	}
 	
 	String _getSMAP()
@@ -379,7 +366,10 @@ implements IMutableClassInfo, ISerializableLocationInfo
 		IMutableBehaviorInfo theBehavior = getBehavior(aName, theArgumentTypes, theReturnType);
 		if (theBehavior == null)
 		{
-			int theId = itsClassNameInfo.getBehaviorId(aName, theArgumentTypes, theReturnType);
+			int theId = itsClassNameInfo != null ?
+					itsClassNameInfo.getBehaviorId(aName, theArgumentTypes, theReturnType)
+					: getStructureDatabase().getIds().nextBehaviorId();
+					
 			theBehavior = new BehaviorInfo(
 					getStructureDatabase(), 
 					theId,
@@ -426,7 +416,10 @@ implements IMutableClassInfo, ISerializableLocationInfo
 		IMutableFieldInfo theField = getField(aName);
 		if (theField == null)
 		{
-			int theId = itsClassNameInfo.getFieldId(aName, aType);
+			int theId = itsClassNameInfo != null ?
+					itsClassNameInfo.getFieldId(aName, aType)
+					: getStructureDatabase().getIds().nextFieldId();
+					
 			theField = new FieldInfo(getStructureDatabase(), theId, this, aName, aType, aStatic);
 			
 			register(theField);
@@ -522,15 +515,18 @@ implements IMutableClassInfo, ISerializableLocationInfo
 		StringBuilder theBuilder = new StringBuilder("b");
 		theBuilder.append(aName);
 		theBuilder.append('|');
-		for (ITypeInfo theType : aArgumentTypes)
-		{
-			theBuilder.append('|');
-			theBuilder.append(theType.getName());
-		}
-		theBuilder.append('/');
-		theBuilder.append(aReturnType.getName());
+		for (ITypeInfo theType : aArgumentTypes) theBuilder.append(getTypeChar(theType));
+		theBuilder.append('|');
+		theBuilder.append(getTypeChar(aReturnType));
 		
 		return theBuilder.toString();
+	}
+	
+	public static char getTypeChar(ITypeInfo aType)
+	{
+		int theId = aType.getId();
+		if (theId > Character.MAX_VALUE) throw new RuntimeException(""+theId);
+		return (char) theId;
 	}
 
 	/**
@@ -558,4 +554,5 @@ implements IMutableClassInfo, ISerializableLocationInfo
 	{
 		return null;
 	}
+	
 }

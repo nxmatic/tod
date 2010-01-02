@@ -49,7 +49,6 @@ import tod.gui.GUIUtils;
 import tod.gui.IGUIManager;
 import tod.gui.components.eventsequences.mural.AbstractMuralPainter;
 import tod.gui.components.eventsequences.mural.EventMural;
-import tod.utils.TODUtils;
 import tod2.agent.AgentUtils;
 import zz.utils.ItemAction;
 import zz.utils.properties.ArrayListProperty;
@@ -64,7 +63,7 @@ import zz.utils.properties.SimpleRWProperty;
  */
 public class SequenceViewsDock extends JPanel
 {
-	private IListProperty<IEventSequenceSeed> pSeeds = new ArrayListProperty<IEventSequenceSeed>(this)
+	private IListProperty<IEventSequenceSeed> pSeeds = new ArrayListProperty<IEventSequenceSeed>()
 	{
 		@Override
 		protected void elementAdded(int aIndex, IEventSequenceSeed aSeed)
@@ -96,7 +95,7 @@ public class SequenceViewsDock extends JPanel
 	
 	private List<IEventSequenceView> itsViews = new ArrayList<IEventSequenceView>();
 	
-	private IRWProperty<Long> pStart = new SimpleRWProperty<Long>(this)
+	private IRWProperty<Long> pStart = new SimpleRWProperty<Long>()
 	{
 		@Override
 		protected void changed(Long aOldValue, Long aNewValue)
@@ -114,7 +113,7 @@ public class SequenceViewsDock extends JPanel
 		}
 	};
 	
-	private IRWProperty<Long> pEnd = new SimpleRWProperty<Long>(this)
+	private IRWProperty<Long> pEnd = new SimpleRWProperty<Long>()
 	{
 		@Override
 		protected void changed(Long aOldValue, Long aNewValue)

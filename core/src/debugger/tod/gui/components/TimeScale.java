@@ -37,7 +37,7 @@ import tod.gui.components.eventsequences.mural.EventMural;
 import zz.utils.properties.IListProperty;
 import zz.utils.properties.IRWProperty;
 import zz.utils.properties.SimpleRWProperty;
-import zz.utils.ui.MouseModifiers;
+import zz.utils.ui.InputModifiers;
 import zz.utils.ui.Orientation;
 import zz.utils.ui.StackLayout;
 import zz.utils.ui.UIUtils;
@@ -49,7 +49,7 @@ import zz.utils.ui.UIUtils;
  */
 public class TimeScale extends JPanel
 {
-	private IRWProperty<Long> pSelectionStart = new SimpleRWProperty<Long>(this)
+	private IRWProperty<Long> pSelectionStart = new SimpleRWProperty<Long>()
 	{
 		@Override
 		protected void changed(Long aOldValue, Long aNewValue)
@@ -58,7 +58,7 @@ public class TimeScale extends JPanel
 		}
 	};
 	
-	private IRWProperty<Long> pSelectionEnd = new SimpleRWProperty<Long>(this)
+	private IRWProperty<Long> pSelectionEnd = new SimpleRWProperty<Long>()
 	{
 		@Override
 		protected void changed(Long aOldValue, Long aNewValue)
@@ -68,7 +68,7 @@ public class TimeScale extends JPanel
 	};
 
 	
-	private IRWProperty<Long> pCurrentPosition = new SimpleRWProperty<Long>(this)
+	private IRWProperty<Long> pCurrentPosition = new SimpleRWProperty<Long>()
 	{
 		@Override
 		protected void changed(Long aOldValue, Long aNewValue)
@@ -91,12 +91,12 @@ public class TimeScale extends JPanel
 				{
 					public void mouseWheelMoved(MouseWheelEvent aEvent)
 					{
-						if (MouseModifiers.hasAlt(aEvent)) return;
+						if (InputModifiers.hasAlt(aEvent)) return;
 						
-						boolean theShift = MouseModifiers.hasShift(aEvent);
+						boolean theShift = InputModifiers.hasShift(aEvent);
 						int theAmount = aEvent.getWheelRotation();
 						
-						if (MouseModifiers.hasCtrl(aEvent))
+						if (InputModifiers.hasCtrl(aEvent))
 						{
 							// zoom
 							long mt = getT (aEvent.getX());

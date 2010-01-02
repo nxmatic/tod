@@ -26,10 +26,19 @@ import java.tod.TracedMethods;
 import java.util.List;
 
 import tod.core.config.TODConfig;
+import tod.core.database.structure.IMutableStructureDatabase.LastIds;
 import tod.core.database.structure.IStructureDatabase.BehaviorMonitoringModeChange;
 
 public interface IInstrumenter
 {
+	/**
+	 * Informs the instrumenter about the last used ids that can be found in
+	 * the client's cache.
+	 */
+	public void setLastIds(LastIds aIds);
+	
+	public LastIds getLastIds();
+	
     /**
      * Instruments the given class.
      * @param aClassName JVM internal class name (eg. "java/lang/Object")
@@ -75,5 +84,4 @@ public interface IInstrumenter
 			modeChanges = aModeChanges;
 		}
 	}
-	
 }

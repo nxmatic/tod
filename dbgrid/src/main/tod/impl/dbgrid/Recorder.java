@@ -35,7 +35,6 @@ import tod.core.DebugFlags;
 import tod.core.config.TODConfig;
 import tod.impl.bci.asm2.ASMInstrumenter2;
 import tod.impl.database.structure.standard.StructureDatabase;
-import tod.impl.database.structure.standard.StructureDatabaseUtils;
 import tod.impl.server.NativeAgentPeer;
 import tod2.agent.AgentConfig;
 import tod2.agent.io._ByteBuffer;
@@ -49,11 +48,10 @@ public class Recorder extends Server
 {
 	private static final TODConfig itsConfig = new TODConfig(); 
 	
-	private StructureDatabase itsStructureDatabase = StructureDatabase.create(itsConfig);
-	private ASMInstrumenter2 itsInstrumenter = new ASMInstrumenter2(itsConfig, itsStructureDatabase);
+	private final StructureDatabase itsStructureDatabase;
+	private ASMInstrumenter2 itsInstrumenter;
 	
 	private final File itsEventsFile;
-	private final File itsDbFile;
 	private final OutputStream itsFileOut;
 	
 	private boolean itsJavaConnected = false;
@@ -65,11 +63,15 @@ public class Recorder extends Server
 
 		itsEventsFile = new File(itsConfig.get(TODConfig.DB_RAW_EVENTS_DIR)+"/events.raw");
 		itsEventsFile.delete();
+		itsEventsFile.getParentFile().mkdirs();
 		
-		itsDbFile = new File(itsConfig.get(TODConfig.DB_RAW_EVENTS_DIR)+"/db.raw");
-		itsDbFile.delete();
+		File theDbFile = new File(itsConfig.get(TODConfig.DB_RAW_EVENTS_DIR)+"/db.raw");
+		theDbFile.delete();
 		
 		itsFileOut = new BufferedOutputStream(new FileOutputStream(itsEventsFile));
+		
+		itsStructureDatabase = StructureDatabase.create(itsConfig, theDbFile);
+		itsInstrumenter = new ASMInstrumenter2(itsConfig, itsStructureDatabase);
 	}
 	
 	@Override
@@ -142,7 +144,7 @@ public class Recorder extends Server
 				String theHostName = _ByteBuffer.getString(itsDataIn);
 				System.out.println("Received hostname: "+theHostName);
 				
-				int theCount = 0;
+				long theCount = 0;
 				byte[] theBuffer = new byte[4096];
 				while(true)
 				{
@@ -173,7 +175,8 @@ public class Recorder extends Server
 				itsFileOut.close();
 				System.out.println("Received "+theCount+" bytes");
 				
-				StructureDatabaseUtils.saveDatabase(itsStructureDatabase, itsDbFile);
+				itsStructureDatabase.save();
+				System.out.println("Saved structure database, exiting.");
 				System.exit(0);
 			}
 			catch (IOException e)

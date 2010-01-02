@@ -47,23 +47,23 @@ implements IEventSeed
 	/**
 	 * Timestamp of the first event displayed by this view.
 	 */
-	private final IRWProperty<Long> pTimestamp = new SimpleRWProperty<Long>(this);
+	private final IRWProperty<Long> pTimestamp = new SimpleRWProperty<Long>();
 	
 	/**
 	 * Currently selected event.
 	 */
-	private final IRWProperty<ILogEvent> pSelectedEvent = new SimpleRWProperty<ILogEvent>(this);
+	private final IRWProperty<ILogEvent> pSelectedEvent = new SimpleRWProperty<ILogEvent>();
 	
-	private final IRWProperty<Boolean> pShowRole_Target = new SimpleRWProperty<Boolean>(this);
-	private final IRWProperty<Boolean> pShowRole_Value = new SimpleRWProperty<Boolean>(this);
-	private final IRWProperty<Boolean> pShowRole_Arg = new SimpleRWProperty<Boolean>(this);
-	private final IRWProperty<Boolean> pShowRole_Result = new SimpleRWProperty<Boolean>(this);
+	private final IRWProperty<Boolean> pShowRole_Target = new SimpleRWProperty<Boolean>();
+	private final IRWProperty<Boolean> pShowRole_Value = new SimpleRWProperty<Boolean>();
+	private final IRWProperty<Boolean> pShowRole_Arg = new SimpleRWProperty<Boolean>();
+	private final IRWProperty<Boolean> pShowRole_Result = new SimpleRWProperty<Boolean>();
 	
-	private final IRWProperty<Boolean> pShowKind_BehaviorCall = new SimpleRWProperty<Boolean>(this);
-	private final IRWProperty<Boolean> pShowKind_FieldWrite = new SimpleRWProperty<Boolean>(this);
-	private final IRWProperty<Boolean> pShowKind_LocalWrite = new SimpleRWProperty<Boolean>(this);
-	private final IRWProperty<Boolean> pShowKind_ArrayWrite = new SimpleRWProperty<Boolean>(this);
-	private final IRWProperty<Boolean> pShowKind_Exception = new SimpleRWProperty<Boolean>(this);
+	private final IRWProperty<Boolean> pShowKind_BehaviorCall = new SimpleRWProperty<Boolean>();
+	private final IRWProperty<Boolean> pShowKind_FieldWrite = new SimpleRWProperty<Boolean>();
+	private final IRWProperty<Boolean> pShowKind_LocalWrite = new SimpleRWProperty<Boolean>();
+	private final IRWProperty<Boolean> pShowKind_ArrayWrite = new SimpleRWProperty<Boolean>();
+	private final IRWProperty<Boolean> pShowKind_Exception = new SimpleRWProperty<Boolean>();
 	
 	public ObjectHistorySeed(ILogBrowser aLog, ObjectId aObject)
 	{

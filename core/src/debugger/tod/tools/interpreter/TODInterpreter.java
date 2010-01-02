@@ -199,7 +199,7 @@ public class TODInterpreter extends SimpleInterp
 	{
 		IStructureDatabase theStructureDatabase = getLogBrowser().getStructureDatabase();
 		IClassInfo theClass = theStructureDatabase.getClass(aName.replace('/', '.'), false);
-		return theClass != null ? theClass.getOriginalBytecode() : null;
+		return theClass != null ? theClass.getBytecode().original : null;
 	}
 	
 	private static IEntryInfo getEntry(IObjectInspector aInspector, IFieldInfo aField) 

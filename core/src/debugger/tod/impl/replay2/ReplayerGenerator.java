@@ -40,7 +40,6 @@ import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
-import org.python.modules.newmodule;
 
 import tod.core.config.TODConfig;
 import tod.core.database.browser.LocationUtils;
@@ -115,7 +114,7 @@ public class ReplayerGenerator
 		IBehaviorInfo theBehavior = itsDatabase.getBehavior(aBehaviorId, true);
 		IClassInfo theClass = theBehavior.getDeclaringType();
 
-		byte[] theClassBytecode = theClass.getOriginalBytecode();
+		byte[] theClassBytecode = theClass.getBytecode().original;
 		ClassNode theClassNode = new ClassNode();
 		ClassReader theReader = new ClassReader(theClassBytecode);
 		theReader.accept(theClassNode, 0);

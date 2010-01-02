@@ -74,7 +74,7 @@ import zz.utils.properties.IListProperty;
 import zz.utils.properties.IRWProperty;
 import zz.utils.properties.SimpleRWProperty;
 import zz.utils.ui.GridStackLayout;
-import zz.utils.ui.MouseModifiers;
+import zz.utils.ui.InputModifiers;
 import zz.utils.ui.MouseWheelPanel;
 import zz.utils.ui.NullLayout;
 import zz.utils.ui.Orientation;
@@ -110,7 +110,7 @@ public class EventMural extends MouseWheelPanel
 	/**
 	 * The first timestamp of the displayed time range.
 	 */
-	public final IRWProperty<Long> pStart = new SimpleRWProperty<Long>(this)
+	public final IRWProperty<Long> pStart = new SimpleRWProperty<Long>()
 	{
 		@Override
 		protected void changed(Long aOldValue, Long aNewValue)
@@ -122,7 +122,7 @@ public class EventMural extends MouseWheelPanel
 	/**
 	 * The last timestamp of the displayed time range.
 	 */
-	public final IRWProperty<Long> pEnd = new SimpleRWProperty<Long>(this)
+	public final IRWProperty<Long> pEnd = new SimpleRWProperty<Long>()
 	{
 		@Override
 		protected void changed(Long aOldValue, Long aNewValue)
@@ -134,7 +134,7 @@ public class EventMural extends MouseWheelPanel
 	/**
 	 * The list of event browsers displayed in this mural.
 	 */
-	public final IListProperty<BrowserData> pEventBrowsers = new ArrayListProperty<BrowserData>(this)
+	public final IListProperty<BrowserData> pEventBrowsers = new ArrayListProperty<BrowserData>()
 	{
 		@Override
 		protected void contentChanged()
@@ -454,7 +454,7 @@ public class EventMural extends MouseWheelPanel
 	 */
 	private boolean hasTooltipModifier(MouseEvent aEvent)
 	{
-		return MouseModifiers.hasCtrl(aEvent) || MouseModifiers.hasShift(aEvent);
+		return InputModifiers.hasCtrl(aEvent) || InputModifiers.hasShift(aEvent);
 	}
 	
 	@Override
@@ -563,7 +563,7 @@ public class EventMural extends MouseWheelPanel
 	@Override
 	public void mouseWheelMoved(MouseWheelEvent aE)
 	{
-		if (MouseModifiers.getModifiers(aE) == MouseModifiers.CTRL)
+		if (InputModifiers.getModifiers(aE) == InputModifiers.CTRL)
 		{
 			zoom(-aE.getWheelRotation(), aE.getX());
 		}

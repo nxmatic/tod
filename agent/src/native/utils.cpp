@@ -44,12 +44,17 @@ void fatal_ioerror(char* message)
 	exit(-1);
 }
 
-void writeByte(STREAM* f, int i)
+void writeByte(std::ostream* f, const int i)
 {
 	f->put((char) (i & 0xff));
 }
 
-void writeShort(STREAM* f, int v)
+void writeBytes(std::ostream* f, const int n, const void* buffer)
+{
+	f->write((const char*)buffer, n);
+}
+
+void writeShort(std::ostream* f, const int v)
 {
 	char buf[2];
 	buf[0] = 0xff & (v >> 8);
@@ -57,7 +62,7 @@ void writeShort(STREAM* f, int v)
 	f->write(buf, 2);
 }
 
-void writeInt(STREAM* f, int v)
+void writeInt(std::ostream* f, const int v)
 {
 	char buf[4];
 	buf[0] = 0xff & (v >> 24);
@@ -67,7 +72,7 @@ void writeInt(STREAM* f, int v)
 	f->write(buf, 4);
 }
 
-void writeLong(STREAM* f, jlong v)
+void writeLong(std::ostream* f, const jlong v)
 {
 	char buf[8];
 	buf[0] = 0xff & (v >> 56);
@@ -81,12 +86,18 @@ void writeLong(STREAM* f, jlong v)
 	f->write(buf, 8);
 }
 
-int readByte(STREAM* f)
+int readByte(std::istream* f)
 {
 	return f->get();
 }
 
-int readShort(STREAM* f)
+void readBytes(std::istream* f, const int n, void* buffer)
+{
+	f->read((char*) buffer, n);
+}
+
+
+int readShort(std::istream* f)
 {
 	char buf[2];
 	f->read(buf, 2);
@@ -94,7 +105,7 @@ int readShort(STREAM* f)
 	return (((buf[0] & 0xff) << 8) | (buf[1] & 0xff));
 }
 
-int readInt(STREAM* f)
+int readInt(std::istream* f)
 {
 	char buf[4];
 	f->read(buf, 4);
@@ -105,14 +116,14 @@ int readInt(STREAM* f)
 		| (buf[3] & 0xff));
 }
 
-void writeUTF(STREAM* f, const char* s)
+void writeUTF(std::ostream* f, const char* s)
 {
 	int len = strlen(s);
 	writeShort(f, len);
 	f->write(s, len);
 }
 
-char* readUTF(STREAM* f)
+char* readUTF(std::istream* f)
 {
 	int len = readShort(f);
 	char* s = (char*) malloc(len+1);
@@ -122,7 +133,7 @@ char* readUTF(STREAM* f)
 	return s;
 }
 
-void flush(STREAM* f)
+void flush(std::ostream* f)
 {
 	f->flush();
 }

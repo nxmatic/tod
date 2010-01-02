@@ -32,21 +32,21 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 typedef boost::recursive_mutex t_mutex;
 typedef boost::recursive_mutex::scoped_lock t_lock;
 
-typedef std::iostream STREAM;
-
 void fatal_error(char*);
 void fatal_ioerror(char*);
 
-void writeByte(STREAM* f, int i);
-void writeShort(STREAM* f, int v);
-void writeInt(STREAM* f, int v);
-void writeLong(STREAM* f, jlong v);
-int readByte(STREAM* f);
-int readShort(STREAM* f);
-int readInt(STREAM* f);
-void writeUTF(STREAM* f, const char* s);
-char* readUTF(STREAM* f);
-void flush(STREAM* f);
+void writeByte(std::ostream* f, const int i);
+void writeBytes(std::ostream* f, const int n, const void* buffer);
+void writeShort(std::ostream* f, const int v);
+void writeInt(std::ostream* f, const int v);
+void writeLong(std::ostream* f, const jlong v);
+int readByte(std::istream* f);
+void readBytes(std::istream* f, const int n, void* buffer);
+int readShort(std::istream* f);
+int readInt(std::istream* f);
+void writeUTF(std::ostream* f, const char* s);
+char* readUTF(std::istream* f);
+void flush(std::ostream* f);
 
 bool startsWith(const char* aString, const char* aPrefix);
 

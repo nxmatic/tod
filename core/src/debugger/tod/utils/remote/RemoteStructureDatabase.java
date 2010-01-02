@@ -44,7 +44,9 @@ import tod.core.database.structure.IStructureDatabase;
 import tod.core.database.structure.ITypeInfo;
 import tod.core.database.structure.SourceRange;
 import tod.core.database.structure.IBehaviorInfo.BytecodeRole;
+import tod.core.database.structure.IClassInfo.Bytecode;
 import tod.core.database.structure.ILocationInfo.ISerializableLocationInfo;
+import tod.core.database.structure.IMutableStructureDatabase.LastIds;
 import tod.core.database.structure.IStructureDatabase.LineNumberInfo;
 import tod.core.database.structure.IStructureDatabase.LocalVariableInfo;
 import tod.core.database.structure.IStructureDatabase.ProbeInfo;
@@ -257,14 +259,9 @@ public class RemoteStructureDatabase implements RIStructureDatabase
 		return itsSource._getClassBehaviorsMap(aClassId);
 	}
 
-	public byte[] _getClassBytecode(int aClassId) 
+	public Bytecode _getClassBytecode(int aClassId) 
 	{
 		return itsSource._getClassBytecode(aClassId);
-	}
-
-	public byte[] _getClassOriginalBytecode(int aClassId) 
-	{
-		return itsSource._getClassOriginalBytecode(aClassId);
 	}
 	
 	public String _getClassSMAP(int aClassId)
@@ -702,16 +699,10 @@ public class RemoteStructureDatabase implements RIStructureDatabase
 			return theMap;
 		}
 
-		public byte[] _getClassBytecode(int aClassId)
+		public Bytecode _getClassBytecode(int aClassId)
 		{
 			System.out.println("Retrieving bytecode for class: "+aClassId);
 			return itsDatabase._getClassBytecode(aClassId);
-		}
-		
-		public byte[] _getClassOriginalBytecode(int aClassId)
-		{
-			System.out.println("Retrieving original bytecode for class: "+aClassId);
-			return itsDatabase._getClassOriginalBytecode(aClassId);
 		}
 		
 		public String _getClassSMAP(int aClassId)
@@ -751,6 +742,16 @@ public class RemoteStructureDatabase implements RIStructureDatabase
 		}
 
 		public boolean isInScope(String aClassName)
+		{
+			throw new UnsupportedOperationException();
+		}
+
+		public LastIds getLastIds()
+		{
+			throw new UnsupportedOperationException();
+		}
+
+		public void setLastIds(LastIds aIds)
 		{
 			throw new UnsupportedOperationException();
 		}

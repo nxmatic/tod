@@ -64,7 +64,7 @@ public class FrozenContext implements IContext
 	 */
 	public static FrozenContext create(IContext aSource)
 	{
-		IRWProperty<ILogEvent> theProperty= new SimpleRWProperty<ILogEvent>(null, aSource.pSelectedEvent().get())
+		IRWProperty<ILogEvent> theProperty= new SimpleRWProperty<ILogEvent>(aSource.pSelectedEvent().get())
 		{
 			@Override
 			protected Object canChange(ILogEvent aOldValue, ILogEvent aNewValue)

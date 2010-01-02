@@ -38,34 +38,39 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 #include <iostream>
 #include <fstream>
 #include <boost/asio.hpp>
-#include <boost/thread/tss.hpp>
+#include <boost/filesystem.hpp>
+#include <boost/filesystem/fstream.hpp>
+//#include <boost/thread/tss.hpp>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 using boost::asio::ip::tcp;
+namespace fs = boost::filesystem;
 
 // Outgoing commands
 const char EXCEPTION_GENERATED = 20;
 const char INSTRUMENT_CLASS = 50;
-const char REGISTER_CLASS = 51;
+const char SYNC_CACHE_IDS = 51;
 const char FLUSH = 99;
 
 // Incoming commands
 const char SET_CAPTURE_EXCEPTIONS = 83;
 const char SET_HOST_BITS = 84;
+const char SET_CACHE_PATH = 85;
 const char CONFIG_DONE = 99;
 
 int AGENT_STARTED = 0;
 int CAPTURE_STARTED = 0;
-STREAM* gSocket = 0;
+std::iostream* gSocket = 0;
 
 // Configuration data
 bool cfgIsJVM14 = false;
 int cfgCaptureExceptions = 0;
 int cfgHostBits = 8; // Number of bits used to encode host id.
 int cfgHostId = 0; // A host id assigned by the TODServer - not the "real" host id used in events.
+char* cfgCachePath = 0;
 
 // System properties configuration data.
 char* propHost = NULL;
@@ -120,6 +125,44 @@ void agentConnect(char* host, char* port, char* clientName)
 	fflush(stdout);
 }
 
+void syncCache()
+{
+	if (propVerbose >= 1) printf("Synchronizing class cache\n");
+	
+	// Read last ids from cache
+	fs::path cachePath(cfgCachePath);
+	fs::path idsPath(cachePath / "ids.bin");
+	if (fs::exists(idsPath))
+	{
+		fs::ifstream idsFile(idsPath);
+		int lastClassId = readInt(&idsFile);
+		int lastBehaviorId = readInt(&idsFile);
+		int lastFieldId = readInt(&idsFile);
+		idsFile.close();
+		
+		if (propVerbose >= 2) printf("Ids: %d, %d, %d\n", lastClassId, lastBehaviorId, lastFieldId);
+		writeByte(gSocket, SYNC_CACHE_IDS);
+		writeInt(gSocket, lastClassId);
+		writeInt(gSocket, lastBehaviorId);
+		writeInt(gSocket, lastFieldId);
+		flush(gSocket);
+	}
+	
+	fflush(stdout);
+}
+
+void writeIds(int classId, int behaviorId, int fieldId)
+{
+	fs::path cachePath(cfgCachePath);
+	fs::path idsPath(cachePath / "ids.bin");
+	fs::ofstream idsFile(idsPath);
+	
+	writeInt(&idsFile, classId);
+	writeInt(&idsFile, behaviorId);
+	writeInt(&idsFile, fieldId);
+	
+	idsFile.close();
+}
 
 void agentConfigure()
 {
@@ -137,6 +180,11 @@ void agentConfigure()
 				cfgHostBits = readByte(gSocket);
 				if (propVerbose >= 1) printf("Host bits: %d\n", cfgHostBits);
 				break;
+				
+			case SET_CACHE_PATH:
+				cfgCachePath = readUTF(gSocket);
+				if (propVerbose >= 1) printf("Cache path: %s\n", cfgCachePath);
+				break;
 
 			case CONFIG_DONE:
 				// Check host id vs host bits
@@ -150,14 +198,17 @@ void agentConfigure()
 					cfgHostId = 0;
 				}
 				
+				// Synchronize class cache
+				if (cfgCachePath) syncCache();
+				
 				if (propVerbose >= 1) printf("Config done.\n");
 				return;
 				
 			default:
 				printf("Config command not handled: %d\n", cmd);
 		}
+		fflush(stdout);
 	}
-	fflush(stdout);
 }
 
 void registerTracedMethod(JNIEnv* jni, int tracedMethod)
@@ -196,6 +247,125 @@ void registerTracedMethods(JNIEnv* jni, int nTracedMethods, int* tracedMethods)
 		for (int i=0;i<nTracedMethods;i++) tmpTracedMethods.push_back(tracedMethods[i]);
 	}
 }
+
+struct ClassInfo
+{
+/*	ClassInfo(unsigned char* _data, jint _dataLen, int* _tracedMethods, int _nTracedMethods)
+		: data(_data), dataLen(_dataLen), tracedMethods(_tracedMethods), nTracedMethods(_nTracedMethods)
+	{}*/
+	
+	unsigned char* data;
+	jint dataLen;
+	
+	int* tracedMethods;
+	int nTracedMethods;
+};
+
+ClassInfo* checkCacheInfo(
+	const char* name, 
+	char md5Buffer_in[16],
+	void* (*malloc_f)(unsigned int))
+{
+	fs::path cachePath(cfgCachePath);
+	
+	fs::path classPath(cachePath / name / "class");
+	fs::path infoPath(cachePath / name / "info");
+
+	if (fs::exists(infoPath))
+	{
+		fs::ifstream infoFile(infoPath);
+		char md5Buffer_cached[16];
+		readBytes(&infoFile, 16, md5Buffer_cached);
+		
+		if (memcmp(md5Buffer_cached, md5Buffer_in, 16) == 0)
+		{
+			if (propVerbose>=1) printf("Found valid in cache: %s\n", name);
+			
+			int nTracedMethods = readInt(&infoFile);
+			int* tracedMethods = new int[nTracedMethods];
+			for (int i=0;i<nTracedMethods;i++) tracedMethods[i] = readInt(&infoFile);
+			
+			fs::ifstream classFile(classPath);
+			jint len = fs::file_size(classPath);
+			unsigned char* data = (unsigned char*) malloc_f(len);
+			readBytes(&classFile, len, data);
+			
+			return new ClassInfo { data, len, tracedMethods, nTracedMethods };
+		}
+	}
+	
+	return NULL;
+}
+
+ClassInfo* requestInstrumentation(
+	const char* name, 
+	const char md5Buffer_in[16],
+	const unsigned char* data,
+	const jint len,
+	void* (*malloc_f)(unsigned int))
+{
+	// Send command
+	writeByte(gSocket, INSTRUMENT_CLASS);
+	
+	// Send class name
+	writeUTF(gSocket, name);
+	
+	// Send bytecode
+	writeInt(gSocket, len);
+	writeBytes(gSocket, len, data);
+	flush(gSocket);
+	
+	jint instrLen = readInt(gSocket);
+	
+	if (instrLen > 0)
+	{
+		if (propVerbose>=1) printf("Instrumented: %s\n", name);
+
+		unsigned char* instrData = (unsigned char*) malloc_f(instrLen);
+		
+		readBytes(gSocket, instrLen, instrData);
+
+		if (gSocket->eof()) fatal_ioerror("fread");
+		if (propVerbose>=2) printf("Class definition downloaded.\n");
+		
+		int nTracedMethods = readInt(gSocket);
+		int* tracedMethods = new int[nTracedMethods];
+		for (int i=0;i<nTracedMethods;i++) tracedMethods[i] = readInt(gSocket);
+		
+		int lastClassId = readInt(gSocket);
+		int lastBehaviorId = readInt(gSocket);
+		int lastFieldId = readInt(gSocket);
+		writeIds(lastClassId, lastBehaviorId, lastFieldId);
+		
+		// Write cache
+		fs::path cachePath(cfgCachePath);
+		fs::create_directories(cachePath / name);
+		fs::path classPath(cachePath / name / "class");
+		fs::path infoPath(cachePath / name / "info");
+		
+		fs::ofstream classFile(classPath);
+		writeBytes(&classFile, instrLen, instrData);
+		classFile.close();
+		
+		fs::ofstream infoFile(infoPath);
+		writeBytes(&infoFile, 16, md5Buffer_in);
+		writeInt(&infoFile, nTracedMethods);
+		for (int i=0;i<nTracedMethods;i++) writeInt(&infoFile, tracedMethods[i]);
+		infoFile.close();
+		
+		if (propVerbose>=2) std::cout << "Stored cache: " << infoPath << std::endl;
+
+
+		return new ClassInfo { instrData, instrLen, tracedMethods, nTracedMethods };
+	}
+	else if (instrLen == -1)
+	{
+		char* errorString = readUTF(gSocket);
+		fatal_error(errorString);
+	}
+	else return NULL;
+}
+
 
 void agentClassFileLoadHook(
 	JNIEnv* jni, const char* name, 
@@ -243,46 +413,19 @@ void agentClassFileLoadHook(
 	
 	{
 		t_lock lock(loadMutex);
+		
+		ClassInfo* info = checkCacheInfo(name, md5Buffer, malloc_f);
+		if (info == NULL) info = requestInstrumentation(name, md5Buffer, class_data, class_data_len, malloc_f);
 	
-		// Send command
-		writeByte(gSocket, INSTRUMENT_CLASS);
-		
-		// Send class name
-		writeUTF(gSocket, name);
-		
-		// Send bytecode
-		writeInt(gSocket, class_data_len);
-		gSocket->write((char*) class_data, class_data_len);
-		flush(gSocket);
-		
-		int len = readInt(gSocket);
-		
-		if (len > 0)
+		if (info != NULL)
 		{
-			if (propVerbose>=1) printf("Instrumented: %s\n", name);
-
-			*new_class_data = (unsigned char*) malloc_f(len);
-			*new_class_data_len = len;
-			
-			gSocket->read((char*) *new_class_data, len);
-			if (gSocket->eof()) fatal_ioerror("fread");
-			if (propVerbose>=2) printf("Class definition downloaded.\n");
-			
-			nTracedMethods = readInt(gSocket);
-			tracedMethods = new int[nTracedMethods];
-			for (int i=0;i<nTracedMethods;i++) tracedMethods[i] = readInt(gSocket);
-		}
-		else if (len == -1)
-		{
-			char* errorString = readUTF(gSocket);
-			fatal_error(errorString);
-		}
-		
-		// Register traced methods
-		if (tracedMethods) 
-		{
-			registerTracedMethods(jni, nTracedMethods, tracedMethods);
-			delete tracedMethods;
+			*new_class_data = info->data;
+			*new_class_data_len = info->dataLen;
+				
+			// Register traced methods
+			registerTracedMethods(jni, info->nTracedMethods, info->tracedMethods);
+			delete info->tracedMethods;
+			delete info;
 		}
 	}
 	
@@ -482,6 +625,7 @@ JNIEXPORT jstring JNICALL Java_java_tod__1AgConfig_getClientName
 	return jni->NewStringUTF(propClientName);
 }
 
+/*
 #ifdef WIN32
 void tss_cleanup_implemented(void)
 {
@@ -490,6 +634,7 @@ void tss_cleanup_implemented(void)
 	// See http://boost.org/doc/html/thread/release_notes.html#thread.release_notes.boost_1_32_0.change_log.static_link
 }
 #endif
+*/
 
 #ifdef __cplusplus
 }

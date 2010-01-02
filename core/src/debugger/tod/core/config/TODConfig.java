@@ -314,6 +314,15 @@ public class TODConfig extends PublicCloneable implements Serializable
 							+ "database files.",
 					HOME + File.separatorChar + "tmp" + File.separatorChar + "tod");
 
+	public static final BooleanItem ALLOW_HOMONYM_CLASSES =
+		new BooleanItem(
+				ConfigLevel.ADVANCED,
+				"allow-homonym-classes",
+				"Allow homonym classes",
+				"Allow various classes to have the same (fully-qualified) name. This uses "
+						+" more memory.",
+				false);
+	
 	/**
 	 * Contains all available configuration items.
 	 */

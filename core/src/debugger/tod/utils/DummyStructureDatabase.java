@@ -216,7 +216,13 @@ implements IMutableStructureDatabase
 	{
 		return false;
 	}
-	
-	
 
+	public LastIds getLastIds()
+	{
+		return null;
+	}
+
+	public void setLastIds(LastIds aIds)
+	{
+	}
 }

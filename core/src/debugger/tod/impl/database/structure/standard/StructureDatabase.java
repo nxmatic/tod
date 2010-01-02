@@ -22,9 +22,13 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.database.structure.standard;
 
+import gnu.trove.TLongArrayList;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.RandomAccessFile;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.util.ArrayList;
@@ -52,10 +56,14 @@ import tod.core.database.structure.IStructureDatabase;
 import tod.core.database.structure.ITypeInfo;
 import tod.core.database.structure.SourceRange;
 import tod.core.database.structure.IBehaviorInfo.BytecodeRole;
+import tod.core.database.structure.IClassInfo.Bytecode;
+import tod.core.database.structure.IMutableStructureDatabase.LastIds;
 import tod.impl.bci.asm2.BCIUtils;
 import tod.tools.parsers.ParseException;
 import tod.tools.parsers.workingset.WorkingSetFactory;
 import tod.utils.remote.RemoteStructureDatabase;
+import zz.utils.RandomAccessInputStream;
+import zz.utils.RandomAccessOutputStream;
 import zz.utils.Utils;
 
 /**
@@ -63,9 +71,20 @@ import zz.utils.Utils;
  * @author gpothier
  */
 public class StructureDatabase 
-implements Serializable, IShareableStructureDatabase
+implements IShareableStructureDatabase
 {
 	private static final long serialVersionUID = -3929708435718445343L;
+	
+	public static ThreadLocal<Boolean> SAVING = new ThreadLocal<Boolean>()
+	{
+		@Override
+		protected Boolean initialValue()
+		{
+			return false;
+		}
+	};
+	
+
 
 	/**
 	 * Class ids below this value are reserved.
@@ -76,11 +95,17 @@ implements Serializable, IShareableStructureDatabase
 	
 	private final String itsId;
 	
+	private final boolean itsAllowHomonymClasses;
+	
 	/**
-	 * The directory that stores the database.
-	 * Can be null if the database is not stored.
+	 * The file that stores this structure database
 	 */
-	private final File itsFile;
+	private final RandomAccessFile itsFile;
+	
+	/**
+	 * Stores the offset into the file of the bytecode of each class. 
+	 */
+	private TLongArrayList itsByteCodeOffsets = new TLongArrayList(1000);
 	
 	/**
 	 * Next free ids.
@@ -91,16 +116,16 @@ implements Serializable, IShareableStructureDatabase
 	 * Maps class names to {@link ClassNameInfo} objects that keep track
 	 * of all the versions of a same class.
 	 */
-	private final Map<String, ClassNameInfo> itsClassNameInfos =
-		new HashMap<String, ClassNameInfo>(1000);
+	private final Map<String, ClassNameInfo> itsClassNameInfos;
+	private final Map<String, ClassInfo> itsClassInfos;
 	
-	private final List<BehaviorInfo> itsBehaviors = new ArrayList<BehaviorInfo>(10000);
-	private final List<FieldInfo> itsFields = new ArrayList<FieldInfo>(10000);
-	private final List<ClassInfo> itsClasses = new ArrayList<ClassInfo>(1000);
+	private List<BehaviorInfo> itsBehaviors;
+	private List<FieldInfo> itsFields;
+	private List<ClassInfo> itsClasses;
 	
-	private final List<ProbeInfo> itsProbes;
+	private List<ProbeInfo> itsProbes;
 	
-	private final Map<Long, ProbeInfo> itsExceptionProbesMap = new HashMap<Long, ProbeInfo>();
+	private Map<Long, ProbeInfo> itsExceptionProbesMap = new HashMap<Long, ProbeInfo>();
 	
 	private List<AdviceInfo> itsAdvices = new ArrayList<AdviceInfo>(100); 
 	
@@ -117,24 +142,101 @@ implements Serializable, IShareableStructureDatabase
 	private transient ClassSelector itsTraceSelector;
 	private transient ClassSelector itsIdSelector;
 	
-
-	
-	protected StructureDatabase(TODConfig aConfig, String aId, File aFile, Ids aIds)
+	protected StructureDatabase(TODConfig aConfig, String aId, File aFile, Ids aIds) throws IOException
 	{
 		itsConfig = aConfig;
+		itsAllowHomonymClasses = itsConfig.get(TODConfig.ALLOW_HOMONYM_CLASSES);
 		itsId = aId;
-		itsFile = aFile;
+		boolean theFileExists = aFile.exists();
+		itsFile = new RandomAccessFile(aFile, theFileExists ? "r" : "rw");
 		itsIds = aIds;
-		itsProbes = new ArrayList<ProbeInfo>(10000);
-		itsProbes.add(null);
 		
 		itsTraceSelector = parseWorkingSet(itsConfig.get(TODConfig.SCOPE_TRACE_FILTER));
 		itsGlobalSelector = parseWorkingSet(itsConfig.get(TODConfig.SCOPE_GLOBAL_FILTER));
 		itsIdSelector = parseWorkingSet(itsConfig.get(TODConfig.SCOPE_ID_FILTER));
 		System.out.println("SCOPE_ID_FILTER: "+itsConfig.get(TODConfig.SCOPE_ID_FILTER));
 		
-		itsMethodGroupManager = new MethodGroupManager(this);
+		itsClassNameInfos = itsAllowHomonymClasses ? new HashMap<String, ClassNameInfo>(1000) : null;
+		itsClassInfos = itsAllowHomonymClasses ? null : new HashMap<String, ClassInfo>(1000);
+		
+		if (theFileExists) 
+		{
+			load();
+			itsMethodGroupManager = null;
+		}
+		else 
+		{
+			itsFile.seek(8); // The first long is used to store the offset of the serialized data
+			itsMethodGroupManager = new MethodGroupManager(this);
+			itsBehaviors = new ArrayList<BehaviorInfo>(10000);
+			itsFields = new ArrayList<FieldInfo>(10000);
+			itsClasses = new ArrayList<ClassInfo>(1000);
+			
+			itsProbes = new ArrayList<ProbeInfo>(10000);
+			itsProbes.add(null);
+		}
 	}
+	
+	private void load() throws IOException
+	{
+		itsFile.seek(0);
+		long theOffset =  itsFile.readLong();
+		itsFile.seek(theOffset);
+		
+		RandomAccessInputStream theStream = new RandomAccessInputStream(itsFile);
+		ObjectInputStream ois = new ObjectInputStream(theStream);
+		
+		try
+		{
+			itsByteCodeOffsets = (TLongArrayList) ois.readObject();
+			itsBehaviors = (List<BehaviorInfo>) ois.readObject();
+			itsFields = (List<FieldInfo>) ois.readObject();
+			itsClasses = (List<ClassInfo>) ois.readObject();
+			itsProbes = (List<ProbeInfo>) ois.readObject();
+			
+			reown();
+		}
+		catch (ClassNotFoundException e)
+		{
+			throw new RuntimeException(e);
+		}
+	}
+	
+	
+	public static boolean isSaving()
+	{
+		return SAVING.get();
+	}
+
+
+	public void save() throws IOException
+	{
+		long theOffset = itsFile.getFilePointer();
+		itsFile.seek(0);
+		itsFile.writeLong(theOffset);
+		itsFile.seek(theOffset);
+		
+		// Write serialized data
+		RandomAccessOutputStream theStream = new RandomAccessOutputStream(itsFile);
+		ObjectOutputStream oos = new ObjectOutputStream(theStream);
+		
+		try
+		{
+			SAVING.set(true);
+			
+			oos.writeObject(itsByteCodeOffsets);
+			oos.writeObject(itsBehaviors);
+			oos.writeObject(itsFields);
+			oos.writeObject(itsClasses);
+			oos.writeObject(itsProbes);			
+		}
+		finally
+		{
+			SAVING.set(true);
+		}
+	}
+	
+
 	
 	private static String transformClassName(String aName)
 	{
@@ -151,14 +253,6 @@ implements Serializable, IShareableStructureDatabase
 	}
 
 
-	/**
-	 * Creates a non-persistent structure database.
-	 */
-	public static StructureDatabase create(TODConfig aConfig, String aId)
-	{
-		return new StructureDatabase(aConfig, aId, null, new Ids());
-	}
-	
 	/**
 	 * Creates a structure database at the location specified in the given config.
 	 */
@@ -177,16 +271,13 @@ implements Serializable, IShareableStructureDatabase
 	{
 		try
 		{
-			aFile.mkdirs();
+			aFile.getParentFile().mkdirs();
 			
 			// Generate a new id.
 			long theTime = System.nanoTime();
 			String theId = Utils.md5String(BigInteger.valueOf(theTime).toByteArray());
 			
-			Utils.writeObject(theId, new File(aFile, "id"));
-			
 			StructureDatabase theDatabase = new StructureDatabase(aConfig, theId, aFile, new Ids());
-			theDatabase.save();
 			return theDatabase;
 		}
 		catch (Exception e)
@@ -195,25 +286,6 @@ implements Serializable, IShareableStructureDatabase
 		}
 	}
 
-	/**
-	 * Loads an existing structure database.
-	 */
-	public static IStructureDatabase load(File aFile)
-	{
-		try
-		{
-			String theId = (String) Utils.readObject(new File(aFile, "id"));
-			Ids theIds = (Ids) Utils.readObject(new File(aFile, "ids"));
-			// TODO: read config
-//			return new StructureDatabase(null, theId, aFile, theIds);
-			throw new UnsupportedOperationException();
-		}
-		catch (Exception e)
-		{
-			throw new RuntimeException(e);
-		}
-	}
-	
 	/**
 	 * Call this method after deserializing a {@link StructureDatabase} to
 	 * set the database field on all locations.
@@ -233,20 +305,6 @@ implements Serializable, IShareableStructureDatabase
 		for (FieldInfo theField : itsFields) if (theField != null) 
 		{
 			theField.setDatabase(this, true);
-		}
-	}
-	
-	private void save()
-	{
-		if (itsFile == null) return;
-		
-		try
-		{
-			Utils.writeObject(itsIds, new File(itsFile, "ids"));
-		}
-		catch (Exception e)
-		{
-			throw new RuntimeException(e);
 		}
 	}
 	
@@ -297,24 +355,46 @@ implements Serializable, IShareableStructureDatabase
 	public ClassInfo getClass(String aName, boolean aFailIfAbsent)
 	{
 		aName = transformClassName(aName);
-		ClassNameInfo theClassNameInfo = itsClassNameInfos.get(aName);
-		if (theClassNameInfo == null) 
+		if (itsAllowHomonymClasses)
 		{
-			if (aFailIfAbsent) throw new RuntimeException("Class not found: "+aName);
-			else return null;
+			ClassNameInfo theClassNameInfo = itsClassNameInfos.get(aName);
+			if (theClassNameInfo == null) 
+			{
+				if (aFailIfAbsent) throw new RuntimeException("Class not found: "+aName);
+				else return null;
+			}
+			return theClassNameInfo.getLatest();
 		}
-		return theClassNameInfo.getLatest();
+		else
+		{
+			ClassInfo theClassInfo = itsClassInfos.get(aName);
+			if (theClassInfo == null) 
+			{
+				if (aFailIfAbsent) throw new RuntimeException("Class not found: "+aName);
+				else return null;
+			}
+			return theClassInfo;
+			
+		}
 	}
 
 	public ClassInfo[] getClasses(String aName)
 	{
 		aName = transformClassName(aName);
-		ClassNameInfo theClassNameInfo = itsClassNameInfos.get(aName);
-		if (theClassNameInfo == null) 
+		if (itsAllowHomonymClasses)
 		{
-			return new ClassInfo[0];
+			ClassNameInfo theClassNameInfo = itsClassNameInfos.get(aName);
+			if (theClassNameInfo == null) 
+			{
+				return new ClassInfo[0];
+			}
+			return theClassNameInfo.getAll();
 		}
-		return theClassNameInfo.getAll();
+		else
+		{
+			ClassInfo theClass = getClass(aName, false);
+			return theClass != null ? new ClassInfo[] { theClass } : new ClassInfo[0];
+		}
 	}
 	
 	void fireClassChanged(IClassInfo aClass)
@@ -326,14 +406,42 @@ implements Serializable, IShareableStructureDatabase
 	{
 		itsIds.registerClassId(aClass.getId());
 		Utils.listSet(itsClasses, aClass.getId(), (ClassInfo) aClass);
-		ClassNameInfo theClassNameInfo = getClassNameInfo(aClass.getName());
-		theClassNameInfo.addClass((ClassInfo) aClass);
+		
+		if (itsAllowHomonymClasses)
+		{
+			ClassNameInfo theClassNameInfo = getClassNameInfo(aClass.getName());
+			theClassNameInfo.addClass((ClassInfo) aClass);
+		}
+		else
+		{
+			ClassInfo theClassInfo = itsClassInfos.put(aClass.getName(), (ClassInfo) aClass);
+			if (theClassInfo != null) throw new RuntimeException("Class already exists: "+aClass.getName()+", enable allow homonym classes.");
+		}
 		
 		for (Listener theListener : itsListeners) theListener.classAdded(aClass);
 	}
 	
+	protected void registerBytecode(int aClassId, byte[] aBytecode, byte[] aOriginalBytecode)
+	{
+		try
+		{
+			itsByteCodeOffsets.ensureCapacity(aClassId+1);
+			itsByteCodeOffsets.setQuick(aClassId, itsFile.getFilePointer());
+			itsFile.writeInt(aBytecode.length);
+			itsFile.write(aBytecode);
+			itsFile.writeInt(aOriginalBytecode.length);
+			itsFile.write(aOriginalBytecode);
+		}
+		catch (IOException e)
+		{
+			throw new RuntimeException(e);
+		}
+	}
+	
 	protected ClassNameInfo getClassNameInfo(String aName)
 	{
+		if (! itsAllowHomonymClasses) return null;
+		
 		aName = transformClassName(aName);
 		ClassNameInfo theClassNameInfo = itsClassNameInfos.get(aName);
 		if (theClassNameInfo == null)
@@ -641,18 +749,37 @@ implements Serializable, IShareableStructureDatabase
 	 * This method is used to retrieve the value of transient fields on the remote side
 	 * (see {@link RemoteStructureDatabase}).
 	 */
-	public byte[] _getClassBytecode(int aClassId)
+	public Bytecode _getClassBytecode(int aClassId)
 	{
-		return getClass(aClassId, true)._getBytecode();
+		ClassInfo theClass = getClass(aClassId, true);
+		Bytecode theBytecode = theClass._getBytecode();
+		if (theBytecode == null)
+		{
+			readClassBytecode(aClassId);
+			theBytecode = theClass._getBytecode();
+		}
+		return theBytecode;
 	}
 	
-	/**
-	 * This method is used to retrieve the value of transient fields on the remote side
-	 * (see {@link RemoteStructureDatabase}).
-	 */
-	public byte[] _getClassOriginalBytecode(int aClassId)
+	private void readClassBytecode(int aClassId)
 	{
-		return getClass(aClassId, true)._getOriginalBytecode();
+		try
+		{
+			itsFile.seek(itsByteCodeOffsets.get(aClassId));
+			int l = itsFile.readInt();
+			byte[] theBytecode = new byte[l];
+			itsFile.readFully(theBytecode);
+			l = itsFile.readInt();
+			byte[] theOriginalBytecode = new byte[l];
+			itsFile.readFully(theOriginalBytecode);
+			
+			ClassInfo theClass = getClass(aClassId, true);
+			theClass._setBytecode(theBytecode, theOriginalBytecode);
+		}
+		catch (IOException e)
+		{
+			throw new RuntimeException(e);
+		}
 	}
 	
 	/**
@@ -747,10 +874,26 @@ implements Serializable, IShareableStructureDatabase
 		return BCIUtils.acceptClass(aClassName, itsIdSelector);
 	}
 	
+	public Ids getIds()
+	{
+		return itsIds;
+	}
+
+	public LastIds getLastIds()
+	{
+		return new LastIds(itsIds.getLastClassId(), itsIds.getLastBehaviorId(), itsIds.getLastFieldId());
+	}
+
+	public void setLastIds(LastIds aIds)
+	{
+		itsIds.setLastClassId(aIds.classId);
+		itsIds.setLastBehaviorId(aIds.behaviorId);
+		itsIds.setLastFieldId(aIds.fieldId);
+	}
 
 
 
-	private static class Ids implements Serializable
+	static class Ids implements Serializable
 	{
 		private static final long serialVersionUID = -8031089051309554360L;
 		
@@ -767,14 +910,29 @@ implements Serializable, IShareableStructureDatabase
 			return itsNextFreeClassId++;
 		}
 		
+		public int getLastClassId()
+		{
+			return itsNextFreeClassId-1;
+		}
+		
 		public synchronized int nextBehaviorId()
 		{
 			return itsNextFreeBehaviorId++;
 		}
 		
+		public int getLastBehaviorId()
+		{
+			return itsNextFreeBehaviorId-1;
+		}
+		
 		public synchronized int nextFieldId()
 		{
 			return itsNextFreeFieldId++;
+		}
+		
+		public int getLastFieldId()
+		{
+			return itsNextFreeFieldId-1;
 		}
 		
 		public synchronized int nextAspectId()
@@ -788,6 +946,11 @@ implements Serializable, IShareableStructureDatabase
 		 */
 		public synchronized void registerClassId(int aId)
 		{
+			setLastClassId(aId);
+		}
+		
+		public synchronized void setLastClassId(int aId)
+		{
 			if (aId >= itsNextFreeClassId) itsNextFreeClassId = aId+1;
 		}
 
@@ -797,6 +960,11 @@ implements Serializable, IShareableStructureDatabase
 		 */
 		public synchronized void registerBehaviorId(int aId)
 		{
+			setLastBehaviorId(aId);
+		}
+		
+		public synchronized void setLastBehaviorId(int aId)
+		{
 			if (aId >= itsNextFreeBehaviorId) itsNextFreeBehaviorId = aId+1;
 		}
 		
@@ -805,6 +973,11 @@ implements Serializable, IShareableStructureDatabase
 		 * registered without asking for an id here.
 		 */
 		public synchronized void registerFieldId(int aId)
+		{
+			setLastFieldId(aId);
+		}
+		
+		public synchronized void setLastFieldId(int aId)
 		{
 			if (aId >= itsNextFreeFieldId) itsNextFreeFieldId = aId+1;
 		}

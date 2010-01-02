@@ -25,6 +25,7 @@ package tod.core.database.structure;
 import java.util.List;
 import java.util.Map;
 
+import tod.core.database.structure.IClassInfo.Bytecode;
 import tod.impl.database.structure.standard.TagMap;
 
 /**
@@ -34,8 +35,7 @@ import tod.impl.database.structure.standard.TagMap;
  */
 public interface IShareableStructureDatabase extends IMutableStructureDatabase
 {
-	public byte[] _getClassBytecode(int aClassId);
-	public byte[] _getClassOriginalBytecode(int aClassId);
+	public Bytecode _getClassBytecode(int aClassId);
 	public String _getClassSMAP(int aClassId);
 	public Map<String, IMutableFieldInfo> _getClassFieldMap(int aClassId);
 	public Map<String, IMutableBehaviorInfo> _getClassBehaviorsMap(int aClassId);

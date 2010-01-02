@@ -14,6 +14,7 @@ import tod.core.database.structure.IClassInfo;
 import tod.core.database.structure.IFieldInfo;
 import tod.core.database.structure.IMutableStructureDatabase;
 import tod.core.database.structure.IStructureDatabase;
+import tod.core.database.structure.IMutableStructureDatabase.LastIds;
 import tod.core.database.structure.IStructureDatabase.BehaviorMonitoringModeChange;
 
 /**
@@ -95,6 +96,16 @@ public class ASMInstrumenter2 implements IInstrumenter
 		List<BehaviorMonitoringModeChange> theChanges = itsChanges;
 		itsChanges = new ArrayList<BehaviorMonitoringModeChange>();
 		return theChanges;
+	}
+
+	public LastIds getLastIds()
+	{
+		return itsDatabase.getLastIds();
+	}
+
+	public void setLastIds(LastIds aIds)
+	{
+		itsDatabase.setLastIds(aIds);
 	}
 
 }

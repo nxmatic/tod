@@ -26,7 +26,6 @@ package tod.impl.server;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -39,6 +38,7 @@ import tod.core.DebugFlags;
 import tod.core.bci.IInstrumenter;
 import tod.core.bci.IInstrumenter.InstrumentedClass;
 import tod.core.config.TODConfig;
+import tod.core.database.structure.IMutableStructureDatabase.LastIds;
 import tod.core.database.structure.IStructureDatabase.BehaviorMonitoringModeChange;
 import tod.core.server.TODServer;
 import tod2.agent.AgentConfig;
@@ -53,13 +53,14 @@ import zz.utils.Utils;
 public abstract class NativeAgentPeer extends SocketThread
 {
 	public static final byte INSTRUMENT_CLASS = 50;
-	public static final byte REGISTER_CLASS = 51;
+	public static final byte SYNC_CACHE_IDS = 51;
 	public static final byte FLUSH = 99;
 	public static final byte OBJECT_HASH = 1;
 	public static final byte OBJECT_UID = 2;
 	
 	public static final byte SET_CAPTURE_EXCEPTIONS = 83;
 	public static final byte SET_HOST_BITS = 84;
+	public static final byte SET_CACHE_PATH = 85;
 
 	public static final byte CONFIG_DONE = 99;
 	
@@ -117,7 +118,7 @@ public abstract class NativeAgentPeer extends SocketThread
 		itsHostId = aHostId;
 		
 		// Check that the class cache path exists.
-		itsStoreClassesDir = new File(itsConfig.get(TODConfig.CLASS_CACHE_PATH));
+		itsStoreClassesDir = new File(itsConfig.get(TODConfig.CLASS_CACHE_PATH), "server");
 		itsStoreClassesDir.mkdirs();
 		
 		itsBadClassesDir = new File(itsConfig.get(TODConfig.BAD_CLASSES_PATH));
@@ -191,11 +192,11 @@ public abstract class NativeAgentPeer extends SocketThread
 		switch (aCommand)
 		{
 		case INSTRUMENT_CLASS:
-			processInstrumentClassCommand(itsInstrumenter, aInputStream, aOutputStream);
+			processInstrumentClassCommand(aInputStream, aOutputStream);
 			break;
 			
-		case REGISTER_CLASS:
-			processRegisterClassCommand(itsInstrumenter, aInputStream);
+		case SYNC_CACHE_IDS:
+			processSyncCacheIdsCommand(aInputStream);
 			break;
 			
 		case FLUSH:
@@ -243,6 +244,13 @@ public abstract class NativeAgentPeer extends SocketThread
 		theOutStream.writeByte(SET_HOST_BITS);
 		theOutStream.writeByte(theHostBits);
 		
+		String theCachePath =
+			itsConfig.get(TODConfig.CLASS_CACHE_PATH)
+			+ File.separatorChar + "client" + File.separatorChar
+			+ Utils.md5String(itsConfig.get(TODConfig.SCOPE_TRACE_FILTER).getBytes());
+		theOutStream.writeByte(SET_CACHE_PATH);
+		theOutStream.writeUTF(theCachePath);
+		
 		// Finish
 		theOutStream.writeByte(CONFIG_DONE);
 		theOutStream.flush();
@@ -272,7 +280,6 @@ public abstract class NativeAgentPeer extends SocketThread
 	 * @param aOutputStream Output stream connected to the agent
 	 */
 	public void processInstrumentClassCommand(
-			IInstrumenter aInstrumenter,
 			DataInputStream aInputStream, 
 			DataOutputStream aOutputStream) throws IOException
 	{
@@ -289,7 +296,7 @@ public abstract class NativeAgentPeer extends SocketThread
 			if (DebugFlags.INSTRUMENTER_LOG) System.out.println("Instrumenting "+theClassName+"... ");
 			try
 			{
-				theInstrumentedClass = aInstrumenter.instrumentClass(theClassName, theBytecode, itsUseJava14);
+				theInstrumentedClass = itsInstrumenter.instrumentClass(theClassName, theBytecode, itsUseJava14);
 			}
 			catch (Throwable e)
 			{
@@ -326,6 +333,12 @@ public abstract class NativeAgentPeer extends SocketThread
 			{
 				aOutputStream.writeInt((theMode.behaviorId << 2) | (theMode.mode & 0x3));
 			}
+			
+			// Write out last ids
+			LastIds theLastIds = itsInstrumenter.getLastIds();
+			aOutputStream.writeInt(theLastIds.classId);
+			aOutputStream.writeInt(theLastIds.behaviorId);
+			aOutputStream.writeInt(theLastIds.fieldId);
 		}
 		else if (theError != null)
 		{
@@ -345,31 +358,11 @@ public abstract class NativeAgentPeer extends SocketThread
 		aOutputStream.flush();
 	}
 	
-	/**
-	 * Processes a REGISTER_CLASS command sent by the agent.
-	 * @param aInstrumenter The instrumenter that will register the class
-	 * @param aInputStream Input stream connected to the agent
-	 */
-	public void processRegisterClassCommand(
-			IInstrumenter aInstrumenter,
-			DataInputStream aInputStream) throws IOException
+	public void processSyncCacheIdsCommand(DataInputStream aInputStream) throws IOException
 	{
-		String theClassName = aInputStream.readUTF();
-		int theLength = aInputStream.readInt();
-		byte[] theBytecode = new byte[theLength];
-		aInputStream.readFully(theBytecode);
-		
-		Utils.println("Registering %s [%d]...", theClassName, theLength);
-		InstrumentedClass theInstrumentedClass = null;
-		try
-		{
-			theInstrumentedClass = aInstrumenter.instrumentClass(theClassName, theBytecode, itsUseJava14);
-			if (theInstrumentedClass != null) throw new RuntimeException("Class should not be instrumented: "+theClassName);
-		}
-		catch (Exception e)
-		{
-			System.err.println("Error during registration: ");
-			e.printStackTrace();
-		}
+		int theClassId = aInputStream.readInt();
+		int theBehaviorId = aInputStream.readInt();
+		int theFieldId = aInputStream.readInt();
+		itsInstrumenter.setLastIds(new LastIds(theClassId, theBehaviorId, theFieldId));
 	}
 }

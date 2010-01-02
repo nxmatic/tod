@@ -51,9 +51,9 @@ public class FilterSeed extends ActivitySeed/*<FilterView>*/
 	 */
 	private long itsTimestamp;
 	
-	private IRWProperty<ILogEvent> pSelectedEvent = new SimpleRWProperty<ILogEvent>(this);
+	private IRWProperty<ILogEvent> pSelectedEvent = new SimpleRWProperty<ILogEvent>();
 	
-	private IRWProperty<IEventFilter> pAdditionalFilter = new SimpleRWProperty<IEventFilter>(this);
+	private IRWProperty<IEventFilter> pAdditionalFilter = new SimpleRWProperty<IEventFilter>();
 
 	public FilterSeed(
 			ILogBrowser aLog, 

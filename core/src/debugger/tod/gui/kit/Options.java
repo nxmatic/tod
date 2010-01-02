@@ -115,7 +115,7 @@ public class Options
 					save(aDef, theValue);
 				}
 				
-				theProperty = new SimpleRWProperty<T>(null, theValue);
+				theProperty = new SimpleRWProperty<T>(theValue);
 				itsValues.put(aDef, theProperty);
 			}
 			

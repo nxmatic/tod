@@ -41,7 +41,7 @@ implements IJobScheduler
 	private BlockingQueue<Job> itsQueuedJobs = new PriorityBlockingQueue<Job>();
 	private Job itsCurrentJob;
 	
-	private IRWProperty<Integer> pQueueSize = new SimpleRWProperty<Integer>(this, 0);
+	private IRWProperty<Integer> pQueueSize = new SimpleRWProperty<Integer>(0);
 	
 	public JobScheduler()
 	{

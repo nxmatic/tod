@@ -50,7 +50,7 @@ public class TODSessionManager
 	{
 	}
 	
-	private IRWProperty<ISession> pCurrentSession = new SimpleRWProperty<ISession>(this)
+	private IRWProperty<ISession> pCurrentSession = new SimpleRWProperty<ISession>()
 	{
 		@Override
 		protected void changed(ISession aOldValue, ISession aNewValue)

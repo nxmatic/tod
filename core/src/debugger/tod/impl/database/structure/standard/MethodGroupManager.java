@@ -44,6 +44,7 @@ import tod.core.database.structure.IBehaviorInfo;
 import tod.core.database.structure.IClassInfo;
 import tod.core.database.structure.IFieldInfo;
 import tod.core.database.structure.IStructureDatabase;
+import tod.core.database.structure.ITypeInfo;
 import tod.core.database.structure.IStructureDatabase.BehaviorMonitoringModeChange;
 import tod2.agent.MonitoringMode;
 import zz.utils.SetMap;
@@ -101,12 +102,13 @@ public class MethodGroupManager implements IStructureDatabase.Listener, Serializ
 	private String getSignature(IBehaviorInfo aBehavior)
 	{
 		String theName = aBehavior.getName();
-		if ("<init>".equals(theName)) theName = "<init_"+aBehavior.getDeclaringType().getName()+">";
-		if ("<clinit>".equals(theName)) theName = "<clinit_"+aBehavior.getDeclaringType().getName()+">";
+		if ("<init>".equals(theName)) theName = "<init_"+ClassInfo.getTypeChar(aBehavior.getDeclaringType())+">";
+		if ("<clinit>".equals(theName)) theName = "<clinit_"+ClassInfo.getTypeChar(aBehavior.getDeclaringType())+">";
 		
-		String theSig = theName+aBehavior.getSignature();
-		int i = theSig.indexOf(')');
-		return theSig.substring(0, i+1);
+		StringBuilder theBuilder = new StringBuilder(theName);
+		theBuilder.append('|');
+		for(ITypeInfo theType : aBehavior.getArgumentTypes()) theBuilder.append(ClassInfo.getTypeChar(theType));
+		return theBuilder.toString();
 	}
 	
 	private void markMonitored(IBehaviorInfo aBehavior)
@@ -270,7 +272,7 @@ public class MethodGroupManager implements IStructureDatabase.Listener, Serializ
 		private static final long serialVersionUID = 7719483876342347891L;
 
 		private final Set<IClassInfo> itsTypes = new HashSet<IClassInfo>();
-		private final List<IBehaviorInfo> itsBehaviors = new ArrayList<IBehaviorInfo>();
+		private final List<IBehaviorInfo> itsBehaviors = new ArrayList<IBehaviorInfo>(1);
 		private boolean itsMonitored = false;
 		
 		public MethodGroup(IBehaviorInfo aInitialBehavior)
@@ -316,7 +318,7 @@ public class MethodGroupManager implements IStructureDatabase.Listener, Serializ
 		private static final long serialVersionUID = 1029462904632099612L;
 		
 		private final String itsSignature;
-		private final List<MethodGroup> itsGroups = new ArrayList<MethodGroup>();
+		private final List<MethodGroup> itsGroups = new ArrayList<MethodGroup>(1);
 		
 		public MethodSignatureGroup(String aSignature)
 		{

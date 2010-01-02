@@ -45,7 +45,7 @@ implements IEventListSeed
 {
 	private IThreadInfo itsThread;
 	
-	private IRWProperty<ILogEvent> pSelectedEvent = new SimpleRWProperty<ILogEvent>(this)
+	private IRWProperty<ILogEvent> pSelectedEvent = new SimpleRWProperty<ILogEvent>()
 	{
 		@Override
 		protected void changed(ILogEvent aOldValue, ILogEvent aNewValue)
@@ -55,10 +55,10 @@ implements IEventListSeed
 		}
 	};
 	
-	private IRWProperty<IParentEvent> pRootEvent = new SimpleRWProperty<IParentEvent>(this);
-	private IRWProperty<ILogEvent> pLeafEvent = new SimpleRWProperty<ILogEvent>(this);
+	private IRWProperty<IParentEvent> pRootEvent = new SimpleRWProperty<IParentEvent>();
+	private IRWProperty<ILogEvent> pLeafEvent = new SimpleRWProperty<ILogEvent>();
 	
-	private IRWProperty<ObjectId> pInspectedObject = new SimpleRWProperty<ObjectId>(this);
+	private IRWProperty<ObjectId> pInspectedObject = new SimpleRWProperty<ObjectId>();
 	
 	public CFlowSeed(ILogBrowser aLog, ILogEvent aSelectedEvent)
 	{

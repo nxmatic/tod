@@ -98,4 +98,27 @@ public interface IMutableStructureDatabase extends IStructureDatabase
 	 * inconsistency.
 	 */
 	public void setAdviceSourceMap(Map<Integer, SourceRange> aMap);
+	
+	/**
+	 * Informs the database about the last used ids that can be found in
+	 * the client's cache.
+	 */
+	public void setLastIds(LastIds aIds);
+	
+	public LastIds getLastIds();
+	
+	public static class LastIds
+	{
+		public final int classId;
+		public final int behaviorId;
+		public final int fieldId;
+		
+		public LastIds(int aClassId, int aBehaviorId, int aFieldId)
+		{
+			classId = aClassId;
+			behaviorId = aBehaviorId;
+			fieldId = aFieldId;
+		}
+	}
+
 }
