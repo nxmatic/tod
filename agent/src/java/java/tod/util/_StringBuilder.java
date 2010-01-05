@@ -313,17 +313,17 @@ public final class _StringBuilder
 	 * @param   sb   the <tt>StringBuffer</tt> to append.
 	 * @return  a reference to this object.
 	 */
-	public _StringBuilder append(StringBuffer sb) {
-		if (sb == null)
-			return append("null");
-		int len = sb.length();
-		int newCount = count + len;
-		if (newCount > value.length)
-			expandCapacity(newCount);
-		sb.getChars(0, len, value, count);
-		count = newCount;
-		return this;
-	}
+//	public _StringBuilder append(StringBuffer sb) {
+//		if (sb == null)
+//			return append("null");
+//		int len = sb.length();
+//		int newCount = count + len;
+//		if (newCount > value.length)
+//			expandCapacity(newCount);
+//		sb.getChars(0, len, value, count);
+//		count = newCount;
+//		return this;
+//	}
 
 	/**
 	 * @throws IndexOutOfBoundsException {@inheritDoc}
@@ -333,8 +333,8 @@ public final class _StringBuilder
 			s = "null";
 		if (s instanceof String)
 			return this.append((String)s);
-		if (s instanceof StringBuffer)
-			return this.append((StringBuffer)s);
+//		if (s instanceof StringBuffer)
+//			return this.append((StringBuffer)s);
 		if (s instanceof StringBuilder)
 			return this.append((StringBuilder)s);
 		return this.append(s, 0, s.length());
