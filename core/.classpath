@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <classpath>
 	<classpathentry kind="src" path="resources"/>
-	<classpathentry excluding="tod/impl/bci/asm/" kind="src" path="src/debugger"/>
+	<classpathentry kind="src" path="src/debugger"/>
 	<classpathentry kind="src" path="src/test"/>
-	<classpathentry excluding="tod/test/DBBench.java|tod/experiments/SootDriver.java" kind="src" path="src/experiments"/>
+	<classpathentry kind="src" path="src/experiments"/>
 	<classpathentry kind="src" path="src/testcase"/>
 	<classpathentry exported="true" kind="src" path="/zz.utils"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.junit.JUNIT_CONTAINER/4"/>
