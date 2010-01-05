@@ -37,8 +37,7 @@ import tod.core.database.browser.LocationUtils;
 import tod.core.database.structure.IBehaviorInfo;
 import tod.core.database.structure.IClassInfo;
 import tod.gui.activities.structure.DisassemblyPanel;
-import tod.impl.bci.asm.ASMDebuggerConfig;
-import tod.impl.bci.asm.ASMInstrumenter;
+import tod.impl.bci.asm2.ASMInstrumenter2;
 import tod.impl.database.structure.standard.StructureDatabase;
 import zz.utils.Utils;
 
@@ -57,9 +56,8 @@ public class Instrument
 		System.out.println(theName);
 		
 		TODConfig theConfig = new TODConfig();
-		ASMDebuggerConfig theDebuggerConfig = new ASMDebuggerConfig(theConfig);
-		StructureDatabase theStructureDatabase = StructureDatabase.create(theConfig, "test");
-		ASMInstrumenter theInstrumenter = new ASMInstrumenter(theStructureDatabase, theDebuggerConfig);
+		StructureDatabase theStructureDatabase = StructureDatabase.create(theConfig);
+		ASMInstrumenter2 theInstrumenter = new ASMInstrumenter2(theConfig, theStructureDatabase);
 		
 		InstrumentedClass theInstrumentedClass = theInstrumenter.instrumentClass(theName, theClassData, false);
 

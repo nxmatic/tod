@@ -27,9 +27,9 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.PrintStream;
 
-import tod.core.transport.EventInterpreter;
 import tod.core.transport.LogReceiver;
 import tod.impl.common.ObjectInspector;
+import tod.impl.server.NativeAgentPeer;
 import tod.utils.ConfigUtils;
 import zz.utils.bit.BitUtils;
 

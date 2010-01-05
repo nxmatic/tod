@@ -45,7 +45,6 @@ import tod.core.database.structure.IStructureDatabase.ProbeInfo;
 import tod.core.session.ISession;
 import tod.impl.common.PrecomputedFilter;
 import tod.impl.dbgrid.GridLogBrowser;
-import tod.impl.dbgrid.GridMaster;
 import tod.impl.dbgrid.RIGridMaster;
 import tod.impl.dbgrid.aggregator.GridEventBrowser;
 import tod.impl.dbgrid.messages.MessageType;
@@ -88,11 +87,11 @@ public class GridLogBrowserNG extends GridLogBrowser
 		super(aSession, aMaster, aStructureDatabase);
 	}
 	
-	public static GridLogBrowser createLocal(ISession aSession, GridMaster aMaster) 
-	{
-		return new GridLogBrowserNG(aSession, aMaster, aMaster.getStructureDatabase());
-	}
-	
+//	public static GridLogBrowser createLocal(ISession aSession, GridMaster aMaster) 
+//	{
+//		return new GridLogBrowserNG(aSession, aMaster, aMaster.getStructureDatabase());
+//	}
+//	
 	public static GridLogBrowser createRemote(ISession aSession, RIGridMaster aMaster)
 	{
 		return new GridLogBrowserNG(

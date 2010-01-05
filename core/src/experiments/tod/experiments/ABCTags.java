@@ -60,8 +60,7 @@ import tod.gui.IExtensionPoints;
 import tod.gui.IGUIManager;
 import tod.gui.MinerUI;
 import tod.gui.activities.structure.StructureSeed;
-import tod.impl.bci.asm.ASMDebuggerConfig;
-import tod.impl.bci.asm.ASMInstrumenter;
+import tod.impl.bci.asm2.ASMInstrumenter2;
 import tod.impl.database.IBidiIterator;
 import tod.impl.database.structure.standard.StructureDatabase;
 import zz.utils.Utils;
@@ -72,10 +71,9 @@ public class ABCTags
 	public static void main(String[] args) throws Exception
 	{
 		TODConfig theConfig = new TODConfig();
-		StructureDatabase theStructureDatabase = StructureDatabase.create(theConfig, "abc");
+		StructureDatabase theStructureDatabase = StructureDatabase.create(theConfig);
 		theConfig.set(TODConfig.SCOPE_TRACE_FILTER, "[+xys]");
-		ASMDebuggerConfig theDebuggerConfig = new ASMDebuggerConfig(theConfig);
-		ASMInstrumenter theInstrumenter = new ASMInstrumenter(theStructureDatabase, theDebuggerConfig);
+		ASMInstrumenter2 theInstrumenter = new ASMInstrumenter2(theConfig, theStructureDatabase);
 		
 		byte[] theBytecode = Utils.readInputStream_byte(new FileInputStream(args[0]));
 		theInstrumenter.instrumentClass("x", theBytecode, false);

@@ -41,7 +41,6 @@ import tod.impl.database.structure.standard.HostInfo;
 public class CollectorLogReceiver extends LogReceiver
 {
 	private final ILogCollector itsCollector;
-	private final EventInterpreter itsInterpreter;
 	
 	public CollectorLogReceiver(
 			TODConfig aConfig,
@@ -54,7 +53,6 @@ public class CollectorLogReceiver extends LogReceiver
 	{
 		super(aConfig, aStructureDatabase, aHostInfo, aInStream, aOutStream, false);
 		itsCollector = aCollector;
-		itsInterpreter = null;//new EventInterpreter(aStructureDatabase, itsCollector);
 		if (aStart) start();
 	}
 	

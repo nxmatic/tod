@@ -27,8 +27,6 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
 import tod.core.session.ISession;
-import tod.impl.dbgrid.db.DatabaseNode;
-import tod.impl.dbgrid.db.ObjectsDatabase;
 import tod.utils.ConfigUtils;
 import zz.utils.srpc.SRPCRemoteException;
 
@@ -132,38 +130,38 @@ public class DebuggerGridConfig
 		else throw new RuntimeException("Not handled: "+DBIMPL);
 	}
 	
-	/**
-	 * Creates the proper instance of {@link DatabaseNode} according to
-	 * the selected database implementation ({@link #DBIMPL}).
-	 */
-	public static DatabaseNode createDatabaseNode()
-	{
-		try
-		{
-			return (DatabaseNode) getDbImpl().getClass(DATABASENODE_BASE).newInstance();
-		}
-		catch (Exception e)
-		{
-			throw new RuntimeException(e);
-		}
-	}
-	
-	public static GridLogBrowser createLocalLogBrowser(ISession aSession, GridMaster aMaster)
-	{
-		try
-		{
-			Method theMethod = getDbImpl().getClass(GRIDLOGBROWSER_BASE).getDeclaredMethod(
-					"createLocal", 
-					ISession.class, 
-					GridMaster.class);
-			
-			return (GridLogBrowser) theMethod.invoke(null, aSession, aMaster);
-		}
-		catch (Exception e)
-		{
-			throw new RuntimeException(e);
-		}
-	}
+//	/**
+//	 * Creates the proper instance of {@link DatabaseNode} according to
+//	 * the selected database implementation ({@link #DBIMPL}).
+//	 */
+//	public static DatabaseNode createDatabaseNode()
+//	{
+//		try
+//		{
+//			return (DatabaseNode) getDbImpl().getClass(DATABASENODE_BASE).newInstance();
+//		}
+//		catch (Exception e)
+//		{
+//			throw new RuntimeException(e);
+//		}
+//	}
+//	
+//	public static GridLogBrowser createLocalLogBrowser(ISession aSession, GridMaster aMaster)
+//	{
+//		try
+//		{
+//			Method theMethod = getDbImpl().getClass(GRIDLOGBROWSER_BASE).getDeclaredMethod(
+//					"createLocal", 
+//					ISession.class, 
+//					GridMaster.class);
+//			
+//			return (GridLogBrowser) theMethod.invoke(null, aSession, aMaster);
+//		}
+//		catch (Exception e)
+//		{
+//			throw new RuntimeException(e);
+//		}
+//	}
 	
 	public static GridLogBrowser createRemoteLogBrowser(ISession aSession, RIGridMaster aMaster) 
 	{

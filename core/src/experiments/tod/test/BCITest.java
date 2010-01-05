@@ -81,7 +81,7 @@ public class BCITest
 	
 	public static void print (Object aObject)
 	{
-		System.out.println("Object: "+TODAccessor.getId(aObject));
+		System.out.println("Object: "+TODAccessor.getObjectId(aObject));
 	}
 	
 	private void foo (int i, long l, float f, double d, String s)
