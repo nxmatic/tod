@@ -31,7 +31,7 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.replay2;
 
-import com.sun.xml.internal.ws.org.objectweb.asm.Type;
+import org.objectweb.asm.Type;
 
 import tod2.agent.Message;
 
