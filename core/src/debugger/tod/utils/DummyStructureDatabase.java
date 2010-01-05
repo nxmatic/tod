@@ -225,4 +225,8 @@ implements IMutableStructureDatabase
 	public void setLastIds(LastIds aIds)
 	{
 	}
+
+	public void replayModeChanges(int aClassId)
+	{
+	}
 }

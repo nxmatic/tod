@@ -108,4 +108,8 @@ public class ASMInstrumenter2 implements IInstrumenter
 		itsDatabase.setLastIds(aIds);
 	}
 
+	public void replayModeChanges(int aClassId)
+	{
+		itsDatabase.replayModeChanges(aClassId);
+	}
 }

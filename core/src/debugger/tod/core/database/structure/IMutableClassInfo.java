@@ -22,6 +22,8 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 */
 package tod.core.database.structure;
 
+import tod.core.database.structure.IStructureDatabase.BehaviorMonitoringModeChange;
+
 
 /**
  * Represents an in-construction {@link IClassInfo}.
@@ -45,6 +47,11 @@ public interface IMutableClassInfo extends IClassInfo, IMutableLocationInfo
 	 * Sets up the bytecode information of this class.
 	 */
 	public void setBytecode(byte[] aInstrumentedBytecode, byte[] aOriginalBytecode);
+	
+	/**
+	 * Sets the mode changes caused by this class.
+	 */
+	public void setModeChanges(BehaviorMonitoringModeChange[] aModeChanges);
 	
 	/**
 	 * Sets the SMAP of the class (JSR 45).

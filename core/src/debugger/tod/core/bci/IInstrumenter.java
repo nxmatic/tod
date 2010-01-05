@@ -39,6 +39,11 @@ public interface IInstrumenter
 	
 	public LastIds getLastIds();
 	
+	/**
+	 * "Replays" the monitoring mode changes of the given class.
+	 */
+	public void replayModeChanges(int aClassId);
+	
     /**
      * Instruments the given class.
      * @param aClassName JVM internal class name (eg. "java/lang/Object")
@@ -67,6 +72,8 @@ public interface IInstrumenter
 	 */
 	public static class InstrumentedClass
 	{
+		public final int id;
+		
 		/**
 		 * Instrumented bytecode
 		 */
@@ -78,8 +85,9 @@ public interface IInstrumenter
 		 */
 		public final List<BehaviorMonitoringModeChange> modeChanges;
 
-		public InstrumentedClass(byte[] aBytecode, List<BehaviorMonitoringModeChange> aModeChanges)
+		public InstrumentedClass(int aId, byte[] aBytecode, List<BehaviorMonitoringModeChange> aModeChanges)
 		{
+			id = aId;
 			bytecode = aBytecode;
 			modeChanges = aModeChanges;
 		}

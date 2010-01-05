@@ -57,7 +57,7 @@ import tod.core.database.structure.ITypeInfo;
 import tod.core.database.structure.SourceRange;
 import tod.core.database.structure.IBehaviorInfo.BytecodeRole;
 import tod.core.database.structure.IClassInfo.Bytecode;
-import tod.core.database.structure.IMutableStructureDatabase.LastIds;
+import tod.core.database.structure.IStructureDatabase.BehaviorMonitoringModeChange;
 import tod.impl.bci.asm2.BCIUtils;
 import tod.tools.parsers.ParseException;
 import tod.tools.parsers.workingset.WorkingSetFactory;
@@ -137,6 +137,11 @@ implements IShareableStructureDatabase
 	private transient List<Listener> itsListeners = new ArrayList<Listener>();
 	
 	private final MethodGroupManager itsMethodGroupManager; 
+	
+	/**
+	 * For deserialized databases, stores the replayed mode changes. 
+	 */
+	private final List<BehaviorMonitoringModeChange> itsModeChanges;
 
 	private transient ClassSelector itsGlobalSelector;
 	private transient ClassSelector itsTraceSelector;
@@ -163,11 +168,13 @@ implements IShareableStructureDatabase
 		{
 			load();
 			itsMethodGroupManager = null;
+			itsModeChanges = new ArrayList<BehaviorMonitoringModeChange>();
 		}
 		else 
 		{
 			itsFile.seek(8); // The first long is used to store the offset of the serialized data
 			itsMethodGroupManager = new MethodGroupManager(this);
+			itsModeChanges = null;
 			itsBehaviors = new ArrayList<BehaviorInfo>(10000);
 			itsFields = new ArrayList<FieldInfo>(10000);
 			itsClasses = new ArrayList<ClassInfo>(1000);
@@ -696,7 +703,16 @@ implements IShareableStructureDatabase
 	
 	public BehaviorMonitoringModeChange getBehaviorMonitoringModeChange(int aVersion)
 	{
-		return itsMethodGroupManager.getChange(aVersion);
+		return itsMethodGroupManager != null ?
+				itsMethodGroupManager.getChange(aVersion)
+				: itsModeChanges.get(aVersion);
+	}
+	
+	public void replayModeChanges(int aClassId)
+	{
+		ClassInfo theClass = getClass(aClassId, true);
+		BehaviorMonitoringModeChange[] theModeChanges = theClass.getModeChanges();
+		Utils.fillCollection(itsModeChanges, theModeChanges);
 	}
 
 	public IAdviceInfo getAdvice(int aAdviceId)
@@ -782,6 +798,17 @@ implements IShareableStructureDatabase
 		}
 	}
 	
+	
+	
+	/**
+	 * This method is used to retrieve the value of transient fields on the remote side
+	 * (see {@link RemoteStructureDatabase}).
+	 */
+	public BehaviorMonitoringModeChange[] _getModeChanges(int aClassId)
+	{
+		return getClass(aClassId, true)._getModeChanges();
+	}
+
 	/**
 	 * This method is used to retrieve the value of transient fields on the remote side
 	 * (see {@link RemoteStructureDatabase}).

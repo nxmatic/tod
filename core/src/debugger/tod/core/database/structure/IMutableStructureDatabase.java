@@ -107,6 +107,12 @@ public interface IMutableStructureDatabase extends IStructureDatabase
 	
 	public LastIds getLastIds();
 	
+	/**
+	 * Replays the mode changes associated to the given class so that
+	 * version numbers are synchronized with the client.
+	 */
+	public void replayModeChanges(int aClassId);
+	
 	public static class LastIds
 	{
 		public final int classId;

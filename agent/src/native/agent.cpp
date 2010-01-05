@@ -53,6 +53,7 @@ namespace fs = boost::filesystem;
 const char EXCEPTION_GENERATED = 20;
 const char INSTRUMENT_CLASS = 50;
 const char SYNC_CACHE_IDS = 51;
+const char USE_CACHED_CLASS = 52;
 const char FLUSH = 99;
 
 // Incoming commands
@@ -250,9 +251,7 @@ void registerTracedMethods(JNIEnv* jni, int nTracedMethods, int* tracedMethods)
 
 struct ClassInfo
 {
-/*	ClassInfo(unsigned char* _data, jint _dataLen, int* _tracedMethods, int _nTracedMethods)
-		: data(_data), dataLen(_dataLen), tracedMethods(_tracedMethods), nTracedMethods(_nTracedMethods)
-	{}*/
+	jint id;
 	
 	unsigned char* data;
 	jint dataLen;
@@ -281,6 +280,8 @@ ClassInfo* checkCacheInfo(
 		{
 			if (propVerbose>=1) printf("Found valid in cache: %s\n", name);
 			
+			jint id = readInt(&infoFile);
+			
 			int nTracedMethods = readInt(&infoFile);
 			int* tracedMethods = new int[nTracedMethods];
 			for (int i=0;i<nTracedMethods;i++) tracedMethods[i] = readInt(&infoFile);
@@ -290,7 +291,7 @@ ClassInfo* checkCacheInfo(
 			unsigned char* data = (unsigned char*) malloc_f(len);
 			readBytes(&classFile, len, data);
 			
-			return new ClassInfo { data, len, tracedMethods, nTracedMethods };
+			return new ClassInfo { id, data, len, tracedMethods, nTracedMethods };
 		}
 	}
 	
@@ -328,6 +329,8 @@ ClassInfo* requestInstrumentation(
 		if (gSocket->eof()) fatal_ioerror("fread");
 		if (propVerbose>=2) printf("Class definition downloaded.\n");
 		
+		jint id = readInt(gSocket);
+		
 		int nTracedMethods = readInt(gSocket);
 		int* tracedMethods = new int[nTracedMethods];
 		for (int i=0;i<nTracedMethods;i++) tracedMethods[i] = readInt(gSocket);
@@ -349,6 +352,7 @@ ClassInfo* requestInstrumentation(
 		
 		fs::ofstream infoFile(infoPath);
 		writeBytes(&infoFile, 16, md5Buffer_in);
+		writeInt(&infoFile, id);
 		writeInt(&infoFile, nTracedMethods);
 		for (int i=0;i<nTracedMethods;i++) writeInt(&infoFile, tracedMethods[i]);
 		infoFile.close();
@@ -356,7 +360,7 @@ ClassInfo* requestInstrumentation(
 		if (propVerbose>=2) std::cout << "Stored cache: " << infoPath << std::endl;
 
 
-		return new ClassInfo { instrData, instrLen, tracedMethods, nTracedMethods };
+		return new ClassInfo { id, instrData, instrLen, tracedMethods, nTracedMethods };
 	}
 	else if (instrLen == -1)
 	{
@@ -416,6 +420,12 @@ void agentClassFileLoadHook(
 		
 		ClassInfo* info = checkCacheInfo(name, md5Buffer, malloc_f);
 		if (info == NULL) info = requestInstrumentation(name, md5Buffer, class_data, class_data_len, malloc_f);
+		else
+		{
+			// Notify server of class loaded from cache
+			writeByte(gSocket, USE_CACHED_CLASS);
+			writeInt(gSocket, info->id);
+		}
 	
 		if (info != NULL)
 		{

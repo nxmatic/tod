@@ -347,6 +347,11 @@ public class JavaTODServer extends TODServer
 		{
 			itsDelegate.setLastIds(aIds);
 		}
+
+		public synchronized void replayModeChanges(int aClassId)
+		{
+			itsDelegate.replayModeChanges(aClassId);
+		}
 	}
 	
 	/**

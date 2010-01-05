@@ -21,14 +21,14 @@ VMARGS="$VMARGS -ea"
 VMARGS="$VMARGS -server" 
 VMARGS="$VMARGS -Xmx256m" 
 VMARGS="$VMARGS -XX:MaxPermSize=128m"
-VMARGS="$VMARGS -Dagent-verbose=0"
+VMARGS="$VMARGS -Dagent-verbose=1"
 #VMARGS="$VMARGS -Dagent-cache-path=/home/gpothier/tmp/tod"
 #VMARGS="$VMARGS -Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=8000"
 #VMARGS="$VMARGS -agentlib:hprof=cpu=samples,depth=3"
 #VMARGS="$VMARGS -Dcom.sun.management.jmxremote=true"
 
 #java $VMARGS -cp ./bin dummy.BurnTest
-java $VMARGS -cp ./bin calls.Main
+#java $VMARGS -cp ./bin calls.Main
 #java $VMARGS -cp /home/gpothier/ws/TOD-TestCases/bin:/home/gpothier/ws/zz.utils/bin MainJavac 
 #java $VMARGS -cp ./bin dummy.BCITestCase
 #java $VMARGS -cp ../../ws-tod-daughter/Dummy/bin TestToString
@@ -45,7 +45,7 @@ java $VMARGS -cp ./bin calls.Main
 #$JAVA_HOME/bin/java $VMARGS -cp "../../ws-tod-daughter/AspectJTODTest/bin/":lib/zz.utils.jar imageviewer2008.ImageViewer $1
 #java $VMARGS -cp ./bin dummy.Dummy2
 
-#~/apps/eclipse-3.3.1.1/eclipse -vm /home/gpothier/apps/java/jdk1.5.0_08/bin/java -data ~/eclipse/ws-tod -consolelog -vmargs $VMARGS
+~/apps/eclipse-3.5/eclipse  -data ~/devel/ws-todtest -consolelog -vmargs $VMARGS
 
 # /home/gpothier/apps/java/jdk1.6.0_01/bin/java $VMARGS -jar /home/gpothier/apps/eclipse-3.3.1.1/plugins/org.eclipse.equinox.launcher_1.0.1.R33x_v20070828.jar -os linux -ws gtk -arch x86 -showsplash -launcher /home/gpothier/apps/eclipse-3.3.1.1/eclipse -name Eclipse --launcher.library /home/gpothier/apps/eclipse-3.3.1.1/plugins/org.eclipse.equinox.launcher.gtk.linux.x86_1.0.2.R331_v20071019/eclipse_1021.so -startup /home/gpothier/apps/eclipse-3.3.1.1/plugins/org.eclipse.equinox.launcher_1.0.1.R33x_v20070828.jar -exitdata 2d88001 -data ~/eclipse/ws-tod -consolelog -vm /home/gpothier/apps/java/jdk1.5.0_08/bin/java -vmargs -Xmx256m -XX:MaxPermSize=128m -jar /home/gpothier/apps/eclipse-3.3.1.1/plugins/org.eclipse.equinox.launcher_1.0.1.R33x_v20070828.jar
 

@@ -51,8 +51,8 @@ import tod.core.database.structure.IMutableBehaviorInfo;
 import tod.core.database.structure.IMutableClassInfo;
 import tod.core.database.structure.IMutableStructureDatabase;
 import tod.core.database.structure.ITypeInfo;
+import tod.core.database.structure.IStructureDatabase.BehaviorMonitoringModeChange;
 import tod2.access.TODAccessor;
-import tod2.agent.Message;
 import zz.utils.Utils;
 
 /**
@@ -166,12 +166,17 @@ public class ClassInstrumenter
 			System.err.println("Class "+getNode().name+" failed check. Writing out bytecode.");
 			e.printStackTrace();
 		}
-		
+				
 		itsClassInfo.setBytecode(theBytecode, itsOriginal);
 		
+		List<BehaviorMonitoringModeChange> theModeChanges = getInstrumenter().getModeChangesAndReset();
+		
+		itsClassInfo.setModeChanges(theModeChanges.toArray(new BehaviorMonitoringModeChange[theModeChanges.size()]));
+		
 		return new InstrumentedClass(
+				itsClassInfo.getId(),
 				theBytecode, 
-				getInstrumenter().getModeChangesAndReset());
+				theModeChanges);
 	}
 	
 	private void processNormalClass()

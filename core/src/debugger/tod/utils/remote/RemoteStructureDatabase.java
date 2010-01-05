@@ -47,6 +47,7 @@ import tod.core.database.structure.IBehaviorInfo.BytecodeRole;
 import tod.core.database.structure.IClassInfo.Bytecode;
 import tod.core.database.structure.ILocationInfo.ISerializableLocationInfo;
 import tod.core.database.structure.IMutableStructureDatabase.LastIds;
+import tod.core.database.structure.IStructureDatabase.BehaviorMonitoringModeChange;
 import tod.core.database.structure.IStructureDatabase.LineNumberInfo;
 import tod.core.database.structure.IStructureDatabase.LocalVariableInfo;
 import tod.core.database.structure.IStructureDatabase.ProbeInfo;
@@ -264,6 +265,11 @@ public class RemoteStructureDatabase implements RIStructureDatabase
 		return itsSource._getClassBytecode(aClassId);
 	}
 	
+	public BehaviorMonitoringModeChange[] _getModeChanges(int aClassId)
+	{
+		return itsSource._getModeChanges(aClassId);
+	}
+
 	public String _getClassSMAP(int aClassId)
 	{
 		return itsSource._getClassSMAP(aClassId);
@@ -705,6 +711,12 @@ public class RemoteStructureDatabase implements RIStructureDatabase
 			return itsDatabase._getClassBytecode(aClassId);
 		}
 		
+		public BehaviorMonitoringModeChange[] _getModeChanges(int aClassId)
+		{
+			System.out.println("Retrieving mode changes for class: "+aClassId);
+			return itsDatabase._getModeChanges(aClassId);
+		}
+
 		public String _getClassSMAP(int aClassId)
 		{
 			System.out.println("Retrieving SMAP for class: "+aClassId);
@@ -752,6 +764,11 @@ public class RemoteStructureDatabase implements RIStructureDatabase
 		}
 
 		public void setLastIds(LastIds aIds)
+		{
+			throw new UnsupportedOperationException();
+		}
+		
+		public void replayModeChanges(int aClassId)
 		{
 			throw new UnsupportedOperationException();
 		}

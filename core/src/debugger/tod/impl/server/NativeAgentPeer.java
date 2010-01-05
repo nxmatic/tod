@@ -54,6 +54,7 @@ public abstract class NativeAgentPeer extends SocketThread
 {
 	public static final byte INSTRUMENT_CLASS = 50;
 	public static final byte SYNC_CACHE_IDS = 51;
+	public static final byte USE_CACHED_CLASS = 52;
 	public static final byte FLUSH = 99;
 	public static final byte OBJECT_HASH = 1;
 	public static final byte OBJECT_UID = 2;
@@ -199,6 +200,10 @@ public abstract class NativeAgentPeer extends SocketThread
 			processSyncCacheIdsCommand(aInputStream);
 			break;
 			
+		case USE_CACHED_CLASS:
+			processUseCachedClassCommand(aInputStream);
+			break;
+			
 		case FLUSH:
 			processFlush();
 			break;
@@ -279,7 +284,7 @@ public abstract class NativeAgentPeer extends SocketThread
 	 * @param aInputStream Input stream connected to the agent
 	 * @param aOutputStream Output stream connected to the agent
 	 */
-	public void processInstrumentClassCommand(
+	private void processInstrumentClassCommand(
 			DataInputStream aInputStream, 
 			DataOutputStream aOutputStream) throws IOException
 	{
@@ -326,6 +331,9 @@ public abstract class NativeAgentPeer extends SocketThread
 			aOutputStream.writeInt(theInstrumentedClass.bytecode.length);
 			aOutputStream.write(theInstrumentedClass.bytecode);
 			
+			// Write out class id
+			aOutputStream.writeInt(theInstrumentedClass.id);
+			
 			// Write out traced method ids
 			if (DebugFlags.INSTRUMENTER_LOG) System.out.println("Sending "+theInstrumentedClass.modeChanges.size()+" mode changes.");
 			aOutputStream.writeInt(theInstrumentedClass.modeChanges.size());
@@ -358,11 +366,17 @@ public abstract class NativeAgentPeer extends SocketThread
 		aOutputStream.flush();
 	}
 	
-	public void processSyncCacheIdsCommand(DataInputStream aInputStream) throws IOException
+	private void processSyncCacheIdsCommand(DataInputStream aInputStream) throws IOException
 	{
 		int theClassId = aInputStream.readInt();
 		int theBehaviorId = aInputStream.readInt();
 		int theFieldId = aInputStream.readInt();
 		itsInstrumenter.setLastIds(new LastIds(theClassId, theBehaviorId, theFieldId));
+	}
+	
+	private void processUseCachedClassCommand(DataInputStream aInputStream) throws IOException
+	{
+		int theClassId = aInputStream.readInt();
+		itsInstrumenter.replayModeChanges(theClassId);
 	}
 }
