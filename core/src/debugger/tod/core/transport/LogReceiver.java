@@ -291,7 +291,8 @@ public abstract class LogReceiver extends PacketProcessor
 		{
 			TODUtils.log(0, "Storing raw events to file.");
 			storePackets(aDataIn);
-			StructureDatabaseUtils.saveDatabase(itsStructureDatabase, itsDbFile);
+			if (true) throw new RuntimeException("See how to save the db");
+//			itsStructureDatabase.save(itsDbFile);
 			TODUtils.logf(0, "Client terminated. Stored %.2fMB", 1f*itsEventsFile.length()/(1024*1024));
 			
 			readPackets(
