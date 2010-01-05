@@ -31,6 +31,7 @@
             <pathelement path="${lib.dir}/lucene-core-2.0.0.jar"/>
             <pathelement path="${lib.dir}/infovis.jar"/>
             <pathelement path="${lib.dir}/aspectjrt.jar"/>
+            <pathelement path="${lib.dir}/trove-2.0.4.jar"/>
         </path>
     	
         <path id="test.classpath">
@@ -38,7 +39,9 @@
         	<pathelement path="${tod-agent.dir}/build/tod-agent15.jar"/>
         	
         	<pathelement path="${classes-debugger.dir}"/>
+        	<pathelement path="${classes-test.dir}"/>
         	
+            <pathelement path="${lib.dir}/asm-all-3.2-svn.jar"/>
             <pathelement path="${lib.dir}/junit-4.1.jar"/>
             <pathelement path="${lib.dir}/aspectjrt.jar"/>
         </path>
@@ -87,7 +90,7 @@
         	debug="yes" nowarn="yes"
             srcdir="${src-testcase.dir}"
             destdir="${classes-testcase.dir}"
-            classpathref="debugger.classpath"/>
+            classpathref="test.classpath"/>
     </target>
 	
 	<target name="compile" depends="dep.all, compile-debugger, compile-test, compile-testcase"/>
