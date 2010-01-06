@@ -38,6 +38,7 @@ import tod.impl.database.structure.standard.StructureDatabase;
 import tod.impl.server.NativeAgentPeer;
 import tod2.agent.AgentConfig;
 import tod2.agent.io._ByteBuffer;
+import zz.utils.Utils;
 import zz.utils.net.Server;
 
 /**
@@ -65,8 +66,8 @@ public class Recorder extends Server
 		itsEventsFile.delete();
 		itsEventsFile.getParentFile().mkdirs();
 		
-		File theDbFile = new File(itsConfig.get(TODConfig.DB_RAW_EVENTS_DIR)+"/db.raw");
-		theDbFile.delete();
+		String theScopeMD5 = Utils.md5String(itsConfig.get(TODConfig.SCOPE_TRACE_FILTER).getBytes());
+		File theDbFile = new File(itsConfig.get(TODConfig.DB_RAW_EVENTS_DIR)+"/db-"+theScopeMD5+".raw");
 		
 		itsFileOut = new BufferedOutputStream(new FileOutputStream(itsEventsFile));
 		

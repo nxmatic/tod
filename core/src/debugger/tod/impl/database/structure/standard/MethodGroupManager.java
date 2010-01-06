@@ -31,6 +31,12 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.database.structure.standard;
 
+import gnu.trove.TIntHashSet;
+import gnu.trove.TIntIntIterator;
+import gnu.trove.TIntIterator;
+import gnu.trove.TIntObjectHashMap;
+import gnu.trove.TObjectIntHashMap;
+
 import java.io.Serializable;
 import java.tod.TracedMethods;
 import java.util.ArrayList;
@@ -65,7 +71,7 @@ public class MethodGroupManager implements IStructureDatabase.Listener, Serializ
 {
 	private static final long serialVersionUID = 173278295020871234L;
 
-	private final StructureDatabase itsStructureDatabase;
+	private transient StructureDatabase itsStructureDatabase;
 	
 	/**
 	 * Maps signatures to signature groups. Each signature groups contains method groups.
@@ -74,14 +80,15 @@ public class MethodGroupManager implements IStructureDatabase.Listener, Serializ
 	
 	/**
 	 * Maps types to their direct subtypes.
+	 * Keys and values are class ids.
 	 */
-	private final SetMap<IClassInfo, IClassInfo> itsChildrenMap = new SetMap<IClassInfo, IClassInfo>();
+	private final IntSetMap itsChildrenMap = new IntSetMap();
 
 	/**
 	 * Keeps track of all mode changes.
 	 * This is used in conjunction with {@link TracedMethods} versioning.
 	 */
-	private final List<BehaviorMonitoringModeChange> itsChanges = new ArrayList<BehaviorMonitoringModeChange>();
+	private transient List<BehaviorMonitoringModeChange> itsChanges = new ArrayList<BehaviorMonitoringModeChange>();
 
 	public MethodGroupManager(StructureDatabase aStructureDatabase)
 	{
@@ -89,9 +96,24 @@ public class MethodGroupManager implements IStructureDatabase.Listener, Serializ
 		itsStructureDatabase.addListener(this);
 	}
 	
+	public void setDatabase(StructureDatabase aStructureDatabase)
+	{
+		itsStructureDatabase = aStructureDatabase;
+	}
+	
 	public BehaviorMonitoringModeChange getChange(int aVersion)
 	{
 		return itsChanges.get(aVersion);
+	}
+	
+	public void clearChanges()
+	{
+		itsChanges = new ArrayList<BehaviorMonitoringModeChange>();
+	}
+	
+	public void addChange(BehaviorMonitoringModeChange aChange)
+	{
+		itsChanges.add(aChange);
 	}
 	
 	private boolean isInScope(IBehaviorInfo aBehavior)
@@ -215,11 +237,17 @@ public class MethodGroupManager implements IStructureDatabase.Listener, Serializ
 
 	private void fillDescendants(List<IClassInfo> aTypes, IClassInfo aType)
 	{
-		Set<IClassInfo> theChildren = itsChildrenMap.getSet(aType);
-		if (theChildren != null) for(IClassInfo theChild : theChildren)
+		TIntHashSet theChildren = itsChildrenMap.getSet(aType.getId());
+		if (theChildren != null) 
 		{
-			aTypes.add(theChild);
-			fillDescendants(aTypes, theChild);
+			TIntIterator theIterator = theChildren.iterator();
+			while(theIterator.hasNext())
+			{
+				int theChildId = theIterator.next();
+				IClassInfo theChild = itsStructureDatabase.getClass(theChildId, true);
+				aTypes.add(theChild);
+				fillDescendants(aTypes, theChild);
+			}
 		}
 	}
 	
@@ -237,7 +265,7 @@ public class MethodGroupManager implements IStructureDatabase.Listener, Serializ
 	 */
 	private void addEdge(IClassInfo aParent, IClassInfo aChild)
 	{
-		itsChildrenMap.add(aParent, aChild);
+		itsChildrenMap.add(aParent.getId(), aChild.getId());
 		for(MethodSignatureGroup theSignatureGroup : itsSignatureGroups.values()) merge(theSignatureGroup, aParent, aChild);
 	}
 
@@ -380,4 +408,36 @@ public class MethodGroupManager implements IStructureDatabase.Listener, Serializ
 		}
 	}
 
+	/**
+	 * A Map with int keys where the values are sets of ints. 
+	 * @author gpothier
+	 */
+	public static class IntSetMap implements Serializable
+	{
+		private static final long serialVersionUID = 177413409867774L;
+		private final TIntObjectHashMap<TIntHashSet> itsMap = new TIntObjectHashMap<TIntHashSet>();
+		
+		public void add(int aKey, int aValue)
+		{
+			TIntHashSet theSet = itsMap.get(aKey);
+			if (theSet == null)
+			{
+				theSet = new TIntHashSet();
+				itsMap.put(aKey, theSet);
+			}
+			theSet.add(aValue);
+		}
+		
+		public boolean remove(int aKey, int aValue)
+		{
+			TIntHashSet theSet = itsMap.get(aKey);
+			if (theSet == null) return false;
+			else return theSet.remove(aValue);
+		}
+		
+		public TIntHashSet getSet(int aKey)
+		{
+			return itsMap.get(aKey);
+		}
+	}
 }

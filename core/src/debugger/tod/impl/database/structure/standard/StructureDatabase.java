@@ -57,7 +57,6 @@ import tod.core.database.structure.ITypeInfo;
 import tod.core.database.structure.SourceRange;
 import tod.core.database.structure.IBehaviorInfo.BytecodeRole;
 import tod.core.database.structure.IClassInfo.Bytecode;
-import tod.core.database.structure.IStructureDatabase.BehaviorMonitoringModeChange;
 import tod.impl.bci.asm2.BCIUtils;
 import tod.tools.parsers.ParseException;
 import tod.tools.parsers.workingset.WorkingSetFactory;
@@ -136,13 +135,8 @@ implements IShareableStructureDatabase
 	
 	private transient List<Listener> itsListeners = new ArrayList<Listener>();
 	
-	private final MethodGroupManager itsMethodGroupManager; 
+	private MethodGroupManager itsMethodGroupManager; 
 	
-	/**
-	 * For deserialized databases, stores the replayed mode changes. 
-	 */
-	private final List<BehaviorMonitoringModeChange> itsModeChanges;
-
 	private transient ClassSelector itsGlobalSelector;
 	private transient ClassSelector itsTraceSelector;
 	private transient ClassSelector itsIdSelector;
@@ -153,7 +147,7 @@ implements IShareableStructureDatabase
 		itsAllowHomonymClasses = itsConfig.get(TODConfig.ALLOW_HOMONYM_CLASSES);
 		itsId = aId;
 		boolean theFileExists = aFile.exists();
-		itsFile = new RandomAccessFile(aFile, theFileExists ? "r" : "rw");
+		itsFile = new RandomAccessFile(aFile, "rw");
 		itsIds = aIds;
 		
 		itsTraceSelector = parseWorkingSet(itsConfig.get(TODConfig.SCOPE_TRACE_FILTER));
@@ -167,14 +161,12 @@ implements IShareableStructureDatabase
 		if (theFileExists) 
 		{
 			load();
-			itsMethodGroupManager = null;
-			itsModeChanges = new ArrayList<BehaviorMonitoringModeChange>();
+			itsMethodGroupManager.clearChanges();
 		}
 		else 
 		{
 			itsFile.seek(8); // The first long is used to store the offset of the serialized data
 			itsMethodGroupManager = new MethodGroupManager(this);
-			itsModeChanges = null;
 			itsBehaviors = new ArrayList<BehaviorInfo>(10000);
 			itsFields = new ArrayList<FieldInfo>(10000);
 			itsClasses = new ArrayList<ClassInfo>(1000);
@@ -188,6 +180,11 @@ implements IShareableStructureDatabase
 	{
 		itsFile.seek(0);
 		long theOffset =  itsFile.readLong();
+		
+		// mark file invalid
+		itsFile.seek(0);
+		itsFile.writeLong(0); 
+		
 		itsFile.seek(theOffset);
 		
 		RandomAccessInputStream theStream = new RandomAccessInputStream(itsFile);
@@ -200,6 +197,7 @@ implements IShareableStructureDatabase
 			itsFields = (List<FieldInfo>) ois.readObject();
 			itsClasses = (List<ClassInfo>) ois.readObject();
 			itsProbes = (List<ProbeInfo>) ois.readObject();
+			itsMethodGroupManager = (MethodGroupManager) ois.readObject();
 			
 			reown();
 		}
@@ -207,6 +205,8 @@ implements IShareableStructureDatabase
 		{
 			throw new RuntimeException(e);
 		}
+		
+		itsFile.seek(theOffset); // Continue writing at the old location
 	}
 	
 	
@@ -236,6 +236,7 @@ implements IShareableStructureDatabase
 			oos.writeObject(itsFields);
 			oos.writeObject(itsClasses);
 			oos.writeObject(itsProbes);			
+			oos.writeObject(itsMethodGroupManager);
 		}
 		finally
 		{
@@ -313,6 +314,8 @@ implements IShareableStructureDatabase
 		{
 			theField.setDatabase(this, true);
 		}
+		
+		itsMethodGroupManager.setDatabase(this);
 	}
 	
 	public String getId()
@@ -703,16 +706,15 @@ implements IShareableStructureDatabase
 	
 	public BehaviorMonitoringModeChange getBehaviorMonitoringModeChange(int aVersion)
 	{
-		return itsMethodGroupManager != null ?
-				itsMethodGroupManager.getChange(aVersion)
-				: itsModeChanges.get(aVersion);
+		return itsMethodGroupManager.getChange(aVersion);
 	}
 	
 	public void replayModeChanges(int aClassId)
 	{
 		ClassInfo theClass = getClass(aClassId, true);
 		BehaviorMonitoringModeChange[] theModeChanges = theClass.getModeChanges();
-		Utils.fillCollection(itsModeChanges, theModeChanges);
+		if (theModeChanges != null) for (BehaviorMonitoringModeChange theChange : theModeChanges) 
+			itsMethodGroupManager.addChange(theChange);
 	}
 
 	public IAdviceInfo getAdvice(int aAdviceId)
