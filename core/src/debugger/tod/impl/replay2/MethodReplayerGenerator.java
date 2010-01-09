@@ -240,6 +240,8 @@ public class MethodReplayerGenerator
 		
 		byte[] theBytecode = theWriter.toByteArray();
 
+		BCIUtils.writeClass("/home/gpothier/tmp/tod/replayer", itsTarget, theBytecode);
+
 		// Check the methods
 		try
 		{
@@ -252,7 +254,6 @@ public class MethodReplayerGenerator
 			e.printStackTrace();
 		}
 		
-		BCIUtils.writeClass("/home/gpothier/tmp/tod/replayer", itsTarget, theBytecode);
 		return theBytecode;
 	}
 	
@@ -341,19 +342,38 @@ public class MethodReplayerGenerator
 	}
 	
 	/**
-	 * Generates the handler for {@link HandlerReachedException}.
-	 * Generates a switch statement that takes a handler id (as passed as argument
-	 * of {@link Message#HANDLER_REACHED}) and jumps to the corresponding handler.
+	 * Returns a key that represents the start and end label of the try-catch block
+	 */
+	private static String getTryCatchBlockKey(InsnList aInstructions, TryCatchBlockNode aNode)
+	{
+		return ""+aInstructions.indexOf(aNode.start)+"_"+aInstructions.indexOf(aNode.end);
+	}
+	
+	/**
+	 * Replaces the exception types for every handler 
+	 * (uses {@link HandlerReachedException}), and fixes the handler code as needed.
 	 */
 	private void addExceptionHandling()
 	{
-		SList s = new SList();
-		
-		// Handler for HandlerReachedException
-		Label lHandlerReached = new Label();
-		s.label(lHandlerReached);
+		Set<Label> theProcessedLabels = new HashSet<Label>();
+		Set<String> theProcessedRegions = new HashSet<String>();
 		
 		int nHandlers = itsMethodNode.tryCatchBlocks.size();
+		for(int i=0;i<nHandlers;i++)
+		{
+			TryCatchBlockNode theNode = (TryCatchBlockNode) itsMethodNode.tryCatchBlocks.get(i);
+			Label theLabel = theNode.handler.getLabel();
+			if (theProcessedLabels.add(theLabel)) 
+			{
+				LabelNode theLabelNode = (LabelNode) theLabel.info;
+				SList s = new SList();
+				s.GETFIELD(CLS_HANDLERREACHED, "exception", BCIUtils.DSC_OBJECTID);
+				itsMethodNode.instructions.insert(theLabelNode, s);
+			}
+			
+			theNode.type = CLS_HANDLERREACHED;
+		}
+
 		
 		if (nHandlers > 0)
 		{

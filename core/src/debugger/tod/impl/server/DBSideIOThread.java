@@ -192,9 +192,11 @@ public abstract class DBSideIOThread
 		{
 			TODConfig theConfig = new TODConfig();
 			File theEventsFile = new File(theConfig.get(TODConfig.DB_RAW_EVENTS_DIR)+"/events.raw");
-			File theDbFile = new File(theConfig.get(TODConfig.DB_RAW_EVENTS_DIR)+"/db.raw");
-			
-			IStructureDatabase theDatabase = StructureDatabase.create(theConfig, theDbFile);
+
+			String theScopeMD5 = Utils.md5String(theConfig.get(TODConfig.SCOPE_TRACE_FILTER).getBytes());
+			File theDbFile = new File(theConfig.get(TODConfig.DB_RAW_EVENTS_DIR)+"/db-"+theScopeMD5+".raw");
+
+			IStructureDatabase theDatabase = StructureDatabase.create(theConfig, theDbFile, true);
 			
 			final Map<Integer, EventCollector> theCollectors = new HashMap<Integer, EventCollector>();  
 			

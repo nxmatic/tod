@@ -88,7 +88,7 @@ public class MethodGroupManager implements IStructureDatabase.Listener, Serializ
 	 * Keeps track of all mode changes.
 	 * This is used in conjunction with {@link TracedMethods} versioning.
 	 */
-	private transient List<BehaviorMonitoringModeChange> itsChanges = new ArrayList<BehaviorMonitoringModeChange>();
+	private List<BehaviorMonitoringModeChange> itsChanges = new ArrayList<BehaviorMonitoringModeChange>();
 
 	public MethodGroupManager(StructureDatabase aStructureDatabase)
 	{

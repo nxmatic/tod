@@ -35,18 +35,29 @@ import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.AnnotationNode;
 import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.FieldInsnNode;
+import org.objectweb.asm.tree.FrameNode;
+import org.objectweb.asm.tree.IincInsnNode;
 import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.InsnNode;
 import org.objectweb.asm.tree.IntInsnNode;
+import org.objectweb.asm.tree.JumpInsnNode;
 import org.objectweb.asm.tree.LabelNode;
 import org.objectweb.asm.tree.LdcInsnNode;
+import org.objectweb.asm.tree.LineNumberNode;
 import org.objectweb.asm.tree.LocalVariableNode;
+import org.objectweb.asm.tree.LookupSwitchInsnNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
+import org.objectweb.asm.tree.MultiANewArrayInsnNode;
+import org.objectweb.asm.tree.TableSwitchInsnNode;
 import org.objectweb.asm.tree.TryCatchBlockNode;
+import org.objectweb.asm.tree.TypeInsnNode;
+import org.objectweb.asm.tree.VarInsnNode;
 import org.objectweb.asm.tree.analysis.Analyzer;
 import org.objectweb.asm.tree.analysis.AnalyzerException;
 import org.objectweb.asm.tree.analysis.BasicVerifier;
+import org.objectweb.asm.tree.analysis.Frame;
 
 import tod.core.config.ClassSelector;
 import tod.core.database.structure.ObjectId;
@@ -371,6 +382,41 @@ public class BCIUtils implements Opcodes
 		}
 		catch (AnalyzerException e)
 		{
+			Frame[] theFrames = theAnalyzer.getFrames();
+			
+			int bcIndex = 1;
+			
+			for (int i = 0; i < theFrames.length; i++)
+			{
+				Frame theFrame = theFrames[i];
+				AbstractInsnNode theInsn = aNode.instructions.get(i);
+				
+				
+				switch(theInsn.getType())
+				{
+				case AbstractInsnNode.INSN:
+				case AbstractInsnNode.INT_INSN:
+				case AbstractInsnNode.VAR_INSN:
+				case AbstractInsnNode.TYPE_INSN:
+				case AbstractInsnNode.FIELD_INSN:
+				case AbstractInsnNode.METHOD_INSN:
+				case AbstractInsnNode.JUMP_INSN:
+				case AbstractInsnNode.LDC_INSN:
+				case AbstractInsnNode.IINC_INSN:
+				case AbstractInsnNode.TABLESWITCH_INSN:
+				case AbstractInsnNode.LOOKUPSWITCH_INSN:
+				case AbstractInsnNode.MULTIANEWARRAY_INSN:
+					System.out.println(bcIndex+" "+theFrame+" - "+theInsn);
+					bcIndex++;
+					break;
+					
+				case AbstractInsnNode.FRAME:
+				case AbstractInsnNode.LINE:
+				case AbstractInsnNode.LABEL:
+					break;
+				}
+			}
+			
 			Utils.rtex(
 					e,
 					"Error in %s.%s%s at instruction #%d: %s",

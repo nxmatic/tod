@@ -49,7 +49,7 @@ public class LocalSession extends AbstractSession
 	public LocalSession(IGUIManager aGUIManager, URI aUri, TODConfig aConfig)
 	{
 		super(aGUIManager, aUri, aConfig);
-		itsStructureDatabase = StructureDatabase.create(aConfig);
+		itsStructureDatabase = StructureDatabase.create(aConfig, false);
 		itsBrowser = new LocalBrowser(this, itsStructureDatabase);
 		
 		itsServer = TODServer.getFactory(aConfig).create(

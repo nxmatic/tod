@@ -22,9 +22,12 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 */
 package tod.utils;
 
+import gnu.trove.TLongArrayList;
+
 import java.awt.EventQueue;
 import java.awt.GraphicsEnvironment;
 import java.util.Arrays;
+import java.util.List;
 
 import tod.core.config.TODConfig;
 import tod.core.database.browser.IEventFilter;
@@ -96,5 +99,18 @@ public class TODUtils
 		if (headless) return false;
 		else return EventQueue.isDispatchThread();
 	}
+	
+	public static void TLongArrayListSet(TLongArrayList aList, int aIndex, long aValue)
+	{
+		if (aList.size() > aIndex) 
+		{
+			aList.set(aIndex, aValue);
+			return;
+		}
+		
+		while (aList.size() < aIndex) aList.add(0);
+		aList.add(aValue);
+	}
+
 	
 }

@@ -71,7 +71,7 @@ public class Recorder extends Server
 		
 		itsFileOut = new BufferedOutputStream(new FileOutputStream(itsEventsFile));
 		
-		itsStructureDatabase = StructureDatabase.create(itsConfig, theDbFile);
+		itsStructureDatabase = StructureDatabase.create(itsConfig, theDbFile, false);
 		itsInstrumenter = new ASMInstrumenter2(itsConfig, itsStructureDatabase);
 	}
 	

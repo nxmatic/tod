@@ -60,6 +60,7 @@ import tod.core.database.structure.IClassInfo.Bytecode;
 import tod.impl.bci.asm2.BCIUtils;
 import tod.tools.parsers.ParseException;
 import tod.tools.parsers.workingset.WorkingSetFactory;
+import tod.utils.TODUtils;
 import tod.utils.remote.RemoteStructureDatabase;
 import zz.utils.RandomAccessInputStream;
 import zz.utils.RandomAccessOutputStream;
@@ -141,13 +142,13 @@ implements IShareableStructureDatabase
 	private transient ClassSelector itsTraceSelector;
 	private transient ClassSelector itsIdSelector;
 	
-	protected StructureDatabase(TODConfig aConfig, String aId, File aFile, Ids aIds) throws IOException
+	protected StructureDatabase(TODConfig aConfig, String aId, File aFile, Ids aIds, boolean aForReplay) throws IOException
 	{
 		itsConfig = aConfig;
 		itsAllowHomonymClasses = itsConfig.get(TODConfig.ALLOW_HOMONYM_CLASSES);
 		itsId = aId;
 		boolean theFileExists = aFile.exists();
-		itsFile = new RandomAccessFile(aFile, "rw");
+		itsFile = new RandomAccessFile(aFile, aForReplay ? "r" : "rw");
 		itsIds = aIds;
 		
 		itsTraceSelector = parseWorkingSet(itsConfig.get(TODConfig.SCOPE_TRACE_FILTER));
@@ -161,10 +162,11 @@ implements IShareableStructureDatabase
 		if (theFileExists) 
 		{
 			load();
-			itsMethodGroupManager.clearChanges();
+			if (! aForReplay) itsMethodGroupManager.clearChanges();
 		}
 		else 
 		{
+			if (aForReplay) throw new RuntimeException("Database file not found: "+aFile);
 			itsFile.seek(8); // The first long is used to store the offset of the serialized data
 			itsMethodGroupManager = new MethodGroupManager(this);
 			itsBehaviors = new ArrayList<BehaviorInfo>(10000);
@@ -180,11 +182,6 @@ implements IShareableStructureDatabase
 	{
 		itsFile.seek(0);
 		long theOffset =  itsFile.readLong();
-		
-		// mark file invalid
-		itsFile.seek(0);
-		itsFile.writeLong(0); 
-		
 		itsFile.seek(theOffset);
 		
 		RandomAccessInputStream theStream = new RandomAccessInputStream(itsFile);
@@ -193,11 +190,20 @@ implements IShareableStructureDatabase
 		try
 		{
 			itsByteCodeOffsets = (TLongArrayList) ois.readObject();
+			System.out.println("Got "+itsByteCodeOffsets.size()+" bytecode offsets.");
 			itsBehaviors = (List<BehaviorInfo>) ois.readObject();
 			itsFields = (List<FieldInfo>) ois.readObject();
 			itsClasses = (List<ClassInfo>) ois.readObject();
 			itsProbes = (List<ProbeInfo>) ois.readObject();
 			itsMethodGroupManager = (MethodGroupManager) ois.readObject();
+			
+			if (! itsAllowHomonymClasses)
+			{
+				for (ClassInfo theClass : itsClasses) 
+				{
+					if (theClass != null) itsClassInfos.put(theClass.getName(), theClass);
+				}
+			}
 			
 			reown();
 		}
@@ -232,6 +238,7 @@ implements IShareableStructureDatabase
 			SAVING.set(true);
 			
 			oos.writeObject(itsByteCodeOffsets);
+			System.out.println("Saved "+itsByteCodeOffsets.size()+" bytecode offsets.");
 			oos.writeObject(itsBehaviors);
 			oos.writeObject(itsFields);
 			oos.writeObject(itsClasses);
@@ -264,10 +271,10 @@ implements IShareableStructureDatabase
 	/**
 	 * Creates a structure database at the location specified in the given config.
 	 */
-	public static StructureDatabase create(TODConfig aConfig)
+	public static StructureDatabase create(TODConfig aConfig, boolean aForReplay)
 	{
 		File theFile = new File(aConfig.get(TODConfig.STRUCTURE_DATABASE_LOCATION));
-		return create(aConfig, theFile);
+		return create(aConfig, theFile, aForReplay);
 	}
 	
 	/**
@@ -275,7 +282,7 @@ implements IShareableStructureDatabase
 	 * @param aFile Location where the structure database must be stored.
 	 * The file should not exist.
 	 */
-	public static StructureDatabase create(TODConfig aConfig, File aFile)
+	public static StructureDatabase create(TODConfig aConfig, File aFile, boolean aForReplay)
 	{
 		try
 		{
@@ -285,7 +292,7 @@ implements IShareableStructureDatabase
 			long theTime = System.nanoTime();
 			String theId = Utils.md5String(BigInteger.valueOf(theTime).toByteArray());
 			
-			StructureDatabase theDatabase = new StructureDatabase(aConfig, theId, aFile, new Ids());
+			StructureDatabase theDatabase = new StructureDatabase(aConfig, theId, aFile, new Ids(), aForReplay);
 			return theDatabase;
 		}
 		catch (Exception e)
@@ -435,8 +442,7 @@ implements IShareableStructureDatabase
 	{
 		try
 		{
-			itsByteCodeOffsets.ensureCapacity(aClassId+1);
-			itsByteCodeOffsets.setQuick(aClassId, itsFile.getFilePointer());
+			TODUtils.TLongArrayListSet(itsByteCodeOffsets, aClassId, itsFile.getFilePointer());
 			itsFile.writeInt(aBytecode.length);
 			itsFile.write(aBytecode);
 			itsFile.writeInt(aOriginalBytecode.length);
