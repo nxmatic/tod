@@ -89,8 +89,8 @@ public class EventGenerator
 		itsObjectRange = aObjectRange;
 		
 		for(int i=0;i<itsThreadsRange;i++) itsThreads.add(new ThreadInfo(null, i, 0, ""+i));
-		for(int i=0;i<itsBehaviorRange;i++) itsBehaviors.add(new BehaviorInfo(null, i, null, ""+i, false, "", null, null));
-		for(int i=0;i<itsFieldRange;i++) itsFields.add(new FieldInfo(null, i, null, ""+i, null, false));
+		for(int i=0;i<itsBehaviorRange;i++) itsBehaviors.add(new BehaviorInfo(null, i, null, ""+i, 0, "", null, null));
+		for(int i=0;i<itsFieldRange;i++) itsFields.add(new FieldInfo(null, i, null, ""+i, null, 0));
 	}
 
 	public EventGenerator(long aSeed)

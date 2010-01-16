@@ -68,7 +68,7 @@ public interface IMutableClassInfo extends IClassInfo, IMutableLocationInfo
 	 * For now this is the ASM-provided descriptor.
 	 * @param aStatic Whether the ehavior is a static one.
 	 */
-	public IMutableBehaviorInfo getNewBehavior(String aName, String aDescriptor, boolean aStatic);
+	public IMutableBehaviorInfo getNewBehavior(String aName, String aDescriptor, int aAccessFlags);
 	
 	/**
 	 * Adds a new behavior with a specific id.
@@ -77,7 +77,7 @@ public interface IMutableClassInfo extends IClassInfo, IMutableLocationInfo
 	 * Othwerwise, use {@link #getNewBehavior(String, String, boolean)}.
 	 * @param aStatic Whether the ehavior is a static one.
 	 */
-	public IMutableBehaviorInfo addBehavior(int aId, String aName, String aDescriptor, boolean aStatic);
+	public IMutableBehaviorInfo addBehavior(int aId, String aName, String aDescriptor, int aAccessFlags);
 	
 	/**
 	 * This method either creates a new uninitialized field, or 
@@ -86,7 +86,7 @@ public interface IMutableClassInfo extends IClassInfo, IMutableLocationInfo
 	 * to the database.
 	 * @param aStatic Whether the field is a static one.
 	 */
-	public IMutableFieldInfo getNewField(String aName, ITypeInfo aType, boolean aStatic);
+	public IMutableFieldInfo getNewField(String aName, ITypeInfo aType, int aAccessFlags);
 
 	/**
 	 * Adds a new field with a specific id.
@@ -95,6 +95,6 @@ public interface IMutableClassInfo extends IClassInfo, IMutableLocationInfo
 	 * Othwerwise, use {@link #getNewField(String, ITypeInfo, boolean)}.
 	 * @param aStatic Whether the field is a static one.
 	 */
-	public IMutableFieldInfo addField(int aId, String aName, ITypeInfo aType, boolean aStatic);
+	public IMutableFieldInfo addField(int aId, String aName, ITypeInfo aType, int aAccessFlags);
 	
 }

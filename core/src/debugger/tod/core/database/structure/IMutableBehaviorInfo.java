@@ -53,4 +53,5 @@ public interface IMutableBehaviorInfo extends IBehaviorInfo, IMutableMemberInfo
 	 * Adds a probe info.
 	 */
 	public void addProbe(ProbeInfo aProbe);
+	
 }

@@ -99,7 +99,9 @@ public class Util
 	{
 		int theIndex = Math.max(
 				aFullyQualifiedName.lastIndexOf('.'),
-				aFullyQualifiedName.lastIndexOf('$'));
+				Math.max(
+						aFullyQualifiedName.lastIndexOf('/'),
+						aFullyQualifiedName.lastIndexOf('$')));
 		
 		String theName = theIndex == -1 ?
 				aFullyQualifiedName

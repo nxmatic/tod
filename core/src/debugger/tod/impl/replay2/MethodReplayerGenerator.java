@@ -34,9 +34,10 @@ package tod.impl.replay2;
 import static tod.impl.bci.asm2.BCIUtils.DSC_OBJECTID;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
@@ -73,6 +74,8 @@ import tod.impl.bci.asm2.MethodInfo;
 import tod.impl.bci.asm2.MethodInfo.BCIFrame;
 import tod.impl.database.structure.standard.StructureDatabaseUtils;
 import tod2.agent.Message;
+import zz.utils.SetMap;
+import zz.utils.Utils;
 
 public class MethodReplayerGenerator
 {
@@ -83,6 +86,7 @@ public class MethodReplayerGenerator
 	public static final String DSC_EVENTCOLLECTOR = "L"+CLS_EVENTCOLLECTOR+";";
 	public static final String CLS_INSCOPEREPLAYERFRAME = BCIUtils.getJvmClassName(InScopeReplayerFrame.class);
 	public static final String CLS_HANDLERREACHED = BCIUtils.getJvmClassName(HandlerReachedException.class);
+	public static final String CLS_BEHAVIOREXITEXCEPTION = BCIUtils.getJvmClassName(BehaviorExitException.class);
 
 	private final TODConfig itsConfig;
 	private final IStructureDatabase itsDatabase;
@@ -134,6 +138,7 @@ public class MethodReplayerGenerator
 		itsArgTypes = Type.getArgumentTypes(itsMethodNode.desc);
 		itsReturnType = Type.getReturnType(itsMethodNode.desc);
 		itsStatic = BCIUtils.isStatic(itsMethodNode.access);
+		itsConstructor = "<init>".equals(itsMethodNode.name);
 
 		itsTarget = new ClassNode();
 		itsTarget.name = ReplayerGenerator.makeReplayerClassName(itsClassNode.name, itsMethodNode.name, itsMethodNode.desc);
@@ -189,6 +194,9 @@ public class MethodReplayerGenerator
 	
 	public byte[] generate()
 	{
+		System.out.println("Generating replayer for: "+itsClassNode.name+"."+itsMethodNode.name);
+		
+		
 		lCodeStart = new Label();
 		LabelNode nStart = new LabelNode(lCodeStart);
 		lCodeStart.info = nStart;
@@ -246,7 +254,7 @@ public class MethodReplayerGenerator
 		try
 		{
 			BCIUtils.checkClass(theBytecode);
-			for(MethodNode theNode : (List<MethodNode>) itsTarget.methods) BCIUtils.checkMethod(itsTarget, theNode);
+			for(MethodNode theNode : (List<MethodNode>) itsTarget.methods) BCIUtils.checkMethod(itsTarget, theNode, new ReplayerVerifier());
 		}
 		catch(Exception e)
 		{
@@ -320,7 +328,12 @@ public class MethodReplayerGenerator
 		int theSize = 1;
 		if (! itsStatic)
 		{
-			s.invokeReadRef();
+			if (! itsConstructor) s.invokeReadRef();
+			else 
+			{
+				s.ALOAD(0);
+				s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "nextTmpId", "()"+BCIUtils.DSC_OBJECTID);
+			}
 			theSize++;
 		}
 		
@@ -355,59 +368,92 @@ public class MethodReplayerGenerator
 	 */
 	private void addExceptionHandling()
 	{
-		Set<Label> theProcessedLabels = new HashSet<Label>();
-		Set<String> theProcessedRegions = new HashSet<String>();
+		final Map<Label, Integer> theHandlerIds = new HashMap<Label, Integer>();
+		SetMap<String, TryCatchBlockNode> theRegionData = new SetMap<String, TryCatchBlockNode>();
 		
+		// Assign ids to handlers and register the handlers for each region
+		int theNextId = 0;
 		int nHandlers = itsMethodNode.tryCatchBlocks.size();
 		for(int i=0;i<nHandlers;i++)
 		{
 			TryCatchBlockNode theNode = (TryCatchBlockNode) itsMethodNode.tryCatchBlocks.get(i);
 			Label theLabel = theNode.handler.getLabel();
-			if (theProcessedLabels.add(theLabel)) 
+			
+			Integer theId = theHandlerIds.get(theLabel);
+			if (theId == null)
 			{
-				LabelNode theLabelNode = (LabelNode) theLabel.info;
-				SList s = new SList();
-				s.GETFIELD(CLS_HANDLERREACHED, "exception", BCIUtils.DSC_OBJECTID);
-				itsMethodNode.instructions.insert(theLabelNode, s);
+				theId = theNextId++;
+				theHandlerIds.put(theLabel, theId);
 			}
 			
-			theNode.type = CLS_HANDLERREACHED;
+			theRegionData.add(getTryCatchBlockKey(itsMethodNode.instructions, theNode), theNode);
 		}
 
+		SList s = new SList();
+		itsMethodNode.tryCatchBlocks.clear();
+
+		Label lDefault = new Label();
+		s.label(lDefault);
+		s.createRTEx("Invalid handler id");
+		s.ATHROW();
 		
-		if (nHandlers > 0)
+		// For each region we keep a single handler and create a dispatching switch statement
+		for(Map.Entry<String, Set<TryCatchBlockNode>> theEntry : theRegionData.entrySet())
 		{
+			TryCatchBlockNode theFirstNode = theEntry.getValue().iterator().next();
+			
+			Label lDispatcher = new Label();
+			s.label(lDispatcher);
+
 			s.DUP();
 			s.GETFIELD(CLS_HANDLERREACHED, "exception", BCIUtils.DSC_OBJECTID);
 			s.SWAP();
 			s.GETFIELD(CLS_HANDLERREACHED, "handlerId", "I");
 			
-			Set<Label> theProcessedLabels = new HashSet<Label>();
-			List<Label> theLabels = new ArrayList<Label>();
-			
-			for(int i=0;i<nHandlers;i++)
+			int n = theEntry.getValue().size();
+			TryCatchBlockNode[] theNodes = theEntry.getValue().toArray(new TryCatchBlockNode[n]);
+			Arrays.sort(theNodes, new Comparator<TryCatchBlockNode>()
 			{
-				TryCatchBlockNode theNode = (TryCatchBlockNode) itsMethodNode.tryCatchBlocks.get(i);
+				private int getValue(TryCatchBlockNode aNode)
+				{
+					Label theLabel = aNode.handler.getLabel();
+					return theHandlerIds.get(theLabel); 
+				}
+				
+				public int compare(TryCatchBlockNode n1, TryCatchBlockNode n2)
+				{
+					return getValue(n1) - getValue(n2);
+				}
+			});
+			
+			int[] theValues = new int[n];
+			Label[] theLabels = new Label[n];
+			
+			int i=0;
+			for(TryCatchBlockNode theNode : theNodes)
+			{
 				Label theLabel = theNode.handler.getLabel();
-				if (theProcessedLabels.add(theLabel)) theLabels.add(theLabel);
+				theLabels[i] = theLabel;
+				theValues[i] = theHandlerIds.get(theLabel); 
+				i++;
 			}
 			
-			Label lDefault = new Label();
-			s.TABLESWITCH(0, theLabels.size()-1, lDefault, theLabels.toArray(new Label[theLabels.size()]));
-			s.label(lDefault);
-			s.createRTEx("Invalid handler id");
-			s.ATHROW();
+			s.LOOKUPSWITCH(lDefault, theValues, theLabels);
+			
+			itsMethodNode.visitTryCatchBlock(theFirstNode.start.getLabel(), theFirstNode.end.getLabel(), lDispatcher, CLS_HANDLERREACHED);
 		}
-		else
-		{
-			s.createRTEx("No handlers in the original method");
-			s.ATHROW();
-		}
+		
+		Label lExitException = new Label();
+		s.label(lExitException);
+		s.ALOAD(0);
+		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "expectException", "()V");
+		s.pushDefaultValue(itsReturnType);
+		s.RETURN(itsReturnType);
+
+		itsMethodNode.visitTryCatchBlock(lCodeStart, lCodeEnd, lExitException, CLS_BEHAVIOREXITEXCEPTION);
+
 		
 		itsMethodNode.instructions.add(s);
-		
-		itsMethodNode.tryCatchBlocks.clear();
-		itsMethodNode.visitTryCatchBlock(lCodeStart, lCodeEnd, lHandlerReached, CLS_HANDLERREACHED);
 	}
 	
 	private int getFieldCacheSlot(FieldInsnNode aNode)
@@ -578,8 +624,11 @@ public class MethodReplayerGenerator
 	{
 		SList s = new SList();
 
+		s.ALOAD(0);
 		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "expectException", "()V");
-		
+		s.pushDefaultValue(itsReturnType);
+		s.RETURN(itsReturnType);
+
 		aInsns.insert(aNode, s);
 		aInsns.remove(aNode);
 	}
@@ -591,6 +640,7 @@ public class MethodReplayerGenerator
 	{
 		IClassInfo theClass = getDatabase().getClass(Util.jvmToScreen(aNode.owner), true);
 		IBehaviorInfo theBehavior = theClass.getBehavior(aNode.name, aNode.desc);
+		if (theBehavior == null) return -1;
 		return theBehavior.getId();
 	}
 	
@@ -599,6 +649,19 @@ public class MethodReplayerGenerator
 		Type[] theArgTypes = Type.getArgumentTypes(aNode.desc);
 		Type theReturnType = getTypeOrId(Type.getReturnType(aNode.desc).getSort());
 		int theBehaviorId = getBehaviorId(aNode);
+		if (theBehaviorId == -1)
+		{
+			// The behavior was not found, meaning that the class was never loaded at runtime,
+			// so we are creating the replayer for code that was never executed
+			
+			SList s = new SList();
+			s.createRTEx("The code was never executed");
+			s.ATHROW();
+			aInsns.insert(aNode, s);
+			aInsns.remove(aNode);
+			return;
+		}
+		
 		boolean theStatic = aNode.getOpcode() == Opcodes.INVOKESTATIC;
 		int theArgCount = theArgTypes.length;
 		if (! theStatic) theArgCount++;
@@ -713,6 +776,8 @@ public class MethodReplayerGenerator
 
 	private static final String[] SUFFIX_FOR_SORT = new String[11];
 	private boolean itsStatic;
+	private boolean itsConstructor;
+	
 	static
 	{
 		SUFFIX_FOR_SORT[Type.OBJECT] = "Ref";
@@ -743,6 +808,7 @@ public class MethodReplayerGenerator
 	{
 		SList s = new SList();
 		
+		s.POP(); // Pop array size
 		s.ALOAD(0);
 		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "expectNewArray", "()"+BCIUtils.DSC_OBJECTID);
 		
@@ -1007,6 +1073,7 @@ public class MethodReplayerGenerator
 		BCIFrame theFrame = itsMethodInfo.getFrame(aNode);
 		
 		SList s = new SList();
+		s.ALOAD(0);
 		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "checkCast", "()V");
 
 		aInsns.insert(aNode, s);

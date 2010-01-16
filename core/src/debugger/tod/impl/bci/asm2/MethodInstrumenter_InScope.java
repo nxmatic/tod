@@ -363,7 +363,10 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 	private int getBehaviorId(MethodInsnNode aNode)
 	{
 		IMutableClassInfo theClass = getDatabase().getNewClass(Util.jvmToScreen(aNode.owner));
-		IMutableBehaviorInfo theBehavior = theClass.getNewBehavior(aNode.name, aNode.desc, aNode.getOpcode() == Opcodes.INVOKESTATIC);
+		IMutableBehaviorInfo theBehavior = theClass.getNewBehavior(
+				aNode.name, 
+				aNode.desc, 
+				aNode.getOpcode() == Opcodes.INVOKESTATIC ? Opcodes.ACC_STATIC : 0);
 		return theBehavior.getId();
 	}
 	

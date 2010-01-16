@@ -176,6 +176,7 @@ public class UnmonitoredReplayerFrame extends ReplayerFrame
 			break;
 			
 		case Type.OBJECT:
+		case Type.ARRAY:
 			itsRefResult = readRef();
 			
 		case Type.VOID:

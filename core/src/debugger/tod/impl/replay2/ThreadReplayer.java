@@ -53,7 +53,7 @@ import zz.utils.Utils;
 
 public class ThreadReplayer
 {
-	public static final boolean ECHO = false;
+	public static final boolean ECHO = true;
 
 	private final TODConfig itsConfig;
 	private final IStructureDatabase itsDatabase;
@@ -135,7 +135,11 @@ public class ThreadReplayer
 	private byte nextMessage()
 	{
 		byte theMessage = itsStream.get();
-		if (ECHO) echo("Message: %s [#%d @%d]", Message._NAMES[theMessage], itsMessageCount++, itsStream.position());
+		if (ECHO) 
+		{
+			if (theMessage != Message.REGISTER_OBJECT) itsMessageCount++;
+			echo("Message: %s [#%d @%d]", Message._NAMES[theMessage], itsMessageCount, itsStream.position());
+		}
 		return theMessage;
 	}
 	
@@ -234,7 +238,7 @@ public class ThreadReplayer
 			IBehaviorInfo theBehavior = getDatabase().getBehavior(aBehaviorId, true);
 			String theSignature = theBehavior.getSignature();
 			theType = Type.getReturnType(theSignature);
-			theType = MethodReplayerGenerator.getActualType(theType);
+//			theType = MethodReplayerGenerator.getActualType(theType);
 			Utils.listSet(itsBehaviorReturnTypes, aBehaviorId, theType);
 		}
 		

@@ -135,6 +135,16 @@ public interface IBehaviorInfo extends IMemberInfo
     public boolean isStatic();
     
     /**
+     * Indicates if this behavior is abstract.
+     */
+    public boolean isAbstract();
+    
+    /**
+     * Indicates if this behavior is native.
+     */
+    public boolean isNative();
+    
+    /**
      * Returns all the probes of this method.
      */
     public ProbeInfo[] getProbes();

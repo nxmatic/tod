@@ -72,7 +72,11 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 	protected byte getNextMessage()
 	{
 		byte m = super.getNextMessage();
-		if (m == Message.EXCEPTION) processException();
+		if (m == Message.EXCEPTION) 
+		{
+			processException();
+			throw new RuntimeException("processException should always throw an exception");
+		}
 		return m;
 	}
 	
@@ -80,7 +84,12 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 	protected byte peekNextMessage()
 	{
 		byte m = super.peekNextMessage();
-		if (m == Message.EXCEPTION) processException();
+//		if (m == Message.EXCEPTION)  
+//		{
+//			super.getNextMessage(); // Consume the message
+//			processException();
+//			throw new RuntimeException("processException should always throw an exception");
+//		}
 		return m;
 	}
 	
@@ -93,7 +102,7 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 	protected void expectException()
 	{
 		byte m = getNextMessage();
-		throw new UnexpectedMessageException(m);
+		throw new UnexpectedMessageException(m); // should never get executed: getNextMessage should throw an exception
 	}
 	
 	protected ObjectId expectConstant()

@@ -118,6 +118,7 @@ public class MethodGroupManager implements IStructureDatabase.Listener, Serializ
 	
 	private boolean isInScope(IBehaviorInfo aBehavior)
 	{
+		if (aBehavior.isAbstract() || aBehavior.isNative()) return false;
 		return itsStructureDatabase.isInScope(aBehavior.getDeclaringType().getName());
 	}
 	

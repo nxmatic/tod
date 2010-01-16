@@ -211,6 +211,16 @@ public final class ThreadData
 	
 	public void echoMessageType(byte aMessage, long aArg)
 	{
+		echoMessageType(aMessage, aArg, -1);
+	}
+	
+	public void echoMessageType_NoIncCount(byte aMessage, long aArg)
+	{
+		echoMessageType_NoIncCount(aMessage, aArg, -1);
+	}
+	
+	public void echoMessageType(byte aMessage, long aArg1, long aArg2)
+	{
 		_StringBuilder theBuilder = new _StringBuilder();
 		theBuilder.append(getId());
 		theBuilder.append(" #");
@@ -218,10 +228,29 @@ public final class ThreadData
 		theBuilder.append(itsMessageCount);
 		theBuilder.append(": ");
 		theBuilder.append(Message._NAMES[aMessage]);
-		if (aArg >= 0)
+		if (aArg1 >= 0 || aArg2 >= 0)
 		{
 			theBuilder.append(" (");
-			theBuilder.append(aArg);
+			if (aArg1 >= 0) theBuilder.append(aArg1);
+			if (aArg1 >= 0 && aArg2 >= 0) theBuilder.append(' ');
+			if (aArg2 >= 0) theBuilder.append(aArg2);
+			theBuilder.append(")");
+		}
+		_IO.out(theBuilder.toString());		
+	}
+	
+	public void echoMessageType_NoIncCount(byte aMessage, long aArg1, long aArg2)
+	{
+		_StringBuilder theBuilder = new _StringBuilder();
+		theBuilder.append(getId());
+		theBuilder.append(": ");
+		theBuilder.append(Message._NAMES[aMessage]);
+		if (aArg1 >= 0 || aArg2 >= 0)
+		{
+			theBuilder.append(" (");
+			if (aArg1 >= 0) theBuilder.append(aArg1);
+			if (aArg1 >= 0 && aArg2 >= 0) theBuilder.append(' ');
+			if (aArg2 >= 0) theBuilder.append(aArg2);
 			theBuilder.append(")");
 		}
 		_IO.out(theBuilder.toString());		
@@ -559,6 +588,7 @@ public final class ThreadData
 		msgStart(Message.EXCEPTION, 0);
 
 		checkTimestamp();
+		int p0 = itsBuffer.position();
 		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.EXCEPTION, -1); 
 		sendMessageType(itsBuffer, Message.EXCEPTION);
 
@@ -567,7 +597,21 @@ public final class ThreadData
 		itsBuffer.putString(aMethodDeclaringClassSignature);
 		itsBuffer.putShort((short) aBytecodeIndex);
 		sendValue(itsBuffer, aException);
+		int p1 = itsBuffer.position();
 
+		
+		
+		
+		_StringBuilder theBuilder = new _StringBuilder();
+		theBuilder.append("Exception data: ");
+		theBuilder.append(p0);
+		theBuilder.append(" ");
+		theBuilder.append(p1);
+		_IO.out(theBuilder.toString());
+		
+		
+		
+		
 		msgStop();
 		
 		commitBuffer();
@@ -807,7 +851,7 @@ public final class ThreadData
 		if (enter()) return;
 		
 		msgStart(Message.INSCOPE_BEHAVIOR_EXIT_NORMAL, 0);
-		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.INSCOPE_BEHAVIOR_EXIT_NORMAL, -1); 
+		if (AgentDebugFlags.EVENT_LOG) echoMessageType_NoIncCount(Message.INSCOPE_BEHAVIOR_EXIT_NORMAL, -1); 
 		msgStop();
 		
 		if (! popScope()) throw new TODError("Unexpected scope state");
@@ -938,7 +982,7 @@ public final class ThreadData
 		if (enter()) return;
 		
 		msgStart(Message.UNMONITORED_BEHAVIOR_CALL, 0);
-		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.UNMONITORED_BEHAVIOR_CALL, -1); 
+		if (AgentDebugFlags.EVENT_LOG) echoMessageType_NoIncCount(Message.UNMONITORED_BEHAVIOR_CALL, -1); 
 		msgStop();
 		pushOutOfScope();
 		
@@ -998,7 +1042,7 @@ public final class ThreadData
 		if (enter()) return;
 		
 		msgStart(Message.UNMONITORED_BEHAVIOR_CALL_EXCEPTION, 0);
-		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.UNMONITORED_BEHAVIOR_CALL_EXCEPTION, -1); 
+		if (AgentDebugFlags.EVENT_LOG) echoMessageType_NoIncCount(Message.UNMONITORED_BEHAVIOR_CALL_EXCEPTION, -1); 
 		msgStop();
 		if (popScope()) throw new TODError("Unexpected scope state");
 		
@@ -1182,7 +1226,7 @@ public final class ThreadData
 		int theDataSize = thePacketSize-HEADER_SIZE; 
 	
 		theBuffer.position(0);
-		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.REGISTER_OBJECT, aId); 
+		if (AgentDebugFlags.EVENT_LOG) echoMessageType_NoIncCount(Message.REGISTER_OBJECT, aId, theDataSize); 
 		sendMessageType(theBuffer, Message.REGISTER_OBJECT);
 		theBuffer.putInt(theDataSize); 
 		

@@ -231,6 +231,10 @@ public interface IStructureDatabase
 		
 		public BehaviorMonitoringModeChange(int aBehaviorId, int aMode)
 		{
+			if (aBehaviorId == 7683)
+			{
+				System.out.println("IStructureDatabase.BehaviorMonitoringModeChange.BehaviorMonitoringModeChange()");
+			}
 			behaviorId = aBehaviorId;
 			mode = aMode;
 		}

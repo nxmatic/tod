@@ -29,6 +29,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.Type;
+
 import tod.Util;
 import tod.core.database.structure.BehaviorKind;
 import tod.core.database.structure.IClassInfo;
@@ -38,6 +41,7 @@ import tod.core.database.structure.ITypeInfo;
 import tod.core.database.structure.IStructureDatabase.LineNumberInfo;
 import tod.core.database.structure.IStructureDatabase.LocalVariableInfo;
 import tod.core.database.structure.IStructureDatabase.ProbeInfo;
+import tod.impl.bci.asm2.BCIUtils;
 
 
 /**
@@ -49,6 +53,7 @@ public class BehaviorInfo extends MemberInfo implements IMutableBehaviorInfo
 	private static final long serialVersionUID = 8645425455286128491L;
 	
 	private BehaviorKind itsBehaviourKind;
+	
 	private HasTrace itsHasTrace = HasTrace.UNKNOWN;
 	
 //	private final String itsSignature;
@@ -73,19 +78,19 @@ public class BehaviorInfo extends MemberInfo implements IMutableBehaviorInfo
 			int aId, 
 			ClassInfo aType, 
 			String aName,
-			boolean aStatic,
+			int aAccessFlags,
 			String aSignature,
 			ITypeInfo[] aArgumentTypes,
 			ITypeInfo aReturnType)
 	{
-		super(aDatabase, aId, aType, aName, aStatic);
+		super(aDatabase, aId, aType, aName, aAccessFlags);
 //		itsSignature = aSignature;
 		itsArgumentTypes = aArgumentTypes;
 		itsReturnType = aReturnType;
 		
 		if ("<init>".equals(getName())) itsBehaviourKind = BehaviorKind.CONSTRUCTOR;
 		else if ("<clinit>".equals(getName())) itsBehaviourKind = BehaviorKind.STATIC_INIT;
-		else if (aStatic) itsBehaviourKind = BehaviorKind.STATIC_METHOD;
+		else if (isStatic()) itsBehaviourKind = BehaviorKind.STATIC_METHOD;
 		else itsBehaviourKind = BehaviorKind.METHOD;
 		
 //		System.out.println(String.format(
@@ -145,8 +150,6 @@ public class BehaviorInfo extends MemberInfo implements IMutableBehaviorInfo
 		itsTagMap = aTagMap;
 		itsHasTagMap = itsTagMap != null;
 	}
-	
-	
 	
 	@Override
 	public IClassInfo getDeclaringType()
@@ -356,13 +359,6 @@ public class BehaviorInfo extends MemberInfo implements IMutableBehaviorInfo
     	return getBehaviourKind() == BehaviorKind.STATIC_INIT;
     }
     
-    @Override
-	public boolean isStatic()
-    {
-    	return getBehaviourKind() == BehaviorKind.STATIC_INIT
-    		|| getBehaviourKind() == BehaviorKind.STATIC_METHOD;
-    }
-	
 	@Override
 	public String toString()
 	{

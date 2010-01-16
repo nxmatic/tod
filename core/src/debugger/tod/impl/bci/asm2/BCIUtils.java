@@ -56,8 +56,11 @@ import org.objectweb.asm.tree.TypeInsnNode;
 import org.objectweb.asm.tree.VarInsnNode;
 import org.objectweb.asm.tree.analysis.Analyzer;
 import org.objectweb.asm.tree.analysis.AnalyzerException;
+import org.objectweb.asm.tree.analysis.BasicInterpreter;
 import org.objectweb.asm.tree.analysis.BasicVerifier;
 import org.objectweb.asm.tree.analysis.Frame;
+import org.objectweb.asm.tree.analysis.Interpreter;
+import org.objectweb.asm.tree.analysis.SimpleVerifier;
 
 import tod.core.config.ClassSelector;
 import tod.core.database.structure.ObjectId;
@@ -375,10 +378,15 @@ public class BCIUtils implements Opcodes
 	 */
 	public static void checkMethod(ClassNode aClassNode, MethodNode aNode)
 	{
-		Analyzer theAnalyzer = new Analyzer(new BasicVerifier());
+		checkMethod(aClassNode, aNode, new BasicInterpreter());
+	}
+	
+	public static void checkMethod(ClassNode aClassNode, MethodNode aNode, Interpreter aInterpreter)
+	{
+		Analyzer theAnalyzer = new Analyzer(aInterpreter);
 		try
 		{
-			theAnalyzer.analyze(aNode.name, aNode);
+			theAnalyzer.analyze(aClassNode.name, aNode);
 		}
 		catch (AnalyzerException e)
 		{
@@ -419,11 +427,11 @@ public class BCIUtils implements Opcodes
 			
 			Utils.rtex(
 					e,
-					"Error in %s.%s%s at instruction #%d: %s",
+					"Error in %s.%s%s at instructions #(%s): %s",
 					aClassNode.name,
 					aNode.name,
 					aNode.desc,
-					getBytecodeRank(aNode, e.node),
+					getBytecodeRanks(aNode, e.nodes),
 					e.getMessage());
 		}
 		catch (Exception e)
@@ -454,6 +462,18 @@ public class BCIUtils implements Opcodes
 		return -1;
 	}
 
+	public static String getBytecodeRanks(MethodNode aNode, AbstractInsnNode[] aInstructions)
+	{
+		StringBuilder theBuilder = new StringBuilder();
+		for (AbstractInsnNode theNode : aInstructions)
+		{
+			theBuilder.append(getBytecodeRank(aNode, theNode));
+			theBuilder.append(", ");
+		}
+		return theBuilder.toString();
+	}
+
+	
 	public static void checkClass(byte[] aBytecode)
 	{
 		// StringWriter sw = new StringWriter();

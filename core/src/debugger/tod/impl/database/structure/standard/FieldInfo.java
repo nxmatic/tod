@@ -51,9 +51,9 @@ public class FieldInfo extends MemberInfo implements IMutableFieldInfo
 			ITypeInfo aDeclaringType, 
 			String aName,
 			ITypeInfo aType,
-			boolean aStatic)
+			int aAccessFlags)
 	{
-		super(aDatabase, aId, aDeclaringType, aName, aStatic);
+		super(aDatabase, aId, aDeclaringType, aName, aAccessFlags);
 		itsTypePtr = getTypePtr(aType);
 	}
 

@@ -373,7 +373,7 @@ public class MethodInfo
 			IMutableClassInfo theOwner = theDatabase.getNewClass(aNode.owner);
 			ITypeInfo theType = theDatabase.getNewType(aNode.desc);
 
-			return theOwner.getNewField(aNode.name, theType, aNode.getOpcode() == Opcodes.GETSTATIC);
+			return theOwner.getNewField(aNode.name, theType, aNode.getOpcode() == Opcodes.GETSTATIC ? Opcodes.ACC_STATIC : 0);
 		}
 		else
 		{

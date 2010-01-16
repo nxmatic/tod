@@ -52,14 +52,14 @@ public class Disassembler
 		File f = new File("/home/gpothier/tmp/Fixtures.class");
 		byte[] theBytecode = Utils.readInputStream_byte(new FileInputStream(f));
 		
-		StructureDatabase theStructureDatabase = StructureDatabase.create(new TODConfig());
+		StructureDatabase theStructureDatabase = StructureDatabase.create(new TODConfig(), true);
 		ClassInfo theClass = theStructureDatabase.getNewClass("dummy.Dummy");
 		theClass.setBytecode(theBytecode, theBytecode);
 		
 		IMutableBehaviorInfo theBehavior = theClass.getNewBehavior(
 				"checkCondition",
 				"(Ltod/impl/database/IBidiIterator;Ltod/impl/evdbng/queries/EventCondition;Ltod/impl/evdbng/EventGenerator;I)I", 
-				false);
+				0);
 		
 		DisassembledBehavior theDisassembledBehavior = disassemble(theBehavior);
 		System.out.println(theDisassembledBehavior);

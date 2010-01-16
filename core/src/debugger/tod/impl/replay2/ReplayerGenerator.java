@@ -121,6 +121,8 @@ public class ReplayerGenerator
 
 		for (MethodNode theMethodNode : (List<MethodNode>) theClassNode.methods)
 		{
+			if (BCIUtils.isAbstract(theMethodNode.access) || BCIUtils.isNative(theMethodNode.access)) continue;
+			
 			// Get info about the method before transforming, as the generator modifies it.
 			String theMethodName = theMethodNode.name;
 			String theMethodDesc = theMethodNode.desc;
@@ -185,7 +187,7 @@ public class ReplayerGenerator
 		theMethod.desc = "()L"+BCIUtils.getJvmClassName(InScopeReplayerFrame.class)+";";
 		theMethod.exceptions = Collections.EMPTY_LIST;
 		theMethod.access = Opcodes.ACC_PUBLIC;
-		theMethod.maxStack = 1;
+		theMethod.maxStack = 2;
 		theMethod.maxLocals = 1;
 		theMethod.tryCatchBlocks = Collections.EMPTY_LIST;
 
@@ -203,6 +205,21 @@ public class ReplayerGenerator
 		classNode.accept(theWriter);
 		
 		byte[] theBytecode = theWriter.toByteArray();
+		
+		BCIUtils.writeClass("/home/gpothier/tmp/tod/replayer", classNode, theBytecode);
+
+		// Check the methods
+		try
+		{
+			BCIUtils.checkClass(theBytecode);
+			for(MethodNode theNode : (List<MethodNode>) classNode.methods) BCIUtils.checkMethod(classNode, theNode);
+		}
+		catch(Exception e)
+		{
+			System.err.println("Class "+classNode.name+" failed check.");
+			e.printStackTrace();
+		}
+
 
 		String theFactoryClassName = classNode.name.replace('/', '.');
 		itsLoader.addClass(theFactoryClassName, theBytecode);

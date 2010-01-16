@@ -78,7 +78,7 @@ public class ASM2Test
 	{
 		TODConfig theConfig = new TODConfig();
 		theConfig.set(TODConfig.SCOPE_TRACE_FILTER, "[+org.eclipse.**]");
-		StructureDatabase theDatabase = StructureDatabase.create(theConfig);
+		StructureDatabase theDatabase = StructureDatabase.create(theConfig, false);
 		ASMInstrumenter2 theInstrumenter = new ASMInstrumenter2(theConfig, theDatabase);
 		
 		instrument(theDatabase, theInstrumenter, "/home/gpothier/tmp/tod/eclipse/Main.class");
@@ -90,7 +90,7 @@ public class ASM2Test
 	{
 		TODConfig theConfig = new TODConfig();
 		theConfig.set(TODConfig.SCOPE_TRACE_FILTER, "[+com.sun.tools.**]");
-		StructureDatabase theDatabase = StructureDatabase.create(theConfig);
+		StructureDatabase theDatabase = StructureDatabase.create(theConfig, false);
 		ASMInstrumenter2 theInstrumenter = new ASMInstrumenter2(theConfig, theDatabase);
 		
 		JavaCompiler theCompiler = ToolProvider.getSystemJavaCompiler();

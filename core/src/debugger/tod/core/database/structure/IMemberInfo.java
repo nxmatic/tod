@@ -34,8 +34,4 @@ public interface IMemberInfo extends ILocationInfo
 	 */
 	public boolean isStatic();
 
-	/**
-	 * Returns the access type of this member.
-	 */
-	public Access getAccess();
 }

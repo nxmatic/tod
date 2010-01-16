@@ -202,7 +202,7 @@ public class ClassInstrumenter
 		for(FieldNode theNode : (List<FieldNode>) itsNode.fields) 
 		{
 			ITypeInfo theType = getDatabase().getNewType(theNode.desc);
-			itsClassInfo.getNewField(theNode.name, theType, BCIUtils.isStatic(theNode.access));
+			itsClassInfo.getNewField(theNode.name, theType, theNode.access);
 		}
 
 		// Add infrastructure
@@ -216,10 +216,7 @@ public class ClassInstrumenter
 	
 	private void processMethod(MethodNode aNode)
 	{
-		IMutableBehaviorInfo theBehavior = itsClassInfo.getNewBehavior(
-				aNode.name,
-				aNode.desc, 
-				BCIUtils.isStatic(aNode.access));
+		IMutableBehaviorInfo theBehavior = itsClassInfo.getNewBehavior(aNode.name, aNode.desc, aNode.access);
 		
 		if (BCIUtils.CLS_CLASSLOADER.equals(getNode().name) && "loadClassInternal".equals(aNode.name)) 
 		{

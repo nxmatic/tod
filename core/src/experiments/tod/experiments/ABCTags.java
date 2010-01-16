@@ -71,7 +71,7 @@ public class ABCTags
 	public static void main(String[] args) throws Exception
 	{
 		TODConfig theConfig = new TODConfig();
-		StructureDatabase theStructureDatabase = StructureDatabase.create(theConfig);
+		StructureDatabase theStructureDatabase = StructureDatabase.create(theConfig, false);
 		theConfig.set(TODConfig.SCOPE_TRACE_FILTER, "[+xys]");
 		ASMInstrumenter2 theInstrumenter = new ASMInstrumenter2(theConfig, theStructureDatabase);
 		

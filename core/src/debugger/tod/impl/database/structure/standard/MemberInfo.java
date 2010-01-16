@@ -28,6 +28,7 @@ import tod.core.database.structure.IMemberInfo;
 import tod.core.database.structure.IShareableStructureDatabase;
 import tod.core.database.structure.ITypeInfo;
 import tod.core.database.structure.ILocationInfo.ISerializableLocationInfo;
+import tod.impl.bci.asm2.BCIUtils;
 
 
 /**
@@ -46,19 +47,22 @@ implements IMemberInfo, ISerializableLocationInfo
 	 */
 	private final int itsDeclaringTypeId;
 	
-	private final boolean itsStatic;
-	private Access itsAccess;
+	/**
+	 * Access flags (public, private, static, native, etc) of the method.
+	 * The values are those of ASM (eg. Opcodes.ACC_ABSTRACT).
+	 */
+	private int itsAccessFlags;
 	
 	public MemberInfo(
 			IShareableStructureDatabase aDatabase, 
 			int aId, 
 			ITypeInfo aDeclaringType, 
 			String aName, 
-			boolean aStatic)
+			int aAccessFlags)
 	{
 		super(aDatabase, aId, aName);
 		itsDeclaringTypeId = aDeclaringType.getId();
-		itsStatic = aStatic;
+		itsAccessFlags = aAccessFlags;
 	}
 	
 	public ITypeInfo getDeclaringType()
@@ -66,18 +70,23 @@ implements IMemberInfo, ISerializableLocationInfo
 		return getDatabase().getType(itsDeclaringTypeId, true);
 	}
 	
+	public void updateAccessFlags(int aAccessFlags)
+	{
+		itsAccessFlags |= aAccessFlags;
+	}
+	
 	public boolean isStatic()
-	{
-		return itsStatic;
-	}
-
-	public Access getAccess()
-	{
-		return itsAccess;
-	}
-
-	public void setAccess(Access aAccess)
-	{
-		itsAccess = aAccess;
-	}
+    {
+    	return BCIUtils.isStatic(itsAccessFlags);
+    }
+    
+    public boolean isAbstract()
+    {
+    	return BCIUtils.isAbstract(itsAccessFlags);
+    }
+	
+    public boolean isNative()
+    {
+    	return BCIUtils.isNative(itsAccessFlags);
+    }
 }

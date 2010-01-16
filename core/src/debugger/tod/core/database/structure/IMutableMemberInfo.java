@@ -34,7 +34,8 @@ package tod.core.database.structure;
 public interface IMutableMemberInfo extends IMemberInfo, IMutableLocationInfo
 {
 	/**
-	 * Changes the access type for this member
+	 * Take new access flags from the supplied set.
 	 */
-	public void setAccess(Access aAccess);
+	public void updateAccessFlags(int aAccessFlags);
+
 }

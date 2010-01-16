@@ -56,7 +56,7 @@ public class Instrument
 		System.out.println(theName);
 		
 		TODConfig theConfig = new TODConfig();
-		StructureDatabase theStructureDatabase = StructureDatabase.create(theConfig);
+		StructureDatabase theStructureDatabase = StructureDatabase.create(theConfig, false);
 		ASMInstrumenter2 theInstrumenter = new ASMInstrumenter2(theConfig, theStructureDatabase);
 		
 		InstrumentedClass theInstrumentedClass = theInstrumenter.instrumentClass(theName, theClassData, false);
