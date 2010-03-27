@@ -215,19 +215,22 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		int theArgCount = getArgTypes().length;
 		if (theSendThis) theArgCount++;
 
-		s.ALOAD(getThreadDataVar());
-		s.pushInt(theArgCount); 
-		s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "sendBehaviorEnterArgs", "(I)V");
-
-		int theArgIndex = 0;
-		if (theSendThis) sendValue_Ref(s, theArgIndex++);
-		else if (isConstructor()) theArgIndex++;
-		
-		for(Type theType : getArgTypes())
+		if (theArgCount > 0)
 		{
-			sendValue(s, theArgIndex, theType);
-			theArgIndex += theType.getSize();
-		}
+			s.ALOAD(getThreadDataVar());
+			s.pushInt(theArgCount); 
+			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "sendBehaviorEnterArgs", "(I)V");
+
+			int theArgIndex = 0;
+			if (theSendThis) sendValue_Ref(s, theArgIndex++);
+			else if (isConstructor()) theArgIndex++;
+			
+			for(Type theType : getArgTypes())
+			{
+				sendValue(s, theArgIndex, theType);
+				theArgIndex += theType.getSize();
+			}
+		}			
 	}
 	
 	/**
@@ -512,18 +515,6 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 			s.ALOAD(getThreadDataVar());
 			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evUnmonitoredBehaviorCall", "()V");
 			
-			NewInvokeLink theNewInvokeLink = null;
-			if (! itsMethodInfo.isChainingInvocation(aNode))
-			{
-				// Save target
-				theNewInvokeLink = itsMethodInfo.getNewInvokeLink(aNode);
-				SyntaxInsnList s2 = new SyntaxInsnList();
-				s2.DUP();
-				s2.ASTORE(itsTmpTargetVars[theNewInvokeLink.getNestingLevel()]);
-				insertAfter(theNewInvokeLink.getNewInsn(), s2);
-			}
-			
-			
 			// call
 			s.label(lHnStart);
 			s.add(theUnmonitoredClone);
@@ -535,6 +526,14 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 			// Send object initialized
 			if (! itsMethodInfo.isChainingInvocation(aNode))
 			{
+				// Save target
+				NewInvokeLink theNewInvokeLink = itsMethodInfo.getNewInvokeLink(aNode);
+				SyntaxInsnList s2 = new SyntaxInsnList();
+				s2.DUP();
+				s2.ASTORE(itsTmpTargetVars[theNewInvokeLink.getNestingLevel()]);
+				insertAfter(theNewInvokeLink.getNewInsn(), s2);
+
+				// Do send
 				s.ALOAD(getThreadDataVar());
 				s.ALOAD(itsTmpTargetVars[theNewInvokeLink.getNestingLevel()]);
 				s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evObjectInitialized", "("+BCIUtils.DSC_OBJECT+")V");

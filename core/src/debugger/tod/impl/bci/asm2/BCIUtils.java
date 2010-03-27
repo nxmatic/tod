@@ -25,6 +25,8 @@ package tod.impl.bci.asm2;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -61,6 +63,8 @@ import org.objectweb.asm.tree.analysis.BasicVerifier;
 import org.objectweb.asm.tree.analysis.Frame;
 import org.objectweb.asm.tree.analysis.Interpreter;
 import org.objectweb.asm.tree.analysis.SimpleVerifier;
+import org.objectweb.asm.util.ASMifierMethodVisitor;
+import org.objectweb.asm.util.TraceMethodVisitor;
 
 import tod.core.config.ClassSelector;
 import tod.core.database.structure.ObjectId;
@@ -414,7 +418,12 @@ public class BCIUtils implements Opcodes
 				case AbstractInsnNode.TABLESWITCH_INSN:
 				case AbstractInsnNode.LOOKUPSWITCH_INSN:
 				case AbstractInsnNode.MULTIANEWARRAY_INSN:
-					System.out.println(bcIndex+" "+theFrame+" - "+theInsn);
+					TraceMethodVisitor theTraceVisitor = new TraceMethodVisitor();
+					theInsn.accept(theTraceVisitor);
+					StringWriter theWriter = new StringWriter();
+					theTraceVisitor.print(new PrintWriter(theWriter));
+					String theTraced = theWriter.toString().replace("\n", "");
+					System.out.println(bcIndex+" "+theFrame+" | "+theTraced);
 					bcIndex++;
 					break;
 					
@@ -496,6 +505,15 @@ public class BCIUtils implements Opcodes
 
 			File theFile = new File(theDir, aNode.name.replace('/', '.') + ".class");
 			theFile.getParentFile().mkdirs();
+			
+			String theName = theFile.getName();
+			if (theName.length() > 255)
+			{
+				String theMaimedName = maimFileName(theName);
+				theFile = new File(theFile.getParentFile(), theMaimedName);
+				System.err.println("Warning: changed "+theName+" to "+theMaimedName);
+			}
+			
 			theFile.createNewFile();
 			FileOutputStream theFileOutputStream = new FileOutputStream(theFile);
 			theFileOutputStream.write(aData);
@@ -506,6 +524,18 @@ public class BCIUtils implements Opcodes
 		{
 			throw new RuntimeException(e);
 		}
+	}
+	
+	/**
+	 * If file name is longer than 255 chars, make it shorter by force...
+	 */
+	private static String maimFileName(String aName)
+	{
+		int l = aName.length();
+		int r = (l+254)/255;
+		StringBuilder theBuilder = new StringBuilder();
+		for(int i=0;i<l;i+=r) theBuilder.append(aName.charAt(i));
+		return theBuilder.toString();
 	}
 
 	public static void throwRTEx(SyntaxInsnList s, String aMessage)

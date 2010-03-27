@@ -40,7 +40,7 @@ public class Message
 	public static final byte INSCOPE_CLINIT_ENTER = 11;
 	
 	/**
-	 * Entering into {@link ClassLoader#loadClassInternal}.
+	 * Entering into {@link ClassLoader#loadClassInternal} or similar methods.
 	 * This makes the replayer code simpler.
 	 */
 	public static final byte CLASSLOADER_ENTER = 12;

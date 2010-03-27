@@ -236,6 +236,12 @@ public final class ThreadData
 			if (aArg2 >= 0) theBuilder.append(aArg2);
 			theBuilder.append(")");
 		}
+		
+		if (itsMessageCount == 6930)
+		{
+			System.out.println("ThreadData.echoMessageType()");
+		}
+		
 		_IO.out(theBuilder.toString());		
 	}
 	
@@ -448,7 +454,7 @@ public final class ThreadData
 		sendMessageType(itsBuffer, Message.FIELD_READ);
 		msgStop();
 		
-		commitBuffer();
+//		commitBuffer();
 		
 		exit();
 	}
@@ -486,7 +492,7 @@ public final class ThreadData
 		sendMessageType(itsBuffer, Message.ARRAY_READ);
 		msgStop();
 		
-		commitBuffer();
+//		commitBuffer();
 		
 		exit();
 	}
@@ -1005,7 +1011,7 @@ public final class ThreadData
 		sendMessageType(itsBuffer, Message.UNMONITORED_BEHAVIOR_CALL_RESULT);
 		msgStop();
 		
-		commitBuffer();
+//		commitBuffer();
 		
 		if (popScope()) throw new TODError("Unexpected scope state");
 		

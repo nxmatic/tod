@@ -44,15 +44,15 @@ import tod.core.database.structure.IMutableBehaviorInfo;
 import tod2.agent.Message;
 
 /**
- * Special processing for {@link ClassLoader#loadClassInternal}. Only wrap with
- * {@link Message#CLASSLOADER_ENTER} and {@link Message#CLASSLOADER_EXIT}.
+ * Special processing for {@link ClassLoader#loadClassInternal} and similar methods. 
+ * Simply wraps them with {@link Message#CLASSLOADER_ENTER} and {@link Message#CLASSLOADER_EXIT}.
  * @author gpothier
  */
-public class MethodInstrumenter_loadClassInternal extends MethodInstrumenter
+public class MethodInstrumenter_ClassLoader extends MethodInstrumenter
 {
 	private Label lExit = new Label();
 	
-	public MethodInstrumenter_loadClassInternal(ClassInstrumenter aClassInstrumenter, MethodNode aNode, IMutableBehaviorInfo aBehavior)
+	public MethodInstrumenter_ClassLoader(ClassInstrumenter aClassInstrumenter, MethodNode aNode, IMutableBehaviorInfo aBehavior)
 	{
 		super(aClassInstrumenter, aNode, aBehavior);
 		getNode().maxStack += 2; // This is the max we add to the stack

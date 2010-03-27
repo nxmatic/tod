@@ -114,7 +114,7 @@ public class IOThread extends Thread
 		assert aChannel != null;
 		itsChannel = aChannel;
 		
-		itsHeaderBuffer = _ByteBuffer.allocate(9);
+		itsHeaderBuffer = _ByteBuffer.allocate(256);
 		
 		itsShutdownHook = new MyShutdownHook();
 		Runtime.getRuntime().addShutdownHook(itsShutdownHook);

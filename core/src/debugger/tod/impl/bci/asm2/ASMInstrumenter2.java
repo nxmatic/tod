@@ -84,10 +84,6 @@ public class ASMInstrumenter2 implements IInstrumenter
 	
 	public InstrumentedClass instrumentClass(String aClassName, byte[] aBytecode, boolean aUseJava14)
 	{
-		if ("org/eclipse/equinox/launcher/JNIBridge".equals(aClassName))
-		{
-			System.out.println("ASMInstrumenter2.instrumentClass()");
-		}
 		if (aUseJava14) throw new RuntimeException("Java 1.4 mode not yet supported in asm2");
 		return new ClassInstrumenter(this, aClassName, aBytecode, aUseJava14).proceed();
 	}

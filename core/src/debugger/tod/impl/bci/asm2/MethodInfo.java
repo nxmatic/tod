@@ -887,11 +887,12 @@ public class MethodInfo
 
 	public static class NewInvokeLink
 	{
-		private TypeInsnNode itsNewInsn;
-		private int itsNestingLevel;
+		private final TypeInsnNode itsNewInsn;
+		private final int itsNestingLevel;
 
 		public NewInvokeLink(TypeInsnNode aNewInsn, int aNestingLevel)
 		{
+			assert aNewInsn != null;
 			itsNewInsn = aNewInsn;
 			itsNestingLevel = aNestingLevel;
 		}

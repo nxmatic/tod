@@ -71,11 +71,12 @@ import tod.core.database.structure.IStructureDatabase;
 import tod.core.database.structure.ObjectId;
 import tod.impl.bci.asm2.BCIUtils;
 import tod.impl.bci.asm2.MethodInfo;
+import tod.impl.bci.asm2.SyntaxInsnList;
 import tod.impl.bci.asm2.MethodInfo.BCIFrame;
+import tod.impl.bci.asm2.MethodInfo.NewInvokeLink;
 import tod.impl.database.structure.standard.StructureDatabaseUtils;
 import tod2.agent.Message;
 import zz.utils.SetMap;
-import zz.utils.Utils;
 
 public class MethodReplayerGenerator
 {
@@ -114,6 +115,18 @@ public class MethodReplayerGenerator
 	 */
 	private int itsTmpTargetVar;
 	private int itsTmpValueVar;
+	
+	/**
+	 * Temporarily holds the target of constructor calls
+	 */
+	private int[] itsTmpTargetVars;
+	
+	/**
+	 * For each original NEW instruction, maps to the last instruction of the block that replaces it.
+	 */
+	private Map<TypeInsnNode, AbstractInsnNode> itsNewReplacementInsnsMap = new HashMap<TypeInsnNode, AbstractInsnNode>();
+	
+
 	
 	private int itsSaveArgsSlots;
 	
@@ -196,7 +209,6 @@ public class MethodReplayerGenerator
 	{
 		System.out.println("Generating replayer for: "+itsClassNode.name+"."+itsMethodNode.name);
 		
-		
 		lCodeStart = new Label();
 		LabelNode nStart = new LabelNode(lCodeStart);
 		lCodeStart.info = nStart;
@@ -214,6 +226,9 @@ public class MethodReplayerGenerator
 		itsTmpVar = nextFreeVar(2);
 		itsTmpTargetVar = nextFreeVar(1);
 		itsTmpValueVar = nextFreeVar(2);
+		
+		itsTmpTargetVars = new int[itsMethodInfo.getMaxNewInvokeNesting()+1];
+//		for (int i=0;i<itsTmpTargetVars.length;i++) itsTmpTargetVars[i] = nextFreeVar(1);
 		
 		// Create constructor
 		addConstructor();
@@ -318,29 +333,45 @@ public class MethodReplayerGenerator
 		theMethod.access = Opcodes.ACC_PUBLIC;
 		theMethod.tryCatchBlocks = Collections.EMPTY_LIST;
 		
+		int theSize = 1;
+		
 		SList s = new SList();
 		
-		s.ALOAD(0);
-		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "waitArgs", "()V");
+		boolean theSendThis = !itsStatic && !itsConstructor;
 		
+		int theArgCount = itsArgTypes.length;
+		if (theSendThis) theArgCount++;
+
 		s.ALOAD(0);
 		
-		int theSize = 1;
-		if (! itsStatic)
+		if (theArgCount > 0)
 		{
-			if (! itsConstructor) s.invokeReadRef();
-			else 
+			s.ALOAD(0);
+			s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "waitArgs", "()V");
+			
+			
+			if (! itsStatic)
 			{
-				s.ALOAD(0);
-				s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "nextTmpId", "()"+BCIUtils.DSC_OBJECTID);
+				if (! itsConstructor) s.invokeReadRef();
+				else 
+				{
+					s.ALOAD(0);
+					s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "nextTmpId", "()"+BCIUtils.DSC_OBJECTID);
+				}
+				theSize++;
 			}
-			theSize++;
+			
+			for (Type theType : itsArgTypes)
+			{
+				s.invokeRead(theType);
+				theSize += theType.getSize();
+			}
 		}
-		
-		for (Type theType : itsArgTypes)
+		else if (!itsStatic && itsConstructor)
 		{
-			s.invokeRead(theType);
-			theSize += theType.getSize();
+			s.ALOAD(0);
+			s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "nextTmpId", "()"+BCIUtils.DSC_OBJECTID);
+			theSize++;
 		}
 		
 		s.INVOKEVIRTUAL(itsTarget.name, theSignature[0], theSignature[1]);
@@ -638,7 +669,8 @@ public class MethodReplayerGenerator
 	 */
 	private int getBehaviorId(MethodInsnNode aNode)
 	{
-		IClassInfo theClass = getDatabase().getClass(Util.jvmToScreen(aNode.owner), true);
+		IClassInfo theClass = getDatabase().getClass(Util.jvmToScreen(aNode.owner), false);
+		if (theClass == null) return -1;
 		IBehaviorInfo theBehavior = theClass.getBehavior(aNode.name, aNode.desc);
 		if (theBehavior == null) return -1;
 		return theBehavior.getId();
@@ -694,9 +726,25 @@ public class MethodReplayerGenerator
 		
 		if (theExpectObjectInitialized)
 		{
-			s.DUP();
+			// Save target at the NEW site
+			NewInvokeLink theNewInvokeLink = itsMethodInfo.getNewInvokeLink(aNode);
+			SyntaxInsnList s2 = new SyntaxInsnList();
+			int theLevel = theNewInvokeLink.getNestingLevel();
+			int theVar = itsTmpTargetVars[theLevel];
+			if (theVar == 0)
+			{
+				theVar = nextFreeVar(1);
+				itsTmpTargetVars[theLevel] = theVar;
+			}
+			s2.DUP();
+			s2.ASTORE(theVar);
+			TypeInsnNode theNewInsn = theNewInvokeLink.getNewInsn();
+			AbstractInsnNode theReplacementInsn = itsNewReplacementInsnsMap.get(theNewInsn);
+			aInsns.insert(theReplacementInsn, s2);
+
+			// Do wait
 			s.ALOAD(0);
-			s.SWAP();
+			s.ALOAD(theVar);
 			s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "waitObjectInitialized", "("+DSC_OBJECTID+")V");
 		}
 		else if (theChainingInvocation)
@@ -800,6 +848,8 @@ public class MethodReplayerGenerator
 		s.ALOAD(0);
 		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "nextTmpId", "()"+BCIUtils.DSC_OBJECTID);
 		
+		itsNewReplacementInsnsMap.put(aNode, s.getLast());
+		
 		aInsns.insert(aNode, s);
 		aInsns.remove(aNode);
 	}
@@ -868,7 +918,7 @@ public class MethodReplayerGenerator
 		s.ASTORE(itsTmpTargetVar); // Store target
 		
 		s.ALOAD(0);
-		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "getNextMessage", "()B");
+		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "getNextMessageConsumingClassloading", "()B");
 		s.ISTORE(itsTmpVar);
 		
 		s.ILOAD(itsTmpVar);
@@ -912,7 +962,7 @@ public class MethodReplayerGenerator
 		pushCollector(s);
 		
 		s.ALOAD(itsTmpTargetVar);
-		s.LDC(StructureDatabaseUtils.getFieldId(itsDatabase, aNode.owner, aNode.name));
+		s.LDC(StructureDatabaseUtils.getFieldId(itsDatabase, aNode.owner, aNode.name, false));
 		s.ILOAD(theType, itsTmpValueVar);
 		s.INVOKEVIRTUAL(CLS_EVENTCOLLECTOR, "fieldRead", "("+DSC_OBJECTID+"I"+getActualType(theType).getDescriptor()+")V");
 		
@@ -935,7 +985,7 @@ public class MethodReplayerGenerator
 		pushCollector(s);
 		
 		s.ALOAD(itsTmpTargetVar);
-		s.LDC(StructureDatabaseUtils.getFieldId(itsDatabase, aNode.owner, aNode.name));
+		s.LDC(StructureDatabaseUtils.getFieldId(itsDatabase, aNode.owner, aNode.name, false));
 		s.ILOAD(theType, itsTmpValueVar);
 		s.INVOKEVIRTUAL(CLS_EVENTCOLLECTOR, "fieldWrite", "("+DSC_OBJECTID+"I"+getActualType(theType).getDescriptor()+")V");
 		

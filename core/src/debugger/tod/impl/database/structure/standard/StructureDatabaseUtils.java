@@ -51,12 +51,22 @@ public class StructureDatabaseUtils
 	public static int getFieldId(
 			IStructureDatabase aStructureDatabase, 
 			String aClassName, 
-			String aFieldName)
+			String aFieldName,
+			boolean aFailIfAbsent)
 	{
-		IClassInfo theClass = aStructureDatabase.getClass(aClassName, true);
+		IClassInfo theClass = aStructureDatabase.getClass(aClassName, aFailIfAbsent);
+		if (theClass == null)
+		{
+			if (aFailIfAbsent) throw new RuntimeException("Class not found: "+aClassName);
+			else return -1;			
+		}
 		IFieldInfo theField = theClass.getField(aFieldName);
-		if (theField == null) throw new RuntimeException("Field not found: "+aClassName+"."+aFieldName);
-		return theField.getId();
+		if (theField != null) return theField.getId();
+		else 
+		{
+			if (aFailIfAbsent) throw new RuntimeException("Field not found: "+aClassName+"."+aFieldName);
+			else return -1;
+		}
 	}
 	
 

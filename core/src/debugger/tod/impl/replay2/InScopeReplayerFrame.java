@@ -155,13 +155,25 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 		if (isExceptionNext()) expectException();
 	}
 	
-	protected ReplayerFrame invoke(int aBehaviorId)
+	/**
+	 * Consumes all classloading-related messages (classloader enter, clinit),
+	 * and returns the next (non classloading-related) message.
+	 * @return
+	 */
+	protected byte getNextMessageConsumingClassloading()
 	{
-		byte theMessage = -1;
-		loop:
+		byte m = peekNextMessageConsumingClassloading();
+		byte m2 = getNextMessage();
+		assert m == m2;
+		return m;
+	}
+	
+
+	private byte peekNextMessageConsumingClassloading()
+	{
 		while(true)
 		{
-			theMessage = peekNextMessage();
+			byte theMessage = peekNextMessage();
 			switch(theMessage)
 			{
 			case Message.CLASSLOADER_ENTER:
@@ -186,9 +198,15 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 				break;
 			}
 			
-			default: break loop;
+			default: 
+				return theMessage;
 			}
 		}
+	}
+	
+	protected ReplayerFrame invoke(int aBehaviorId)
+	{
+		byte theMessage = peekNextMessageConsumingClassloading();
 		
 		int theMode = getReplayer().getBehaviorMonitoringMode(aBehaviorId);
 		if (ThreadReplayer.ECHO) Utils.println(

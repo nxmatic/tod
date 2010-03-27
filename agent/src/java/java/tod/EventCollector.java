@@ -176,16 +176,17 @@ public final class EventCollector
 		ThreadData theThreadData = new ThreadData(theId, itsIOThread);
 		itsThreadData.set(theThreadData);
 		
-		theThreadData.sendThread(theJvmId, theCurrentThread.getName());
+		String theName = theCurrentThread.getName();
+		theThreadData.sendThread(theJvmId, theName);
 		
 		_StringBuilder b = new _StringBuilder();
 		b.append("[TOD] New thread: ");
-		b.append(theCurrentThread.getName());
+		b.append(theName);
 		_IO.out(b.toString());
 		
-		if (theCurrentThread.getName().startsWith("[TOD]"))
+		if (theName.startsWith("[TOD]"))
 		{
-			throw new TODError(theCurrentThread.getName());
+			throw new TODError(theName);
 		}
 		
 		return theThreadData;

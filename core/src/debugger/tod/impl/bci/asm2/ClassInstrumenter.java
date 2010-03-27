@@ -218,9 +218,10 @@ public class ClassInstrumenter
 	{
 		IMutableBehaviorInfo theBehavior = itsClassInfo.getNewBehavior(aNode.name, aNode.desc, aNode.access);
 		
-		if (BCIUtils.CLS_CLASSLOADER.equals(getNode().name) && "loadClassInternal".equals(aNode.name)) 
+		if (BCIUtils.CLS_CLASSLOADER.equals(getNode().name) 
+				&& ("loadClassInternal".equals(aNode.name) || "checkPackageAccess".equals(aNode.name))) 
 		{
-			new MethodInstrumenter_loadClassInternal(this, aNode, theBehavior).proceed();
+			new MethodInstrumenter_ClassLoader(this, aNode, theBehavior).proceed();
 		}
 		else if (getDatabase().isInScope(itsName)) new MethodInstrumenter_InScope(this, aNode, theBehavior).proceed();
 		else new MethodInstrumenter_OutOfScope(this, aNode, theBehavior).proceed();
