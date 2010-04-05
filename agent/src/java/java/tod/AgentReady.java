@@ -44,6 +44,8 @@ public class AgentReady
 	 */
 	private static boolean NATIVE_AGENT_LOADED = false;
 	
+	private static boolean STARTED = false;
+	
 	/**
 	 * Whether trace capture is currently enabled.
 	 * @see TOD#enableCapture()
@@ -67,6 +69,11 @@ public class AgentReady
 		return NATIVE_AGENT_LOADED;
 	}
 	
+	public static boolean isStarted()
+	{
+		return STARTED;
+	}
+	
 	/**
 	 * Called by the native agent when the system is ready to start capturing
 	 */
@@ -78,5 +85,7 @@ public class AgentReady
 		
 		EventCollector.INSTANCE.init();
 		TOD.loadInitialCaptureState();
+		
+		STARTED = true;
 	}
 }

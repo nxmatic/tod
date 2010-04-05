@@ -94,11 +94,18 @@ jmethodID ignoredExceptionMethods[3];
 // Mutex for class load callback
 t_mutex loadMutex;
 
+struct TracedMethodInfo
+{
+	jint behaviorId;
+	jbyte instrumentationMode;
+	jbyte callMode;
+};
+
 // This vector holds traced methods ids for methods
 // that are registered prior to VM initialization.
 // The two lower order bits of each int represent 
 // the monitoring mode -- the higher order bits are the method id
-std::vector<int> tmpTracedMethods;
+std::vector<TracedMethodInfo> tmpTracedMethods;
 
 /*
 Connects to the instrumenting host
@@ -212,13 +219,19 @@ void agentConfigure()
 	}
 }
 
-void registerTracedMethod(JNIEnv* jni, int tracedMethod)
+void registerTracedMethod(JNIEnv* jni, TracedMethodInfo& info)
 {
-	int behaviorId = tracedMethod >> 2;
-	int mode = tracedMethod & 0x3;
-	
-	TracedMethods_setMode->invoke(jni, behaviorId, mode);
-	if (propVerbose>=2) printf("Registered traced method: %d -> %d\n", behaviorId, mode);
+	if (propVerbose>=2) printf(
+		"Trying: %d -> (%d, %d)\n", 
+		info.behaviorId, 
+		info.instrumentationMode, 
+		info.callMode);
+	TracedMethods_setMode->invoke(jni, info.behaviorId, (jint)info.instrumentationMode, (jint)info.callMode);
+	if (propVerbose>=2) printf(
+		"Registered traced method: %d -> (%d, %d)\n", 
+		info.behaviorId, 
+		info.instrumentationMode, 
+		info.callMode);
 }
 
 /**
@@ -227,15 +240,16 @@ Registers the traced methods that were registered in tmpTracedMethods
 void registerTmpTracedMethods(JNIEnv* jni)
 {
 	if (propVerbose>=1) printf("Registering %d buffered traced methods\n", tmpTracedMethods.size());
-	std::vector<int>::iterator iter = tmpTracedMethods.begin();
-	std::vector<int>::iterator end = tmpTracedMethods.end();
+	std::vector<TracedMethodInfo>::iterator iter = tmpTracedMethods.begin();
+	std::vector<TracedMethodInfo>::iterator end = tmpTracedMethods.end();
 	
+	if (propVerbose>=1) printf("Yeah, now starting\n");
 	while (iter != end) registerTracedMethod(jni, *iter++);
 	
 	tmpTracedMethods.clear();
 }
 
-void registerTracedMethods(JNIEnv* jni, int nTracedMethods, int* tracedMethods)
+void registerTracedMethods(JNIEnv* jni, int nTracedMethods, TracedMethodInfo* tracedMethods)
 {
 	if (AGENT_STARTED)
 	{
@@ -256,9 +270,23 @@ struct ClassInfo
 	unsigned char* data;
 	jint dataLen;
 	
-	int* tracedMethods;
+	TracedMethodInfo* tracedMethods;
 	int nTracedMethods;
 };
+
+void readTracedMethodInfo(std::istream* file, TracedMethodInfo& info)
+{
+	info.behaviorId = readInt(file);
+	info.instrumentationMode = readByte(file);
+	info.callMode = readByte(file);
+}
+
+void writeTracedMethodInfo(std::ostream* file, TracedMethodInfo& info)
+{
+	writeInt(file, info.behaviorId);
+	writeByte(file, info.instrumentationMode);
+	writeByte(file, info.callMode);
+}
 
 ClassInfo* checkCacheInfo(
 	const char* name, 
@@ -283,8 +311,8 @@ ClassInfo* checkCacheInfo(
 			jint id = readInt(&infoFile);
 			
 			int nTracedMethods = readInt(&infoFile);
-			int* tracedMethods = new int[nTracedMethods];
-			for (int i=0;i<nTracedMethods;i++) tracedMethods[i] = readInt(&infoFile);
+			TracedMethodInfo* tracedMethods = new TracedMethodInfo[nTracedMethods];
+			for (int i=0;i<nTracedMethods;i++) readTracedMethodInfo(&infoFile, tracedMethods[i]);
 			
 			fs::ifstream classFile(classPath);
 			jint len = fs::file_size(classPath);
@@ -332,8 +360,8 @@ ClassInfo* requestInstrumentation(
 		jint id = readInt(gSocket);
 		
 		int nTracedMethods = readInt(gSocket);
-		int* tracedMethods = new int[nTracedMethods];
-		for (int i=0;i<nTracedMethods;i++) tracedMethods[i] = readInt(gSocket);
+		TracedMethodInfo* tracedMethods = new TracedMethodInfo[nTracedMethods];
+		for (int i=0;i<nTracedMethods;i++) readTracedMethodInfo(gSocket, tracedMethods[i]);
 		
 		int lastClassId = readInt(gSocket);
 		int lastBehaviorId = readInt(gSocket);
@@ -354,7 +382,7 @@ ClassInfo* requestInstrumentation(
 		writeBytes(&infoFile, 16, md5Buffer_in);
 		writeInt(&infoFile, id);
 		writeInt(&infoFile, nTracedMethods);
-		for (int i=0;i<nTracedMethods;i++) writeInt(&infoFile, tracedMethods[i]);
+		for (int i=0;i<nTracedMethods;i++) writeTracedMethodInfo(&infoFile, tracedMethods[i]);
 		infoFile.close();
 		
 		if (propVerbose>=2) std::cout << "Stored cache: " << infoPath << std::endl;
@@ -389,7 +417,8 @@ void agentClassFileLoadHook(
 		if (! startsWith(name, "java/") 
 			&& ! startsWith(name, "javax/")
 			&& ! startsWith(name, "sun/") 
-			&& ! startsWith(name, "tod/"))
+			&& ! startsWith(name, "tod/")
+			&& ! startsWith(name, "tod2/"))
 		{
 			printf("[TOD] Starting capture (%s).\n", name);
 			fflush(stdout);
@@ -530,7 +559,7 @@ void agentStart(JNIEnv* jni)
 	// Initialize the classes and method ids that will be used
 	// for registering traced methods
 	
-	TracedMethods_setMode = new StaticVoidMethod(jni, "java/tod/TracedMethods", "setMode", "(II)V");
+	TracedMethods_setMode = new StaticVoidMethod(jni, "java/tod/TracedMethods", "setMode", "(III)V");
 	TOD_enable = new StaticVoidMethod(jni, "java/tod/AgentReady", "nativeAgentLoaded", "()V");	
 	TOD_start = new StaticVoidMethod(jni, "java/tod/AgentReady", "start", "()V");	
 
@@ -551,7 +580,7 @@ void agentInit(
 	char* aPropCachePath,
 	char* aPropClientName)
 {
-	printf("Loading TOD agent - v4.0.4\n");
+	printf("Loading TOD agent - v4.0.5\n");
 
 	if (aPropVerbose)
 	{

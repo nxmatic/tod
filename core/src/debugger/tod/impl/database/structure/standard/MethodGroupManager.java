@@ -32,14 +32,13 @@ Inc. MD5 Message-Digest Algorithm".
 package tod.impl.database.structure.standard;
 
 import gnu.trove.TIntHashSet;
-import gnu.trove.TIntIntIterator;
 import gnu.trove.TIntIterator;
 import gnu.trove.TIntObjectHashMap;
-import gnu.trove.TObjectIntHashMap;
 
 import java.io.Serializable;
 import java.tod.TracedMethods;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -53,7 +52,8 @@ import tod.core.database.structure.IStructureDatabase;
 import tod.core.database.structure.ITypeInfo;
 import tod.core.database.structure.IStructureDatabase.BehaviorMonitoringModeChange;
 import tod2.agent.MonitoringMode;
-import zz.utils.SetMap;
+import zz.utils.Utils;
+import zz.utils.primitive.ByteArray;
 
 /**
  * Manages method groups. 
@@ -70,6 +70,8 @@ import zz.utils.SetMap;
 public class MethodGroupManager implements IStructureDatabase.Listener, Serializable
 {
 	private static final long serialVersionUID = 173278295020871234L;
+	
+	private static final boolean ECHO = true;
 
 	private transient StructureDatabase itsStructureDatabase;
 	
@@ -89,6 +91,11 @@ public class MethodGroupManager implements IStructureDatabase.Listener, Serializ
 	 * This is used in conjunction with {@link TracedMethods} versioning.
 	 */
 	private List<BehaviorMonitoringModeChange> itsChanges = new ArrayList<BehaviorMonitoringModeChange>();
+	
+	/**
+	 * Contains the mode of each behavior
+	 */
+	private ByteArray itsModes = new ByteArray();
 
 	public MethodGroupManager(StructureDatabase aStructureDatabase)
 	{
@@ -113,6 +120,18 @@ public class MethodGroupManager implements IStructureDatabase.Listener, Serializ
 	
 	public void addChange(BehaviorMonitoringModeChange aChange)
 	{
+		byte theMode = itsModes.get(aChange.behaviorId);
+		if (ECHO)
+		{
+			Utils.println("[MGM] addChange. Original mode: %d, c.im: %d, c.cm: %d", theMode, aChange.instrumentationMode, aChange.callMode);
+		}
+		
+		if (aChange.instrumentationMode >= 0) 
+			theMode = (byte) ((theMode & ~MonitoringMode.MASK_INSTRUMENTATION) | aChange.instrumentationMode);
+		if (aChange.callMode >= 0) 
+			theMode = (byte) ((theMode & ~MonitoringMode.MASK_CALL) | aChange.callMode);
+		itsModes.set(aChange.behaviorId, theMode);
+		
 		itsChanges.add(aChange);
 	}
 	
@@ -136,11 +155,58 @@ public class MethodGroupManager implements IStructureDatabase.Listener, Serializ
 	
 	private void markMonitored(IBehaviorInfo aBehavior)
 	{
-		BehaviorMonitoringModeChange theChange = new BehaviorMonitoringModeChange(
-				aBehavior.getId(), 
-				isInScope(aBehavior) ? MonitoringMode.FULL : MonitoringMode.ENVELOPPE);
+		byte theMode = itsModes.get(aBehavior.getId());
+		int theInstrumentationMode = theMode & MonitoringMode.MASK_INSTRUMENTATION;
+		int theCallMode = theMode & MonitoringMode.MASK_CALL;
+
+		if (ECHO)
+		{
+			Utils.println("[MGM] markMonitored id: %d, old im: %d, old cm: %d", aBehavior.getId(), theInstrumentationMode, theCallMode);
+		}
 		
-		itsChanges.add(theChange);
+		if (theInstrumentationMode != MonitoringMode.INSTRUMENTATION_NONE)
+			throw new RuntimeException("Huh? Should not happen (bid: "+aBehavior.getId()+")");
+		
+		theInstrumentationMode = isInScope(aBehavior) ? 
+				MonitoringMode.INSTRUMENTATION_FULL 
+				: MonitoringMode.INSTRUMENTATION_ENVELOPPE;
+		
+		switch(theCallMode)
+		{
+		case MonitoringMode.CALL_UNMONITORED:
+			theCallMode = MonitoringMode.CALL_MONITORED;
+			break;
+			
+		case MonitoringMode.CALL_MONITORED:
+		case MonitoringMode.CALL_UNKNOWN:
+			theCallMode = -1;
+			break;
+			
+		default: throw new RuntimeException("Not handled: "+theCallMode);
+		}
+
+		BehaviorMonitoringModeChange theChange = new BehaviorMonitoringModeChange(
+				aBehavior.getId(),
+				theInstrumentationMode,
+				theCallMode);
+		
+		addChange(theChange);
+		itsStructureDatabase.fireMonitoringModeChanged(theChange);
+	}
+	
+	private void markUnknown(IBehaviorInfo aBehavior)
+	{
+		if (ECHO)
+		{
+			Utils.println("[MGM] markUnknown id: %d", aBehavior.getId());
+		}
+
+		BehaviorMonitoringModeChange theChange = new BehaviorMonitoringModeChange(
+				aBehavior.getId(),
+				-1,
+				MonitoringMode.CALL_UNKNOWN);
+		
+		addChange(theChange);
 		itsStructureDatabase.fireMonitoringModeChanged(theChange);
 	}
 	
@@ -155,32 +221,72 @@ public class MethodGroupManager implements IStructureDatabase.Listener, Serializ
 	 */
 	public void classChanged(IClassInfo aClass)
 	{
+		// add edges
 		if (aClass.getSupertype() != null) addEdge(aClass.getSupertype(), aClass);
 		
 		if (aClass.getInterfaces() != null) 
 			for(IClassInfo theInterface : aClass.getInterfaces()) addEdge(theInterface, aClass);
+
+		// Merge affected groups
+		List<IClassInfo> theHierarchy = getTypeHierarchy(aClass);
+
+		Set<MethodGroup> theGroups = new HashSet<MethodGroup>();
+		for(MethodSignatureGroup theSignatureGroup : itsSignatureGroups.values()) 
+		{
+			theGroups.clear();
+			for (IClassInfo theType : theHierarchy)
+			{
+				MethodGroup theGroup = theSignatureGroup.getGroup(theType);
+				if (theGroup != null) theGroups.add(theGroup);
+			}
+			
+			theSignatureGroup.merge(theGroups);
+		}
+	}
+	
+	/**
+	 * Calls {@link #merge(MethodSignatureGroup, IClassInfo, IClassInfo)} on each signature group
+	 */
+	private void addEdge(IClassInfo aParent, IClassInfo aChild)
+	{
+		itsChildrenMap.add(aParent.getId(), aChild.getId());
+	}
+	
+	public static boolean isSkipped(String aClassName, String aMethodName, boolean aIsInScope)
+	{
+		if (aClassName.startsWith("java/lang/ref/")) return true;
+//		if (aClassName.startsWith("java/lang/ThreadLocal")) return true;
+		if (!aIsInScope && aClassName.indexOf("ClassLoader") >= 0) return true;
+		return false;
 	}
 
 	public void behaviorAdded(IBehaviorInfo aBehavior)
 	{
-//		System.out.println("    Behavior added: "+LocationUtils.toString(aBehavior));
+		if (ECHO) Utils.println("[MGM] behaviorAdded: %s", aBehavior);
 		MethodSignatureGroup theSignatureGroup = getSignatureGroup(getSignature(aBehavior));
 		
 		// Check if this method goes into an existing group
 		MethodGroup theMethodGroup = findGroup(theSignatureGroup, aBehavior.getDeclaringType());
 		if (theMethodGroup != null)
 		{
+			if (ECHO) Utils.println("[MGM] behaviorAdded - adding to existing group (id: %d)", theMethodGroup.getGroupId());
 			theMethodGroup.add(aBehavior);
 			if (theMethodGroup.isMonitored()) markMonitored(aBehavior);
+			if (theMethodGroup.hasUnknown()) markUnknown(aBehavior);
 		}
 		else
 		{
 			theMethodGroup = theSignatureGroup.addSingleton(aBehavior);
+			if (ECHO) Utils.println("[MGM] behaviorAdded - created new group (id: %d)", theMethodGroup.getGroupId());
 		}
 		
 		// Check if the behavior is in scope
-		if (isInScope(aBehavior)) theMethodGroup.markMonitored();
+		boolean theInScope = isInScope(aBehavior);
+		if (theInScope) theMethodGroup.markMonitored();
+		if (aBehavior.isNative()) theMethodGroup.markUnknown();
+		if (isSkipped(aBehavior.getDeclaringType().getName(), aBehavior.getName(), theInScope)) theMethodGroup.markUnknown();
 	}
+	
 	
 	/**
 	 * Finds an existing suitable group for the given type inside a signature group.
@@ -195,18 +301,10 @@ public class MethodGroupManager implements IStructureDatabase.Listener, Serializ
 		for (IClassInfo theType : theHierarchy)
 		{
 			MethodGroup theGroup = aSignatureGroup.getGroup(theType);
-			if (theGroup == null) continue;
-			else theGroups.add(theGroup);
+			if (theGroup != null) theGroups.add(theGroup);
 		}
 		
-		MethodGroup theResult = null;
-		for(MethodGroup theGroup : theGroups)
-		{
-			if (theResult == null) theResult = theGroup;
-			else theResult = aSignatureGroup.merge(theResult, theGroup);
-		}
-		
-		return theResult;
+		return aSignatureGroup.merge(theGroups);
 	}
 	
 	/**
@@ -262,23 +360,18 @@ public class MethodGroupManager implements IStructureDatabase.Listener, Serializ
 	}
 
 	/**
-	 * Calls {@link #merge(MethodSignatureGroup, IClassInfo, IClassInfo)} on each signature group
-	 */
-	private void addEdge(IClassInfo aParent, IClassInfo aChild)
-	{
-		itsChildrenMap.add(aParent.getId(), aChild.getId());
-		for(MethodSignatureGroup theSignatureGroup : itsSignatureGroups.values()) merge(theSignatureGroup, aParent, aChild);
-	}
-
-	/**
 	 * Merges the method groups corresponding to n1 and n2 if they are distinct.
 	 */
-	private void merge(MethodSignatureGroup aSignatureGroup, IClassInfo n1, IClassInfo n2)
+	private void merge(MethodSignatureGroup aSignatureGroup, Collection<IClassInfo> aClasses)
 	{
-		MethodGroup g1 = aSignatureGroup.getGroup(n1);
-		MethodGroup g2 = aSignatureGroup.getGroup(n2);
+		Set<MethodGroup> theGroups = new HashSet<MethodGroup>();
+		for (IClassInfo theClass : aClasses)
+		{
+			MethodGroup theGroup = aSignatureGroup.getGroup(theClass);
+			if (theGroup != null) theGroups.add(theGroup);
+		}
 		
-		if (g1 != null && g2 != null && g1 != g2) aSignatureGroup.merge(g1, g2);
+		aSignatureGroup.merge(theGroups);
 	}
 	
 	private MethodSignatureGroup getSignatureGroup(String aSignature)
@@ -292,6 +385,12 @@ public class MethodGroupManager implements IStructureDatabase.Listener, Serializ
 		return theGroup;
 	}
 
+	private int itsNextGroupId = 1;
+	private synchronized int nextGroupId()
+	{
+		return itsNextGroupId++;
+	}
+	
 	/**
 	 * Represents a group of methods that have the same signature and belong to related types.
 	 * @author gpothier
@@ -299,14 +398,23 @@ public class MethodGroupManager implements IStructureDatabase.Listener, Serializ
 	public class MethodGroup implements Serializable
 	{
 		private static final long serialVersionUID = 7719483876342347891L;
+		
+		private final int itsGroupId;
 
 		private final Set<IClassInfo> itsTypes = new HashSet<IClassInfo>();
 		private final List<IBehaviorInfo> itsBehaviors = new ArrayList<IBehaviorInfo>(1);
 		private boolean itsMonitored = false;
+		private boolean itsHasUnknown = false;
 		
 		public MethodGroup(IBehaviorInfo aInitialBehavior)
 		{
+			itsGroupId = nextGroupId();
 			add(aInitialBehavior);
+		}
+		
+		public int getGroupId()
+		{
+			return itsGroupId;
 		}
 		
 		public void add(IBehaviorInfo aBehavior)
@@ -334,7 +442,21 @@ public class MethodGroupManager implements IStructureDatabase.Listener, Serializ
 		{
 			if (itsMonitored) return;
 			itsMonitored = true;
+			if (ECHO) Utils.println("[MGM] group.markMonitored(id: %d)", getGroupId());
 			for (IBehaviorInfo theBehavior : getBehaviors()) MethodGroupManager.this.markMonitored(theBehavior);
+		}
+		
+		public boolean hasUnknown()
+		{
+			return itsHasUnknown;
+		}
+		
+		public void markUnknown()
+		{
+			if (itsHasUnknown) return;
+			itsHasUnknown = true;
+			if (ECHO) Utils.println("[MGM] group.markUnknown(id: %d)", getGroupId());
+			for (IBehaviorInfo theBehavior : getBehaviors()) MethodGroupManager.this.markUnknown(theBehavior);
 		}
 	}
 	
@@ -386,26 +508,41 @@ public class MethodGroupManager implements IStructureDatabase.Listener, Serializ
 		 */
 		public MethodGroup merge(MethodGroup g1, MethodGroup g2)
 		{
-			if (g1.isMonitored() != g2.isMonitored())
+			if (ECHO)
 			{
-				MethodGroup theMonitored = g1.isMonitored() ? g1 : g2;
-				MethodGroup theUnmonitored = !g1.isMonitored() ? g1 : g2;
-				
-				for(IBehaviorInfo theBehavior : theUnmonitored.getBehaviors()) 
-				{
-					markMonitored(theBehavior);
-					theMonitored.add(theBehavior);
-				}
-				
-				itsGroups.remove(theUnmonitored);
-				return theMonitored;
+				Utils.println("[MGM] merging groups %d and %d", g1.getGroupId(), g2.getGroupId());
+				Utils.println("[MGM] monitored: %s, %s", g1.isMonitored(), g2.isMonitored());
+				Utils.println("[MGM] unknown: %s, %s", g1.hasUnknown(), g2.hasUnknown());
 			}
-			else
+
+			// Merge monitoring
+			if (g1.isMonitored()) g2.markMonitored();
+			if (g2.isMonitored()) g1.markMonitored();
+			
+			// Merge unknown
+			if (g1.hasUnknown()) g2.markUnknown();
+			if (g2.hasUnknown()) g1.markUnknown();
+			
+			// Merge both groups (into g1)
+			for(IBehaviorInfo theBehavior : g2.getBehaviors()) g1.add(theBehavior);
+			
+			itsGroups.remove(g2);
+			return g1;
+		}
+		
+		/**
+		 * Same as {@link #merge(MethodGroup, MethodGroup)}, but with N groups.
+		 */
+		public MethodGroup merge(Collection<MethodGroup> aGroups)
+		{
+			MethodGroup theResult = null;
+			for(MethodGroup theGroup : aGroups)
 			{
-				for(IBehaviorInfo theBehavior : g2.getBehaviors()) g1.add(theBehavior);
-				itsGroups.remove(g2);
-				return g1;
+				if (theResult == null) theResult = theGroup;
+				else theResult = merge(theResult, theGroup);
 			}
+
+			return theResult;
 		}
 	}
 

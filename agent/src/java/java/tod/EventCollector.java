@@ -30,6 +30,7 @@ import java.tod.transport.IOThread;
 import java.tod.util._ArrayList;
 import java.tod.util._StringBuilder;
 
+import tod2.access.TODAccessor;
 import tod2.agent.AgentConfig;
 import tod2.agent.AgentDebugFlags;
 import tod2.agent.Command;
@@ -94,8 +95,6 @@ public final class EventCollector
 	
 	private static PrintStream itsPrintStream = AgentDebugFlags.EVENT_INTERPRETER_PRINT_STREAM;
 	
-	private ThreadLocal<ThreadData> itsThreadData = null;
-	
 	private _SocketChannel itsChannel;
 	
 	private final String itsCollectorHost;
@@ -108,7 +107,7 @@ public final class EventCollector
 	private ThreadData itsControlThreadData = null;
 	
 	private _ArrayList<ThreadData> itsThreadDataList = new _ArrayList<ThreadData>();
-	private IOThread itsIOThread;
+	private final IOThread itsIOThread = new IOThread();
 
 	
 	private static int itsCurrentThreadId = 1;
@@ -122,15 +121,6 @@ public final class EventCollector
 	
 	void init()
 	{
-		itsThreadData = new ThreadLocal<ThreadData>() 
-		{
-			@Override
-			protected ThreadData initialValue()
-			{
-				return createThreadData();
-			}
-		};
-		
 		// Send initialization
 		_ByteBuffer theBuffer = _GrowingByteBuffer.allocate(200);
 		theBuffer.putIntB(AgentConfig.CNX_JAVA);
@@ -146,7 +136,7 @@ public final class EventCollector
 			throw new RuntimeException(e);
 		}
 		
-		itsIOThread = new IOThread(itsChannel);
+		itsIOThread.setChannel(itsChannel);
 		
 		AgentReady.COLLECTOR_READY = true;
 
@@ -172,11 +162,10 @@ public final class EventCollector
 	{
 		Thread theCurrentThread = Thread.currentThread();
 		int theId = (getNextThreadId() << AgentConfig.HOST_BITS) | _AgentConfig.HOST_ID;
-		long theJvmId = _AgentConfig.JAVA14 ? theId : theCurrentThread.getId();
+		long theJvmId = _AgentConfig.JAVA14 ? theId : TODAccessor.getThreadId(theCurrentThread);
 		ThreadData theThreadData = new ThreadData(theId, itsIOThread);
-		itsThreadData.set(theThreadData);
 		
-		String theName = theCurrentThread.getName();
+		char[] theName = TODAccessor.getThreadName(theCurrentThread);
 		theThreadData.sendThread(theJvmId, theName);
 		
 		_StringBuilder b = new _StringBuilder();
@@ -184,38 +173,37 @@ public final class EventCollector
 		b.append(theName);
 		_IO.out(b.toString());
 		
-		if (theName.startsWith("[TOD]"))
+		if (startsWith(theName, "[TOD]"))
 		{
-			throw new TODError(theName);
+			throw new TODError(String.valueOf(theName));
 		}
 		
 		return theThreadData;
 	}
 	
+	private static boolean startsWith(char[] aChars, String aString)
+	{
+		int l = aString.length();
+		if (l > aChars.length) return false;
+		for(int i=0;i<l;i++) if (aChars[i] != aString.charAt(i)) return false;
+		return true;
+	}
+	
 	/**
 	 * Returns the {@link ThreadData} object for the current thread.
 	 */
-	public ThreadData getThreadData()
-	{
-		ThreadData theThreadData = itsThreadData.get();
-		theThreadData.checkTracedMethodsVersion();
-		return theThreadData;
-	}
-	
 	public static ThreadData _getThreadData()
 	{
-		return INSTANCE.getThreadData();
+		Thread theThread = Thread.currentThread();
+		ThreadData theThreadData = TODAccessor.getThreadData(theThread);
+		if (theThreadData == null)
+		{
+			theThreadData = INSTANCE.createThreadData();
+			TODAccessor.setThreadData(theThread, theThreadData);
+		}
+		return theThreadData;
 	}
 
-	
-	/**
-	 * Sets the ignore next exception flag of the current thread.
-	 * This is called by instrumented classes.
-	 */
-	public void ignoreNextException()
-	{
-		getThreadData().ignoreNextException();
-	}
 	
 	private ThreadData getControlThreadData()
 	{
@@ -233,7 +221,7 @@ public final class EventCollector
 	{
 		if (AgentDebugFlags.COLLECTOR_IGNORE_ALL) return;
 
-		ThreadData theThreadData = getThreadData();
+		ThreadData theThreadData = getControlThreadData();
 
 		theThreadData.sendClear();
 		theThreadData.flushBuffer();

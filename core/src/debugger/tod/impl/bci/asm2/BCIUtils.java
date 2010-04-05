@@ -69,6 +69,7 @@ import org.objectweb.asm.util.TraceMethodVisitor;
 import tod.core.config.ClassSelector;
 import tod.core.database.structure.ObjectId;
 import tod.impl.database.structure.standard.PrimitiveTypeInfo;
+import tod.impl.replay2.TmpObjectId;
 import zz.utils.Utils;
 
 public class BCIUtils implements Opcodes
@@ -91,6 +92,9 @@ public class BCIUtils implements Opcodes
 	public static final String CLS_CLASSLOADER = getJvmClassName(ClassLoader.class);
 	public static final String CLS_OBJECTID = getJvmClassName(ObjectId.class);
 	public static final String DSC_OBJECTID = "L"+CLS_OBJECTID+";";
+	public static final String CLS_TMPOBJECTID = getJvmClassName(TmpObjectId.class);
+	public static final String DSC_TMPOBJECTID = "L"+CLS_TMPOBJECTID+";";
+	public static final String CLS_THREAD = getJvmClassName(Thread.class);
 
 	private static final Type[] TYPE_FOR_SORT = new Type[11];
 	static
@@ -511,7 +515,7 @@ public class BCIUtils implements Opcodes
 			{
 				String theMaimedName = maimFileName(theName);
 				theFile = new File(theFile.getParentFile(), theMaimedName);
-				System.err.println("Warning: changed "+theName+" to "+theMaimedName);
+				System.out.println("[BCIUtils.writeClass] Warning: changed "+theName+" to "+theMaimedName);
 			}
 			
 			theFile.createNewFile();

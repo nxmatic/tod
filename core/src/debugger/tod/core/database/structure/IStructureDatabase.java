@@ -225,14 +225,22 @@ public interface IStructureDatabase
 		public final int behaviorId;
 		
 		/**
-		 * One of the constants in {@link MonitoringMode}.
+		 * One of the INSTRUMENTATION_ constants in {@link MonitoringMode},
+		 * or -1 if no change
 		 */
-		public final int mode;
+		public final int instrumentationMode;
 		
-		public BehaviorMonitoringModeChange(int aBehaviorId, int aMode)
+		/**
+		 * One of the CALL_ constants in {@link MonitoringMode},
+		 * or -1 if no change
+		 */
+		public final int callMode;
+
+		public BehaviorMonitoringModeChange(int aBehaviorId, int aInstrumentationMode, int aCallMode)
 		{
 			behaviorId = aBehaviorId;
-			mode = aMode;
+			instrumentationMode = aInstrumentationMode;
+			callMode = aCallMode;
 		}
 	}
 

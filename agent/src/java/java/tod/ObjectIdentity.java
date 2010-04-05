@@ -43,7 +43,7 @@ public class ObjectIdentity
 	 */
 	public static final Object MON = new Object();
 	
-	private static final boolean USE_JAVA = true;//_AgentConfig.JAVA14;
+	private static final boolean USE_JAVA = false;//_AgentConfig.JAVA14;
 	private static final WeakLongHashMap MAP = USE_JAVA ? new WeakLongHashMap() : null;
 
 	private static final int OBJID_CACHE_SIZE = BitUtilsLite.pow2i(3);

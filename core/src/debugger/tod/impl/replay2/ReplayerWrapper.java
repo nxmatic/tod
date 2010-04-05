@@ -67,6 +67,7 @@ public class ReplayerWrapper
 	private Object itsReplayer;
 	
 	public ReplayerWrapper(
+			int aThreadId,
 			TODConfig aConfig, 
 			IStructureDatabase aDatabase, 
 			EventCollector aCollector,
@@ -80,13 +81,14 @@ public class ReplayerWrapper
 			Class theClass = itsLoader.loadClass("tod.impl.replay2.ThreadReplayer");
 			Constructor theConstructor = theClass.getConstructor(
 					ReplayerLoader.class, 
+					int.class,
 					TODConfig.class, 
 					IStructureDatabase.class, 
 					EventCollector.class,
 					TmpIdManager.class, 
 					BufferStream.class);
 			
-			itsReplayer = theConstructor.newInstance(itsLoader, aConfig, aDatabase, aCollector, aTmpIdManager, aBuffer);
+			itsReplayer = theConstructor.newInstance(itsLoader, aThreadId, aConfig, aDatabase, aCollector, aTmpIdManager, aBuffer);
 		}
 		catch (Exception e)
 		{
@@ -184,7 +186,7 @@ public class ReplayerWrapper
 			theMethodNode.maxLocals = 1;
 			
 			SList s = new SList();
-			s.createUnsupportedEx("ReplayerGenerator.modifyReplayerFrame");
+			s.createUnsupportedEx("ReplayerGenerator.modifyReplayerFrame - "+theDescriptor);
 			s.ATHROW();
 			
 			theMethodNode.instructions = s;

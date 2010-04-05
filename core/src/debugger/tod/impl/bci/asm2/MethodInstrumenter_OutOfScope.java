@@ -41,6 +41,7 @@ import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.MethodNode;
 
 import tod.core.database.structure.IMutableBehaviorInfo;
+import tod.impl.database.structure.standard.MethodGroupManager;
 
 /**
  * Instruments out-of-scope methods (only enveloppe is instrumented).
@@ -74,9 +75,7 @@ public class MethodInstrumenter_OutOfScope extends MethodInstrumenter
 		if (isConstructor() || isStaticInitializer() || isStatic() || isPrivate()) return;
 		
 		// Temp optimizations (ObjectIdentity uses a WeakHashMap which uses refs)
-		if (getClassNode().name.startsWith("java/lang/ref/")) return;
-		if (getClassNode().name.startsWith("java/lang/ThreadLocal")) return;
-		if (getClassNode().name.indexOf("ClassLoader") >= 0) return;
+		if (MethodGroupManager.isSkipped(getClassNode().name, "", false)) return;
 		
 		if (BCIUtils.CLS_OBJECT.equals(getClassNode().name)) 
 		{

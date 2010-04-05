@@ -339,7 +339,9 @@ public abstract class NativeAgentPeer extends SocketThread
 			aOutputStream.writeInt(theInstrumentedClass.modeChanges.size());
 			for(BehaviorMonitoringModeChange theMode : theInstrumentedClass.modeChanges)
 			{
-				aOutputStream.writeInt((theMode.behaviorId << 2) | (theMode.mode & 0x3));
+				aOutputStream.writeInt(theMode.behaviorId);
+				aOutputStream.writeByte(theMode.instrumentationMode);
+				aOutputStream.writeByte(theMode.callMode);
 			}
 			
 			// Write out last ids

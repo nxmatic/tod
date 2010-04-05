@@ -35,41 +35,27 @@ public class ExceptionGeneratedReceiver
 	// Ensures the collector is loaded
 	private static EventCollector COLLECTOR = EventCollector.INSTANCE;
 	
-	private static final ThreadLocal<Boolean> processingExceptions = 
-		new ThreadLocal<Boolean>()
-		{
-			@Override
-			protected Boolean initialValue()
-			{
-				return false;
-			}
-		};
-	
-	private static final ThreadLocal<Boolean> ignoreExceptions = 
-		new ThreadLocal<Boolean>()
-		{
-			@Override
-			protected Boolean initialValue()
-			{
-				return false;
-			}
-		};
-			
-	/**
-	 * Sets the ignore next exception flag of the current thread.
-	 * This is called by instrumented classes.
-	 */
-	public static void ignoreNextException()
-	{
-		if (AgentReady.COLLECTOR_READY) COLLECTOR.ignoreNextException();
-	}
-	
 	/**
 	 * Used to avoid processing exceptions while registered objects are sent.
 	 */
 	public static void setIgnoreExceptions(boolean aIgnore)
 	{
-		ignoreExceptions.set(aIgnore);
+		EventCollector._getThreadData().setIgnoringExceptions(aIgnore);
+	}
+	
+	public static boolean getIgnoreExceptions()
+	{
+		return EventCollector._getThreadData().isIgnoringExceptions();
+	}
+	
+	public static void setProcessingExceptions(boolean aProcessing)
+	{
+		EventCollector._getThreadData().setProcessingExceptions(aProcessing);
+	}
+	
+	public static boolean isProcessingExceptions()
+	{
+		return EventCollector._getThreadData().isProcessingExceptions();
 	}
 	
 	public static void exceptionGenerated(
@@ -81,26 +67,26 @@ public class ExceptionGeneratedReceiver
 	{
 		try
 		{
-			if (ignoreExceptions.get()) return;
+			if (getIgnoreExceptions()) return;
 			if (! AgentReady.COLLECTOR_READY) return;
 			if (! AgentReady.CAPTURE_ENABLED) return;
 			
-			if (processingExceptions.get()) 
+			if (isProcessingExceptions()) 
 			{
 				_IO.err("[TOD] Recursive exception, probably because we got disconnected from the database.");
 				System.exit(1);
 			}
-			processingExceptions.set(true);
+			setProcessingExceptions(true);
 			
 //			_IO.out(String.format("Exception generated: %s.%s, %d", aMethodDeclaringClassSignature, aMethodName, aOperationBytecodeIndex));
-			COLLECTOR.getThreadData().evExceptionGenerated(
+			EventCollector._getThreadData().evExceptionGenerated(
 					aMethodName,
 					aMethodSignature, 
 					aMethodDeclaringClassSignature,
 					aOperationBytecodeIndex, 
 					aThrowable);
 			
-			processingExceptions.set(false);
+			setProcessingExceptions(false);
 		}
 		catch (Throwable e)
 		{

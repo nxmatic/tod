@@ -23,6 +23,8 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 #ifndef _Included_workingset_h
 #define _Included_workingset_h
 
+#include <vector>
+
 class AbstractClassSet
 {
 public:

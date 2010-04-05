@@ -138,7 +138,7 @@ public class ASM2Test
 		for(BehaviorMonitoringModeChange theMode : theInstrumentedClass.modeChanges)
 		{
 			IBehaviorInfo theBehavior = aDatabase.getBehavior(theMode.behaviorId, true);
-			Utils.println("  %s -> %s", LocationUtils.toString(theBehavior), MonitoringMode.toString(theMode.mode));
+			Utils.println("  %s -> %s", LocationUtils.toString(theBehavior), MonitoringMode.toString(theMode.instrumentationMode));
 		}
 		
 		System.out.println("  Done.");

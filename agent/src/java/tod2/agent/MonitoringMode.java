@@ -4,6 +4,7 @@
 package tod2.agent;
 
 import java.tod.TracedMethods;
+import java.tod.util._StringBuilder;
 
 /**
  * Constants defining the different monitoring mode of methods.
@@ -13,36 +14,77 @@ import java.tod.TracedMethods;
 public class MonitoringMode
 {
 	/**
-	 * Monitoring mode constant meaning a method does not emit any event 
+	 * For methods do not emit any event 
 	 */
-	public static final int NONE = 0;
+	public static final int INSTRUMENTATION_NONE = 0;
 	
 	/**
-	 * Monitoring mode constant meaning a method emits entry and exit events
+	 * For methods that emit entry and exit events
 	 */
-	public static final int ENVELOPPE = 1;
+	public static final int INSTRUMENTATION_ENVELOPPE = 1;
 	
 	/**
-	 * Monitoring mode constant meaning a method emits all events 
+	 * For methods that emit all events 
 	 */
-	public static final int FULL = 2;
+	public static final int INSTRUMENTATION_FULL = 2;
+	
+	public static final int CALL_UNMONITORED = 0 << 4;
+	public static final int CALL_MONITORED = 1 << 4;
 	
 	/**
-	 * Monitoring mode constant meaning the method has a special monitoring mode
-	 * specified separately (not used yet). 
+	 * For method groups for which we cannot know beforehand
+	 * whether events will be emitted or not.
+	 * Eg., a group that has a native override. 
 	 */
-	public static final int SPECIAL = 3;
+	public static final int CALL_UNKNOWN = 2 << 4;
+	
+	public static final int MASK_INSTRUMENTATION = 0x0f;
+	public static final int MASK_CALL = 0xf0;
 	
 	public static String toString(int aMode)
 	{
-		switch(aMode)
+		int theInstrumentation = aMode & MASK_INSTRUMENTATION;
+		int theCall = aMode & MASK_CALL;
+		
+		_StringBuilder theBuilder = new _StringBuilder();
+		
+		switch(theInstrumentation)
 		{
-		case NONE: return "NONE";
-		case ENVELOPPE: return "ENVELOPPE";
-		case FULL: return "FULL";
-		case SPECIAL: return "SPECIAL";
-		default: return "bad mode: "+aMode;
+		case INSTRUMENTATION_NONE: 
+			theBuilder.append("INSTRUMENTATION_NONE");
+			break;
+			
+		case INSTRUMENTATION_ENVELOPPE: 
+			theBuilder.append("INSTRUMENTATION_ENVELOPPE");
+			break;
+			
+		case INSTRUMENTATION_FULL: 
+			theBuilder.append("INSTRUMENTATION_FULL");
+			break;
+			
+		default: return "bad mode: "+theInstrumentation;
 		}
-	}
+		
+		theBuilder.append(' ');
 
+		switch(theCall)
+		{
+		case CALL_UNMONITORED: 
+			theBuilder.append("CALL_UNMONITORED");
+			break;
+			
+		case CALL_MONITORED: 
+			theBuilder.append("CALL_MONITORED");
+			break;
+			
+		case CALL_UNKNOWN: 
+			theBuilder.append("CALL_UNKNOWN");
+			break;
+			
+		default: return "bad mode: "+theCall;
+		}
+		
+		return theBuilder.toString();
+	}
+	
 }

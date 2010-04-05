@@ -22,6 +22,7 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 */
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include <jni.h>
 #include <jvmti.h>

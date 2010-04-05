@@ -37,12 +37,8 @@ public final class ThreadData
 	 */
 	private final int itsId;
 	
-	/**
-	 * When this flag is true the next exception generated event
-	 * is ignored. This permits to avoid reporting EG events that
-	 * are caused by the instrumentation.
-	 */
-	private boolean itsIgnoreNextException = false;
+	private boolean itsIgnoringExceptions = false;
+	private boolean itsProcessingExceptions = false;
 	
 	/**
 	 * This flag permits to avoid reentrancy.
@@ -160,24 +156,6 @@ public final class ThreadData
 	}
 	
 	/**
-	 * Sets the ignore next exception flag.
-	 */
-	public void ignoreNextException()
-	{
-		itsIgnoreNextException = true;
-	}
-	
-	/**
-	 * Checks if the ignore next exception flag is set, and resets it.
-	 */
-	public boolean checkIgnoreNextException()
-	{
-		boolean theIgnoreNext = itsIgnoreNextException;
-		itsIgnoreNextException = false;
-		return theIgnoreNext;
-	}
-	
-	/**
 	 * Returns true if the thread is currently executing instrumented code.
 	 */
 	public boolean isInScope()
@@ -221,10 +199,11 @@ public final class ThreadData
 	
 	public void echoMessageType(byte aMessage, long aArg1, long aArg2)
 	{
+		itsMessageCount++;
+		
 		_StringBuilder theBuilder = new _StringBuilder();
 		theBuilder.append(getId());
 		theBuilder.append(" #");
-		itsMessageCount++;
 		theBuilder.append(itsMessageCount);
 		theBuilder.append(": ");
 		theBuilder.append(Message._NAMES[aMessage]);
@@ -235,11 +214,6 @@ public final class ThreadData
 			if (aArg1 >= 0 && aArg2 >= 0) theBuilder.append(' ');
 			if (aArg2 >= 0) theBuilder.append(aArg2);
 			theBuilder.append(")");
-		}
-		
-		if (itsMessageCount == 6930)
-		{
-			System.out.println("ThreadData.echoMessageType()");
 		}
 		
 		_IO.out(theBuilder.toString());		
@@ -448,13 +422,12 @@ public final class ThreadData
 		if (enter()) return;
 		
 		sendRegisteredObjects();
+		commitBuffer();
 		
 		msgStart(Message.FIELD_READ, 1);
 		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.FIELD_READ, -1); 
 		sendMessageType(itsBuffer, Message.FIELD_READ);
 		msgStop();
-		
-//		commitBuffer();
 		
 		exit();
 	}
@@ -467,14 +440,13 @@ public final class ThreadData
 		if (enter()) return;
 		
 		sendRegisteredObjects();
-		
+		commitBuffer();
+
 		msgStart(Message.FIELD_READ_SAME, 0);
 		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.FIELD_READ_SAME, -1); 
 		sendMessageType(itsBuffer, Message.FIELD_READ_SAME);
 		msgStop();
 		
-		commitBuffer();
-
 		exit();
 	}
 	
@@ -486,13 +458,12 @@ public final class ThreadData
 		if (enter()) return;
 		
 		sendRegisteredObjects();
-		
+		commitBuffer();
+
 		msgStart(Message.ARRAY_READ, 1);
 		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.ARRAY_READ, -1); 
 		sendMessageType(itsBuffer, Message.ARRAY_READ);
 		msgStop();
-		
-//		commitBuffer();
 		
 		exit();
 	}
@@ -502,14 +473,13 @@ public final class ThreadData
 		if (enter()) return;
 		
 		sendRegisteredObjects();
-		
+		commitBuffer();
+
 		msgStart(Message.ARRAY_LENGTH, 0);
 		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.ARRAY_LENGTH, aLength); 
 		sendMessageType(itsBuffer, Message.ARRAY_LENGTH);
 		itsBuffer.putInt(aLength);
 		msgStop();
-		
-		commitBuffer();
 		
 		exit();
 	}
@@ -518,16 +488,14 @@ public final class ThreadData
 	{
 		if (enter()) return;
 		
+		commitBuffer();
+
 		msgStart(Message.NEW_ARRAY, 0);
-		
 		checkTimestamp();
 		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.NEW_ARRAY, -1); 
 		sendMessageType(itsBuffer, Message.NEW_ARRAY);
 		sendValue(itsBuffer, aValue);
-		
 		msgStop();
-		
-		commitBuffer();
 		
 		sendRegisteredObjects();
 		
@@ -538,27 +506,45 @@ public final class ThreadData
 	{
 		if (enter()) return;
 		
+		commitBuffer();
+
 		msgStart(Message.CONSTANT, 0);
-		
 		checkTimestamp();
 		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.CONSTANT, -1); 
 		sendMessageType(itsBuffer, Message.CONSTANT);
 		sendValue(itsBuffer, aValue);
-		
 		msgStop();
-		
-		commitBuffer();
 		
 		sendRegisteredObjects();
 		
 		exit();
 	}
 	
+	public void evInstanceOfOutcome(int aOutcome)
+	{
+		if (enter()) return;
+		
+		commitBuffer();
+
+		msgStart(Message.INSTANCEOF_OUTCOME, 0);
+		checkTimestamp();
+		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.INSTANCEOF_OUTCOME, -1); 
+		sendMessageType(itsBuffer, Message.INSTANCEOF_OUTCOME);
+		itsBuffer.put((byte) aOutcome);
+		msgStop();
+		
+		sendRegisteredObjects();
+		
+		exit();
+	}
+	
+
 	public void evObjectInitialized(Object aValue)
 	{
 		if (enter()) return;
 				
 		sendRegisteredObjects();
+		commitBuffer();
 
 		msgStart(Message.OBJECT_INITIALIZED, 0);
 
@@ -568,8 +554,6 @@ public final class ThreadData
 		sendValue(itsBuffer, aValue);
 
 		msgStop();
-		
-		commitBuffer();
 		
 		exit();
 	}
@@ -594,7 +578,7 @@ public final class ThreadData
 		msgStart(Message.EXCEPTION, 0);
 
 		checkTimestamp();
-		int p0 = itsBuffer.position();
+//		int p0 = itsBuffer.position();
 		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.EXCEPTION, -1); 
 		sendMessageType(itsBuffer, Message.EXCEPTION);
 
@@ -603,20 +587,14 @@ public final class ThreadData
 		itsBuffer.putString(aMethodDeclaringClassSignature);
 		itsBuffer.putShort((short) aBytecodeIndex);
 		sendValue(itsBuffer, aException);
-		int p1 = itsBuffer.position();
-
+//		int p1 = itsBuffer.position();
 		
-		
-		
-		_StringBuilder theBuilder = new _StringBuilder();
-		theBuilder.append("Exception data: ");
-		theBuilder.append(p0);
-		theBuilder.append(" ");
-		theBuilder.append(p1);
-		_IO.out(theBuilder.toString());
-		
-		
-		
+//		_StringBuilder theBuilder = new _StringBuilder();
+//		theBuilder.append("Exception data: ");
+//		theBuilder.append(p0);
+//		theBuilder.append(" ");
+//		theBuilder.append(p1);
+//		_IO.out(theBuilder.toString());
 		
 		msgStop();
 		
@@ -636,6 +614,7 @@ public final class ThreadData
 		if (enter()) return;
 		
 		sendRegisteredObjects();
+		commitBuffer();
 		
 		msgStart(Message.HANDLER_REACHED, 0);
 		
@@ -646,8 +625,6 @@ public final class ThreadData
 		
 		msgStop();
 		
-		commitBuffer();
-		
 		exit();
 	}
 	
@@ -656,6 +633,8 @@ public final class ThreadData
 		if (enter()) return;
 		
 		sendRegisteredObjects();
+		checkTracedMethodsVersion();
+		commitBuffer();
 		
 		msgStart(Message.INSCOPE_BEHAVIOR_ENTER, 0);
 
@@ -664,7 +643,6 @@ public final class ThreadData
 		itsBehIdSender.send(itsBuffer, aBehaviorId, Message.INSCOPE_BEHAVIOR_ENTER_DELTA, Message.INSCOPE_BEHAVIOR_ENTER);
 
 		msgStop();
-		commitBuffer();
 		pushInScope();
 		exit();
 	}
@@ -674,6 +652,8 @@ public final class ThreadData
 		if (enter()) return;
 		
 		sendRegisteredObjects();
+		checkTracedMethodsVersion();
+		commitBuffer();
 		
 		msgStart(Message.INSCOPE_CLINIT_ENTER, 0);
 		
@@ -683,7 +663,6 @@ public final class ThreadData
 		itsBuffer.putInt(aBehaviorId);
 		
 		msgStop();
-		commitBuffer();
 		pushInScope();
 		exit();
 	}
@@ -693,6 +672,7 @@ public final class ThreadData
 		if (enter()) return;
 		
 		sendRegisteredObjects();
+		commitBuffer();
 		
 		msgStart(Message.CLASSLOADER_ENTER, 0);
 		
@@ -701,7 +681,6 @@ public final class ThreadData
 		sendMessageType(itsBuffer, Message.CLASSLOADER_ENTER);
 
 		msgStop();
-		commitBuffer();
 		pushOutOfScope();
 		exit();
 	}
@@ -711,6 +690,8 @@ public final class ThreadData
 		if (enter()) return;
 		
 		sendRegisteredObjects();
+		checkTracedMethodsVersion();
+		commitBuffer();
 		
 		msgStart(Message.CLASSLOADER_EXIT, 0);
 		
@@ -719,7 +700,6 @@ public final class ThreadData
 		sendMessageType(itsBuffer, Message.CLASSLOADER_EXIT);
 		
 		msgStop();
-		commitBuffer();
 		if (popScope()) throw new TODError("Unexpected scope state");
 		exit();
 	}
@@ -838,6 +818,7 @@ public final class ThreadData
 		if (enter()) return;
 		
 		sendRegisteredObjects();
+		commitBuffer();
 
 		msgStart(Message.CONSTRUCTOR_TARGET, 0);
 		
@@ -846,9 +827,6 @@ public final class ThreadData
 		sendValue(itsBuffer, aTarget);
 		
 		msgStop();
-		
-		commitBuffer();
-		
 		exit();
 	}
 	
@@ -870,13 +848,12 @@ public final class ThreadData
 		if (enter()) return;
 		
 		sendRegisteredObjects();
+		commitBuffer();
 		
 		msgStart(Message.INSCOPE_BEHAVIOR_EXIT_EXCEPTION, 0);
 		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.INSCOPE_BEHAVIOR_EXIT_EXCEPTION, -1); 
 		sendMessageType(itsBuffer, Message.INSCOPE_BEHAVIOR_EXIT_EXCEPTION);
 		msgStop();
-		
-		commitBuffer();
 		
 		if (! popScope()) throw new TODError("Unexpected scope state");
 		
@@ -891,13 +868,13 @@ public final class ThreadData
 		if (enter()) return;
 		
 		sendRegisteredObjects();
+		checkTracedMethodsVersion();
+		commitBuffer();
 		
 		msgStart(Message.OUTOFSCOPE_BEHAVIOR_ENTER, 0);
 		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.OUTOFSCOPE_BEHAVIOR_ENTER, -1); 
 		sendMessageType(itsBuffer, Message.OUTOFSCOPE_BEHAVIOR_ENTER);
 		msgStop();
-		
-		commitBuffer();
 		
 		pushOutOfScope();
 		
@@ -909,13 +886,13 @@ public final class ThreadData
 		if (enter()) return;
 		
 		sendRegisteredObjects();
+		checkTracedMethodsVersion();
+		commitBuffer();
 		
 		msgStart(Message.OUTOFSCOPE_CLINIT_ENTER, 0);
 		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.OUTOFSCOPE_CLINIT_ENTER, -1); 
 		sendMessageType(itsBuffer, Message.OUTOFSCOPE_CLINIT_ENTER);
 		msgStop();
-		
-		commitBuffer();
 		
 		pushOutOfScope();
 		
@@ -930,14 +907,13 @@ public final class ThreadData
 		if (enter()) return;
 		
 		sendRegisteredObjects();
+		commitBuffer();
 		
 		msgStart(Message.OUTOFSCOPE_BEHAVIOR_EXIT_NORMAL, 0);
 		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.OUTOFSCOPE_BEHAVIOR_EXIT_NORMAL, -1); 
 		sendMessageType(itsBuffer, Message.OUTOFSCOPE_BEHAVIOR_EXIT_NORMAL);
 		msgStop();
 		
-		commitBuffer();
-
 		if (popScope()) throw new TODError("Unexpected scope state");
 		
 		exit();
@@ -966,13 +942,12 @@ public final class ThreadData
 		if (enter()) return;
 		
 		sendRegisteredObjects();
+		commitBuffer();
 		
 		msgStart(Message.OUTOFSCOPE_BEHAVIOR_EXIT_EXCEPTION, 0);
 		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.OUTOFSCOPE_BEHAVIOR_EXIT_EXCEPTION, -1); 
 		sendMessageType(itsBuffer, Message.OUTOFSCOPE_BEHAVIOR_EXIT_EXCEPTION);
 		msgStop();
-		
-		commitBuffer();
 		
 		if (popScope()) throw new TODError("Unexpected scope state");
 		
@@ -987,6 +962,8 @@ public final class ThreadData
 	{
 		if (enter()) return;
 		
+		checkTracedMethodsVersion();
+
 		msgStart(Message.UNMONITORED_BEHAVIOR_CALL, 0);
 		if (AgentDebugFlags.EVENT_LOG) echoMessageType_NoIncCount(Message.UNMONITORED_BEHAVIOR_CALL, -1); 
 		msgStop();
@@ -1004,14 +981,13 @@ public final class ThreadData
 		if (enter()) return;
 		
 		sendRegisteredObjects();
+		commitBuffer();
 		
 		msgStart(Message.UNMONITORED_BEHAVIOR_CALL_RESULT, 1);
 		checkTimestamp();
 		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.UNMONITORED_BEHAVIOR_CALL_RESULT, -1); 
 		sendMessageType(itsBuffer, Message.UNMONITORED_BEHAVIOR_CALL_RESULT);
 		msgStop();
-		
-//		commitBuffer();
 		
 		if (popScope()) throw new TODError("Unexpected scope state");
 		
@@ -1026,14 +1002,13 @@ public final class ThreadData
 		if (enter()) return;
 		
 		sendRegisteredObjects();
+		commitBuffer();
 		
 		msgStart(Message.UNMONITORED_BEHAVIOR_CALL_RESULT, 0);
 		checkTimestamp();
 		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.UNMONITORED_BEHAVIOR_CALL_RESULT, -1); 
 		sendMessageType(itsBuffer, Message.UNMONITORED_BEHAVIOR_CALL_RESULT);
 		msgStop();
-		
-		commitBuffer();
 		
 		if (popScope()) throw new TODError("Unexpected scope state");
 		
@@ -1074,7 +1049,7 @@ public final class ThreadData
 	
 	public void sendThread(
 			long aJVMThreadId,
-			String aName) 
+			char[] aName) 
 	{
 		if (enter()) return;
 		
@@ -1082,7 +1057,8 @@ public final class ThreadData
 		sendMessageType(itsBuffer, Message.REGISTER_THREAD);
 
 		itsBuffer.putLong(aJVMThreadId);
-		itsBuffer.putString(aName);
+		itsBuffer.putInt(aName.length);
+		itsBuffer.putChars(aName, 0, aName.length);
 
 		commitBuffer();
 
@@ -1343,6 +1319,26 @@ public final class ThreadData
 		commitBuffer();
 	}
 	
+	public boolean isIgnoringExceptions()
+	{
+		return itsIgnoringExceptions;
+	}
+
+	public void setIgnoringExceptions(boolean aIgnoringExceptions)
+	{
+		itsIgnoringExceptions = aIgnoringExceptions;
+	}
+
+	public boolean isProcessingExceptions()
+	{
+		return itsProcessingExceptions;
+	}
+
+	public void setProcessingExceptions(boolean aProcessingExceptions)
+	{
+		itsProcessingExceptions = aProcessingExceptions;
+	}
+
 	/**
 	 * A stack of objects pending to be sent.
 	 * 

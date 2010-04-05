@@ -31,14 +31,13 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.replay2;
 
-import gnu.trove.TByteArrayList;
-
 import java.util.ArrayList;
 import java.util.List;
 
 import org.objectweb.asm.Type;
 
 import tod.core.config.TODConfig;
+import tod.core.database.browser.LocationUtils;
 import tod.core.database.structure.IBehaviorInfo;
 import tod.core.database.structure.IStructureDatabase;
 import tod.core.database.structure.ObjectId;
@@ -50,11 +49,14 @@ import tod2.agent.ValueType;
 import zz.utils.ArrayStack;
 import zz.utils.Stack;
 import zz.utils.Utils;
+import zz.utils.primitive.ByteArray;
 
 public class ThreadReplayer
 {
-	public static final boolean ECHO = true;
+	public static final boolean ECHO = false;
+	public static boolean ECHO_FORREAL = true;
 
+	private final int itsThreadId;
 	private final TODConfig itsConfig;
 	private final IStructureDatabase itsDatabase;
 	
@@ -70,7 +72,7 @@ public class ThreadReplayer
 	 * The monitoring modes of each behavior, indexed by behavior id.
 	 * The mode is updated whenever we receive a {@link Message#TRACEDMETHODS_VERSION} message.
 	 */
-	private final TByteArrayList itsMonitoringModes = new TByteArrayList();
+	private final ByteArray itsMonitoringModes = new ByteArray();
 	private int itsCurrentMonitoringModeVersion = 0;
 	
 	private final List<Type> itsBehaviorReturnTypes = new ArrayList<Type>();
@@ -83,12 +85,14 @@ public class ThreadReplayer
 	
 	public ThreadReplayer(
 			ReplayerLoader aLoader,
+			int aThreadId,
 			TODConfig aConfig, 
 			IStructureDatabase aDatabase, 
 			EventCollector aCollector,
 			TmpIdManager aTmpIdManager,
 			BufferStream aBuffer)
 	{
+		itsThreadId = aThreadId;
 		itsConfig = aConfig;
 		itsDatabase = aDatabase;
 		itsCollector = aCollector;
@@ -137,8 +141,9 @@ public class ThreadReplayer
 		byte theMessage = itsStream.get();
 		if (ECHO) 
 		{
+			if (!ECHO_FORREAL && itsMessageCount > 4000000) ECHO_FORREAL = true;
 			if (theMessage != Message.REGISTER_OBJECT) itsMessageCount++;
-			echo("Message: %s [#%d @%d]", Message._NAMES[theMessage], itsMessageCount, itsStream.position());
+			if (ECHO_FORREAL) echo("Message (%d): [#%d @%d] %s", itsThreadId, itsMessageCount, itsStream.position(), Message._NAMES[theMessage]);
 		}
 		return theMessage;
 	}
@@ -212,9 +217,18 @@ public class ThreadReplayer
 		for(int i=itsCurrentMonitoringModeVersion;i<aVersion;i++)
 		{
 			BehaviorMonitoringModeChange theChange = itsDatabase.getBehaviorMonitoringModeChange(i);
-			while (itsMonitoringModes.size() <= theChange.behaviorId) itsMonitoringModes.add((byte) 0);
-			itsMonitoringModes.set(theChange.behaviorId, (byte) theChange.mode);
-			if (ThreadReplayer.ECHO) System.out.println("Mode changed: "+theChange.behaviorId+" -> "+MonitoringMode.toString(theChange.mode));
+			int theBehaviorId = theChange.behaviorId;
+			
+			byte theMode = itsMonitoringModes.get(theBehaviorId);
+			int theInstrumentationMode = theMode & MonitoringMode.MASK_INSTRUMENTATION;
+			int theCallMode = theMode & MonitoringMode.MASK_CALL;
+			
+			if (theChange.instrumentationMode >= 0) theInstrumentationMode = theChange.instrumentationMode;
+			if (theChange.callMode >= 0) theCallMode = theChange.callMode;
+
+			int theNewMode = theInstrumentationMode | theCallMode;
+			itsMonitoringModes.set(theBehaviorId, (byte) theNewMode);
+			if (ThreadReplayer.ECHO && ThreadReplayer.ECHO_FORREAL) System.out.println("Mode changed: "+theBehaviorId+" -> "+LocationUtils.toMonitoringModeString(theNewMode));
 		}
 		
 		itsCurrentMonitoringModeVersion = aVersion;
@@ -226,8 +240,7 @@ public class ThreadReplayer
 	 */
 	public int getBehaviorMonitoringMode(int aBehaviorId)
 	{
-		if (aBehaviorId >= itsMonitoringModes.size()) return 0;
-		else return itsMonitoringModes.getQuick(aBehaviorId);
+		return itsMonitoringModes.get(aBehaviorId);
 	}
 	
 	public Type getBehaviorReturnType(int aBehaviorId)

@@ -3,9 +3,6 @@
  */
 package java.tod.util;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
 
 /**
  * @author gpothier
@@ -25,6 +22,14 @@ public class _ByteArray
 		itsData = new byte[aInitialSize];
 	}
 	
+	/**
+	 * Copied here to avoid using Math
+	 */
+    public static int max(int a, int b)
+    {
+    	return (a >= b) ? a : b;
+	}
+
 	public byte get(int aIndex)
 	{
 		return aIndex < itsSize ? itsData[aIndex] : 0;
@@ -49,7 +54,7 @@ public class _ByteArray
 	{
 		ensureSize(aIndex+1);
 		itsData[aIndex] = aValue;
-		itsSize = Math.max(itsSize, aIndex+1);
+		itsSize = max(itsSize, aIndex+1);
 	}
 	
 	public void clear()
@@ -61,7 +66,7 @@ public class _ByteArray
 	{
 		if (itsData.length >= aSize) return;
 		
-		int theNewSize = Math.max(aSize, itsData.length*2);
+		int theNewSize = max(aSize, itsData.length*2);
 		byte[] theNewData = new byte[theNewSize];
 		System.arraycopy(itsData, 0, theNewData, 0, itsData.length);
 		itsData = theNewData;

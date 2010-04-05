@@ -238,7 +238,7 @@ public class ReplayerGenerator
 	public InScopeReplayerFrame createInScopeFrame(int aBehaviorId)
 	{
 		IBehaviorInfo theBehavior = itsDatabase.getBehavior(aBehaviorId, true);
-		if (ThreadReplayer.ECHO) System.out.println("ReplayerGenerator.createInScopeFrame(): "+theBehavior);
+		if (ThreadReplayer.ECHO && ThreadReplayer.ECHO_FORREAL) System.out.println("ReplayerGenerator.createInScopeFrame(): "+theBehavior);
 		InScopeReplayerFrame.Factory theFactory = getReplayerFactory(aBehaviorId);
 		return theFactory.create();
 	}

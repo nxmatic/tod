@@ -3,6 +3,8 @@
  */
 package tod2.access;
 
+import java.tod.ThreadData;
+
 /**
  * This class is modified by the instrumenter so that it calls various generated 
  * $tod$Xxxx methods.
@@ -11,6 +13,26 @@ package tod2.access;
 public class TODAccessor
 {
 	public static long getObjectId(Object aObject)
+	{
+		throw new Error("This code is supposed to be replaced by the instrumenter.");
+	}
+	
+	public static ThreadData getThreadData(Thread aThread)
+	{
+		throw new Error("This code is supposed to be replaced by the instrumenter.");
+	}
+	
+	public static void setThreadData(Thread aThread, ThreadData aThreadData)
+	{
+		throw new Error("This code is supposed to be replaced by the instrumenter.");
+	}
+	
+	public static char[] getThreadName(Thread aThread)
+	{
+		throw new Error("This code is supposed to be replaced by the instrumenter.");
+	}
+	
+	public static long getThreadId(Thread aThread)
 	{
 		throw new Error("This code is supposed to be replaced by the instrumenter.");
 	}

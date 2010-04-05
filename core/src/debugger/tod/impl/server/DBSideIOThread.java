@@ -139,7 +139,7 @@ public abstract class DBSideIOThread
 		if (theThread == null)
 		{
 			EventCollector theCollector = createCollector(aThreadId);
-			theThread = new ThreadReplayerThread(itsConfig, itsDatabase, theCollector, itsTmpIdManager);
+			theThread = new ThreadReplayerThread(aThreadId, itsConfig, itsDatabase, theCollector, itsTmpIdManager);
 			Utils.listSet(itsReplayerThreads, aThreadId, theThread);
 		}
 		return theThread;
@@ -229,6 +229,7 @@ public abstract class DBSideIOThread
 	{
 		private static int T = 1;
 		
+		private final int itsThreadId;
 		private final TODConfig itsConfig;
 		private final IStructureDatabase itsDatabase;
 		private final EventCollector itsCollector;
@@ -238,6 +239,7 @@ public abstract class DBSideIOThread
 		private ReplayerWrapper itsReplayer;
 		
 		public ThreadReplayerThread(
+				int aThreadId,
 				TODConfig aConfig, 
 				IStructureDatabase aDatabase,
 				EventCollector aCollector,
@@ -246,6 +248,7 @@ public abstract class DBSideIOThread
 			super(ThreadReplayerThread.class.getName()+(T++));
 			setDaemon(true);
 			
+			itsThreadId = aThreadId;
 			itsConfig = aConfig;
 			itsDatabase = aDatabase;
 			itsCollector = aCollector;
@@ -254,10 +257,12 @@ public abstract class DBSideIOThread
 
 		public _ByteBuffer push(_ByteBuffer aBuffer)
 		{
+//			if (itsThreadId != 4) return aBuffer;
+			
 			if (itsStream == null)
 			{
 				itsStream = new BufferStream(aBuffer);
-				itsReplayer = new ReplayerWrapper(itsConfig, itsDatabase, itsCollector, itsTmpIdManager, itsStream);
+				itsReplayer = new ReplayerWrapper(itsThreadId, itsConfig, itsDatabase, itsCollector, itsTmpIdManager, itsStream);
 				start();
 				return null;
 			}

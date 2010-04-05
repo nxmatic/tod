@@ -47,6 +47,7 @@ import org.objectweb.asm.tree.LdcInsnNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
 import org.objectweb.asm.tree.TryCatchBlockNode;
+import org.objectweb.asm.tree.TypeInsnNode;
 
 import tod.Util;
 import tod.core.database.structure.IMutableBehaviorInfo;
@@ -342,6 +343,10 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 				
 			case Opcodes.LDC:
 				processLdc((LdcInsnNode) theNode);
+				break;
+				
+			case Opcodes.INSTANCEOF:
+				processInstanceOf((TypeInsnNode) theNode);
 				break;
 			}
 		}
@@ -705,6 +710,18 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		s.ALOAD(getThreadDataVar());
 		s.SWAP();
 		s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evCst", "("+BCIUtils.DSC_OBJECT+")V");
+		
+		insertAfter(aNode, s);
+	}
+	
+	private void processInstanceOf(TypeInsnNode aNode)
+	{
+		SyntaxInsnList s = new SyntaxInsnList();
+
+		s.DUP();
+		s.ALOAD(getThreadDataVar());
+		s.SWAP();
+		s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evInstanceOfOutcome", "(I)V");
 		
 		insertAfter(aNode, s);
 	}

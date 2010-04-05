@@ -23,16 +23,14 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 package java.tod;
 
 import java.tod.io._IO;
-import java.tod.util._BitSet;
 import java.tod.util._ByteArray;
 import java.tod.util._StringBuilder;
 
 import tod2.agent.AgentDebugFlags;
-import tod2.agent.Message;
 import tod2.agent.MonitoringMode;
 
 /**
- * This class keeps a registry of traced methods.
+ * This class keeps a registry of the monitoring mode of methods.
  * This is used by the instrumentation of method calls:
  * the events generated for a call to a traced method are
  * not the same as those of a non-traced method.
@@ -41,62 +39,52 @@ import tod2.agent.MonitoringMode;
  */
 public class TracedMethods
 {
-	private static final boolean USE_BITSET = false;
-	private static _BitSet tracedB = null;
-	private static _ByteArray tracedA = null;
+	private static final _ByteArray modes = new _ByteArray(16384);
 	
 	public static volatile int version = 0;
 	
 	/**
-	 * Sets the monitoring mode for a method  
+	 * Sets the instrumentation mode for a method  
 	 * @param aId The behavior id.
-	 * @param aMode One of the constants in {@link MonitoringMode}.
+	 * @param aInstrumentationMode One of the INSTRUMENTATION_ constants in {@link MonitoringMode}.
+	 * @param aCallMode One of the CALL_ constants in {@link MonitoringMode}.
 	 */
-	public static final void setMode(int aId, int aMode)
+	public static final void setMode(int aId, int aInstrumentationMode, int aCallMode)
 	{
-		if (USE_BITSET)
+		int theMode = getMode(aId);
+		
+		if (aInstrumentationMode >= 0) 
+			theMode = (byte) ((theMode & ~MonitoringMode.MASK_INSTRUMENTATION) | aInstrumentationMode);
+		if (aCallMode >= 0) 
+			theMode = (byte) ((theMode & ~MonitoringMode.MASK_CALL) | aCallMode);
+
+		setMode(aId, (byte) theMode);
+	}
+	
+	public static final void setMode(int aId, byte aMode)
+	{
+		modes.set(aId, aMode);
+		if (AgentDebugFlags.EVENT_LOG && AgentReady.isStarted()) 
 		{
-			if (tracedB == null) tracedB = new _BitSet();
-			tracedB.set(aId*2 + 0, (aMode & 0x1) != 0);
-			tracedB.set(aId*2 + 1, (aMode & 0x2) != 0);
-		}
-		else
-		{
-			if (tracedA == null) tracedA = new _ByteArray(16384);
-			tracedA.set(aId, (byte) aMode);
-			if (AgentDebugFlags.EVENT_LOG) echoSetMode(aId, aMode);
+			_StringBuilder theBuilder = new _StringBuilder();
+			theBuilder.append("Set instrumentation mode: ");
+			theBuilder.append(aId);
+			theBuilder.append(" -> ");
+			theBuilder.append(MonitoringMode.toString(aMode));
+			_IO.out(theBuilder.toString());	
 		}
 		
 		version++;
 	}
 	
-	private static void echoSetMode(int aId, int aMode)
-	{
-		_StringBuilder theBuilder = new _StringBuilder();
-		theBuilder.append("Set mode: ");
-		theBuilder.append(aId);
-		theBuilder.append(" -> ");
-		theBuilder.append(aMode);
-		_IO.out(theBuilder.toString());	
-	}
-	
 	/**
-	 * Returns the monitoring mode for the given method
+	 * Returns the instrumentation mode for the given method
 	 * @param aId A behavior id
 	 * @return One of the constants in {@link MonitoringMode}.
 	 */
 	public static final int getMode(int aId)
 	{
-		if (USE_BITSET)
-		{
-			if (tracedB == null) return MonitoringMode.NONE;
-			return (tracedB.get(aId*2 + 0) ? 0x1 : 0x0) | (tracedB.get(aId*2 + 1) ? 0x2 : 0x0);
-		}
-		else
-		{
-			if (tracedA == null) return MonitoringMode.NONE;
-			return tracedA.get(aId);
-		}
+		return modes.get(aId);
 	}
 	
 	/**
@@ -106,12 +94,19 @@ public class TracedMethods
 	public static final boolean traceEnveloppe(int aId)
 	{
 		if (! AgentReady.CAPTURE_ENABLED) return false;
-		switch(getMode(aId))
+		int theMode = getMode(aId);
+		int theInstrumentationMode = theMode & MonitoringMode.MASK_INSTRUMENTATION;
+		switch(theInstrumentationMode)
 		{
-		case MonitoringMode.FULL: throw new TODError("Mode cannot be FULL");
-		case MonitoringMode.SPECIAL: throw new TODError("Mode cannot be SPCIAL");
-		case MonitoringMode.NONE: return false;
-		case MonitoringMode.ENVELOPPE: return true;
+		case MonitoringMode.INSTRUMENTATION_FULL:
+			throw new TODError("Mode cannot be "+MonitoringMode.toString(theMode));
+		
+		case MonitoringMode.INSTRUMENTATION_NONE: 
+			return false;
+
+		case MonitoringMode.INSTRUMENTATION_ENVELOPPE: 
+			return true;
+		
 		default: throw new TODError("Invalid mode");
 		}
 	}
@@ -124,12 +119,19 @@ public class TracedMethods
 	public static final boolean traceFull(int aId)
 	{
 		if (! AgentReady.CAPTURE_ENABLED) return false;
-		switch(getMode(aId))
+		int theMode = getMode(aId);
+		int theInstrumentationMode = theMode & MonitoringMode.MASK_INSTRUMENTATION;
+		switch(theInstrumentationMode)
 		{
-		case MonitoringMode.ENVELOPPE: throw new TODError("Mode cannot be ENVELOPPE");
-		case MonitoringMode.SPECIAL: throw new TODError("Mode cannot be SPCIAL");
-		case MonitoringMode.NONE: return false;
-		case MonitoringMode.FULL: return true;
+		case MonitoringMode.INSTRUMENTATION_ENVELOPPE: 
+			throw new TODError("Mode cannot be "+MonitoringMode.toString(theMode));
+		
+		case MonitoringMode.INSTRUMENTATION_NONE: 
+			return false;
+		
+		case MonitoringMode.INSTRUMENTATION_FULL: 
+			return true;
+		
 		default: throw new TODError("Invalid mode");
 		}
 	}
@@ -141,12 +143,18 @@ public class TracedMethods
 	 */
 	public static final boolean traceUnmonitored(int aId)
 	{
-		switch(getMode(aId))
+		int theMode = getMode(aId);
+		int theCallMode = theMode & MonitoringMode.MASK_CALL;
+
+		switch(theCallMode)
 		{
-		case MonitoringMode.FULL: 
-		case MonitoringMode.ENVELOPPE: 
-		case MonitoringMode.SPECIAL: return false;
-		case MonitoringMode.NONE: return true;
+		case MonitoringMode.CALL_MONITORED: 
+			return false;
+		
+		case MonitoringMode.CALL_UNKNOWN:
+		case MonitoringMode.CALL_UNMONITORED:
+			return true;
+		
 		default: throw new TODError("Invalid mode");
 		}
 	}

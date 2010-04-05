@@ -31,7 +31,7 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.replay2;
 
-import static tod.impl.bci.asm2.BCIUtils.DSC_OBJECTID;
+import static tod.impl.bci.asm2.BCIUtils.*;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -207,7 +207,7 @@ public class MethodReplayerGenerator
 	
 	public byte[] generate()
 	{
-		System.out.println("Generating replayer for: "+itsClassNode.name+"."+itsMethodNode.name);
+		if (ThreadReplayer.ECHO && ThreadReplayer.ECHO_FORREAL) System.out.println("Generating replayer for: "+itsClassNode.name+"."+itsMethodNode.name);
 		
 		lCodeStart = new Label();
 		LabelNode nStart = new LabelNode(lCodeStart);
@@ -356,7 +356,7 @@ public class MethodReplayerGenerator
 				else 
 				{
 					s.ALOAD(0);
-					s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "nextTmpId", "()"+BCIUtils.DSC_OBJECTID);
+					s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "nextTmpId", "()"+BCIUtils.DSC_TMPOBJECTID);
 				}
 				theSize++;
 			}
@@ -370,7 +370,7 @@ public class MethodReplayerGenerator
 		else if (!itsStatic && itsConstructor)
 		{
 			s.ALOAD(0);
-			s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "nextTmpId", "()"+BCIUtils.DSC_OBJECTID);
+			s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "nextTmpId", "()"+BCIUtils.DSC_TMPOBJECTID);
 			theSize++;
 		}
 		
@@ -640,6 +640,10 @@ public class MethodReplayerGenerator
 				processMonitor(aInsns, (InsnNode) theNode);
 				break;
 				
+			case Opcodes.INSTANCEOF:
+				processInstanceOf(aInsns, (TypeInsnNode) theNode);
+				break;
+				
 			case Opcodes.CHECKCAST:
 				processCheckCast(aInsns, (TypeInsnNode) theNode);
 				break;
@@ -745,7 +749,7 @@ public class MethodReplayerGenerator
 			// Do wait
 			s.ALOAD(0);
 			s.ALOAD(theVar);
-			s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "waitObjectInitialized", "("+DSC_OBJECTID+")V");
+			s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "waitObjectInitialized", "("+DSC_TMPOBJECTID+")V");
 		}
 		else if (theChainingInvocation)
 		{
@@ -846,7 +850,7 @@ public class MethodReplayerGenerator
 		SList s = new SList();
 		
 		s.ALOAD(0);
-		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "nextTmpId", "()"+BCIUtils.DSC_OBJECTID);
+		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "nextTmpId", "()"+BCIUtils.DSC_TMPOBJECTID);
 		
 		itsNewReplacementInsnsMap.put(aNode, s.getLast());
 		
@@ -876,6 +880,17 @@ public class MethodReplayerGenerator
 		SList s = new SList();
 		s.ALOAD(0);
 		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "expectConstant", "()"+DSC_OBJECTID);
+		
+		aInsns.insert(aNode, s);
+		aInsns.remove(aNode);
+	}
+	
+	private void processInstanceOf(InsnList aInsns, TypeInsnNode aNode)
+	{
+		SList s = new SList();
+		s.POP();
+		s.ALOAD(0);
+		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "expectInstanceofOutcome", "()I");
 		
 		aInsns.insert(aNode, s);
 		aInsns.remove(aNode);

@@ -125,10 +125,6 @@ public class MethodInfo
 		itsDatabase = aDatabase;
 		itsClassNode = aClassNode;
 		itsMethodNode = aMethodNode;
-		if ("setSecurityPolicy".equals(aMethodNode.name))
-		{
-			System.out.println("MethodInfo.MethodInfo()");
-		}
 		setupFrames();
 		mapSelfAccesses();
 		setupChainingInvocation();

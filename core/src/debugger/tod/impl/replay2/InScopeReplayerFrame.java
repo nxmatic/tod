@@ -33,6 +33,7 @@ package tod.impl.replay2;
 
 import org.objectweb.asm.Type;
 
+import tod.core.database.browser.LocationUtils;
 import tod.core.database.structure.ObjectId;
 import tod2.agent.Message;
 import tod2.agent.MonitoringMode;
@@ -52,7 +53,7 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 	
 	public void setSignature(String aName, int aAccess, Type[] aArgTypes, Type aReturnType)
 	{
-		if (ThreadReplayer.ECHO) System.out.println("InScopeReplayerFrame.InScopeReplayerFrame(): "+aName);
+		if (ThreadReplayer.ECHO && ThreadReplayer.ECHO_FORREAL) System.out.println("InScopeReplayerFrame.InScopeReplayerFrame(): "+aName);
 		itsName = aName;
 		itsAccess = aAccess;
 		itsArgTypes = aArgTypes;
@@ -107,24 +108,23 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 	
 	protected ObjectId expectConstant()
 	{
-		while(true)
-		{
-			byte m = getNextMessage();
-			if (m == Message.CONSTANT) return readRef();
-			else if (m == Message.CLASSLOADER_ENTER) invokeClassloader();
-			else throw new UnexpectedMessageException(m);
-		}
+		byte m = getNextMessageConsumingClassloading();
+		if (m == Message.CONSTANT) return readRef();
+		else throw new UnexpectedMessageException(m);
+	}
+	
+	protected int expectInstanceofOutcome()
+	{
+		byte m = getNextMessageConsumingClassloading();
+		if (m == Message.INSTANCEOF_OUTCOME) return readByte();
+		else throw new UnexpectedMessageException(m);
 	}
 	
 	protected ObjectId expectNewArray()
 	{
-		while(true)
-		{
-			byte m = getNextMessage();
-			if (m == Message.NEW_ARRAY) return readRef();
-			else if (m == Message.CLASSLOADER_ENTER) invokeClassloader();
-			else throw new UnexpectedMessageException(m);
-		}
+		byte m = getNextMessageConsumingClassloading();
+		if (m == Message.NEW_ARRAY) return readRef();
+		else throw new UnexpectedMessageException(m);
 	}
 	
 
@@ -209,20 +209,21 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 		byte theMessage = peekNextMessageConsumingClassloading();
 		
 		int theMode = getReplayer().getBehaviorMonitoringMode(aBehaviorId);
-		if (ThreadReplayer.ECHO) Utils.println(
+		int theCallMode = theMode & MonitoringMode.MASK_CALL;
+		
+		if (ThreadReplayer.ECHO && ThreadReplayer.ECHO_FORREAL) Utils.println(
 				"InScopeReplayerFrame.invoke(): [%s] (%d) %s", 
-				MonitoringMode.toString(theMode), 
+				LocationUtils.toMonitoringModeString(theMode), 
 				aBehaviorId,
 				getReplayer().getDatabase().getBehavior(aBehaviorId, true));
 		
-
-		switch(theMode)
+		switch(theCallMode)
 		{
-		case MonitoringMode.FULL:
-		case MonitoringMode.ENVELOPPE:
+		case MonitoringMode.CALL_MONITORED:
 			return invokeMonitored(theMessage, aBehaviorId);
 			
-		case MonitoringMode.NONE:
+		case MonitoringMode.CALL_UNKNOWN:
+		case MonitoringMode.CALL_UNMONITORED:
 			return invokeUnmonitored(theMessage, aBehaviorId);
 			
 		default:
@@ -261,18 +262,25 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 		return getReplayer().createUnmonitoredFrame(this, getReplayer().getBehaviorReturnType(aBehaviorId));
 	}
 	
-	protected ObjectId nextTmpId()
+	protected TmpObjectId nextTmpId()
 	{
-		return new ObjectId(getReplayer().getTmpIdManager().nextId());
+		return new TmpObjectId(getReplayer().getTmpIdManager().nextId());
 	}
 	
-	protected void waitObjectInitialized(ObjectId aId)
+	protected void waitObjectInitialized(TmpObjectId aId)
 	{
 		byte theMessage = getNextMessage();
 		if (theMessage != Message.OBJECT_INITIALIZED) throw new UnexpectedMessageException(theMessage);
 		
 		ObjectId theActualRef = readRef();
 		getReplayer().getTmpIdManager().associate(aId.getId(), theActualRef.getId());
+		
+		if (ThreadReplayer.ECHO && ThreadReplayer.ECHO_FORREAL)
+		{
+			Utils.println("ObjectInitialized [old: %d, new %d]", aId.getId(), theActualRef.getId());
+		}
+		
+		aId.setId(theActualRef.getId());
 	}
 	
 	protected void waitConstructorTarget(ObjectId aId)
@@ -282,6 +290,13 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 		
 		ObjectId theActualRef = readRef();
 		getReplayer().getTmpIdManager().associate(aId.getId(), theActualRef.getId());
+
+		if (ThreadReplayer.ECHO && ThreadReplayer.ECHO_FORREAL)
+		{
+			Utils.println("ConstructorTarget [old: %d, new %d]", aId.getId(), theActualRef.getId());
+		}
+
+		((TmpObjectId) aId).setId(theActualRef.getId());
 	}
 	
 	/**

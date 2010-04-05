@@ -57,7 +57,7 @@ import tod2.agent.io._ByteBuffer;
  */
 public class IOThread extends Thread
 {
-	private final _SocketChannel itsChannel;
+	private _SocketChannel itsChannel;
 	
 	/**
 	 * Used to send the header of each packet.
@@ -107,12 +107,10 @@ public class IOThread extends Thread
 
 
 
-	public IOThread(_SocketChannel aChannel)
+	public IOThread()
 	{
 		super("[TOD] IOThread");
 		setDaemon(true);
-		assert aChannel != null;
-		itsChannel = aChannel;
 		
 		itsHeaderBuffer = _ByteBuffer.allocate(256);
 		
@@ -121,7 +119,13 @@ public class IOThread extends Thread
 		
 		itsFreeThreadPackets = new _ArrayList[ThreadPacket.RECYCLE_QUEUE_COUNT];
 		for(int i=0;i<itsFreeThreadPackets.length;i++) itsFreeThreadPackets[i] = new _ArrayList<ThreadPacket>();
-		
+	}
+	
+	public void setChannel(_SocketChannel aChannel)
+	{
+		assert aChannel != null;
+		if (itsChannel != null) throw new RuntimeException("Already have the channel.");
+		itsChannel = aChannel;
 		start();
 	}
 	

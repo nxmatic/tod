@@ -78,6 +78,10 @@ public class ClassInstrumenter
 	private static final String STRING_GETOFFSET = "$tod$getOffset";
 	private static final String STRING_GETCOUNT = "$tod$getCount";
 	
+	private static final String THREAD_THREADDATAFIELD = "$tod$threadData";
+	private static final String THREAD_GETID = "$tod$getId";
+	private static final String THREAD_GETNAME = "$tod$getName";
+	
 	
 	private final ASMInstrumenter2 itsInstrumenter;
 	private final String itsName;
@@ -148,6 +152,7 @@ public class ClassInstrumenter
 		if (BCIUtils.CLS_OBJECT.equals(getNode().name)) addGetIdMethod_Root();
 		if (BCIUtils.CLS_CLASS.equals(getNode().name)) addGetClsIdMethod();
 		if (BCIUtils.CLS_STRING.equals(getNode().name)) addStringRawAccess();
+		if (BCIUtils.CLS_THREAD.equals(getNode().name)) addThreadAccess();
 		
 		// Output the modified class
 		ClassWriter theWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
@@ -245,6 +250,14 @@ public class ClassInstrumenter
 				makeAccessor(theNode, BCIUtils.CLS_STRING, STRING_GETCOUNT, "I");
 			else if ("getClassId".equals(theNode.name))
 				makeAccessor(theNode, BCIUtils.CLS_CLASS, CLSID_GETTER, "I");
+			else if ("getThreadData".equals(theNode.name))
+				makeGetter(theNode, BCIUtils.CLS_THREAD, THREAD_THREADDATAFIELD, BCIUtils.DSC_THREADDATA);
+			else if ("setThreadData".equals(theNode.name))
+				makeSetThreadData(theNode);
+			else if ("getThreadName".equals(theNode.name))
+				makeAccessor(theNode, BCIUtils.CLS_THREAD, THREAD_GETNAME, "[C");
+			else if ("getThreadId".equals(theNode.name))
+				makeAccessor(theNode, BCIUtils.CLS_THREAD, THREAD_GETID, "J");
 		}
 	}
 	
@@ -259,10 +272,37 @@ public class ClassInstrumenter
 		SyntaxInsnList s = new SyntaxInsnList();
 		s.ALOAD(0);
 		s.INVOKEVIRTUAL(aOwner, aName, "()"+theType.getDescriptor());
-		s.IRETURN(theType);
+		s.RETURN(theType);
 		
 		aNode.instructions = s;
 		aNode.maxStack = theType.getSize();
+	}
+	
+	private void makeGetter(MethodNode aNode, String aOwner, String aName, String aDescriptor)
+	{
+		Type theType = Type.getType(aDescriptor);
+		
+		SyntaxInsnList s = new SyntaxInsnList();
+		s.ALOAD(0);
+		s.GETFIELD(aOwner, aName, aDescriptor);
+		s.RETURN(theType);
+		
+		aNode.instructions = s;
+		aNode.maxStack = theType.getSize();
+	}
+	
+	private void makeSetThreadData(MethodNode aNode)
+	{
+		Type theType = Type.getType(BCIUtils.DSC_THREADDATA);
+		
+		SyntaxInsnList s = new SyntaxInsnList();
+		s.ALOAD(0);
+		s.ALOAD(1);
+		s.PUTFIELD(BCIUtils.CLS_THREAD, THREAD_THREADDATAFIELD, BCIUtils.DSC_THREADDATA);
+		s.RETURN();
+		
+		aNode.instructions = s;
+		aNode.maxStack = theType.getSize()*2;
 	}
 	
 	/**
@@ -443,8 +483,21 @@ public class ClassInstrumenter
 		theGetter.instructions = s;
 	}
 	
-
-
+	private void addThreadAccess()
+	{
+		// Add field for ThreadData access
+		getNode().fields.add(new FieldNode(
+				Opcodes.ACC_PUBLIC | Opcodes.ACC_TRANSIENT | Opcodes.ACC_VOLATILE, 
+				THREAD_THREADDATAFIELD, 
+				BCIUtils.DSC_THREADDATA, 
+				null, 
+				null));
+		
+		
+		// Add accessor for id access
+		createGetter(BCIUtils.CLS_THREAD, THREAD_GETID, "tid", "J");
+		createGetter(BCIUtils.CLS_THREAD, THREAD_GETNAME, "name", "[C");
+	}
 	
 	private MethodNode createMethod(String aName, String aDesc, int aAccess)
 	{

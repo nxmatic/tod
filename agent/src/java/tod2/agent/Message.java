@@ -92,22 +92,24 @@ public class Message
 	
 	public static final byte UNMONITORED_BEHAVIOR_CALL_EXCEPTION = 26;
 	
-	public static final byte REGISTER_OBJECT = 27;
-	public static final byte REGISTER_OBJECT_DELTA = 28;
-	public static final byte REGISTER_REFOBJECT = 29;
-	public static final byte REGISTER_REFOBJECT_DELTA = 30;
-	public static final byte REGISTER_CLASS = 31;
-	public static final byte REGISTER_CLASSLOADER = 32;
-	public static final byte REGISTER_THREAD = 33;
+	public static final byte INSTANCEOF_OUTCOME = 27;
 	
-	public static final byte TRACEDMETHODS_VERSION = 34;
+	public static final byte REGISTER_OBJECT = 28;
+	public static final byte REGISTER_OBJECT_DELTA = 29;
+	public static final byte REGISTER_REFOBJECT = 30;
+	public static final byte REGISTER_REFOBJECT_DELTA = 31;
+	public static final byte REGISTER_CLASS = 32;
+	public static final byte REGISTER_CLASSLOADER = 33;
+	public static final byte REGISTER_THREAD = 34;
+	
+	public static final byte TRACEDMETHODS_VERSION = 35;
 	
 	/**
 	 * Args: timestamp
 	 */
-	public static final byte SYNC = 35;
+	public static final byte SYNC = 36;
 	
-	public static final int MSG_COUNT = 35;
+	public static final int MSG_COUNT = 36;
 	
 	public static final String[] _NAMES = 
 	{
@@ -138,6 +140,7 @@ public class Message
 		"UNMONITORED_BEHAVIOR_CALL",
 		"UNMONITORED_BEHAVIOR_CALL_RESULT",
 		"UNMONITORED_BEHAVIOR_CALL_EXCEPTION",
+		"INSTANCEOF_OUTCOME",
 		"REGISTER_OBJECT",
 		"REGISTER_OBJECT_DELTA",
 		"REGISTER_REFOBJECT",

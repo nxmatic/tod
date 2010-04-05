@@ -28,7 +28,6 @@ import java.util.List;
 import tod.core.database.structure.IStructureDatabase.LineNumberInfo;
 import tod.core.database.structure.IStructureDatabase.LocalVariableInfo;
 import tod.core.database.structure.IStructureDatabase.ProbeInfo;
-import tod.tools.parsers.smap.SMAPFactory;
 
 public interface IBehaviorInfo extends IMemberInfo
 {
