@@ -31,12 +31,11 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.experiments;
 
-import tod2.agent.AgentUtils;
 
 public class Scratch
 {
-	public Object lRefGet(int i)
+	public static void main(String[] args)
 	{
-		throw new RuntimeException("PLOP");
+		System.out.println(System.currentTimeMillis());
 	}
 }

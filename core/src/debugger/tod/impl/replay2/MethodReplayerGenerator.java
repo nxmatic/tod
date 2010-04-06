@@ -38,6 +38,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
@@ -56,6 +57,7 @@ import org.objectweb.asm.tree.InsnNode;
 import org.objectweb.asm.tree.JumpInsnNode;
 import org.objectweb.asm.tree.LabelNode;
 import org.objectweb.asm.tree.LdcInsnNode;
+import org.objectweb.asm.tree.LocalVariableNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
 import org.objectweb.asm.tree.TryCatchBlockNode;
@@ -256,6 +258,15 @@ public class MethodReplayerGenerator
 		itsMethodNode.exceptions = Collections.EMPTY_LIST;
 		
 		itsMethodNode.maxStack += 8;
+		
+		// Update debug info (local vars are shift by 1)
+		for(Iterator<LocalVariableNode> theIterator = itsMethodNode.localVariables.iterator();theIterator.hasNext();)
+		{
+			LocalVariableNode theNode = theIterator.next();
+			theNode.index++;
+			if ("this".equals(theNode.name)) theNode.name = "$ref$";
+		}
+		itsMethodNode.localVariables.add(new LocalVariableNode("this", "L"+itsClassNode.name+";", null, nStart, nEnd, 0));
 		
 		// Output the modified class
 		ClassWriter theWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);

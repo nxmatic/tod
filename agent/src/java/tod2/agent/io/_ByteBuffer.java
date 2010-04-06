@@ -57,15 +57,17 @@ public class _ByteBuffer
 	public final void put(byte[] aBytes, int aOffset, int aLength)
 	{
 		checkRemaining(aLength);
-		System.arraycopy(aBytes, aOffset, itsBytes, itsPos, aLength);
-		itsPos += aLength;
+		int thePos = itsPos;
+		System.arraycopy(aBytes, aOffset, itsBytes, thePos, aLength);
+		itsPos = thePos+aLength;
 	}
 	
 	public final void get(byte[] aBuffer, int aOffset, int aLength)
 	{
 		checkRemaining(aLength);
-		System.arraycopy(itsBytes, itsPos, aBuffer, aOffset, aLength);
-		itsPos += aLength;
+		int thePos = itsPos;
+		System.arraycopy(itsBytes, thePos, aBuffer, aOffset, aLength);
+		itsPos = thePos+aLength;
 	}
 	
 	public final void put(byte v)
@@ -92,7 +94,7 @@ public class _ByteBuffer
 		int thePos = itsPos;
 		itsBytes[thePos + 0] = int0(v);
 		itsBytes[thePos + 1] = int1(v);
-		itsPos += 2;
+		itsPos = thePos+2;
 	}
 	
 	public final void putChars(char[] v, int aOffset, int aCount)
@@ -116,7 +118,7 @@ public class _ByteBuffer
 		char theResult = makeChar(
 				itsBytes[thePos + 1],
 				itsBytes[thePos + 0]);
-		itsPos += 2;
+		itsPos = thePos+2;
 		
 		return theResult;
 	}
@@ -127,7 +129,7 @@ public class _ByteBuffer
 		int thePos = itsPos;
 		itsBytes[thePos + 0] = int0(v);
 		itsBytes[thePos + 1] = int1(v);
-		itsPos += 2;
+		itsPos = thePos+2;
 	}
 	
 	public final short getShort()
@@ -137,7 +139,7 @@ public class _ByteBuffer
 		short theResult = makeShort(
 				itsBytes[thePos + 1],
 				itsBytes[thePos + 0]);
-		itsPos += 2;
+		itsPos = thePos+2;
 		
 		return theResult;
 	}
@@ -150,7 +152,7 @@ public class _ByteBuffer
 		itsBytes[thePos + 1] = int1(v);
 		itsBytes[thePos + 2] = int2(v);
 		itsBytes[thePos + 3] = int3(v);
-		itsPos += 4;
+		itsPos = thePos+4;
 	}
 	
 	public final void putIntB(int v)
@@ -161,7 +163,7 @@ public class _ByteBuffer
 		itsBytes[thePos + 1] = int2(v);
 		itsBytes[thePos + 2] = int1(v);
 		itsBytes[thePos + 3] = int0(v);
-		itsPos += 4;
+		itsPos = thePos+4;
 	}
 	
 	public final int getInt()
@@ -173,7 +175,7 @@ public class _ByteBuffer
 				itsBytes[thePos + 2],
 				itsBytes[thePos + 1],
 				itsBytes[thePos + 0]);
-		itsPos += 4;
+		itsPos = thePos+4;
 		
 		return theResult;
 	}
@@ -190,7 +192,7 @@ public class _ByteBuffer
 		itsBytes[thePos + 5] = long5(v);
 		itsBytes[thePos + 6] = long6(v);
 		itsBytes[thePos + 7] = long7(v);
-		itsPos += 8;
+		itsPos = thePos+8;
 	}
 	
 	public final long getLong()
@@ -206,7 +208,7 @@ public class _ByteBuffer
 				itsBytes[thePos + 2],
 				itsBytes[thePos + 1],
 				itsBytes[thePos + 0]);
-		itsPos += 8;
+		itsPos = thePos+8;
 		
 		return theResult;
 	}
@@ -400,8 +402,8 @@ public class _ByteBuffer
 	
 	public static long makeLong(byte b7, byte b6, byte b5, byte b4, byte b3, byte b2, byte b1, byte b0)
 	{
-		return ((b7 & 0xff) << 56) | ((b6 & 0xff) << 48) | ((b5 & 0xff) << 40) | ((b4 & 0xff) << 32)
-			| ((b3 & 0xff) << 24) | ((b2 & 0xff) << 16) | ((b1 & 0xff) << 8) | ((b0 & 0xff) << 0);
+		return ((b7 & 0xffL) << 56) | ((b6 & 0xffL) << 48) | ((b5 & 0xffL) << 40) | ((b4 & 0xffL) << 32)
+			| ((b3 & 0xffL) << 24) | ((b2 & 0xffL) << 16) | ((b1 & 0xffL) << 8) | ((b0 & 0xffL) << 0);
 	}
 
 	public static int makeInt(byte b3, byte b2, byte b1, byte b0)

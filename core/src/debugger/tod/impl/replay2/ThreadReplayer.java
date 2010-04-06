@@ -53,8 +53,8 @@ import zz.utils.primitive.ByteArray;
 
 public class ThreadReplayer
 {
-	public static final boolean ECHO = false;
-	public static boolean ECHO_FORREAL = true;
+	public static final boolean ECHO = true;
+	public static boolean ECHO_FORREAL = false;
 
 	private final int itsThreadId;
 	private final TODConfig itsConfig;
@@ -141,7 +141,7 @@ public class ThreadReplayer
 		byte theMessage = itsStream.get();
 		if (ECHO) 
 		{
-			if (!ECHO_FORREAL && itsMessageCount > 4000000) ECHO_FORREAL = true;
+			if (!ECHO_FORREAL && itsMessageCount > 300000) ECHO_FORREAL = true;
 			if (theMessage != Message.REGISTER_OBJECT) itsMessageCount++;
 			if (ECHO_FORREAL) echo("Message (%d): [#%d @%d] %s", itsThreadId, itsMessageCount, itsStream.position(), Message._NAMES[theMessage]);
 		}

@@ -219,6 +219,26 @@ public final class ThreadData
 		_IO.out(theBuilder.toString());		
 	}
 	
+	public void echoValue(String aType, long aValue)
+	{
+		_StringBuilder theBuilder = new _StringBuilder();
+		theBuilder.append("Value (");
+		theBuilder.append(aType);
+		theBuilder.append("): ");
+		theBuilder.append(aValue);
+		_IO.out(theBuilder.toString());
+	}
+	
+	public void echoValue(String aType, double aValue)
+	{
+		_StringBuilder theBuilder = new _StringBuilder();
+		theBuilder.append("Value (");
+		theBuilder.append(aType);
+		theBuilder.append("): ");
+		theBuilder.append(aValue);
+		_IO.out(theBuilder.toString());
+	}
+	
 	public void echoMessageType_NoIncCount(byte aMessage, long aArg1, long aArg2)
 	{
 		_StringBuilder theBuilder = new _StringBuilder();
@@ -727,6 +747,7 @@ public final class ThreadData
 	{
 		if (enter()) return;
 		
+		if (AgentDebugFlags.EVENT_LOG) echoValue("boolean", aValue ? 1 : 0);
 		itsBuffer.put(aValue ? TRUE : FALSE);
 		msgStop();
 		
@@ -737,6 +758,7 @@ public final class ThreadData
 	{
 		if (enter()) return;
 		
+		if (AgentDebugFlags.EVENT_LOG) echoValue("byte", aValue);
 		itsBuffer.put(aValue);
 		msgStop();
 		
@@ -747,6 +769,7 @@ public final class ThreadData
 	{
 		if (enter()) return;
 		
+		if (AgentDebugFlags.EVENT_LOG) echoValue("char", aValue);
 		itsBuffer.putChar(aValue);
 		msgStop();
 		
@@ -757,6 +780,7 @@ public final class ThreadData
 	{
 		if (enter()) return;
 		
+		if (AgentDebugFlags.EVENT_LOG) echoValue("short", aValue);
 		itsBuffer.putShort(aValue);
 		msgStop();
 		
@@ -767,6 +791,7 @@ public final class ThreadData
 	{
 		if (enter()) return;
 		
+		if (AgentDebugFlags.EVENT_LOG) echoValue("int", aValue);
 		itsBuffer.putInt(aValue);
 		msgStop();
 		
@@ -777,6 +802,7 @@ public final class ThreadData
 	{
 		if (enter()) return;
 		
+		if (AgentDebugFlags.EVENT_LOG) echoValue("long", aValue);
 		itsBuffer.putLong(aValue);
 		msgStop();
 		
@@ -787,6 +813,7 @@ public final class ThreadData
 	{
 		if (enter()) return;
 		
+		if (AgentDebugFlags.EVENT_LOG) echoValue("float", aValue);
 		itsBuffer.putFloat(aValue);
 		msgStop();
 		
@@ -797,6 +824,7 @@ public final class ThreadData
 	{
 		if (enter()) return;
 		
+		if (AgentDebugFlags.EVENT_LOG) echoValue("double", aValue);
 		itsBuffer.putDouble(aValue);
 		msgStop();
 		
