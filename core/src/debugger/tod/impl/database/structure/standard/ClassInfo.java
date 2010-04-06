@@ -34,6 +34,7 @@ import java.util.Map;
 import org.objectweb.asm.Type;
 
 import tod.core.database.browser.LocationUtils;
+import tod.core.database.structure.IArrayTypeInfo;
 import tod.core.database.structure.IBehaviorInfo;
 import tod.core.database.structure.IClassInfo;
 import tod.core.database.structure.IFieldInfo;
@@ -548,18 +549,26 @@ implements IMutableClassInfo, ISerializableLocationInfo
 		StringBuilder theBuilder = new StringBuilder("b");
 		theBuilder.append(aName);
 		theBuilder.append('|');
-		for (ITypeInfo theType : aArgumentTypes) theBuilder.append(getTypeChar(theType));
+		for (ITypeInfo theType : aArgumentTypes) theBuilder.append(getTypeChars(theType));
 		theBuilder.append('|');
-		theBuilder.append(getTypeChar(aReturnType));
+		theBuilder.append(getTypeChars(aReturnType));
 		
 		return theBuilder.toString();
 	}
 	
-	public static char getTypeChar(ITypeInfo aType)
+	public static String getTypeChars(ITypeInfo aType)
 	{
+		int theDimensions = 0;
+		if (aType instanceof IArrayTypeInfo)
+		{
+			IArrayTypeInfo theArrayType = (IArrayTypeInfo) aType;
+			aType = theArrayType.getElementType();
+			theDimensions = theArrayType.getDimensions()+1; // Not sure dimension == 0 is illegal, so stay on the safe side
+		}
 		int theId = aType.getId();
+		if (theId < 0) throw new RuntimeException("Invalid id for type: "+aType);
 		if (theId > Character.MAX_VALUE) throw new RuntimeException(""+theId);
-		return (char) theId;
+		return new String(new char[] {(char) theDimensions, (char) theId});
 	}
 
 	/**

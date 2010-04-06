@@ -144,12 +144,12 @@ public class MethodGroupManager implements IStructureDatabase.Listener, Serializ
 	private String getSignature(IBehaviorInfo aBehavior)
 	{
 		String theName = aBehavior.getName();
-		if ("<init>".equals(theName)) theName = "<init_"+ClassInfo.getTypeChar(aBehavior.getDeclaringType())+">";
-		if ("<clinit>".equals(theName)) theName = "<clinit_"+ClassInfo.getTypeChar(aBehavior.getDeclaringType())+">";
+		if ("<init>".equals(theName)) theName = "<init_"+ClassInfo.getTypeChars(aBehavior.getDeclaringType())+">";
+		if ("<clinit>".equals(theName)) theName = "<clinit_"+ClassInfo.getTypeChars(aBehavior.getDeclaringType())+">";
 		
 		StringBuilder theBuilder = new StringBuilder(theName);
 		theBuilder.append('|');
-		for(ITypeInfo theType : aBehavior.getArgumentTypes()) theBuilder.append(ClassInfo.getTypeChar(theType));
+		for(ITypeInfo theType : aBehavior.getArgumentTypes()) theBuilder.append(ClassInfo.getTypeChars(theType));
 		return theBuilder.toString();
 	}
 	
