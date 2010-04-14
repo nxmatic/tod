@@ -29,14 +29,34 @@ POSSIBILITY OF SUCH DAMAGE.
 Parts of this work rely on the MD5 algorithm "derived from the RSA Data Security, 
 Inc. MD5 Message-Digest Algorithm".
 */
-package tod.core.database.structure;
+package tod.utils;
 
-public interface IMutableMemberInfo extends IMemberInfo, IMutableLocationInfo
+import java.io.File;
+import java.io.FileInputStream;
+import java.util.List;
+
+import org.jcp.xml.dsig.internal.dom.Utils;
+import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.MethodNode;
+
+import tod.impl.bci.asm2.BCIUtils;
+
+public class ClassChecker
 {
-	/**
-	 * Take new access flags from the supplied set.
-	 * @return Whether there was a change between current and provided flags.
-	 */
-	public boolean updateAccessFlags(int aAccessFlags);
+	public static void main(String[] args) throws Exception
+	{
+		File theFile = new File(args[0]);
+		
+		byte[] theBytecode = Utils.readBytesFromStream(new FileInputStream(theFile));
+		ClassNode theClassNode = new ClassNode();
+		ClassReader theReader = new ClassReader(theBytecode);
+		theReader.accept(theClassNode, 0);
 
+		for (MethodNode theMethodNode : (List<MethodNode>) theClassNode.methods)
+		{
+			System.out.println("Checking "+theMethodNode.name);
+			BCIUtils.checkMethod(theClassNode, theMethodNode, true);
+		}
+	}
 }

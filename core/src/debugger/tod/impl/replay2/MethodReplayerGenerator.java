@@ -60,6 +60,7 @@ import org.objectweb.asm.tree.LdcInsnNode;
 import org.objectweb.asm.tree.LocalVariableNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
+import org.objectweb.asm.tree.MultiANewArrayInsnNode;
 import org.objectweb.asm.tree.TryCatchBlockNode;
 import org.objectweb.asm.tree.TypeInsnNode;
 import org.objectweb.asm.tree.VarInsnNode;
@@ -90,6 +91,7 @@ public class MethodReplayerGenerator
 	public static final String CLS_INSCOPEREPLAYERFRAME = BCIUtils.getJvmClassName(InScopeReplayerFrame.class);
 	public static final String CLS_HANDLERREACHED = BCIUtils.getJvmClassName(HandlerReachedException.class);
 	public static final String CLS_BEHAVIOREXITEXCEPTION = BCIUtils.getJvmClassName(BehaviorExitException.class);
+	public static final String CLS_UNMONITOREDCALLEXCEPTION = BCIUtils.getJvmClassName(UnmonitoredBehaviorCallException.class);
 
 	private final TODConfig itsConfig;
 	private final IStructureDatabase itsDatabase;
@@ -103,7 +105,9 @@ public class MethodReplayerGenerator
 	
 	private Label lCodeStart;
 	private Label lCodeEnd;
-	
+	private Label lExitException = new Label();
+	private List itsOriginalTryCatchNodes;
+
 	private Type[] itsArgTypes;
 	private Type itsReturnType;
 		
@@ -211,6 +215,9 @@ public class MethodReplayerGenerator
 	{
 		if (ThreadReplayer.ECHO && ThreadReplayer.ECHO_FORREAL) System.out.println("Generating replayer for: "+itsClassNode.name+"."+itsMethodNode.name);
 		
+		itsOriginalTryCatchNodes = itsMethodNode.tryCatchBlocks;
+		itsMethodNode.tryCatchBlocks = new ArrayList();
+		
 		lCodeStart = new Label();
 		LabelNode nStart = new LabelNode(lCodeStart);
 		lCodeStart.info = nStart;
@@ -280,7 +287,8 @@ public class MethodReplayerGenerator
 		try
 		{
 			BCIUtils.checkClass(theBytecode);
-			for(MethodNode theNode : (List<MethodNode>) itsTarget.methods) BCIUtils.checkMethod(itsTarget, theNode, new ReplayerVerifier());
+			for(MethodNode theNode : (List<MethodNode>) itsTarget.methods) 
+				BCIUtils.checkMethod(itsTarget, theNode, new ReplayerVerifier(), false);
 		}
 		catch(Exception e)
 		{
@@ -415,10 +423,10 @@ public class MethodReplayerGenerator
 		
 		// Assign ids to handlers and register the handlers for each region
 		int theNextId = 0;
-		int nHandlers = itsMethodNode.tryCatchBlocks.size();
+		int nHandlers = itsOriginalTryCatchNodes.size();
 		for(int i=0;i<nHandlers;i++)
 		{
-			TryCatchBlockNode theNode = (TryCatchBlockNode) itsMethodNode.tryCatchBlocks.get(i);
+			TryCatchBlockNode theNode = (TryCatchBlockNode) itsOriginalTryCatchNodes.get(i);
 			Label theLabel = theNode.handler.getLabel();
 			
 			Integer theId = theHandlerIds.get(theLabel);
@@ -428,11 +436,11 @@ public class MethodReplayerGenerator
 				theHandlerIds.put(theLabel, theId);
 			}
 			
-			theRegionData.add(getTryCatchBlockKey(itsMethodNode.instructions, theNode), theNode);
+			String theKey = getTryCatchBlockKey(itsMethodNode.instructions, theNode);
+			theRegionData.add(theKey, theNode);
 		}
 
 		SList s = new SList();
-		itsMethodNode.tryCatchBlocks.clear();
 
 		Label lDefault = new Label();
 		s.label(lDefault);
@@ -440,9 +448,14 @@ public class MethodReplayerGenerator
 		s.ATHROW();
 		
 		// For each region we keep a single handler and create a dispatching switch statement
-		for(Map.Entry<String, Set<TryCatchBlockNode>> theEntry : theRegionData.entrySet())
+		// We iterate again on the original handlers, as we need to maintain the ordering
+		for(int i=0;i<nHandlers;i++)
 		{
-			TryCatchBlockNode theFirstNode = theEntry.getValue().iterator().next();
+			TryCatchBlockNode theOriginalNode = (TryCatchBlockNode) itsOriginalTryCatchNodes.get(i);
+			String theKey = getTryCatchBlockKey(itsMethodNode.instructions, theOriginalNode);
+		
+			Set<TryCatchBlockNode> theSet = theRegionData.get(theKey);
+			TryCatchBlockNode theFirstNode = theSet.iterator().next();
 			
 			Label lDispatcher = new Label();
 			s.label(lDispatcher);
@@ -452,8 +465,8 @@ public class MethodReplayerGenerator
 			s.SWAP();
 			s.GETFIELD(CLS_HANDLERREACHED, "handlerId", "I");
 			
-			int n = theEntry.getValue().size();
-			TryCatchBlockNode[] theNodes = theEntry.getValue().toArray(new TryCatchBlockNode[n]);
+			int n = theSet.size();
+			TryCatchBlockNode[] theNodes = theSet.toArray(new TryCatchBlockNode[n]);
 			Arrays.sort(theNodes, new Comparator<TryCatchBlockNode>()
 			{
 				private int getValue(TryCatchBlockNode aNode)
@@ -471,13 +484,13 @@ public class MethodReplayerGenerator
 			int[] theValues = new int[n];
 			Label[] theLabels = new Label[n];
 			
-			int i=0;
+			int j=0;
 			for(TryCatchBlockNode theNode : theNodes)
 			{
 				Label theLabel = theNode.handler.getLabel();
-				theLabels[i] = theLabel;
-				theValues[i] = theHandlerIds.get(theLabel); 
-				i++;
+				theLabels[j] = theLabel;
+				theValues[j] = theHandlerIds.get(theLabel); 
+				j++;
 			}
 			
 			s.LOOKUPSWITCH(lDefault, theValues, theLabels);
@@ -485,7 +498,6 @@ public class MethodReplayerGenerator
 			itsMethodNode.visitTryCatchBlock(theFirstNode.start.getLabel(), theFirstNode.end.getLabel(), lDispatcher, CLS_HANDLERREACHED);
 		}
 		
-		Label lExitException = new Label();
 		s.label(lExitException);
 		s.ALOAD(0);
 		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "expectException", "()V");
@@ -494,7 +506,6 @@ public class MethodReplayerGenerator
 
 		itsMethodNode.visitTryCatchBlock(lCodeStart, lCodeEnd, lExitException, CLS_BEHAVIOREXITEXCEPTION);
 
-		
 		itsMethodNode.instructions.add(s);
 	}
 	
@@ -562,8 +573,11 @@ public class MethodReplayerGenerator
 
 			case Opcodes.NEWARRAY:
 			case Opcodes.ANEWARRAY:
+				processNewArray(aInsns, theNode, 1);
+				break;
+				
 			case Opcodes.MULTIANEWARRAY:
-				processNewArray(aInsns, theNode);
+				processNewArray(aInsns, theNode, ((MultiANewArrayInsnNode) theNode).dims);
 				break;
 				
 			case Opcodes.NEW:
@@ -734,9 +748,26 @@ public class MethodReplayerGenerator
 			// Reload arguments
 			genLoadArgs(s, theArgTypes, theStatic);
 			
-			// Invoke
+			// Invoke (w/ exception handling)
+			Label lHnStart = new Label();
+			Label lHnEnd = new Label();
+			Label lHnException = new Label();
+			Label lHnAfter = new Label();
+
 			String[] theSignature = getInvokeMethodSignature(theStatic, theArgTypes, theReturnType);
+			s.label(lHnStart);
 			s.INVOKEVIRTUAL(CLS_REPLAYERFRAME, theSignature[0], theSignature[1]);
+			s.GOTO(lHnAfter);
+			s.label(lHnEnd);
+			
+			s.label(lHnException);
+			s.ALOAD(0);
+			s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "expectException", "()V");
+			s.pushDefaultValue(itsReturnType);
+			s.RETURN(itsReturnType);
+			s.label(lHnAfter);
+
+			itsMethodNode.visitTryCatchBlock(lHnStart, lHnEnd, lHnException, CLS_UNMONITOREDCALLEXCEPTION);
 		}
 		
 		if (theExpectObjectInitialized)
@@ -869,11 +900,11 @@ public class MethodReplayerGenerator
 		aInsns.remove(aNode);
 	}
 
-	private void processNewArray(InsnList aInsns, AbstractInsnNode aNode)
+	private void processNewArray(InsnList aInsns, AbstractInsnNode aNode, int aDimensions)
 	{
 		SList s = new SList();
 		
-		s.POP(); // Pop array size
+		for (int i=0;i<aDimensions;i++) s.POP(); // Pop array size(s)
 		s.ALOAD(0);
 		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "expectNewArray", "()"+BCIUtils.DSC_OBJECTID);
 		

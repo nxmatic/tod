@@ -82,7 +82,6 @@ public class ClassInstrumenter
 	private static final String THREAD_GETID = "$tod$getId";
 	private static final String THREAD_GETNAME = "$tod$getName";
 	
-	
 	private final ASMInstrumenter2 itsInstrumenter;
 	private final String itsName;
 	private final byte[] itsOriginal;

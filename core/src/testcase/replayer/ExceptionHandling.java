@@ -29,14 +29,58 @@ POSSIBILITY OF SUCH DAMAGE.
 Parts of this work rely on the MD5 algorithm "derived from the RSA Data Security, 
 Inc. MD5 Message-Digest Algorithm".
 */
-package tod.core.database.structure;
+package replayer;
 
-public interface IMutableMemberInfo extends IMemberInfo, IMutableLocationInfo
+import java.io.BufferedInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Properties;
+
+public class ExceptionHandling
 {
-	/**
-	 * Take new access flags from the supplied set.
-	 * @return Whether there was a change between current and provided flags.
-	 */
-	public boolean updateAccessFlags(int aAccessFlags);
+	public static boolean DEBUG_PREFERENCE_GENERAL = false;
+	
+	public static void main(String[] args) throws BackingStoreException
+	{
+		loadProperties(new File("bloip"));
+	}
+	
+	protected static Properties loadProperties(File location) throws BackingStoreException {
+		if (DEBUG_PREFERENCE_GENERAL)
+			System.out.println("Loading preferences from file: " + location); 
+		InputStream input = null;
+		Properties result = new Properties();
+		try {
+			input = new BufferedInputStream(new FileInputStream(location));
+			result.load(input);
+		} catch (FileNotFoundException e) {
+			// file doesn't exist but that's ok.
+			if (DEBUG_PREFERENCE_GENERAL)
+				System.out.println("Preference file does not exist: " + location); 
+			return result;
+		} catch (IOException e) {
+			String message = "bop";
+			System.out.println(message);
+			throw new BackingStoreException(message);
+		} finally {
+			if (input != null)
+				try {
+					input.close();
+				} catch (IOException e) {
+					// ignore
+				}
+		}
+		return result;
+	}
 
+	private static class BackingStoreException extends Exception
+	{
+		public BackingStoreException(String aMessage)
+		{
+			super(aMessage);
+		}
+	}
 }

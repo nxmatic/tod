@@ -38,6 +38,7 @@ import tod2.agent.Message;
  * is received.
  * @author gpothier
  */
+@SuppressWarnings("serial")
 public class BehaviorExitException extends RuntimeException
 {
 

@@ -70,9 +70,11 @@ implements IMemberInfo, ISerializableLocationInfo
 		return getDatabase().getType(itsDeclaringTypeId, true);
 	}
 	
-	public void updateAccessFlags(int aAccessFlags)
+	public boolean updateAccessFlags(int aAccessFlags)
 	{
+		int theOldFlags = itsAccessFlags;
 		itsAccessFlags |= aAccessFlags;
+		return theOldFlags != itsAccessFlags;
 	}
 	
 	public boolean isStatic()

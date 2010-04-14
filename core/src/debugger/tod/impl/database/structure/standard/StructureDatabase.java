@@ -419,6 +419,11 @@ implements IShareableStructureDatabase
 		for (Listener theListener : itsListeners) theListener.classChanged(aClass);
 	}
 
+	void fireBehaviorChanged(IBehaviorInfo aBehavior)
+	{
+		for (Listener theListener : itsListeners) theListener.behaviorChanged(aBehavior);
+	}
+	
 	protected void registerClass(IClassInfo aClass)
 	{
 		itsIds.registerClassId(aClass.getId());

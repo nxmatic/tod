@@ -64,9 +64,20 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 	{
 		ObjectId theException = readException();
 		byte m = super.getNextMessage();
-		if (m == Message.HANDLER_REACHED) throw new HandlerReachedException(theException, readInt());
-		else if (m == Message.INSCOPE_BEHAVIOR_EXIT_EXCEPTION) throw new BehaviorExitException();
-		else throw new UnexpectedMessageException(m);
+		switch(m)
+		{
+		case Message.HANDLER_REACHED: 
+			throw new HandlerReachedException(theException, readInt());
+			
+		case Message.INSCOPE_BEHAVIOR_EXIT_EXCEPTION:
+		case Message.OUTOFSCOPE_BEHAVIOR_EXIT_EXCEPTION: // Because when we process exceptions we are already in the outer frame
+			throw new BehaviorExitException();
+			
+		case Message.UNMONITORED_BEHAVIOR_CALL_EXCEPTION:
+			throw new UnmonitoredBehaviorCallException();
+			
+		default: throw new UnexpectedMessageException(m);
+		}
 	}
 	
 	@Override
@@ -135,7 +146,8 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 	 */
 	protected void expectArrayRead()
 	{
-		byte m = getNextMessage();
+//		byte m = getNextMessage();
+		byte m = getNextMessageConsumingClassloading();
 		if (m == Message.ARRAY_READ) return;
 		else throw new UnexpectedMessageException(m);
 	}

@@ -27,7 +27,7 @@ VMARGS="$VMARGS -Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=8000"
 #VMARGS="$VMARGS -agentlib:hprof=cpu=samples,depth=3"
 #VMARGS="$VMARGS -Dcom.sun.management.jmxremote=true"
 
-#java $VMARGS -cp ./bin tod.experiments.ThreadLocalTest
+#java $VMARGS -cp ./bin replayer.ExceptionHandling
 #java $VMARGS -cp ./bin calls.Main
 #java $VMARGS -cp /home/gpothier/ws/TOD-TestCases/bin:/home/gpothier/ws/zz.utils/bin MainJavac 
 #java $VMARGS -cp ./bin dummy.BCITestCase

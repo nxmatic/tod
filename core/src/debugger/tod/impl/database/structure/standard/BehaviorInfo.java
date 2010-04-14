@@ -151,6 +151,24 @@ public class BehaviorInfo extends MemberInfo implements IMutableBehaviorInfo
 		itsHasTagMap = itsTagMap != null;
 	}
 	
+	protected void fireBehaviorChanged()
+	{
+		IShareableStructureDatabase theDatabase = getDatabase();
+		if (theDatabase instanceof StructureDatabase)
+		{
+			StructureDatabase d = (StructureDatabase) theDatabase;
+			d.fireBehaviorChanged(this);
+		}
+	}
+	
+	@Override
+	public boolean updateAccessFlags(int aAccessFlags)
+	{
+		boolean theChanged = super.updateAccessFlags(aAccessFlags);
+		if (theChanged) fireBehaviorChanged();
+		return theChanged;
+	}
+	
 	@Override
 	public IClassInfo getDeclaringType()
 	{

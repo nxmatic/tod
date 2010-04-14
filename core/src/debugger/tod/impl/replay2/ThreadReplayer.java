@@ -141,13 +141,13 @@ public class ThreadReplayer
 		byte theMessage = itsStream.get();
 		if (ECHO) 
 		{
-			if (!ECHO_FORREAL && itsMessageCount > 440000) ECHO_FORREAL = true;
+			if (!ECHO_FORREAL && itsMessageCount > 4800000) ECHO_FORREAL = true;
 			if (theMessage != Message.REGISTER_OBJECT) itsMessageCount++;
 			if (ECHO_FORREAL) echo("Message (%d): [#%d @%d] %s", itsThreadId, itsMessageCount, itsStream.position(), Message._NAMES[theMessage]);
-//			if (itsMessageCount == 326847)
-//			{
-//				System.out.println("ThreadReplayer.nextMessage()");
-//			}
+			if (itsMessageCount == 4836800)
+			{
+				System.out.println("ThreadReplayer.nextMessage()");
+			}
 		}
 		return theMessage;
 	}

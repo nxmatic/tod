@@ -13,6 +13,8 @@ import java.tod.util.IntDeltaSender;
 import java.tod.util.LongDeltaSender;
 import java.tod.util._StringBuilder;
 
+import com.sun.org.apache.bcel.internal.generic.ATHROW;
+
 import tod2.access.TODAccessor;
 import tod2.agent.AgentDebugFlags;
 import tod2.agent.Command;
@@ -214,6 +216,11 @@ public final class ThreadData
 			if (aArg1 >= 0 && aArg2 >= 0) theBuilder.append(' ');
 			if (aArg2 >= 0) theBuilder.append(aArg2);
 			theBuilder.append(")");
+		}
+		
+		if (itsMessageCount == 75538 && getId() == 5)
+		{
+			System.out.println("ThreadData.echoMessageType()");
 		}
 		
 		_IO.out(theBuilder.toString());		
@@ -609,12 +616,23 @@ public final class ThreadData
 		sendValue(itsBuffer, aException);
 //		int p1 = itsBuffer.position();
 		
-//		_StringBuilder theBuilder = new _StringBuilder();
-//		theBuilder.append("Exception data: ");
-//		theBuilder.append(p0);
-//		theBuilder.append(" ");
-//		theBuilder.append(p1);
-//		_IO.out(theBuilder.toString());
+		if (AgentDebugFlags.EVENT_LOG) 
+		{
+			_StringBuilder theBuilder = new _StringBuilder();
+			theBuilder.append("Exception data: ");
+			theBuilder.append(aException.getClass().getName());
+			theBuilder.append(" ");
+			theBuilder.append(aException.getMessage());
+			theBuilder.append(" ");
+			theBuilder.append(aMethodDeclaringClassSignature);
+			theBuilder.append(" ");
+			theBuilder.append(aMethodName);
+			theBuilder.append(" ");
+			theBuilder.append(aMethodSignature);
+			theBuilder.append(" ");
+			theBuilder.append(aBytecodeIndex);
+			_IO.out(theBuilder.toString());
+		}
 		
 		msgStop();
 		
@@ -1050,9 +1068,15 @@ public final class ThreadData
 	{
 		if (enter()) return;
 		
+		sendRegisteredObjects();
+		commitBuffer();
+		
 		msgStart(Message.UNMONITORED_BEHAVIOR_CALL_EXCEPTION, 0);
-		if (AgentDebugFlags.EVENT_LOG) echoMessageType_NoIncCount(Message.UNMONITORED_BEHAVIOR_CALL_EXCEPTION, -1); 
+		checkTimestamp();
+		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.UNMONITORED_BEHAVIOR_CALL_EXCEPTION, -1); 
+		sendMessageType(itsBuffer, Message.UNMONITORED_BEHAVIOR_CALL_EXCEPTION);
 		msgStop();
+		
 		if (popScope()) throw new TODError("Unexpected scope state");
 		
 		exit();

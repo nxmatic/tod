@@ -37,33 +37,20 @@ import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.AnnotationNode;
 import org.objectweb.asm.tree.ClassNode;
-import org.objectweb.asm.tree.FieldInsnNode;
-import org.objectweb.asm.tree.FrameNode;
-import org.objectweb.asm.tree.IincInsnNode;
 import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.InsnNode;
 import org.objectweb.asm.tree.IntInsnNode;
-import org.objectweb.asm.tree.JumpInsnNode;
 import org.objectweb.asm.tree.LabelNode;
 import org.objectweb.asm.tree.LdcInsnNode;
-import org.objectweb.asm.tree.LineNumberNode;
 import org.objectweb.asm.tree.LocalVariableNode;
-import org.objectweb.asm.tree.LookupSwitchInsnNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
-import org.objectweb.asm.tree.MultiANewArrayInsnNode;
-import org.objectweb.asm.tree.TableSwitchInsnNode;
 import org.objectweb.asm.tree.TryCatchBlockNode;
-import org.objectweb.asm.tree.TypeInsnNode;
-import org.objectweb.asm.tree.VarInsnNode;
 import org.objectweb.asm.tree.analysis.Analyzer;
 import org.objectweb.asm.tree.analysis.AnalyzerException;
 import org.objectweb.asm.tree.analysis.BasicInterpreter;
-import org.objectweb.asm.tree.analysis.BasicVerifier;
 import org.objectweb.asm.tree.analysis.Frame;
 import org.objectweb.asm.tree.analysis.Interpreter;
-import org.objectweb.asm.tree.analysis.SimpleVerifier;
-import org.objectweb.asm.util.ASMifierMethodVisitor;
 import org.objectweb.asm.util.TraceMethodVisitor;
 
 import tod.core.config.ClassSelector;
@@ -386,57 +373,30 @@ public class BCIUtils implements Opcodes
 	 */
 	public static void checkMethod(ClassNode aClassNode, MethodNode aNode)
 	{
-		checkMethod(aClassNode, aNode, new BasicInterpreter());
+		checkMethod(aClassNode, aNode, new BasicInterpreter(), false);
 	}
 	
-	public static void checkMethod(ClassNode aClassNode, MethodNode aNode, Interpreter aInterpreter)
+	public static void checkMethod(ClassNode aClassNode, MethodNode aNode, boolean aAlwaysPrint)
+	{
+		checkMethod(aClassNode, aNode, new BasicInterpreter(), aAlwaysPrint);
+	}
+	
+	public static void checkMethod(ClassNode aClassNode, MethodNode aNode, Interpreter aInterpreter, boolean aAlwaysPrint)
 	{
 		Analyzer theAnalyzer = new Analyzer(aInterpreter);
 		try
 		{
 			theAnalyzer.analyze(aClassNode.name, aNode);
+			if (aAlwaysPrint)
+			{
+				Frame[] theFrames = theAnalyzer.getFrames();
+				printFrames(aNode, theFrames);
+			}
 		}
 		catch (AnalyzerException e)
 		{
 			Frame[] theFrames = theAnalyzer.getFrames();
-			
-			int bcIndex = 1;
-			
-			for (int i = 0; i < theFrames.length; i++)
-			{
-				Frame theFrame = theFrames[i];
-				AbstractInsnNode theInsn = aNode.instructions.get(i);
-				
-				
-				switch(theInsn.getType())
-				{
-				case AbstractInsnNode.INSN:
-				case AbstractInsnNode.INT_INSN:
-				case AbstractInsnNode.VAR_INSN:
-				case AbstractInsnNode.TYPE_INSN:
-				case AbstractInsnNode.FIELD_INSN:
-				case AbstractInsnNode.METHOD_INSN:
-				case AbstractInsnNode.JUMP_INSN:
-				case AbstractInsnNode.LDC_INSN:
-				case AbstractInsnNode.IINC_INSN:
-				case AbstractInsnNode.TABLESWITCH_INSN:
-				case AbstractInsnNode.LOOKUPSWITCH_INSN:
-				case AbstractInsnNode.MULTIANEWARRAY_INSN:
-					TraceMethodVisitor theTraceVisitor = new TraceMethodVisitor();
-					theInsn.accept(theTraceVisitor);
-					StringWriter theWriter = new StringWriter();
-					theTraceVisitor.print(new PrintWriter(theWriter));
-					String theTraced = theWriter.toString().replace("\n", "");
-					System.out.println(bcIndex+" "+theFrame+" | "+theTraced);
-					bcIndex++;
-					break;
-					
-				case AbstractInsnNode.FRAME:
-				case AbstractInsnNode.LINE:
-				case AbstractInsnNode.LABEL:
-					break;
-				}
-			}
+			printFrames(aNode, theFrames);
 			
 			Utils.rtex(
 					e,
@@ -455,6 +415,47 @@ public class BCIUtils implements Opcodes
 					aClassNode.name,
 					aNode.name,
 					aNode.desc);
+		}
+	}
+	
+	private static void printFrames(MethodNode aNode, Frame[] aFrames)
+	{
+		int bcIndex = 1;
+		
+		for (int i = 0; i < aFrames.length; i++)
+		{
+			Frame theFrame = aFrames[i];
+			AbstractInsnNode theInsn = aNode.instructions.get(i);
+			
+			
+			switch(theInsn.getType())
+			{
+			case AbstractInsnNode.INSN:
+			case AbstractInsnNode.INT_INSN:
+			case AbstractInsnNode.VAR_INSN:
+			case AbstractInsnNode.TYPE_INSN:
+			case AbstractInsnNode.FIELD_INSN:
+			case AbstractInsnNode.METHOD_INSN:
+			case AbstractInsnNode.JUMP_INSN:
+			case AbstractInsnNode.LDC_INSN:
+			case AbstractInsnNode.IINC_INSN:
+			case AbstractInsnNode.TABLESWITCH_INSN:
+			case AbstractInsnNode.LOOKUPSWITCH_INSN:
+			case AbstractInsnNode.MULTIANEWARRAY_INSN:
+				TraceMethodVisitor theTraceVisitor = new TraceMethodVisitor();
+				theInsn.accept(theTraceVisitor);
+				StringWriter theWriter = new StringWriter();
+				theTraceVisitor.print(new PrintWriter(theWriter));
+				String theTraced = theWriter.toString().replace("\n", "");
+				System.out.println(bcIndex+" "+theFrame+" | "+theTraced);
+				bcIndex++;
+				break;
+				
+			case AbstractInsnNode.FRAME:
+			case AbstractInsnNode.LINE:
+			case AbstractInsnNode.LABEL:
+				break;
+			}
 		}
 	}
 

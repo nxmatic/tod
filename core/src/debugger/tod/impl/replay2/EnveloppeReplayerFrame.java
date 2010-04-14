@@ -53,7 +53,8 @@ public class EnveloppeReplayerFrame extends UnmonitoredReplayerFrame
 			return false;
 			
 		case Message.OUTOFSCOPE_BEHAVIOR_EXIT_EXCEPTION:
-			throw new BehaviorExitException();
+			return false;
+//			throw new BehaviorExitException();
 		
 		default: 
 			return super.replay(aMessage);

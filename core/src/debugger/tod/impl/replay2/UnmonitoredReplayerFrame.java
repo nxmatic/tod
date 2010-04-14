@@ -37,6 +37,7 @@ import tod.core.database.structure.ObjectId;
 import tod2.agent.Message;
 
 public class UnmonitoredReplayerFrame extends ReplayerFrame
+
 {
 	private ObjectId itsRefResult;
 	private int itsIntResult;
@@ -93,7 +94,11 @@ public class UnmonitoredReplayerFrame extends ReplayerFrame
 		case Message.CLASSLOADER_ENTER: evClassloaderEnter(); break;
 
 		case Message.UNMONITORED_BEHAVIOR_CALL_RESULT: readResult(); return false;
-		case Message.UNMONITORED_BEHAVIOR_CALL_EXCEPTION: throw new BehaviorExitException();
+		case Message.UNMONITORED_BEHAVIOR_CALL_EXCEPTION: throw new UnmonitoredBehaviorCallException();
+//			byte m = getNextMessage();
+//			if (m != Message.EXCEPTION) throw new UnexpectedMessageException(m);
+//			itsLastException = readException();
+//			break;
 		
 		case Message.HANDLER_REACHED:
 			if (itsLastMessage != Message.EXCEPTION) throw new IllegalStateException();

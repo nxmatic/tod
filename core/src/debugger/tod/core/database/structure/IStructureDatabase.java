@@ -210,6 +210,7 @@ public interface IStructureDatabase
 		public void classAdded(IClassInfo aClass);
 		public void classChanged(IClassInfo aClass);
 		public void behaviorAdded(IBehaviorInfo aBehavior);
+		public void behaviorChanged(IBehaviorInfo aBehavior);
 		public void fieldAdded(IFieldInfo aField);
 		
 		/**

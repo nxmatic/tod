@@ -40,6 +40,10 @@ public class ASMInstrumenter2 implements IInstrumenter
 		{
 		}
 
+		public void behaviorChanged(IBehaviorInfo aBehavior)
+		{
+		}
+
 		public void fieldAdded(IFieldInfo aField)
 		{
 		}

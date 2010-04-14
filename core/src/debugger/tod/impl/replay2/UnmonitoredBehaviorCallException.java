@@ -29,14 +29,17 @@ POSSIBILITY OF SUCH DAMAGE.
 Parts of this work rely on the MD5 algorithm "derived from the RSA Data Security, 
 Inc. MD5 Message-Digest Algorithm".
 */
-package tod.core.database.structure;
+package tod.impl.replay2;
 
-public interface IMutableMemberInfo extends IMemberInfo, IMutableLocationInfo
+import tod2.agent.Message;
+
+/**
+ * This exception is thrown when a {@link Message#UNMONITORED_BEHAVIOR_CALL_EXCEPTION} message
+ * is received.
+ * @author gpothier
+ */
+@SuppressWarnings("serial")
+public class UnmonitoredBehaviorCallException extends RuntimeException
 {
-	/**
-	 * Take new access flags from the supplied set.
-	 * @return Whether there was a change between current and provided flags.
-	 */
-	public boolean updateAccessFlags(int aAccessFlags);
 
 }

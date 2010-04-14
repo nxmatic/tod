@@ -244,6 +244,16 @@ public class MethodGroupManager implements IStructureDatabase.Listener, Serializ
 		}
 	}
 	
+	public void behaviorChanged(IBehaviorInfo aBehavior)
+	{
+		if (ECHO) Utils.println("[MGM] behaviorChanged: %s", aBehavior);
+		MethodSignatureGroup theSignatureGroup = getSignatureGroup(getSignature(aBehavior));
+		MethodGroup theMethodGroup = findGroup(theSignatureGroup, aBehavior.getDeclaringType());
+		
+		// Update flags
+		if (aBehavior.isNative()) theMethodGroup.markUnknown();
+	}
+
 	/**
 	 * Calls {@link #merge(MethodSignatureGroup, IClassInfo, IClassInfo)} on each signature group
 	 */
