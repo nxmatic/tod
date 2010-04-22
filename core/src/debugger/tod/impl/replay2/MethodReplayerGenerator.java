@@ -768,6 +768,7 @@ public class MethodReplayerGenerator
 			s.label(lHnAfter);
 
 			itsMethodNode.visitTryCatchBlock(lHnStart, lHnEnd, lHnException, CLS_UNMONITOREDCALLEXCEPTION);
+			itsMethodNode.visitTryCatchBlock(lHnStart, lHnEnd, lHnException, CLS_BEHAVIOREXITEXCEPTION);
 		}
 		
 		if (theExpectObjectInitialized)
@@ -892,7 +893,7 @@ public class MethodReplayerGenerator
 		SList s = new SList();
 		
 		s.ALOAD(0);
-		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "nextTmpId", "()"+BCIUtils.DSC_TMPOBJECTID);
+		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "nextTmpId_skipClassloading", "()"+BCIUtils.DSC_TMPOBJECTID);
 		
 		itsNewReplacementInsnsMap.put(aNode, s.getLast());
 		

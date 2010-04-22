@@ -227,8 +227,6 @@ public abstract class DBSideIOThread
 	
 	private static class ThreadReplayerThread extends Thread
 	{
-		private static int T = 1;
-		
 		private final int itsThreadId;
 		private final TODConfig itsConfig;
 		private final IStructureDatabase itsDatabase;
@@ -245,7 +243,7 @@ public abstract class DBSideIOThread
 				EventCollector aCollector,
 				TmpIdManager aTmpIdManager)
 		{
-			super(ThreadReplayerThread.class.getName()+(T++));
+			super(ThreadReplayerThread.class.getName()+"-"+aThreadId);
 			setDaemon(true);
 			
 			itsThreadId = aThreadId;

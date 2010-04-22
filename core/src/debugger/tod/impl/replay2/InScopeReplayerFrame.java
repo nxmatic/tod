@@ -41,6 +41,7 @@ import zz.utils.Utils;
 
 public abstract class InScopeReplayerFrame extends ReplayerFrame
 {
+	private int itsId;
 	private String itsName;
 	private int itsAccess;
 	
@@ -51,9 +52,10 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 	{
 	}
 	
-	public void setSignature(String aName, int aAccess, Type[] aArgTypes, Type aReturnType)
+	public void setSignature(int aId, String aName, int aAccess, Type[] aArgTypes, Type aReturnType)
 	{
 		if (ThreadReplayer.ECHO && ThreadReplayer.ECHO_FORREAL) System.out.println("InScopeReplayerFrame.InScopeReplayerFrame(): "+aName);
+		itsId = aId;
 		itsName = aName;
 		itsAccess = aAccess;
 		itsArgTypes = aArgTypes;
@@ -107,7 +109,7 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 	
 	protected void invokeClassloader()
 	{
-		ClassloaderWrapperReplayerFrame theChild = getReplayer().createClassloaderFrame(this);
+		ClassloaderWrapperReplayerFrame theChild = getReplayer().createClassloaderFrame(this, null);
 		theChild.invoke_OOS();
 	}
 	
@@ -174,10 +176,8 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 	 */
 	protected byte getNextMessageConsumingClassloading()
 	{
-		byte m = peekNextMessageConsumingClassloading();
-		byte m2 = getNextMessage();
-		assert m == m2;
-		return m;
+		skipClassloading();
+		return getNextMessage();
 	}
 	
 
@@ -197,7 +197,7 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 			{
 				getNextMessage();
 				int theBehaviorId = readInt();
-				InScopeReplayerFrame theReplayer = getReplayer().createInScopeFrame(this, theBehaviorId);
+				InScopeReplayerFrame theReplayer = getReplayer().createInScopeFrame(this, theBehaviorId, "bid: "+theBehaviorId);
 				theReplayer.invokeVoid_S();
 				break;
 			}
@@ -205,7 +205,7 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 			case Message.OUTOFSCOPE_CLINIT_ENTER:
 			{
 				getNextMessage();
-				EnveloppeReplayerFrame theReplayer = getReplayer().createEnveloppeFrame(this, null);
+				EnveloppeReplayerFrame theReplayer = getReplayer().createEnveloppeFrame(this, Type.VOID_TYPE, null);
 				theReplayer.invokeVoid_S();
 				break;
 			}
@@ -214,6 +214,11 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 				return theMessage;
 			}
 		}
+	}
+	
+	private void skipClassloading()
+	{
+		peekNextMessageConsumingClassloading();
 	}
 	
 	protected ReplayerFrame invoke(int aBehaviorId)
@@ -251,19 +256,19 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 			{
 				getNextMessage();
 				int theBehaviorId = getReplayer().getBehIdReceiver().receiveFull(getStream());
-				return getReplayer().createInScopeFrame(this, theBehaviorId);
+				return getReplayer().createInScopeFrame(this, theBehaviorId, "bid: "+theBehaviorId);
 			}
 				
 			case Message.INSCOPE_BEHAVIOR_ENTER_DELTA:
 			{
 				getNextMessage();
 				int theBehaviorId = getReplayer().getBehIdReceiver().receiveDelta(getStream());
-				return getReplayer().createInScopeFrame(this, theBehaviorId);
+				return getReplayer().createInScopeFrame(this, theBehaviorId, "bid: "+theBehaviorId);
 			}
 
 			case Message.OUTOFSCOPE_BEHAVIOR_ENTER:
 				getNextMessage();
-				return getReplayer().createEnveloppeFrame(this, getReplayer().getBehaviorReturnType(aBehaviorId));
+				return getReplayer().createEnveloppeFrame(this, getReplayer().getBehaviorReturnType(aBehaviorId), "bid: "+aBehaviorId);
 				
 			default: throw new UnexpectedMessageException(aMessage);
 		}
@@ -271,12 +276,18 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 	
 	private ReplayerFrame invokeUnmonitored(byte aMessage, int aBehaviorId)
 	{
-		return getReplayer().createUnmonitoredFrame(this, getReplayer().getBehaviorReturnType(aBehaviorId));
+		return getReplayer().createUnmonitoredFrame(this, getReplayer().getBehaviorReturnType(aBehaviorId), "bid: "+aBehaviorId);
 	}
 	
 	protected TmpObjectId nextTmpId()
 	{
 		return new TmpObjectId(getReplayer().getTmpIdManager().nextId());
+	}
+	
+	protected TmpObjectId nextTmpId_skipClassloading()
+	{
+		skipClassloading();
+		return nextTmpId();
 	}
 	
 	protected void waitObjectInitialized(TmpObjectId aId)
@@ -333,13 +344,15 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 	 */
 	public static abstract class Factory
 	{
+		private int itsId;
 		private String itsName;
 		private int itsAccess;
 		private Type[] itsArgTypes;
 		private Type itsReturnType;
 
-		public void setSignature(String aName, int aAccess, String aDescriptor)
+		public void setSignature(int aId, String aName, int aAccess, String aDescriptor)
 		{
+			itsId = aId;
 			itsName = aName;
 			itsAccess = aAccess;
 			itsArgTypes = Type.getArgumentTypes(aDescriptor);
@@ -359,7 +372,7 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 		public InScopeReplayerFrame create()
 		{
 			InScopeReplayerFrame theFrame = create0();
-			theFrame.setSignature(itsName, itsAccess, itsArgTypes, itsReturnType);
+			theFrame.setSignature(itsId, itsName, itsAccess, itsArgTypes, itsReturnType);
 			return theFrame;
 		}
 		

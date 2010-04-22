@@ -43,13 +43,20 @@ public abstract class ReplayerFrame
 {
 	private ThreadReplayer itsReplayer;
 	private BufferStream itsStream;
+	
+	/**
+	 * Information used only for debugging the replayer. 
+	 */
+	private String itsDebugInfo;
+	
 	private boolean itsFromScope;
 	private Type itsReturnType;
 	
-	public void setup(ThreadReplayer aReplayer, BufferStream aStream, boolean aFromScope, Type aReturnType)
+	public void setup(ThreadReplayer aReplayer, BufferStream aStream, String aDebugInfo, boolean aFromScope, Type aReturnType)
 	{
 		itsReplayer = aReplayer;
 		itsStream = aStream;
+		itsDebugInfo = aDebugInfo;
 		itsFromScope = aFromScope;
 		itsReturnType = aReturnType;
 	}
@@ -108,7 +115,6 @@ public abstract class ReplayerFrame
 		return itsReplayer.peekNextMessage() == Message.EXCEPTION;
 	}
 
-	
 	protected ObjectId readRef()
 	{
 		return itsReplayer.readRef();

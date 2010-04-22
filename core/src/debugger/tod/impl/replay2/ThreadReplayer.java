@@ -103,7 +103,7 @@ public class ThreadReplayer
 	
 	public void replay()
 	{
-		UnmonitoredReplayerFrame theRootFrame = createUnmonitoredFrame(null, null);
+		UnmonitoredReplayerFrame theRootFrame = createUnmonitoredFrame(null, null, null);
 		theRootFrame.setRootFrame(true);
 		theRootFrame.invoke_OOS();		
 		System.out.println("ThreadReplayer.replay()");
@@ -141,10 +141,10 @@ public class ThreadReplayer
 		byte theMessage = itsStream.get();
 		if (ECHO) 
 		{
-			if (!ECHO_FORREAL && itsMessageCount > 4800000) ECHO_FORREAL = true;
+			if (!ECHO_FORREAL && itsMessageCount > 100000000) ECHO_FORREAL = true;
 			if (theMessage != Message.REGISTER_OBJECT) itsMessageCount++;
 			if (ECHO_FORREAL) echo("Message (%d): [#%d @%d] %s", itsThreadId, itsMessageCount, itsStream.position(), Message._NAMES[theMessage]);
-			if (itsMessageCount == 4836800)
+			if (itsMessageCount == 138450)
 			{
 				System.out.println("ThreadReplayer.nextMessage()");
 			}
@@ -313,31 +313,31 @@ public class ThreadReplayer
 		// TODO: register
 	}
 	
-	public InScopeReplayerFrame createInScopeFrame(ReplayerFrame aParent, int aBehaviorId)
+	public InScopeReplayerFrame createInScopeFrame(ReplayerFrame aParent, int aBehaviorId, String aDebugInfo)
 	{
 		InScopeReplayerFrame theFrame = itsGenerator.createInScopeFrame(aBehaviorId);
-		theFrame.setup(this, itsStream, aParent instanceof InScopeReplayerFrame, null);
+		theFrame.setup(this, itsStream, aDebugInfo, aParent instanceof InScopeReplayerFrame, null);
 		return theFrame;
 	}
 	
-	public EnveloppeReplayerFrame createEnveloppeFrame(ReplayerFrame aParent, Type aReturnType)
+	public EnveloppeReplayerFrame createEnveloppeFrame(ReplayerFrame aParent, Type aReturnType, String aDebugInfo)
 	{
 		EnveloppeReplayerFrame theFrame = itsGenerator.createEnveloppeFrame();
-		theFrame.setup(this, itsStream, aParent instanceof InScopeReplayerFrame, aReturnType);
+		theFrame.setup(this, itsStream, aDebugInfo, aParent instanceof InScopeReplayerFrame, aReturnType);
 		return theFrame;
 	}
 	
-	public UnmonitoredReplayerFrame createUnmonitoredFrame(ReplayerFrame aParent, Type aReturnType)
+	public UnmonitoredReplayerFrame createUnmonitoredFrame(ReplayerFrame aParent, Type aReturnType, String aDebugInfo)
 	{
 		UnmonitoredReplayerFrame theFrame = itsGenerator.createUnmonitoredFrame();
-		theFrame.setup(this, itsStream, aParent instanceof InScopeReplayerFrame, aReturnType);
+		theFrame.setup(this, itsStream, aDebugInfo, aParent instanceof InScopeReplayerFrame, aReturnType);
 		return theFrame;
 	}
 	
-	public ClassloaderWrapperReplayerFrame createClassloaderFrame(ReplayerFrame aParent)
+	public ClassloaderWrapperReplayerFrame createClassloaderFrame(ReplayerFrame aParent, String aDebugInfo)
 	{
 		ClassloaderWrapperReplayerFrame theFrame = itsGenerator.createClassloaderWrapperFrame();
-		theFrame.setup(this, itsStream, aParent instanceof InScopeReplayerFrame, null);
+		theFrame.setup(this, itsStream, aDebugInfo, aParent instanceof InScopeReplayerFrame, null);
 		return theFrame;
 	}
 	

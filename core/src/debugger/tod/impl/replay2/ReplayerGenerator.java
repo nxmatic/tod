@@ -127,6 +127,8 @@ public class ReplayerGenerator
 			String theMethodName = theMethodNode.name;
 			String theMethodDesc = theMethodNode.desc;
 			
+			theBehavior = LocationUtils.getBehavior(itsDatabase, theClass, theMethodName, theMethodDesc, false);
+
 			MethodReplayerGenerator theGenerator = new MethodReplayerGenerator(
 					itsConfig, 
 					itsDatabase, 
@@ -146,8 +148,7 @@ public class ReplayerGenerator
 			itsLoader.addClass(theFrameClassName, theReplayerBytecode);
 						
 			theFactory = createFactory(theFrameClassJVMName);
-			theFactory.setSignature(theMethodName, theMethodNode.access, theMethodDesc);
-			theBehavior = LocationUtils.getBehavior(itsDatabase, theClass, theMethodName, theMethodDesc, false);
+			theFactory.setSignature(theBehavior.getId(), theMethodName, theMethodNode.access, theMethodDesc);
 			Utils.listSet(itsInScopeFrameFactories, theBehavior.getId(), theFactory);
 		}
 		

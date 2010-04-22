@@ -137,7 +137,7 @@ public class MethodGroupManager implements IStructureDatabase.Listener, Serializ
 	
 	private boolean isInScope(IBehaviorInfo aBehavior)
 	{
-		if (aBehavior.isAbstract() || aBehavior.isNative()) return false;
+//		if (aBehavior.isAbstract() || aBehavior.isNative()) return false;
 		return itsStructureDatabase.isInScope(aBehavior.getDeclaringType().getName());
 	}
 	
@@ -221,6 +221,8 @@ public class MethodGroupManager implements IStructureDatabase.Listener, Serializ
 	 */
 	public void classChanged(IClassInfo aClass)
 	{
+		if (ECHO) Utils.println("[MGM] classChanged: %s", aClass);
+		
 		// add edges
 		if (aClass.getSupertype() != null) addEdge(aClass.getSupertype(), aClass);
 		
@@ -228,7 +230,7 @@ public class MethodGroupManager implements IStructureDatabase.Listener, Serializ
 			for(IClassInfo theInterface : aClass.getInterfaces()) addEdge(theInterface, aClass);
 
 		// Merge affected groups
-		List<IClassInfo> theHierarchy = getTypeHierarchy(aClass);
+		Collection<IClassInfo> theHierarchy = getTypeHierarchy(aClass);
 
 		Set<MethodGroup> theGroups = new HashSet<MethodGroup>();
 		for(MethodSignatureGroup theSignatureGroup : itsSignatureGroups.values()) 
@@ -259,14 +261,14 @@ public class MethodGroupManager implements IStructureDatabase.Listener, Serializ
 	 */
 	private void addEdge(IClassInfo aParent, IClassInfo aChild)
 	{
+		if (ECHO) Utils.println("[MGM] adding edge: %s <|- %s", aParent, aChild);
 		itsChildrenMap.add(aParent.getId(), aChild.getId());
 	}
 	
 	public static boolean isSkipped(String aClassName, String aMethodName, boolean aIsInScope)
 	{
 		if (aClassName.startsWith("java/lang/ref/")) return true;
-//		if (aClassName.startsWith("java/lang/ThreadLocal")) return true;
-		if (!aIsInScope && aClassName.indexOf("ClassLoader") >= 0) return true;
+//		if (!aIsInScope && aClassName.indexOf("ClassLoader") >= 0) return true;
 		return false;
 	}
 
@@ -295,6 +297,12 @@ public class MethodGroupManager implements IStructureDatabase.Listener, Serializ
 		if (theInScope) theMethodGroup.markMonitored();
 		if (aBehavior.isNative()) theMethodGroup.markUnknown();
 		if (isSkipped(aBehavior.getDeclaringType().getName(), aBehavior.getName(), theInScope)) theMethodGroup.markUnknown();
+		
+		// Always mark clinits monitored as they can be executed at any time (we need at least enveloppe messages)
+		if (!theInScope && ! theMethodGroup.isMonitored() && "<clinit>".equals(aBehavior.getName()))
+		{
+			markMonitored(aBehavior);
+		}
 	}
 	
 	
@@ -307,7 +315,7 @@ public class MethodGroupManager implements IStructureDatabase.Listener, Serializ
 	private MethodGroup findGroup(MethodSignatureGroup aSignatureGroup, IClassInfo aType)
 	{
 		Set<MethodGroup> theGroups = new HashSet<MethodGroup>();
-		List<IClassInfo> theHierarchy = getTypeHierarchy(aType);
+		Collection<IClassInfo> theHierarchy = getTypeHierarchy(aType);
 		for (IClassInfo theType : theHierarchy)
 		{
 			MethodGroup theGroup = aSignatureGroup.getGroup(theType);
@@ -320,16 +328,16 @@ public class MethodGroupManager implements IStructureDatabase.Listener, Serializ
 	/**
 	 * Returns all the ancestors and descendants of the given type.
 	 */
-	private List<IClassInfo> getTypeHierarchy(IClassInfo aType)
+	private Set<IClassInfo> getTypeHierarchy(IClassInfo aType)
 	{
-		List<IClassInfo> theTypes = new ArrayList<IClassInfo>();
+		Set<IClassInfo> theTypes = new HashSet<IClassInfo>();
 		fillAncestors(theTypes, aType);
 		fillDescendants(theTypes, aType);
 		theTypes.add(aType);
 		return theTypes;
 	}
 	
-	private void fillAncestors(List<IClassInfo> aTypes, IClassInfo aType)
+	private void fillAncestors(Set<IClassInfo> aTypes, IClassInfo aType)
 	{
 		if (aType.getSupertype() != null)
 		{
@@ -344,7 +352,7 @@ public class MethodGroupManager implements IStructureDatabase.Listener, Serializ
 		}
 	}
 
-	private void fillDescendants(List<IClassInfo> aTypes, IClassInfo aType)
+	private void fillDescendants(Set<IClassInfo> aTypes, IClassInfo aType)
 	{
 		TIntHashSet theChildren = itsChildrenMap.getSet(aType.getId());
 		if (theChildren != null) 
@@ -356,6 +364,7 @@ public class MethodGroupManager implements IStructureDatabase.Listener, Serializ
 				IClassInfo theChild = itsStructureDatabase.getClass(theChildId, true);
 				aTypes.add(theChild);
 				fillDescendants(aTypes, theChild);
+				fillAncestors(aTypes, theChild);
 			}
 		}
 	}
@@ -496,7 +505,7 @@ public class MethodGroupManager implements IStructureDatabase.Listener, Serializ
 			{
 				if (theGroup.hasType(aClass)) 
 				{
-					if (theResult != null) throw new RuntimeException("Several groups contain the same ");
+					if (theResult != null) throw new RuntimeException("Several groups contain the same "+aClass);
 					theResult = theGroup;
 				}
 			}

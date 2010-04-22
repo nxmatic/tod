@@ -116,33 +116,82 @@ public class UnmonitoredReplayerFrame extends ReplayerFrame
 	
 	private void evInScopeBehaviorEnter(int aBehaviorId)
 	{
-		InScopeReplayerFrame theChild = getReplayer().createInScopeFrame(this, aBehaviorId);
+		InScopeReplayerFrame theChild = getReplayer().createInScopeFrame(this, aBehaviorId, "bid: "+aBehaviorId);
 		theChild.invoke_OOS();
 	}
 	
 	private void evOutOfScopeBehaviorEnter()
 	{
-		EnveloppeReplayerFrame theChild = getReplayer().createEnveloppeFrame(this, null);
-		theChild.invoke_OOS();
+		EnveloppeReplayerFrame theChild = getReplayer().createEnveloppeFrame(this, null, null);
+		try
+		{
+			theChild.invoke_OOS();
+		}
+		catch(BehaviorExitException e)
+		{
+			expectException();
+		}
 	}
 	
 	private void evInScopeClinitEnter(int aBehaviorId)
 	{
-		InScopeReplayerFrame theChild = getReplayer().createInScopeFrame(this, aBehaviorId);
-		theChild.invoke_OOS();
+		InScopeReplayerFrame theChild = getReplayer().createInScopeFrame(this, aBehaviorId, "bid: "+aBehaviorId);
+		try
+		{
+			theChild.invoke_OOS();
+		}
+		catch(BehaviorExitException e)
+		{
+			expectException();
+		}
 	}
 	
 	private void evOutOfScopeClinitEnter()
 	{
-		EnveloppeReplayerFrame theChild = getReplayer().createEnveloppeFrame(this, null);
-		theChild.invoke_OOS();
+		EnveloppeReplayerFrame theChild = getReplayer().createEnveloppeFrame(this, null, null);
+		try
+		{
+			theChild.invoke_OOS();
+		}
+		catch(BehaviorExitException e)
+		{
+			expectException();
+		}
 	}
 	
 	private void evClassloaderEnter()
 	{
-		ClassloaderWrapperReplayerFrame theChild = getReplayer().createClassloaderFrame(this);
-		theChild.invoke_OOS();
+		ClassloaderWrapperReplayerFrame theChild = getReplayer().createClassloaderFrame(this, null);
+		try
+		{
+			theChild.invoke_OOS();
+		}
+		catch(BehaviorExitException e)
+		{
+			expectException();
+		}
 	}
+	
+	protected void expectException()
+	{
+		byte m = getNextMessage();
+		switch(m)
+		{
+		case Message.OUTOFSCOPE_BEHAVIOR_EXIT_EXCEPTION:
+			// For unknown reasons, sometimes the EXCEPTION message is not generated
+			// This seems to be related to exceptions generated in native code during class loading
+			throw new BehaviorExitException();
+			
+		case Message.EXCEPTION:
+			itsLastException = readException();
+			break;
+			
+		default:
+			throw new UnexpectedMessageException(m); 
+		}
+	}
+	
+
 
 	protected void readResult()
 	{

@@ -69,10 +69,10 @@ public class MethodInstrumenter_OutOfScope extends MethodInstrumenter
 		// Abstracts and natives have no body.
 		if (isAbstract() || isNative()) return;
 		
-		// Constructors are not overridable so if a constructor is out of scope it is never monitored
+		// Constructors are not overridable so if a constructor is out of scope it is never monitored.
 		// Same for statics and privates
-		// NOT for finals (they can override something)
-		if (isConstructor() || isStaticInitializer() || isStatic() || isPrivate()) return;
+		// NOT for finals (they can override something) nor clinit (called automatically)
+		if ((isConstructor() || isStatic() || isPrivate()) && ! isStaticInitializer()) return;
 		
 		// Temp optimizations (ObjectIdentity uses a WeakHashMap which uses refs)
 		if (MethodGroupManager.isSkipped(getClassNode().name, "", false)) return;
