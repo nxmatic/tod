@@ -69,7 +69,16 @@ public class ClassInstrumenter
 	private static final String TODACCESSOR_CLASSNAME = TODAccessor.class.getName().replace('.', '/');
 	
 	private static final String OBJID_FIELD = "$tod$id";
-	private static final String OBJID_GETTER = "$tod$getId";
+	
+	/**
+	 * As we can't add as many methods to Object as we wish (otherwise the JVM crashes),
+	 * we add a single method that takes a parameter that indicates the action to take.
+	 */
+	private static final String OBJID_HUB = "$tod$idHub";
+	private static final String OBJID_HUB_DESC = "(I)J";
+	
+	private static final int OBJID_HUB_GETID = 0;
+	private static final int OBJID_HUB_RESETID = 1;
 	
 	private static final String CLSID_FIELD = "$tod$clsId";
 	private static final String CLSID_GETTER = "$tod$getClsId";
@@ -148,10 +157,14 @@ public class ClassInstrumenter
 		if (TODACCESSOR_CLASSNAME.equals(getNode().name)) processTODAccessor();
 		else processNormalClass();
 		
-		if (BCIUtils.CLS_OBJECT.equals(getNode().name)) addGetIdMethod_Root();
-		if (BCIUtils.CLS_CLASS.equals(getNode().name)) addGetClsIdMethod();
-		if (BCIUtils.CLS_STRING.equals(getNode().name)) addStringRawAccess();
-		if (BCIUtils.CLS_THREAD.equals(getNode().name)) addThreadAccess();
+		if (BCIUtils.CLS_OBJECT.equals(getNode().name)) 
+		{
+			addCloneWrapper();
+			addIdMethods_Root();
+		}
+		else if (BCIUtils.CLS_CLASS.equals(getNode().name)) addGetClsIdMethod();
+		else if (BCIUtils.CLS_STRING.equals(getNode().name)) addStringRawAccess();
+		else if (BCIUtils.CLS_THREAD.equals(getNode().name)) addThreadAccess();
 		
 		// Output the modified class
 		ClassWriter theWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
@@ -162,7 +175,8 @@ public class ClassInstrumenter
 		try
 		{
 			BCIUtils.checkClass(theBytecode);
-			for(MethodNode theNode : (List<MethodNode>) itsNode.methods) BCIUtils.checkMethod(getNode(), theNode);
+			for(MethodNode theNode : (List<MethodNode>) itsNode.methods)
+				if ((theNode.access & Opcodes.ACC_NATIVE) == 0) BCIUtils.checkMethod(getNode(), theNode);
 		}
 		catch(Exception e)
 		{
@@ -214,7 +228,7 @@ public class ClassInstrumenter
 				&& BCIUtils.CLS_OBJECT.equals(getNode().superName) 
 				&& getDatabase().isInIdScope(getNode().name)) 
 		{
-			addGetIdMethod_InScope();
+			addIdMethods_InScope();
 		}
 	}
 	
@@ -240,7 +254,7 @@ public class ClassInstrumenter
 		for(MethodNode theNode : (List<MethodNode>) itsNode.methods) 
 		{
 			if ("getObjectId".equals(theNode.name))
-				makeAccessor(theNode, BCIUtils.CLS_OBJECT, OBJID_GETTER, "J");
+				makeGetObjectId(theNode);
 			else if ("getStringChars".equals(theNode.name))
 				makeAccessor(theNode, BCIUtils.CLS_STRING, STRING_GETCHARS, "[C");
 			else if ("getStringOffset".equals(theNode.name))
@@ -290,6 +304,18 @@ public class ClassInstrumenter
 		aNode.maxStack = theType.getSize();
 	}
 	
+	private void makeGetObjectId(MethodNode aNode)
+	{
+		SyntaxInsnList s = new SyntaxInsnList();
+		s.ALOAD(0);
+		s.pushInt(OBJID_HUB_GETID);
+		s.INVOKEVIRTUAL(BCIUtils.CLS_OBJECT, OBJID_HUB, OBJID_HUB_DESC);
+		s.LRETURN();
+		
+		aNode.instructions = s;
+		aNode.maxStack = 2;
+	}
+	
 	private void makeSetThreadData(MethodNode aNode)
 	{
 		Type theType = Type.getType(BCIUtils.DSC_THREADDATA);
@@ -304,19 +330,76 @@ public class ClassInstrumenter
 		aNode.maxStack = theType.getSize()*2;
 	}
 	
-	/**
-	 * Adds the $tod$getId method to java.lang.Object
-	 */
-	private void addGetIdMethod_Root()
+	private MethodNode findMethod(String aName)
 	{
-		MethodNode theGetter = createMethod(OBJID_GETTER, "()J", Opcodes.ACC_PUBLIC);
-		theGetter.maxStack = 2;
-		theGetter.maxLocals = 1;
+		for(MethodNode theNode : (List<MethodNode>) itsNode.methods)
+		{
+			if (theNode.name.equals(aName)) return theNode;
+		}
+		return null;
+	}
+	
+	/**
+	 * Adds a wrapper for the native Object.clone method
+	 */
+	private void addCloneWrapper()
+	{
+		MethodNode theNativeClone = findMethod("clone");
+		int theAccess = theNativeClone.access & ~(Opcodes.ACC_NATIVE | Opcodes.ACC_PROTECTED); 
+		theNativeClone.name = "$tod$clone";
+		theNativeClone.access = theAccess | Opcodes.ACC_PRIVATE | Opcodes.ACC_NATIVE;
+		
+		MethodNode theWrapper = createMethod("clone", theNativeClone.desc, theAccess | Opcodes.ACC_PROTECTED);
+		theWrapper.maxStack = 4;
+		theWrapper.maxLocals = 1;
+		theWrapper.exceptions = theNativeClone.exceptions;
 		
 		SyntaxInsnList s = new SyntaxInsnList();
 		
 		s.ALOAD(0);
+		s.INVOKESPECIAL(BCIUtils.CLS_OBJECT, theNativeClone.name, theNativeClone.desc);
+//		s.DUP();
+//		
+//		s.pushInt(OBJID_HUB_RESETID);
+//		s.INVOKEVIRTUAL(BCIUtils.CLS_OBJECT, OBJID_HUB, "(I)J");
+//		s.POP2();
+		
+		s.ARETURN();
+
+		theWrapper.instructions = s;
+	}
+	
+	/**
+	 * Adds the $tod$getId method to java.lang.Object
+	 */
+	private void addIdMethods_Root()
+	{
+		// Add hub
+		MethodNode theGetter = createMethod(OBJID_HUB, OBJID_HUB_DESC, Opcodes.ACC_PUBLIC);
+		theGetter.maxStack = 2;
+		theGetter.maxLocals = 2;
+		
+		SyntaxInsnList s = new SyntaxInsnList();
+		Label lGetId = new Label();
+		Label lResetId = new Label();
+		Label lDefault = new Label();
+		
+		s.ILOAD(1);
+		s.LOOKUPSWITCH(lDefault, new int[] { OBJID_HUB_GETID, OBJID_HUB_RESETID }, new Label[] { lGetId, lResetId });
+		
+		s.label(lGetId);
+		s.ALOAD(0);
 		s.INVOKESTATIC("java/tod/ObjectIdentity", "get", "("+BCIUtils.DSC_OBJECT+")J");
+		s.LRETURN();
+		
+		s.label(lResetId);
+		s.pushLong(0);
+		s.LRETURN();
+		
+		s.label(lDefault);
+		s.pushLong(0);
+		s.pushLong(0);
+		s.LDIV(); // Cause an artificial arithmetic exception, easier than creating a true exception...
 		s.LRETURN();
 		
 		theGetter.instructions = s;
@@ -326,7 +409,7 @@ public class ClassInstrumenter
 	 * Overrides the $tod$getId method for objects that are in id scope 
 	 * @see {@link TODConfig#SCOPE_ID_FILTER}
 	 */
-	private void addGetIdMethod_InScope()
+	private void addIdMethods_InScope()
 	{
 		// Add field
 		getNode().fields.add(new FieldNode(
@@ -336,19 +419,24 @@ public class ClassInstrumenter
 				null, 
 				null));
 		
-		// Add getter
-		MethodNode theGetter = createMethod(
-				OBJID_GETTER, 
-				"()J", 
-				Opcodes.ACC_PUBLIC);
+		// Add hub
+		MethodNode theGetter = createMethod(OBJID_HUB, OBJID_HUB_DESC, Opcodes.ACC_PUBLIC);
 		
 		theGetter.maxStack = 6;
-		theGetter.maxLocals = 1;
+		theGetter.maxLocals = 2;
 		
 		SyntaxInsnList s = new SyntaxInsnList();
+		Label lGetId = new Label();
+		Label lResetId = new Label();
+		Label lDefault = new Label();
+
 		Label lReturn = new Label();
 		Label lUnlock = new Label();
 		
+		s.ILOAD(1);
+		s.LOOKUPSWITCH(lDefault, new int[] { OBJID_HUB_GETID, OBJID_HUB_RESETID }, new Label[] { lGetId, lResetId });
+		
+		s.label(lGetId);
 		s.ALOAD(0);
 		s.GETFIELD(getNode().name, OBJID_FIELD, "J");
 		s.DUP2();
@@ -388,6 +476,19 @@ public class ClassInstrumenter
 		s.label(lReturn);
 		s.LRETURN();
 
+		s.label(lResetId);
+		s.ALOAD(0);
+		s.pushLong(0);
+		s.PUTFIELD(getNode().name, OBJID_FIELD, "J");
+		s.pushLong(0);
+		s.LRETURN();
+		
+		s.label(lDefault);
+		s.ALOAD(0);
+		s.ILOAD(1);
+		s.INVOKESPECIAL(BCIUtils.CLS_OBJECT, OBJID_HUB, OBJID_HUB_DESC);
+		s.LRETURN();
+		
 		theGetter.instructions = s;
 	}
 	

@@ -33,11 +33,14 @@ package tod.impl.replay2;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
 
@@ -69,19 +72,27 @@ public class ReplayerGenerator
 		itsDatabase = aDatabase;
 	}
 
+	public static final boolean USE_SHORT_NAMES = false;
 	
-	public static final String REPLAYER_NAME_PREFIX = "$tod$replayer2$";
-
+	public static final String REPLAYER_NAME_PREFIX = "$tdrpl$";
+	
 	/**
 	 * Returns the JVM name of the replayer class for the given method.
 	 */
 	public static String makeReplayerClassName(String aJvmClassName, String aJvmMethodName, String aDesc)
 	{
 		String theName = aJvmClassName+"_"+aJvmMethodName+"_"+aDesc;
-		StringBuilder theBuilder = new StringBuilder(theName.length());
-		for (int i=0;i<theName.length();i++)
+		return USE_SHORT_NAMES ? 
+				makeShortReplayerClassName(theName)
+				: makeLongReplayerClassName(theName);
+	}
+	
+	private static String makeLongReplayerClassName(String aName)
+	{
+		StringBuilder theBuilder = new StringBuilder(aName.length());
+		for (int i=0;i<aName.length();i++)
 		{
-			char c = theName.charAt(i);
+			char c = aName.charAt(i);
 			switch(c)
 			{
 			case '/':
@@ -99,6 +110,24 @@ public class ReplayerGenerator
 		return REPLAYER_NAME_PREFIX+theBuilder.toString();
 	}
 	
+	private static final Map<String, String> NAMES_MAP = new HashMap<String, String>();
+
+	private static synchronized String makeShortReplayerClassName(String aName)
+	{
+		String theShortName = NAMES_MAP.get(aName);
+		if (theShortName == null)
+		{
+			theShortName = REPLAYER_NAME_PREFIX+NAMES_MAP.size();
+			NAMES_MAP.put(aName, theShortName);
+		}
+		return theShortName;
+	}
+	
+	public static boolean isConcreteFrameType(Type aType)
+	{
+		String theName = aType.getClassName();
+		return theName.startsWith(REPLAYER_NAME_PREFIX) && ! theName.endsWith("_Factory");
+	}
 
 	
 	/**

@@ -201,6 +201,7 @@ Agent_OnLoad(JavaVM *vm, char *options, void *reserved)
 	capabilities.can_generate_all_class_hook_events = 1;
 	capabilities.can_generate_exception_events = 1;
 	capabilities.can_tag_objects = 1;
+	capabilities.can_set_native_method_prefix = 1;
 	err = jvmti->AddCapabilities(&capabilities);
 	check_jvmti_error(jvmti, err, "AddCapabilities");
 
@@ -219,6 +220,9 @@ Agent_OnLoad(JavaVM *vm, char *options, void *reserved)
 	enable_event(jvmti, JVMTI_EVENT_VM_START);
 	
 	cfgIsJVM14 = false;
+
+	// Native methods prefix
+	jvmti->SetNativeMethodPrefix("$tod$");
 
 	agentInit(propVerbose, propHost, propPort, propCachePath, propClientName);
 

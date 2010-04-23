@@ -32,6 +32,8 @@ import tod2.agent.io._GrowingByteBuffer;
  */
 public final class ThreadData 
 {
+	private boolean ECHO_FORREAL = true;
+	
 	/**
 	 * Internal thread id.
 	 * These are different than JVM thread ids, which can potentially
@@ -203,6 +205,17 @@ public final class ThreadData
 	{
 		itsMessageCount++;
 		
+		if (! ECHO_FORREAL)
+		{
+			if (getId() == 1 && itsMessageCount > 13000000) ECHO_FORREAL = true;
+			return;
+		}
+		
+		if (itsMessageCount == 1287)
+		{
+			System.out.println("ThreadData.echoMessageType()");
+		}
+		
 		_StringBuilder theBuilder = new _StringBuilder();
 		theBuilder.append(getId());
 		theBuilder.append(" #");
@@ -218,16 +231,12 @@ public final class ThreadData
 			theBuilder.append(")");
 		}
 		
-		if (itsMessageCount == 75538 && getId() == 5)
-		{
-			System.out.println("ThreadData.echoMessageType()");
-		}
-		
 		_IO.out(theBuilder.toString());		
 	}
 	
 	public void echoValue(String aType, long aValue)
 	{
+		if (!ECHO_FORREAL) return;
 		_StringBuilder theBuilder = new _StringBuilder();
 		theBuilder.append("Value (");
 		theBuilder.append(aType);
@@ -238,6 +247,7 @@ public final class ThreadData
 	
 	public void echoValue(String aType, double aValue)
 	{
+		if (!ECHO_FORREAL) return;
 		_StringBuilder theBuilder = new _StringBuilder();
 		theBuilder.append("Value (");
 		theBuilder.append(aType);
@@ -248,6 +258,7 @@ public final class ThreadData
 	
 	public void echoMessageType_NoIncCount(byte aMessage, long aArg1, long aArg2)
 	{
+		if (!ECHO_FORREAL) return;
 		_StringBuilder theBuilder = new _StringBuilder();
 		theBuilder.append(getId());
 		theBuilder.append(": ");
@@ -265,6 +276,7 @@ public final class ThreadData
 	
 	public void echoPushScope(boolean aInScope)
 	{
+		if (!ECHO_FORREAL) return;
 		_StringBuilder theBuilder = new _StringBuilder();
 		theBuilder.append(getId());
 		theBuilder.append(" >>>");
@@ -274,6 +286,7 @@ public final class ThreadData
 
 	public void echoPopScope(boolean aInScope)
 	{
+		if (!ECHO_FORREAL) return;
 		_StringBuilder theBuilder = new _StringBuilder();
 		theBuilder.append(getId());
 		theBuilder.append(" <<<");
@@ -1199,6 +1212,8 @@ public final class ThreadData
 	{
 		long theObjectId = getObjectId(aObject);
 		assert theObjectId != 0;
+		
+		if (AgentDebugFlags.EVENT_LOG) echoValue("ref", theObjectId);
 		
 		if (theObjectId < 0)
 		{

@@ -29,66 +29,16 @@ POSSIBILITY OF SUCH DAMAGE.
 Parts of this work rely on the MD5 algorithm "derived from the RSA Data Security, 
 Inc. MD5 Message-Digest Algorithm".
 */
-package tod.impl.replay2;
+package dummy;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.HashMap;
-import java.util.Map;
-
-import zz.utils.Utils;
-
-public class ReplayerLoader extends ClassLoader
+public class CloneCrashTest implements Cloneable
 {
-	private final ClassLoader itsParent;
-	private final Map<String, byte[]> itsClassesMap = new HashMap<String, byte[]>();
-
-	public ReplayerLoader(ClassLoader aParent)
+	public static void main(String[] args) throws CloneNotSupportedException
 	{
-		itsParent = aParent;
-	}
-	
-	public void addClass(String aName, byte[] aBytecode)
-	{
-		itsClassesMap.put(aName, aBytecode);
-	}
-
-	private boolean shouldLoad(String aName)
-	{
-		return aName.startsWith("tod.impl.replay2.") 
-			&& ! aName.equals(getClass().getName())
-			&& ! aName.equals(TmpIdManager.class.getName())
-			&& ! aName.equals(EventCollector.class.getName());
-	}
-	
-	@Override
-	public Class loadClass(String aName) throws ClassNotFoundException
-	{
-		byte[] theBytecode = itsClassesMap.remove(aName);
-		if (theBytecode == null && shouldLoad(aName)) theBytecode = getClassBytecode(aName.replace('.', '/'));
+		int[] is = new int[3];
+		Object os = new Object[5];
 		
-		if (theBytecode != null) 
-		{
-			return super.defineClass(aName, theBytecode, 0, theBytecode.length);
-		}
-		else 
-		{
-			return itsParent.loadClass(aName);
-		}
+		CloneCrashTest cct = new CloneCrashTest();
+		cct = (CloneCrashTest) cct.clone();
 	}
-	
-	public static byte[] getClassBytecode(String aClassName)
-	{
-		try
-		{
-			InputStream theStream = ReplayerLoader.class.getResourceAsStream("/"+aClassName+".class");
-			return Utils.readInputStream_byte(theStream);
-		}
-		catch (IOException e)
-		{
-			throw new RuntimeException(e);
-		}
-	}
-	
-
 }

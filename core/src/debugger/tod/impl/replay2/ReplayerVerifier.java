@@ -72,8 +72,7 @@ public class ReplayerVerifier extends SimpleVerifier
 	
 	private boolean isConcreteFrame(Type aType)
 	{
-		String theName = aType.getClassName();
-		return theName.startsWith("$tod$replayer2$") && ! theName.endsWith("_Factory");
+	    return ReplayerGenerator.isConcreteFrameType(aType);
 	}
 	
 	private boolean isFactory(Type aType)
