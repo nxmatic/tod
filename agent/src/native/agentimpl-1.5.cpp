@@ -39,9 +39,14 @@ extern "C" {
 // Pointer to our JVMTI environment, to be able to use it in pure JNI calls
 jvmtiEnv *gJvmti;
 
-// Object Id mutex and current id value
-t_mutex oidMutex;
-jlong oidCurrent = 1;
+typedef jobject (JNICALL *cloneCall) (JNIEnv *env, jobject obj);
+
+jmethodID methodId_clone = 0;
+cloneCall originalMethod_clone = NULL;
+
+jmethodID methodId_resetId = 0;
+
+jmethodID methodId_class_getName = 0;
 
 /* Every JVMTI interface returns an error code, which should be checked
  *   to avoid any cascading errors down the line.
@@ -151,6 +156,61 @@ void JNICALL cbVMStart(
 	agentStart(jni);
 }
 
+void initMethodIds(JNIEnv* jni)
+{
+	jclass class_Object;
+	class_Object = jni->FindClass("java/lang/Object");
+	methodId_clone = jni->GetMethodID(class_Object, "clone", "()Ljava/lang/Object;");
+	methodId_resetId = jni->GetMethodID(class_Object, "$tod$resetId", "()V");
+
+	jclass class_Class;
+	class_Class = jni->FindClass("java/lang/Class");
+	methodId_class_getName = jni->GetMethodID(class_Class, "getName", "()Ljava/lang/String;");
+}
+
+JNIEXPORT jobject JNICALL cloneWrapper(JNIEnv *jni, jobject obj) 
+{
+	// Call original clone method
+	jobject clone = originalMethod_clone(jni, obj);
+
+	// Determine if the object has a "real" class, as in certain cases
+	// calling the resetId method on array classes crashes the JVM
+	jclass cls = jni->GetObjectClass(obj);
+	jint status;
+	jvmtiError e = gJvmti->GetClassStatus(cls, &status);
+	if (e != JVMTI_ERROR_NONE)
+	{
+		jclass ex = jni->FindClass("java/lang/Error");
+		jni->ThrowNew(ex, "Bam");
+		return 0;
+	}
+
+	// Reset id
+	if (clone && (status & (JVMTI_CLASS_STATUS_ARRAY | JVMTI_CLASS_STATUS_PRIMITIVE)) == 0) 
+		jni->CallObjectMethod(clone, methodId_resetId);
+		
+	return clone;
+}
+
+void JNICALL cbNativeMethodBind(
+	jvmtiEnv *jvmti,
+	JNIEnv* jni,
+	jthread thread,
+	jmethodID method,
+	void* address,
+	void** new_address_ptr)
+{
+	if (jni == NULL) return;
+	
+	if (methodId_clone == NULL) initMethodIds(jni);
+
+	if (method == methodId_clone)
+	{
+		originalMethod_clone = (cloneCall) address;
+		*new_address_ptr = (void*) &cloneWrapper;
+	}
+}
+
 /**
  * JVMTI initialization
  */
@@ -201,7 +261,7 @@ Agent_OnLoad(JavaVM *vm, char *options, void *reserved)
 	capabilities.can_generate_all_class_hook_events = 1;
 	capabilities.can_generate_exception_events = 1;
 	capabilities.can_tag_objects = 1;
-	capabilities.can_set_native_method_prefix = 1;
+	capabilities.can_generate_native_method_bind_events = 1;
 	err = jvmti->AddCapabilities(&capabilities);
 	check_jvmti_error(jvmti, err, "AddCapabilities");
 
@@ -210,6 +270,7 @@ Agent_OnLoad(JavaVM *vm, char *options, void *reserved)
 	callbacks.ClassFileLoadHook = &cbClassFileLoadHook;
 	callbacks.Exception = &cbException;
 	callbacks.VMStart = &cbVMStart;
+	callbacks.NativeMethodBind = &cbNativeMethodBind;
 	
 	err = jvmti->SetEventCallbacks(&callbacks, sizeof(callbacks));
 	check_jvmti_error(jvmti, err, "SetEventCallbacks");
@@ -218,11 +279,9 @@ Agent_OnLoad(JavaVM *vm, char *options, void *reserved)
  	enable_event(jvmti, JVMTI_EVENT_CLASS_FILE_LOAD_HOOK);
 	enable_event(jvmti, JVMTI_EVENT_EXCEPTION);
 	enable_event(jvmti, JVMTI_EVENT_VM_START);
+	enable_event(jvmti, JVMTI_EVENT_NATIVE_METHOD_BIND);
 	
 	cfgIsJVM14 = false;
-
-	// Native methods prefix
-	jvmti->SetNativeMethodPrefix("$tod$");
 
 	agentInit(propVerbose, propHost, propPort, propCachePath, propClientName);
 
@@ -237,27 +296,6 @@ Agent_OnUnload(JavaVM *vm)
 
 //************************************************************************************
 
-/*
-Returns the next free oid value.
-Thread-safe.
-*/
-jlong getNextOid()
-{
-	jlong val;
-	{
-		t_lock lock(oidMutex);
-		val = oidCurrent;
-		oidCurrent += 2; // We create odd ids. Event ids are used for temporary ids (see TmpIdManager)
-	}
-	
-	// Include host id
-	val = (val << cfgHostBits) | cfgHostId; 
-	
-	// We cannot use the 64th bit.
-	if (val >> 63 != 0) fatal_error("OID overflow");
-	return val;
-}
-
 jlong agentimplGetObjectId(JNIEnv* jni, jobject obj)
 {
 	jvmtiError err;
@@ -270,7 +308,7 @@ jlong agentimplGetObjectId(JNIEnv* jni, jobject obj)
 	if (tag != 0) return tag;
 	
 	// Not tagged yet, assign an oid.
-	tag = getNextOid();
+	tag = nextObjectId(jni);
 	
 	err = jvmti->SetTag(obj, tag);
 	check_jvmti_error(jvmti, err, "SetTag");

@@ -29,22 +29,59 @@ POSSIBILITY OF SUCH DAMAGE.
 Parts of this work rely on the MD5 algorithm "derived from the RSA Data Security, 
 Inc. MD5 Message-Digest Algorithm".
 */
-package dummy;
+package tod.impl.bci.asm2;
 
-import tod2.access.TODAccessor;
+import java.util.ListIterator;
 
-public class CloneCrashTest implements Cloneable
+import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.tree.AbstractInsnNode;
+import org.objectweb.asm.tree.InsnList;
+import org.objectweb.asm.tree.MethodInsnNode;
+import org.objectweb.asm.tree.MethodNode;
+
+import tod.core.database.structure.IMutableBehaviorInfo;
+
+/**
+ * Generates code that resets the id of cloned objects, by calling the reset method
+ * after each call to Object.clone().
+ * This instrumenter should be applied to all classes.
+ * @author gpothier
+ */
+public class MethodInstrumenter_PostprocessClone extends MethodInstrumenter
 {
-	public static void main(String[] args) throws CloneNotSupportedException
+	public MethodInstrumenter_PostprocessClone(ClassInstrumenter aClassInstrumenter, MethodNode aNode, IMutableBehaviorInfo aBehavior)
 	{
-		int[] is = new int[5];
-		System.out.println(TODAccessor.getObjectId(is));
-		is = is.clone();
-		System.out.println(TODAccessor.getObjectId(is));
-		
-		boolean[] bs = new boolean[3];
-		System.out.println(TODAccessor.getObjectId(bs));
-		bs = bs.clone();
-		System.out.println(TODAccessor.getObjectId(bs));
+		super(aClassInstrumenter, aNode, aBehavior);
+		getNode().maxStack += 2; // This is the max we add to the stack
+	}
+
+	@Override
+	public void proceed()
+	{
+		processInstructions(getNode().instructions);
+	}
+	
+	private void processInstructions(InsnList aInsns)
+	{
+		ListIterator<AbstractInsnNode> theIterator = aInsns.iterator();
+		while(theIterator.hasNext()) 
+		{
+			AbstractInsnNode theNode = theIterator.next();
+			int theOpcode = theNode.getOpcode();
+			if (theOpcode == Opcodes.INVOKESPECIAL)
+			{
+				MethodInsnNode theInvoke = (MethodInsnNode) theNode;
+				if ("clone".equals(theInvoke.name) 
+						&& BCIUtils.CLS_OBJECT.equals(theInvoke.owner)
+						&& ("()"+BCIUtils.DSC_OBJECT).equals(theInvoke.desc))
+				{
+					SyntaxInsnList s = new SyntaxInsnList();
+					s.DUP();
+					s.INVOKEVIRTUAL(BCIUtils.CLS_OBJECT, ClassInstrumenter.OBJID_RESET, "()V");
+
+					aInsns.insert(theNode, s);
+				}
+			}
+		}
 	}
 }

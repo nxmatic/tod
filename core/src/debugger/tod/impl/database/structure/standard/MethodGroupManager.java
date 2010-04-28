@@ -51,6 +51,7 @@ import tod.core.database.structure.IFieldInfo;
 import tod.core.database.structure.IStructureDatabase;
 import tod.core.database.structure.ITypeInfo;
 import tod.core.database.structure.IStructureDatabase.BehaviorMonitoringModeChange;
+import tod.impl.bci.asm2.BCIUtils;
 import tod2.agent.MonitoringMode;
 import zz.utils.Utils;
 import zz.utils.primitive.ByteArray;
@@ -71,9 +72,10 @@ public class MethodGroupManager implements IStructureDatabase.Listener, Serializ
 {
 	private static final long serialVersionUID = 173278295020871234L;
 	
-	private static final boolean ECHO = false;
+	private static final boolean ECHO = true;
 
 	private transient StructureDatabase itsStructureDatabase;
+	private transient IClassInfo itsObjectClass;
 	
 	/**
 	 * Maps signatures to signature groups. Each signature groups contains method groups.
@@ -339,10 +341,20 @@ public class MethodGroupManager implements IStructureDatabase.Listener, Serializ
 	
 	private void fillAncestors(Set<IClassInfo> aTypes, IClassInfo aType)
 	{
-		if (aType.getSupertype() != null)
+		IClassInfo theSupertype = aType.getSupertype();
+		
+		// For special classes that have no bytecode (eg array classes), make sure we include Object
+		// in the hierarchy
+		if (theSupertype == null && aType.getName().charAt(0) == '[')
 		{
-			aTypes.add(aType.getSupertype());
-			fillAncestors(aTypes, aType.getSupertype());
+			if (itsObjectClass == null) itsObjectClass = itsStructureDatabase.getClass(BCIUtils.CLS_OBJECT, true);
+			theSupertype = itsObjectClass;
+		}
+		
+		if (theSupertype != null)
+		{
+			aTypes.add(theSupertype);
+			fillAncestors(aTypes, theSupertype);
 		}
 		
 		if (aType.getInterfaces() != null) for(IClassInfo theInterface : aType.getInterfaces())

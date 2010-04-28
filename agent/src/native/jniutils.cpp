@@ -27,7 +27,7 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 
 extern int propVerbose;
 
-StaticVoidMethod::StaticVoidMethod(
+StaticMethod::StaticMethod(
 	JNIEnv* jni,
 	char* aClassName, 
 	char* aMethodName, 
@@ -42,9 +42,32 @@ StaticVoidMethod::StaticVoidMethod(
 	if (itsMethod == NULL) printf("Could not find method %s %s!\n", aMethodName, aMethodSignature);	
 }
 
+StaticVoidMethod::StaticVoidMethod(
+	JNIEnv* jni,
+	char* aClassName, 
+	char* aMethodName, 
+	char* aMethodSignature) : StaticMethod(jni, aClassName, aMethodName, aMethodSignature)
+{
+}
+
 void StaticVoidMethod::invoke(JNIEnv* jni, ...)
 {
 	va_list args;
 	va_start(args, jni);
 	jni->CallStaticVoidMethodV(itsClass, itsMethod, args);
+}
+
+StaticLongMethod::StaticLongMethod(
+	JNIEnv* jni,
+	char* aClassName, 
+	char* aMethodName, 
+	char* aMethodSignature) : StaticMethod(jni, aClassName, aMethodName, aMethodSignature)
+{
+}
+
+jlong StaticLongMethod::invoke(JNIEnv* jni, ...)
+{
+	va_list args;
+	va_start(args, jni);
+	return jni->CallStaticLongMethodV(itsClass, itsMethod, args);
 }

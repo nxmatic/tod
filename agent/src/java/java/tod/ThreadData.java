@@ -211,11 +211,6 @@ public final class ThreadData
 			return;
 		}
 		
-		if (itsMessageCount == 1287)
-		{
-			System.out.println("ThreadData.echoMessageType()");
-		}
-		
 		_StringBuilder theBuilder = new _StringBuilder();
 		theBuilder.append(getId());
 		theBuilder.append(" #");

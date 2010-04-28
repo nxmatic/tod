@@ -64,7 +64,11 @@ public class ObjectIdentity
 	 */
 	public static long get (Object aObject)
 	{
-		if (! USE_CACHE) return USE_JAVA ? get14(aObject) : get15(aObject);
+		if (! USE_CACHE) 
+		{
+			long theId = USE_JAVA ? get14(aObject) : get15(aObject);
+			return theId;
+		}
 		
 		if (AgentDebugFlags.COLLECT_PROFILE) itsObjIdCacheAccess++;
 		

@@ -255,7 +255,7 @@ public abstract class DBSideIOThread
 
 		public _ByteBuffer push(_ByteBuffer aBuffer)
 		{
-			if (itsThreadId != 1) return aBuffer;
+//			if (itsThreadId != 1) return aBuffer;
 			
 			if (itsStream == null)
 			{

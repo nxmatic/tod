@@ -25,11 +25,20 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 
 #include <jni.h>
 
-class StaticVoidMethod
+class StaticMethod
 {
 	protected: jclass itsClass;
 	protected: jmethodID itsMethod;
 
+	public: StaticMethod(
+		JNIEnv* jni, 
+		char* aClassName, 
+		char* aMethodName, 
+		char* aMethodSignature);
+};
+
+class StaticVoidMethod : StaticMethod
+{
 	public: StaticVoidMethod(
 		JNIEnv* jni, 
 		char* aClassName, 
@@ -37,6 +46,17 @@ class StaticVoidMethod
 		char* aMethodSignature);
 	
 	public: void invoke(JNIEnv* jni, ...);
+};
+
+class StaticLongMethod : StaticMethod
+{
+	public: StaticLongMethod(
+		JNIEnv* jni, 
+		char* aClassName, 
+		char* aMethodName, 
+		char* aMethodSignature);
+	
+	public: jlong invoke(JNIEnv* jni, ...);
 };
 
 #endif
