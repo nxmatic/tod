@@ -54,7 +54,7 @@ import zz.utils.primitive.ByteArray;
 public class ThreadReplayer
 {
 	public static final boolean ECHO = true;
-	public static boolean ECHO_FORREAL = false;
+	public static boolean ECHO_FORREAL = true;
 
 	private final int itsThreadId;
 	private final TODConfig itsConfig;
