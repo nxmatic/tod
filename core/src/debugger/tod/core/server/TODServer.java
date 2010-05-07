@@ -50,7 +50,7 @@ public abstract class TODServer extends Server
 	
 	public TODServer(TODConfig aConfig)
 	{
-		super(aConfig.getPort(), DebugFlags.TOD_SERVER_DAEMON);
+		super(aConfig.getPort(), true, DebugFlags.TOD_SERVER_DAEMON);
 		TODUtils.logf(0, "TODServer on port: %d", getPort());
 
 		itsConfig = aConfig;

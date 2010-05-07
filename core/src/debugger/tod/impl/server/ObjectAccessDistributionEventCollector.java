@@ -31,97 +31,118 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.server;
 
-import java.util.ArrayList;
-import java.util.List;
-
+import gnu.trove.TIntArrayList;
+import gnu.trove.TIntIterator;
+import gnu.trove.TLongArrayList;
 import gnu.trove.TLongHashSet;
+import gnu.trove.TLongIterator;
 import tod.core.database.structure.ObjectId;
-import tod.impl.replay2.EventCollector;
 
-public class ObjectAccessDistributionEventCollector extends EventCollector
+public class ObjectAccessDistributionEventCollector extends CounterEventCollector
 {
 	private static final int N = 2048;
-	
+
+	private final int itsThreadId;
 	private TLongHashSet itsObjectsSet = new TLongHashSet();
-	private List<Long> itsCounts = new ArrayList<Long>();
-	private long itsCount;
+	
+	private long itsTotal = 0;
+	private int itsBlocks = 0;
+
+	public ObjectAccessDistributionEventCollector(int aThreadId)
+	{
+		itsThreadId = aThreadId;
+	}
 
 	@Override
 	public String toString()
 	{
-		return N + " - "+itsCounts;
+		float theAverage = itsTotal*1f/itsBlocks;
+		return String.format("Thread %d: %d - %.2f", itsThreadId, N, theAverage*100/N);
 	}
 	
 	protected void fieldAccess(ObjectId aTarget, int aFieldId)
 	{
 		long id = aTarget != null ? aTarget.getId() : -1;
-		itsCount++;
 		itsObjectsSet.add(id);
-		if (itsObjectsSet.size() == N)
+		long theCount = getCount();
+		if (theCount == N)
 		{
-			itsCounts.add(itsCount);
-			itsCount = 0;
+			resetCount();
+			itsTotal += itsObjectsSet.size();
+			itsBlocks++;
 			itsObjectsSet.clear();
+			
+			if (itsBlocks % 100 == 0) System.out.println("[TOD] Access distribution: "+this);
 		}
 	}
 
 	@Override
 	public void fieldRead(ObjectId aTarget, int aFieldId, double aValue)
 	{
+		super.fieldRead(aTarget, aFieldId, aValue);
 		fieldAccess(aTarget, aFieldId);
 	}
 
 	@Override
 	public void fieldRead(ObjectId aTarget, int aFieldId, float aValue)
 	{
+		super.fieldRead(aTarget, aFieldId, aValue);
 		fieldAccess(aTarget, aFieldId);
 	}
 
 	@Override
 	public void fieldRead(ObjectId aTarget, int aFieldId, int aValue)
 	{
+		super.fieldRead(aTarget, aFieldId, aValue);
 		fieldAccess(aTarget, aFieldId);
 	}
 
 	@Override
 	public void fieldRead(ObjectId aTarget, int aFieldId, long aValue)
 	{
+		super.fieldRead(aTarget, aFieldId, aValue);
 		fieldAccess(aTarget, aFieldId);
 	}
 
 	@Override
 	public void fieldRead(ObjectId aTarget, int aFieldId, ObjectId aValue)
 	{
+		super.fieldRead(aTarget, aFieldId, aValue);
 		fieldAccess(aTarget, aFieldId);
 	}
 
 	@Override
 	public void fieldWrite(ObjectId aTarget, int aFieldId, double aValue)
 	{
+		super.fieldWrite(aTarget, aFieldId, aValue);
 		fieldAccess(aTarget, aFieldId);
 	}
 
 	@Override
 	public void fieldWrite(ObjectId aTarget, int aFieldId, float aValue)
 	{
+		super.fieldWrite(aTarget, aFieldId, aValue);
 		fieldAccess(aTarget, aFieldId);
 	}
 
 	@Override
 	public void fieldWrite(ObjectId aTarget, int aFieldId, int aValue)
 	{
+		super.fieldWrite(aTarget, aFieldId, aValue);
 		fieldAccess(aTarget, aFieldId);
 	}
 
 	@Override
 	public void fieldWrite(ObjectId aTarget, int aFieldId, long aValue)
 	{
+		super.fieldWrite(aTarget, aFieldId, aValue);
 		fieldAccess(aTarget, aFieldId);
 	}
 
 	@Override
 	public void fieldWrite(ObjectId aTarget, int aFieldId, ObjectId aValue)
 	{
+		super.fieldWrite(aTarget, aFieldId, aValue);
 		fieldAccess(aTarget, aFieldId);
 	}
 }

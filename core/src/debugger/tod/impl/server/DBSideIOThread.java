@@ -205,13 +205,14 @@ public abstract class DBSideIOThread
 				@Override
 				protected EventCollector createCollector(int aThreadId)
 				{
-					EventCollector theCollector = new ObjectAccessDistributionEventCollector();
+					EventCollector theCollector = new ObjectAccessDistributionEventCollector(aThreadId);
 					theCollectors.put(aThreadId, theCollector);
 					return theCollector;
 				}
 			};
 			theIOThread.run();
 			
+			System.out.println("Collectors:");
 			for(Map.Entry<Integer, EventCollector> theEntry : theCollectors.entrySet())
 			{
 				System.out.println(theEntry.getKey() + ": " + theEntry.getValue());

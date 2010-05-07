@@ -53,7 +53,7 @@ import zz.utils.primitive.ByteArray;
 
 public class ThreadReplayer
 {
-	public static final boolean ECHO = true;
+	public static final boolean ECHO = false;
 	public static boolean ECHO_FORREAL = true;
 
 	private final int itsThreadId;

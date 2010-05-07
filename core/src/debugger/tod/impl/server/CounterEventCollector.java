@@ -43,6 +43,11 @@ public class CounterEventCollector extends EventCollector
 		return itsCount;
 	}
 	
+	protected void resetCount()
+	{
+		itsCount = 0;
+	}
+	
 	@Override
 	public void fieldRead(ObjectId aTarget, int aFieldId, double aValue)
 	{

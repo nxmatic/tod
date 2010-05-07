@@ -72,7 +72,7 @@ public class ReplayerGenerator
 		itsDatabase = aDatabase;
 	}
 
-	public static final boolean USE_SHORT_NAMES = false;
+	public static final boolean USE_SHORT_NAMES = true;
 	
 	public static final String REPLAYER_NAME_PREFIX = "$tdrpl$";
 	

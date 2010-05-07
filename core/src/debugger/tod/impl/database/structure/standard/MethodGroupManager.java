@@ -72,7 +72,7 @@ public class MethodGroupManager implements IStructureDatabase.Listener, Serializ
 {
 	private static final long serialVersionUID = 173278295020871234L;
 	
-	private static final boolean ECHO = true;
+	private static final boolean ECHO = false;
 
 	private transient StructureDatabase itsStructureDatabase;
 	private transient IClassInfo itsObjectClass;

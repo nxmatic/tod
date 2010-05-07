@@ -162,7 +162,7 @@ implements IShareableStructureDatabase
 		if (theFileExists) 
 		{
 			load();
-			if (! aForReplay) itsMethodGroupManager.clearChanges();
+//			if (! aForReplay) itsMethodGroupManager.clearChanges();
 		}
 		else 
 		{

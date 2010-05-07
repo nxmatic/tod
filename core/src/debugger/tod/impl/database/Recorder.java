@@ -60,7 +60,7 @@ public class Recorder extends Server
 
 	public Recorder() throws FileNotFoundException
 	{
-		super(itsConfig.getPort(), DebugFlags.TOD_SERVER_DAEMON);
+		super(itsConfig.getPort(), false, DebugFlags.TOD_SERVER_DAEMON);
 
 		itsEventsFile = new File(itsConfig.get(TODConfig.DB_RAW_EVENTS_DIR)+"/events.raw");
 		itsEventsFile.delete();
@@ -73,6 +73,8 @@ public class Recorder extends Server
 		
 		itsStructureDatabase = StructureDatabase.create(itsConfig, theDbFile, false);
 		itsInstrumenter = new ASMInstrumenter2(itsConfig, itsStructureDatabase);
+		
+		start();
 	}
 	
 	@Override
@@ -160,10 +162,12 @@ public class Recorder extends Server
 						theRead = -1;
 					}
 					
-					theCount += theRead;
-
 					if (theRead == 0) continue;
-					else if (theRead > 0) itsFileOut.write(theBuffer, 0, theRead);
+					else if (theRead > 0) 
+					{
+						itsFileOut.write(theBuffer, 0, theRead);
+						theCount += theRead;
+					}
 					else
 					{
 						itsDataIn.close();
