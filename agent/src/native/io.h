@@ -55,6 +55,12 @@ JNIEXPORT jint JNICALL Java_java_tod_io__1IO_out
 JNIEXPORT jint JNICALL Java_java_tod_io__1IO_err
   (JNIEnv* jni, jclass, jstring str);
 
+JNIEXPORT jint JNICALL Java_java_tod_io__1IO_outi
+  (JNIEnv* jni, jclass, jstring str, jintArray v);
+
+JNIEXPORT jint JNICALL Java_java_tod_io__1IO_outb
+  (JNIEnv* jni, jclass, jstring str, jbooleanArray v);
+
 
 #ifdef __cplusplus
 }

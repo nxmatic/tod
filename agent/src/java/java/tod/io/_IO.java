@@ -5,6 +5,7 @@ package java.tod.io;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.tod.util._StringBuilder;
 
 public class _IO
 {
@@ -19,6 +20,9 @@ public class _IO
 	 */
 	public static native void err(String aString);
 	
+	public static native void outi(String aMessage, int... aValues);	
+	public static native void outb(String aMessage, boolean... aValues);
+
 	public static void printStackTrace(Throwable aThrowable)
 	{
 		StringWriter theStringWriter = new StringWriter();
@@ -29,8 +33,8 @@ public class _IO
 	
 	public static void initNatives()
 	{
-		out("[TOD]");
-		err("[TOD]");
+		out("[TOD] _IO.initNatives");
+		err("[TOD] _IO.InitNatives");
 	}
 	
 }

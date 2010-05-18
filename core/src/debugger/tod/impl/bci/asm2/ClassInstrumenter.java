@@ -31,6 +31,7 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.bci.asm2;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -46,13 +47,15 @@ import org.objectweb.asm.tree.MethodNode;
 import tod.Util;
 import tod.core.bci.IInstrumenter.InstrumentedClass;
 import tod.core.config.TODConfig;
+import tod.core.database.structure.IBehaviorInfo;
 import tod.core.database.structure.IClassInfo;
 import tod.core.database.structure.IMutableBehaviorInfo;
 import tod.core.database.structure.IMutableClassInfo;
 import tod.core.database.structure.IMutableStructureDatabase;
 import tod.core.database.structure.ITypeInfo;
-import tod.core.database.structure.IStructureDatabase.BehaviorMonitoringModeChange;
+import tod.impl.database.structure.standard.StructureDatabase;
 import tod2.access.TODAccessor;
+import tod2.agent.io._GrowingByteBuffer;
 import zz.utils.Utils;
 
 /**
@@ -94,6 +97,8 @@ public class ClassInstrumenter
 	private IClassInfo itsSuperclass;
 	private IClassInfo[] itsInterfaces;
 	
+	private List<IBehaviorInfo> itsBehaviors = new ArrayList<IBehaviorInfo>();
+	
 	private boolean itsModified = false;
 	
 	public ClassInstrumenter(ASMInstrumenter2 aInstrumenter, String aName, byte[] aBytecode, boolean aUseJava14)
@@ -114,18 +119,18 @@ public class ClassInstrumenter
 				null
 				: getDatabase().getNewClass(Util.jvmToScreen(itsNode.superName));
 		
-		IClassInfo[] theInterfaces = new IClassInfo[itsNode.interfaces != null ? itsNode.interfaces.size() : 0];
+		itsInterfaces = new IClassInfo[itsNode.interfaces != null ? itsNode.interfaces.size() : 0];
 		if (itsNode.interfaces != null) for (int i = 0; i < itsNode.interfaces.size(); i++)
 		{
 			String theInterface = (String) itsNode.interfaces.get(i);
-			theInterfaces[i] = getDatabase().getNewClass(Util.jvmToScreen(theInterface));
+			itsInterfaces[i] = getDatabase().getNewClass(Util.jvmToScreen(theInterface));
 		}
 		
 		itsClassInfo.setup(
 				itsInterface, 
 				getDatabase().isInScope(itsName), 
 				Utils.md5String(aBytecode), 
-				theInterfaces, 
+				itsInterfaces, 
 				itsSuperclass);
 	}
 	
@@ -179,14 +184,35 @@ public class ClassInstrumenter
 				
 		itsClassInfo.setBytecode(theBytecode, itsOriginal);
 		
-		List<BehaviorMonitoringModeChange> theModeChanges = getInstrumenter().getModeChangesAndReset();
-		
-		itsClassInfo.setModeChanges(theModeChanges.toArray(new BehaviorMonitoringModeChange[theModeChanges.size()]));
-		
 		return new InstrumentedClass(
 				itsClassInfo.getId(),
 				theBytecode, 
-				theModeChanges);
+				createClassInfo());
+	}
+	
+	private byte[] createClassInfo()
+	{
+		_GrowingByteBuffer b = _GrowingByteBuffer.allocate(1024);
+		
+		// Superclass
+		b.putInt(itsSuperclass != null ? itsSuperclass.getId() : 0);
+		
+		// Interfaces
+		b.putShort((short) itsInterfaces.length);
+		for(IClassInfo theInterface : itsInterfaces) b.putInt(theInterface.getId());
+		
+		// Methods
+		b.putShort((short) itsBehaviors.size());
+		for(IBehaviorInfo theBehavior : itsBehaviors) 
+		{
+			b.putInt(theBehavior.getId());
+			b.putInt(getDatabase().getBehaviorSignatureId(theBehavior));
+			b.putBoolean(theBehavior.isNative() || StructureDatabase.isSkipped(itsNode.name));
+			b.putBoolean(theBehavior.isStaticInit());
+			b.putBoolean(getDatabase().isInScope(itsNode.name));
+		}
+		
+		return b.toArray();
 	}
 	
 	private void processNormalClass()
@@ -228,6 +254,7 @@ public class ClassInstrumenter
 	private void processMethod(MethodNode aNode)
 	{
 		IMutableBehaviorInfo theBehavior = itsClassInfo.getNewBehavior(aNode.name, aNode.desc, aNode.access);
+		itsBehaviors.add(theBehavior);
 		
 		if (BCIUtils.CLS_CLASSLOADER.equals(getNode().name) 
 				&& ("loadClassInternal".equals(aNode.name) || "checkPackageAccess".equals(aNode.name))) 

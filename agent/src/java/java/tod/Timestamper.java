@@ -48,6 +48,12 @@ public class Timestamper extends Thread
 		BitUtilsLite.pow2(TIMESTAMP_ADJUST_INACCURACY+TIMESTAMP_ADJUST_SHIFT)-1;
 	
 
+	static
+	{
+		// Start the thread
+		new Timestamper();
+	}
+	
 	private Timestamper()
 	{
 		super("[TOD] Timestamper");

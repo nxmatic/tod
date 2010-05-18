@@ -23,13 +23,11 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 package tod.core.database.structure;
 
 import java.io.Serializable;
-import java.tod.TracedMethods;
 import java.util.Map;
 
 import tod.core.config.TODConfig;
 import tod.core.database.structure.IBehaviorInfo.BytecodeRole;
 import tod.impl.database.structure.standard.AspectInfo;
-import tod2.agent.MonitoringMode;
 
 /**
  * The structure database contains static information about the
@@ -169,13 +167,6 @@ public interface IStructureDatabase
 	public int getProbeCount();
 	
 	/**
-	 * Returns an ordered iterable of all mode changes performed.
-	 * This is aimed to be used in conjunction with {@link TracedMethods} versioning.
-	 * @param aVersion The version number that was created in response to the change.
-	 */
-	public BehaviorMonitoringModeChange getBehaviorMonitoringModeChange(int aVersion);
-	
-	/**
 	 * Returns the information (location of the source code) for the specified advice source id.
 	 * @param aAdviceId An advice source id.
 	 * @return The advice info, or null if not available.
@@ -212,40 +203,8 @@ public interface IStructureDatabase
 		public void behaviorAdded(IBehaviorInfo aBehavior);
 		public void behaviorChanged(IBehaviorInfo aBehavior);
 		public void fieldAdded(IFieldInfo aField);
-		
-		/**
-		 * @see MonitoringMode
-		 */
-		public void monitoringModeChanged(BehaviorMonitoringModeChange aChange);
 	}
 
-	public static class BehaviorMonitoringModeChange implements Serializable
-	{
-		private static final long serialVersionUID = 69242304676431987L;
-
-		public final int behaviorId;
-		
-		/**
-		 * One of the INSTRUMENTATION_ constants in {@link MonitoringMode},
-		 * or -1 if no change
-		 */
-		public final int instrumentationMode;
-		
-		/**
-		 * One of the CALL_ constants in {@link MonitoringMode},
-		 * or -1 if no change
-		 */
-		public final int callMode;
-
-		public BehaviorMonitoringModeChange(int aBehaviorId, int aInstrumentationMode, int aCallMode)
-		{
-			behaviorId = aBehaviorId;
-			instrumentationMode = aInstrumentationMode;
-			callMode = aCallMode;
-		}
-	}
-
-	
 	public static class Stats implements Serializable
 	{
 		private static final long serialVersionUID = -2910977890794945414L;

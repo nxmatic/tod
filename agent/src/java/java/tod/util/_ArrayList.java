@@ -3,6 +3,9 @@
  */
 package java.tod.util;
 
+import java.tod.gnu.trove.TIntProcedure;
+import java.tod.gnu.trove.TObjectProcedure;
+
 /**
  * A simple version of {@link ArrayList}.
  * We don't use {@link ArrayList} because it might be instrumented
@@ -25,7 +28,8 @@ public class _ArrayList<T>
 	
 	public T get(int aIndex)
 	{
-		if (aIndex >= itsSize || aIndex < 0) throw new IndexOutOfBoundsException(""+aIndex+"/"+itsSize);
+		if (aIndex < 0) throw new IndexOutOfBoundsException(""+aIndex+"/"+itsSize);
+		if (aIndex >= itsSize) return null;
 		return itsData[aIndex];
 	}
 	
@@ -41,10 +45,30 @@ public class _ArrayList<T>
 	
 	public void add(int aIndex, T aValue)
 	{
-		if (aIndex > itsSize || aIndex < 0) throw new IndexOutOfBoundsException(""+aIndex+"/"+itsSize);
+//		if (aIndex > itsSize || aIndex < 0) throw new IndexOutOfBoundsException(""+aIndex+"/"+itsSize);
 		ensureSize(aIndex+1);
 		itsData[aIndex] = aValue;
 		itsSize = Math.max(itsSize, aIndex+1);
+	}
+	
+	public int indexOf(T aValue)
+	{
+		for(int i=0;i<itsSize;i++) if (itsData[i] == aValue) return i;
+		return -1;
+	}
+	
+	public boolean remove(T aValue)
+	{
+		int theIndex = indexOf(aValue);
+		if (theIndex == -1) return false;
+		remove(theIndex);
+		return true;
+	}
+	
+	public void remove(int aIndex)
+	{
+		System.arraycopy(itsData, aIndex+1, itsData, aIndex, itsSize-aIndex-1);
+		itsSize--;
 	}
 	
 	public void add(T aValue)
@@ -86,4 +110,21 @@ public class _ArrayList<T>
 		System.arraycopy(itsData, 0, aDest, 0, size());
 		return aDest;
 	}
+	
+    /**
+     * Applies the procedure to each value in the list in ascending
+     * (front to back) order.
+     *
+     * @param procedure a <code>TIntProcedure</code> value
+     * @return true if the procedure did not terminate prematurely.
+     */
+    public boolean forEach(TObjectProcedure<T> procedure) {
+        for (int i = 0; i < itsSize; i++) {
+            if (! procedure.execute(itsData[i])) {
+                return false;
+            }
+        }
+        return true;
+    }
+
 }

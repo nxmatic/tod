@@ -11,6 +11,7 @@ public class Message
 {
 	public static final byte PACKET_TYPE_THREAD = 1;
 	public static final byte PACKET_TYPE_STRING = 2;
+	public static final byte PACKET_TYPE_MODECHANGES = 3;
 	
 	public static final byte FIELD_READ = 1;
 	public static final byte FIELD_READ_SAME = 2;

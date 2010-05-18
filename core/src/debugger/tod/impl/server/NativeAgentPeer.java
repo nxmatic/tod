@@ -38,11 +38,9 @@ import tod.core.DebugFlags;
 import tod.core.bci.IInstrumenter;
 import tod.core.bci.IInstrumenter.InstrumentedClass;
 import tod.core.config.TODConfig;
-import tod.core.database.structure.IMutableStructureDatabase.LastIds;
-import tod.core.database.structure.IStructureDatabase.BehaviorMonitoringModeChange;
 import tod.core.server.TODServer;
 import tod2.agent.AgentConfig;
-import zz.utils.Utils;
+import tod2.agent.io._ByteBuffer;
 
 
 /**
@@ -53,7 +51,6 @@ import zz.utils.Utils;
 public abstract class NativeAgentPeer extends SocketThread
 {
 	public static final byte INSTRUMENT_CLASS = 50;
-	public static final byte SYNC_CACHE_IDS = 51;
 	public static final byte USE_CACHED_CLASS = 52;
 	public static final byte FLUSH = 99;
 	public static final byte OBJECT_HASH = 1;
@@ -68,6 +65,8 @@ public abstract class NativeAgentPeer extends SocketThread
 	private final TODConfig itsConfig;
 	
 	private final IInstrumenter itsInstrumenter;
+	
+	private final String itsStructureDatabaseId;
 	
 	/**
 	 * This flags is set to true when the connection to the agent is entirely
@@ -108,6 +107,7 @@ public abstract class NativeAgentPeer extends SocketThread
 	 */
 	public NativeAgentPeer(
 			TODConfig aConfig,
+			String aStructureDatabaseId,
 			Socket aSocket,
 			IInstrumenter aInstrumenter,
 			int aHostId)
@@ -115,6 +115,7 @@ public abstract class NativeAgentPeer extends SocketThread
 		super (aSocket, false);
 		assert aConfig != null;
 		itsConfig = aConfig;
+		itsStructureDatabaseId = aStructureDatabaseId;
 		itsInstrumenter = aInstrumenter;
 		itsHostId = aHostId;
 		
@@ -196,10 +197,6 @@ public abstract class NativeAgentPeer extends SocketThread
 			processInstrumentClassCommand(aInputStream, aOutputStream);
 			break;
 			
-		case SYNC_CACHE_IDS:
-			processSyncCacheIdsCommand(aInputStream);
-			break;
-			
 		case USE_CACHED_CLASS:
 			processUseCachedClassCommand(aInputStream);
 			break;
@@ -252,7 +249,7 @@ public abstract class NativeAgentPeer extends SocketThread
 		String theCachePath =
 			itsConfig.get(TODConfig.CLASS_CACHE_PATH)
 			+ File.separatorChar + "client" + File.separatorChar
-			+ Utils.md5String(itsConfig.get(TODConfig.SCOPE_TRACE_FILTER).getBytes());
+			+ itsStructureDatabaseId;
 		theOutStream.writeByte(SET_CACHE_PATH);
 		theOutStream.writeUTF(theCachePath);
 		
@@ -334,21 +331,9 @@ public abstract class NativeAgentPeer extends SocketThread
 			// Write out class id
 			aOutputStream.writeInt(theInstrumentedClass.id);
 			
-			// Write out traced method ids
-			if (DebugFlags.INSTRUMENTER_LOG) System.out.println("Sending "+theInstrumentedClass.modeChanges.size()+" mode changes.");
-			aOutputStream.writeInt(theInstrumentedClass.modeChanges.size());
-			for(BehaviorMonitoringModeChange theMode : theInstrumentedClass.modeChanges)
-			{
-				aOutputStream.writeInt(theMode.behaviorId);
-				aOutputStream.writeByte(theMode.instrumentationMode);
-				aOutputStream.writeByte(theMode.callMode);
-			}
-			
-			// Write out last ids
-			LastIds theLastIds = itsInstrumenter.getLastIds();
-			aOutputStream.writeInt(theLastIds.classId);
-			aOutputStream.writeInt(theLastIds.behaviorId);
-			aOutputStream.writeInt(theLastIds.fieldId);
+			// Write out class info
+			aOutputStream.writeInt(theInstrumentedClass.info.length);
+			aOutputStream.write(theInstrumentedClass.info);
 		}
 		else if (theError != null)
 		{
@@ -368,17 +353,8 @@ public abstract class NativeAgentPeer extends SocketThread
 		aOutputStream.flush();
 	}
 	
-	private void processSyncCacheIdsCommand(DataInputStream aInputStream) throws IOException
-	{
-		int theClassId = aInputStream.readInt();
-		int theBehaviorId = aInputStream.readInt();
-		int theFieldId = aInputStream.readInt();
-		itsInstrumenter.setLastIds(new LastIds(theClassId, theBehaviorId, theFieldId));
-	}
-	
 	private void processUseCachedClassCommand(DataInputStream aInputStream) throws IOException
 	{
 		int theClassId = aInputStream.readInt();
-		itsInstrumenter.replayModeChanges(theClassId);
 	}
 }

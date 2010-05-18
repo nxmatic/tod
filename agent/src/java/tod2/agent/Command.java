@@ -64,12 +64,4 @@ public class Command
 	 * return: none 
 	 */
 	public static final byte AGCMD_ENABLECAPTURE = BASE+5;
-	
-	/**
-	 * Tells the agent to set the monitoring mode for a set of methods.
-	 * args: count(int), [bid(int), mode(byte)]*
-	 * return: none
-	 */
-	public static final byte AGCMD_SETMONITORINGMODE = BASE+6;
-	
 }

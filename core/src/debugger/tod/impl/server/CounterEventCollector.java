@@ -49,65 +49,17 @@ public class CounterEventCollector extends EventCollector
 	}
 	
 	@Override
-	public void fieldRead(ObjectId aTarget, int aFieldId, double aValue)
+	public void fieldRead(ObjectId aTarget, int aFieldId)
 	{
 		itsCount++;
 	}
 
 	@Override
-	public void fieldRead(ObjectId aTarget, int aFieldId, float aValue)
+	public void fieldWrite(ObjectId aTarget, int aFieldId)
 	{
 		itsCount++;
 	}
 
-	@Override
-	public void fieldRead(ObjectId aTarget, int aFieldId, int aValue)
-	{
-		itsCount++;
-	}
-
-	@Override
-	public void fieldRead(ObjectId aTarget, int aFieldId, long aValue)
-	{
-		itsCount++;
-	}
-
-	@Override
-	public void fieldRead(ObjectId aTarget, int aFieldId, ObjectId aValue)
-	{
-		itsCount++;
-	}
-
-	@Override
-	public void fieldWrite(ObjectId aTarget, int aFieldId, double aValue)
-	{
-		itsCount++;
-	}
-
-	@Override
-	public void fieldWrite(ObjectId aTarget, int aFieldId, float aValue)
-	{
-		itsCount++;
-	}
-
-	@Override
-	public void fieldWrite(ObjectId aTarget, int aFieldId, int aValue)
-	{
-		itsCount++;
-	}
-
-	@Override
-	public void fieldWrite(ObjectId aTarget, int aFieldId, long aValue)
-	{
-		itsCount++;
-	}
-
-	@Override
-	public void fieldWrite(ObjectId aTarget, int aFieldId, ObjectId aValue)
-	{
-		itsCount++;
-	}
-	
 	@Override
 	public String toString()
 	{

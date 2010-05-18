@@ -106,6 +106,7 @@ public abstract class DBSideIOThread
 				{
 				case Message.PACKET_TYPE_THREAD: processThreadPacket(); break;
 				case Message.PACKET_TYPE_STRING: processStringPacket(); break;
+				case Message.PACKET_TYPE_MODECHANGES: processModeChangesPacket(); break;
 				case -1: break loop;
 				default: throw new RuntimeException("Not handled: "+thePacketType);
 				}
@@ -184,6 +185,24 @@ public abstract class DBSideIOThread
 		String theString = _ByteBuffer.getString(itsIn);
 		
 		itsProcessedSize += 8 + 4 + theString.length()*2;
+	}
+	
+	private void processModeChangesPacket() throws IOException
+	{
+		int theLength = _ByteBuffer.getIntL(itsIn);
+		byte[] theData = new byte[theLength];
+		Utils.readFully(itsIn, theData);
+		
+		_ByteBuffer b = _ByteBuffer.wrap(theData);
+		while(b.remaining() > 0)
+		{
+			int theBehaviorId = b.getInt();
+			byte theMode = b.get();
+			
+			ModeChangesList.add(theBehaviorId, theMode);
+		}
+		
+		itsProcessedSize += 4 + theLength;
 	}
 	
 	public static void main(String[] args) throws InterruptedException

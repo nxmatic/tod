@@ -10,8 +10,6 @@ import java.io.InputStream;
 
 import tod2.access.TODAccessor;
 
-
-
 /**
  * A little-endian byte buffer similar to that of NIO.
  * @author gpothier
@@ -233,6 +231,16 @@ public class _ByteBuffer
 		return Double.longBitsToDouble(getLong());
 	}
 	
+	public final void putBoolean(boolean v)
+	{
+		put(v ? (byte) 1 : (byte) 0);
+	}
+	
+	public final boolean getBoolean()
+	{
+		return get() != 0;
+	}
+	
 	/**
 	 * Writes a representation of the string into this buffer.
 	 */
@@ -384,6 +392,16 @@ public class _ByteBuffer
 	{
 		itsBytes = aNewData;
 		clear();
+	}
+	
+	/**
+	 * Returns a copy of the backing array from start to current position.
+	 */
+	public final byte[] toArray()
+	{
+		byte[] theResult = new byte[itsPos];
+		System.arraycopy(itsBytes, 0, theResult, 0, itsPos);
+		return theResult;
 	}
 
 	private static byte int3(int x) { return (byte)(x >> 24); }

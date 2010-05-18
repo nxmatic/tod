@@ -36,7 +36,6 @@ import tod.core.ILogCollector;
 import tod.core.bci.IInstrumenter;
 import tod.core.config.TODConfig;
 import tod.core.database.structure.IStructureDatabase;
-import tod.core.database.structure.IMutableStructureDatabase.LastIds;
 import tod.core.server.TODServer;
 import tod.core.transport.CollectorLogReceiver;
 import tod.core.transport.LogReceiver;
@@ -292,6 +291,7 @@ public class JavaTODServer extends TODServer
 		{
 			super(
 					getConfig(), 
+					itsStructureDatabase.getId(),
 					aSocket, 
 					new SynchronizedInstrumenter(itsInstrumenter),
 					aHostId);
@@ -336,21 +336,6 @@ public class JavaTODServer extends TODServer
 		public synchronized Iterable<String> getSpecialCaseClasses()
 		{
 			return itsDelegate.getSpecialCaseClasses();
-		}
-
-		public synchronized LastIds getLastIds()
-		{
-			return itsDelegate.getLastIds();
-		}
-
-		public synchronized void setLastIds(LastIds aIds)
-		{
-			itsDelegate.setLastIds(aIds);
-		}
-
-		public synchronized void replayModeChanges(int aClassId)
-		{
-			itsDelegate.replayModeChanges(aClassId);
 		}
 	}
 	

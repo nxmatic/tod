@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <classpath>
 	<classpathentry kind="src" path="resources"/>
-	<classpathentry kind="src" path="src/debugger"/>
+	<classpathentry excluding="tod/impl/database/structure/standard/MethodGroupManager.java" kind="src" path="src/debugger"/>
 	<classpathentry kind="src" path="src/test"/>
 	<classpathentry kind="src" path="src/experiments"/>
 	<classpathentry kind="src" path="src/testcase"/>
@@ -11,7 +11,7 @@
 	<classpathentry combineaccessrules="false" exported="true" kind="src" path="/TOD-agent"/>
 	<classpathentry kind="lib" path="lib/jython-2.2.1.jar"/>
 	<classpathentry kind="lib" path="lib/infovis.jar" sourcepath="/infovis-0.9beta2"/>
-	<classpathentry kind="lib" path="lib/trove-2.0.4.jar"/>
+	<classpathentry exported="true" kind="lib" path="lib/trove-2.1.0.jar" sourcepath="/home/gpothier/installs/java/trove-2.0.4/lib/trove-src-2.0.4.jar"/>
 	<classpathentry kind="con" path="org.eclipse.ajdt.core.ASPECTJRT_CONTAINER"/>
 	<classpathentry combineaccessrules="false" kind="src" path="/asm3-svn"/>
 	<classpathentry combineaccessrules="false" kind="src" path="/zz.jinterp"/>

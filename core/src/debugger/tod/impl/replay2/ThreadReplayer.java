@@ -41,8 +41,9 @@ import tod.core.database.browser.LocationUtils;
 import tod.core.database.structure.IBehaviorInfo;
 import tod.core.database.structure.IStructureDatabase;
 import tod.core.database.structure.ObjectId;
-import tod.core.database.structure.IStructureDatabase.BehaviorMonitoringModeChange;
 import tod.impl.server.BufferStream;
+import tod.impl.server.ModeChangesList;
+import tod.impl.server.ModeChangesList.ModeChange;
 import tod2.agent.Message;
 import tod2.agent.MonitoringMode;
 import tod2.agent.ValueType;
@@ -220,19 +221,10 @@ public class ThreadReplayer
 	{
 		for(int i=itsCurrentMonitoringModeVersion;i<aVersion;i++)
 		{
-			BehaviorMonitoringModeChange theChange = itsDatabase.getBehaviorMonitoringModeChange(i);
-			int theBehaviorId = theChange.behaviorId;
-			
-			byte theMode = itsMonitoringModes.get(theBehaviorId);
-			int theInstrumentationMode = theMode & MonitoringMode.MASK_INSTRUMENTATION;
-			int theCallMode = theMode & MonitoringMode.MASK_CALL;
-			
-			if (theChange.instrumentationMode >= 0) theInstrumentationMode = theChange.instrumentationMode;
-			if (theChange.callMode >= 0) theCallMode = theChange.callMode;
-
-			int theNewMode = theInstrumentationMode | theCallMode;
-			itsMonitoringModes.set(theBehaviorId, (byte) theNewMode);
-			if (ThreadReplayer.ECHO && ThreadReplayer.ECHO_FORREAL) System.out.println("Mode changed: "+theBehaviorId+" -> "+LocationUtils.toMonitoringModeString(theNewMode));
+			ModeChange theChange = ModeChangesList.get(i);
+			itsMonitoringModes.set(theChange.behaviorId, theChange.mode);
+			if (ThreadReplayer.ECHO && ThreadReplayer.ECHO_FORREAL) 
+				System.out.println("Mode changed: "+theChange.behaviorId+" -> "+LocationUtils.toMonitoringModeString(theChange.mode));
 		}
 		
 		itsCurrentMonitoringModeVersion = aVersion;
@@ -309,8 +301,7 @@ public class ThreadReplayer
 	private void processSync(BufferStream aBuffer)
 	{
 		long theTimestamp = aBuffer.getLong();
-		
-		// TODO: register
+		itsCollector.sync(theTimestamp);
 	}
 	
 	public InScopeReplayerFrame createInScopeFrame(ReplayerFrame aParent, int aBehaviorId, String aDebugInfo)

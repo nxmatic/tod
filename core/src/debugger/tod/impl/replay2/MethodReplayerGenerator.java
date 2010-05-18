@@ -540,6 +540,17 @@ public class MethodReplayerGenerator
 		s.ALOAD(0);
 		s.INVOKEVIRTUAL(CLS_REPLAYERFRAME, "getCollector", "()"+DSC_EVENTCOLLECTOR);
 	}
+
+	/**
+	 * Invokes one of the value() methods of {@link EventCollector}. 
+	 * Assumes that the collector and the value are on the stack
+	 * @param s
+	 */
+	private static void invokeValue(SList s, Type aType)
+	{
+		s.INVOKEVIRTUAL(CLS_EVENTCOLLECTOR, "value", "("+getActualType(aType).getDescriptor()+")V");
+
+	}
 	
 	private void processInstructions(InsnList aInsns)
 	{
@@ -1018,11 +1029,14 @@ public class MethodReplayerGenerator
 		
 		// Register event
 		pushCollector(s);
+		s.DUP();
 		
 		s.ALOAD(itsTmpTargetVar);
 		s.LDC(StructureDatabaseUtils.getFieldId(itsDatabase, aNode.owner, aNode.name, false));
+		s.INVOKEVIRTUAL(CLS_EVENTCOLLECTOR, "fieldRead", "("+DSC_OBJECTID+"I)V");
+		
 		s.ILOAD(theType, itsTmpValueVar);
-		s.INVOKEVIRTUAL(CLS_EVENTCOLLECTOR, "fieldRead", "("+DSC_OBJECTID+"I"+getActualType(theType).getDescriptor()+")V");
+		invokeValue(s, theType);
 		
 		s.ILOAD(theType, itsTmpValueVar);		
 		
@@ -1041,11 +1055,14 @@ public class MethodReplayerGenerator
 		
 		// Register event
 		pushCollector(s);
+		s.DUP();
 		
 		s.ALOAD(itsTmpTargetVar);
 		s.LDC(StructureDatabaseUtils.getFieldId(itsDatabase, aNode.owner, aNode.name, false));
+		s.INVOKEVIRTUAL(CLS_EVENTCOLLECTOR, "fieldWrite", "("+DSC_OBJECTID+"I)V");
+		
 		s.ILOAD(theType, itsTmpValueVar);
-		s.INVOKEVIRTUAL(CLS_EVENTCOLLECTOR, "fieldWrite", "("+DSC_OBJECTID+"I"+getActualType(theType).getDescriptor()+")V");
+		invokeValue(s, theType);
 		
 		aInsns.insert(aNode, s);
 		aInsns.remove(aNode);

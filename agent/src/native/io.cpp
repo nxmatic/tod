@@ -165,7 +165,7 @@ JNIEXPORT jint JNICALL Java_java_tod_io__1SocketChannel_in_1avail0
 	return s->rdbuf()->in_avail();
 }
 
-void ioPrint(JNIEnv* jni, jstring str, FILE* o)
+void ioPrint0(const char* format, JNIEnv* jni, jstring str, FILE* o)
 {
 	int len = jni->GetStringUTFLength(str);
 	char* b = (char*) jni->GetStringUTFChars(str, NULL);
@@ -173,23 +173,61 @@ void ioPrint(JNIEnv* jni, jstring str, FILE* o)
 	memcpy(c, b, len);
 	c[len] = 0;
 	
-	fprintf(o, "%s\n", c);
+	fprintf(o, format, c);
 	fflush(o);
 	
 	free(c);
 	jni->ReleaseStringUTFChars(str, b);
 }
 
+void ioPrintln(JNIEnv* jni, jstring str, FILE* o)
+{
+	ioPrint0("%s\n", jni, str, o);
+}
+
+void ioPrint(JNIEnv* jni, jstring str, FILE* o)
+{
+	ioPrint0("%s", jni, str, o);
+}
+
 JNIEXPORT jint JNICALL Java_java_tod_io__1IO_out
   (JNIEnv* jni, jclass, jstring str)
 {
-	ioPrint(jni, str, stdout);
+	ioPrintln(jni, str, stdout);
 }
 
 JNIEXPORT jint JNICALL Java_java_tod_io__1IO_err
   (JNIEnv* jni, jclass, jstring str)
 {
-	ioPrint(jni, str, stderr);
+	ioPrintln(jni, str, stderr);
+}
+
+JNIEXPORT jint JNICALL Java_java_tod_io__1IO_outi
+  (JNIEnv* jni, jclass, jstring str, jintArray v)
+{
+	ioPrint(jni, str, stdout);
+	jsize len = jni->GetArrayLength(v);
+	jint* elem = jni->GetIntArrayElements(v, NULL);
+	
+	for(int i=0;i<len;i++) printf("%d ", elem[i]);
+	printf("\n");
+	fflush(stdout);
+	
+	jni->ReleaseIntArrayElements(v, elem, JNI_ABORT);
+}
+
+JNIEXPORT jint JNICALL Java_java_tod_io__1IO_outb
+  (JNIEnv* jni, jclass, jstring str, jbooleanArray v)
+{
+	ioPrint(jni, str, stdout);
+	jsize len = jni->GetArrayLength(v);
+	jboolean* elem = jni->GetBooleanArrayElements(v, NULL);
+	
+	for(int i=0;i<len;i++) printf("%d ", elem[i]);
+	printf("\n");
+	fflush(stdout);
+	
+	jni->ReleaseBooleanArrayElements(v, elem, JNI_ABORT);
 }
 
 

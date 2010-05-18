@@ -143,18 +143,6 @@ public class MethodGroupManager implements IStructureDatabase.Listener, Serializ
 		return itsStructureDatabase.isInScope(aBehavior.getDeclaringType().getName());
 	}
 	
-	private String getSignature(IBehaviorInfo aBehavior)
-	{
-		String theName = aBehavior.getName();
-		if ("<init>".equals(theName)) theName = "<init_"+ClassInfo.getTypeChars(aBehavior.getDeclaringType())+">";
-		if ("<clinit>".equals(theName)) theName = "<clinit_"+ClassInfo.getTypeChars(aBehavior.getDeclaringType())+">";
-		
-		StringBuilder theBuilder = new StringBuilder(theName);
-		theBuilder.append('|');
-		for(ITypeInfo theType : aBehavior.getArgumentTypes()) theBuilder.append(ClassInfo.getTypeChars(theType));
-		return theBuilder.toString();
-	}
-	
 	private void markMonitored(IBehaviorInfo aBehavior)
 	{
 		byte theMode = itsModes.get(aBehavior.getId());
@@ -251,7 +239,7 @@ public class MethodGroupManager implements IStructureDatabase.Listener, Serializ
 	public void behaviorChanged(IBehaviorInfo aBehavior)
 	{
 		if (ECHO) Utils.println("[MGM] behaviorChanged: %s", aBehavior);
-		MethodSignatureGroup theSignatureGroup = getSignatureGroup(getSignature(aBehavior));
+		MethodSignatureGroup theSignatureGroup = getSignatureGroup(StructureDatabase.getSignature(aBehavior));
 		MethodGroup theMethodGroup = findGroup(theSignatureGroup, aBehavior.getDeclaringType());
 		
 		// Update flags
@@ -267,17 +255,10 @@ public class MethodGroupManager implements IStructureDatabase.Listener, Serializ
 		itsChildrenMap.add(aParent.getId(), aChild.getId());
 	}
 	
-	public static boolean isSkipped(String aClassName, String aMethodName, boolean aIsInScope)
-	{
-		if (aClassName.startsWith("java/lang/ref/")) return true;
-//		if (!aIsInScope && aClassName.indexOf("ClassLoader") >= 0) return true;
-		return false;
-	}
-
 	public void behaviorAdded(IBehaviorInfo aBehavior)
 	{
 		if (ECHO) Utils.println("[MGM] behaviorAdded: %s", aBehavior);
-		MethodSignatureGroup theSignatureGroup = getSignatureGroup(getSignature(aBehavior));
+		MethodSignatureGroup theSignatureGroup = getSignatureGroup(StructureDatabase.getSignature(aBehavior));
 		
 		// Check if this method goes into an existing group
 		MethodGroup theMethodGroup = findGroup(theSignatureGroup, aBehavior.getDeclaringType());
@@ -390,21 +371,6 @@ public class MethodGroupManager implements IStructureDatabase.Listener, Serializ
 	{
 	}
 
-	/**
-	 * Merges the method groups corresponding to n1 and n2 if they are distinct.
-	 */
-	private void merge(MethodSignatureGroup aSignatureGroup, Collection<IClassInfo> aClasses)
-	{
-		Set<MethodGroup> theGroups = new HashSet<MethodGroup>();
-		for (IClassInfo theClass : aClasses)
-		{
-			MethodGroup theGroup = aSignatureGroup.getGroup(theClass);
-			if (theGroup != null) theGroups.add(theGroup);
-		}
-		
-		aSignatureGroup.merge(theGroups);
-	}
-	
 	private MethodSignatureGroup getSignatureGroup(String aSignature)
 	{
 		MethodSignatureGroup theGroup = itsSignatureGroups.get(aSignature);
@@ -432,7 +398,7 @@ public class MethodGroupManager implements IStructureDatabase.Listener, Serializ
 		
 		private final int itsGroupId;
 
-		private final Set<IClassInfo> itsTypes = new HashSet<IClassInfo>();
+		private final TIntHashSet itsTypeIds = new TIntHashSet();
 		private final List<IBehaviorInfo> itsBehaviors = new ArrayList<IBehaviorInfo>(1);
 		private boolean itsMonitored = false;
 		private boolean itsHasUnknown = false;
@@ -450,13 +416,13 @@ public class MethodGroupManager implements IStructureDatabase.Listener, Serializ
 		
 		public void add(IBehaviorInfo aBehavior)
 		{
-			itsTypes.add(aBehavior.getDeclaringType());
+			itsTypeIds.add(aBehavior.getDeclaringType().getId());
 			itsBehaviors.add(aBehavior);
 		}
 		
 		public boolean hasType(IClassInfo aClass)
 		{
-			return itsTypes.contains(aClass);
+			return itsTypeIds.contains(aClass.getId());
 		}
 		
 		public List<IBehaviorInfo> getBehaviors()

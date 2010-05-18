@@ -3,19 +3,11 @@
  */
 package tod.impl.bci.asm2;
 
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.List;
 
 import tod.core.bci.IInstrumenter;
 import tod.core.config.TODConfig;
-import tod.core.database.structure.IBehaviorInfo;
-import tod.core.database.structure.IClassInfo;
-import tod.core.database.structure.IFieldInfo;
 import tod.core.database.structure.IMutableStructureDatabase;
-import tod.core.database.structure.IStructureDatabase;
-import tod.core.database.structure.IMutableStructureDatabase.LastIds;
-import tod.core.database.structure.IStructureDatabase.BehaviorMonitoringModeChange;
 
 /**
  * A new version of the instrumenter ({@link ASMInstrumenter}) that reduces the runtime
@@ -26,44 +18,11 @@ public class ASMInstrumenter2 implements IInstrumenter
 {
 	private TODConfig itsConfig;
 	private final IMutableStructureDatabase itsDatabase;
-	private final IStructureDatabase.Listener itsListener = new IStructureDatabase.Listener()
-	{
-		public void behaviorAdded(IBehaviorInfo aBehavior)
-		{
-		}
 
-		public void classAdded(IClassInfo aClass)
-		{
-		}
-
-		public void classChanged(IClassInfo aClass)
-		{
-		}
-
-		public void behaviorChanged(IBehaviorInfo aBehavior)
-		{
-		}
-
-		public void fieldAdded(IFieldInfo aField)
-		{
-		}
-
-		public void monitoringModeChanged(BehaviorMonitoringModeChange aChange)
-		{
-			itsChanges.add(aChange);
-		}
-	};
-	
-	/**
-	 * Collects pending changes until {@link #getModeChangesAndReset()} is called.
-	 */
-	private List<BehaviorMonitoringModeChange> itsChanges = new ArrayList<BehaviorMonitoringModeChange>();
-	
 	public ASMInstrumenter2(TODConfig aConfig, IMutableStructureDatabase aDatabase)
 	{
 		setConfig(aConfig);
 		itsDatabase = aDatabase;
-		itsDatabase.addListener(itsListener);
 	}
 	
 	public Iterable<String> getSpecialCaseClasses()
@@ -90,30 +49,5 @@ public class ASMInstrumenter2 implements IInstrumenter
 	{
 		if (aUseJava14) throw new RuntimeException("Java 1.4 mode not yet supported in asm2");
 		return new ClassInstrumenter(this, aClassName, aBytecode, aUseJava14).proceed();
-	}
-
-	/**
-	 * Returns a list of the needed changes, and clears the internal list.
-	 */
-	public List<BehaviorMonitoringModeChange> getModeChangesAndReset()
-	{
-		List<BehaviorMonitoringModeChange> theChanges = itsChanges;
-		itsChanges = new ArrayList<BehaviorMonitoringModeChange>();
-		return theChanges;
-	}
-
-	public LastIds getLastIds()
-	{
-		return itsDatabase.getLastIds();
-	}
-
-	public void setLastIds(LastIds aIds)
-	{
-		itsDatabase.setLastIds(aIds);
-	}
-
-	public void replayModeChanges(int aClassId)
-	{
-		itsDatabase.replayModeChanges(aClassId);
 	}
 }

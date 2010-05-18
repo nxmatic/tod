@@ -27,7 +27,6 @@ import java.nio.channels.ByteChannel;
 import java.tod.AgentReady;
 import java.tod.TOD;
 import java.tod.ThreadData;
-import java.tod.TracedMethods;
 import java.tod.io._EOFException;
 import java.tod.io._IO;
 import java.tod.io._IOException;
@@ -257,6 +256,24 @@ public class IOThread extends Thread
 		}
 	}
 	
+	private void sendModeChangesPacket(ModeChangesPacket aPacket) throws _IOException
+	{
+		itsHeaderBuffer.clear();
+		itsHeaderBuffer.put(Message.PACKET_TYPE_MODECHANGES);
+		itsHeaderBuffer.putInt(aPacket.data.length);
+
+		itsHeaderBuffer.flip();
+		itsChannel.write(itsHeaderBuffer);
+		
+		itsChannel.writeAll(aPacket.data, 0, aPacket.data.length);
+		
+		if (AgentDebugFlags.COLLECT_PROFILE) 
+		{
+			itsBytesSent += 5+aPacket.data.length;
+			itsPacketsSent++;
+		}
+	}
+	
 	private void checkStaleBuffers()
 	{
 //		long t = System.currentTimeMillis();
@@ -321,10 +338,6 @@ public class IOThread extends Thread
 					processEnableCapture();
 					break;
 					
-				case Command.AGCMD_SETMONITORINGMODE:
-					processSetMonitoringMode();
-					break;
-					
 				default: throw new RuntimeException("Not handled: "+theMessage); 
 				}
 			}
@@ -350,27 +363,15 @@ public class IOThread extends Thread
 	}
 
 	/**
-	 * Processes the {@link Command#AGCMD_SETMONITORINGMODE} command
-	 */
-	private void processSetMonitoringMode() throws _IOException
-	{
-		int theCount = readInt();
-		for (int i=0;i<theCount;i++)
-		{
-			int theBehaviorId = readInt();
-			byte theMode = readByte();
-			TracedMethods.setMode(theBehaviorId, theMode);
-		}
-	}
-	
-	/**
 	 * Pushes the given packet buffer to the pending queue.
 	 * @param aRecycle If true, the buffer in the given {@link ThreadPacket}
 	 * will be recycled and a free recycled buffer will be returned if available 
 	 */
 	public void pushPacket(Packet aPacket) 
 	{
+		_IO.out("pp1");
 		itsPendingPackets.add(aPacket);
+		_IO.out("pp2");
 	}
 	
 	/**
@@ -464,6 +465,22 @@ public class IOThread extends Thread
 		protected void send(IOThread aIOThread) throws _IOException
 		{
 			aIOThread.sendStringPacket(this);
+		}
+	}
+	
+	public static final class ModeChangesPacket extends Packet
+	{
+		public final byte[] data;
+
+		public ModeChangesPacket(byte[] aData)
+		{
+			data = aData;
+		}
+
+		@Override
+		protected void send(IOThread aIOThread) throws _IOException
+		{
+			aIOThread.sendModeChangesPacket(this);
 		}
 	}
 

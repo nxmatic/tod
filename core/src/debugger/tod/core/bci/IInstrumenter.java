@@ -22,28 +22,12 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 */
 package tod.core.bci;
 
-import java.tod.TracedMethods;
-import java.util.List;
+import java.tod.MethodGroupManager;
 
 import tod.core.config.TODConfig;
-import tod.core.database.structure.IMutableStructureDatabase.LastIds;
-import tod.core.database.structure.IStructureDatabase.BehaviorMonitoringModeChange;
 
 public interface IInstrumenter
 {
-	/**
-	 * Informs the instrumenter about the last used ids that can be found in
-	 * the client's cache.
-	 */
-	public void setLastIds(LastIds aIds);
-	
-	public LastIds getLastIds();
-	
-	/**
-	 * "Replays" the monitoring mode changes of the given class.
-	 */
-	public void replayModeChanges(int aClassId);
-	
     /**
      * Instruments the given class.
      * @param aClassName JVM internal class name (eg. "java/lang/Object")
@@ -80,16 +64,16 @@ public interface IInstrumenter
 		public final byte[] bytecode;
 		
 		/**
-		 * List of behaviors whose monitoring mode changes as a result of processing the class.
-		 * @see TracedMethods
+		 * Information about the structure of the class
+		 * @see MethodGroupManager
 		 */
-		public final List<BehaviorMonitoringModeChange> modeChanges;
+		public final byte[] info;
 
-		public InstrumentedClass(int aId, byte[] aBytecode, List<BehaviorMonitoringModeChange> aModeChanges)
+		public InstrumentedClass(int aId, byte[] aBytecode, byte[] aInfo)
 		{
 			id = aId;
 			bytecode = aBytecode;
-			modeChanges = aModeChanges;
+			info = aInfo;
 		}
 	}
 }

@@ -39,15 +39,35 @@ import tod.core.database.structure.ObjectId;
  */
 public abstract class EventCollector
 {
-	public abstract void fieldRead(ObjectId aTarget, int aFieldId, ObjectId aValue);
-	public abstract void fieldRead(ObjectId aTarget, int aFieldId, int aValue);
-	public abstract void fieldRead(ObjectId aTarget, int aFieldId, long aValue);
-	public abstract void fieldRead(ObjectId aTarget, int aFieldId, float aValue);
-	public abstract void fieldRead(ObjectId aTarget, int aFieldId, double aValue);
+	public void fieldRead(ObjectId aTarget, int aFieldId)
+	{
+	}
 	
-	public abstract void fieldWrite(ObjectId aTarget, int aFieldId, ObjectId aValue);
-	public abstract void fieldWrite(ObjectId aTarget, int aFieldId, int aValue);
-	public abstract void fieldWrite(ObjectId aTarget, int aFieldId, long aValue);
-	public abstract void fieldWrite(ObjectId aTarget, int aFieldId, float aValue);
-	public abstract void fieldWrite(ObjectId aTarget, int aFieldId, double aValue);
+	public void fieldWrite(ObjectId aTarget, int aFieldId)
+	{
+	}
+	
+	public void sync(long aTimestamp)
+	{
+	}
+	
+	public void value(ObjectId aValue)
+	{
+	}
+	
+	public void value(int aValue)
+	{
+	}
+	
+	public void value(long aValue)
+	{
+	}
+	
+	public void value(float aValue)
+	{
+	}
+	
+	public void value(double aValue)
+	{
+	}
 }

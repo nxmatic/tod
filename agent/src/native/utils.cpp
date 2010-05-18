@@ -30,7 +30,7 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 
 #include "utils.h"
 
-void fatal_error(char* message)
+void fatal_error(const char* message)
 {
 	fprintf(stderr, "FATAL ERROR, ABORTING: ");
 	fprintf(stderr, message);
@@ -38,7 +38,7 @@ void fatal_error(char* message)
 	exit(-1);
 }
 
-void fatal_ioerror(char* message)
+void fatal_ioerror(const char* message)
 {
 	fprintf(stderr, "FATAL IO ERROR, ABORTING: ");
 	perror(message);

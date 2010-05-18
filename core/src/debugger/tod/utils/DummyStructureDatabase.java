@@ -77,6 +77,11 @@ implements IMutableStructureDatabase
 		return null;
 	}
 
+	public int getBehaviorSignatureId(IBehaviorInfo aBehavior)
+	{
+		return 0;
+	}
+
 	public IMutableClassInfo getClass(int aId, boolean aFailIfAbsent)
 	{
 		return null;
@@ -202,11 +207,6 @@ implements IMutableStructureDatabase
 	{
 	}
 
-	public BehaviorMonitoringModeChange getBehaviorMonitoringModeChange(int aVersion)
-	{
-		return null;
-	}
-
 	public boolean isInIdScope(String aClassName)
 	{
 		return false;
@@ -215,15 +215,6 @@ implements IMutableStructureDatabase
 	public boolean isInScope(String aClassName)
 	{
 		return false;
-	}
-
-	public LastIds getLastIds()
-	{
-		return null;
-	}
-
-	public void setLastIds(LastIds aIds)
-	{
 	}
 
 	public void replayModeChanges(int aClassId)

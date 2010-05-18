@@ -45,7 +45,6 @@ import tod.core.database.structure.IMutableFieldInfo;
 import tod.core.database.structure.IShareableStructureDatabase;
 import tod.core.database.structure.ITypeInfo;
 import tod.core.database.structure.ILocationInfo.ISerializableLocationInfo;
-import tod.core.database.structure.IStructureDatabase.BehaviorMonitoringModeChange;
 import tod.impl.database.structure.standard.StructureDatabase.ClassNameInfo;
 import zz.utils.Utils;
 
@@ -67,9 +66,6 @@ implements IMutableClassInfo, ISerializableLocationInfo
 	 * Instrumented  and original bytecode
 	 */
 	private transient WeakReference<Bytecode> itsBytecode;
-	
-	private boolean itsHasModeChanges = false;
-	private transient BehaviorMonitoringModeChange[] itsModeChanges;
 	
 	private boolean itsHasSMAP = false;
 	private transient String itsSMAP;
@@ -115,6 +111,7 @@ implements IMutableClassInfo, ISerializableLocationInfo
 	{
 		super(aDatabase, aId, aName);
 		assert aDatabase != null;
+		assert aId > 1 || "java/lang/Object".equals(StructureDatabase.transformClassName(aName)): aName+" - "+aId;
 		itsClassNameInfo = aClassNameInfo;
 		//Thread.currentThread().getContextClassLoader().
 		itsJvmName = Type.getObjectType(getName().replace('.', '/')).getDescriptor();
@@ -213,27 +210,6 @@ implements IMutableClassInfo, ISerializableLocationInfo
 		assert itsHasBytecode;
 		assert _getBytecode() == null;
 		itsBytecode = new WeakReference<Bytecode>(new Bytecode(aOriginalBytecode, aInstrumentedBytecode));
-	}
-	
-	BehaviorMonitoringModeChange[] _getModeChanges()
-	{
-		return itsModeChanges;
-	}
-	
-	public BehaviorMonitoringModeChange[] getModeChanges()
-	{
-		if (itsModeChanges == null && itsHasModeChanges)
-		{
-			assert ! isOriginal();
-			itsModeChanges = getDatabase()._getModeChanges(getId());
-		}
-		return itsModeChanges;
-	}
-	
-	public void setModeChanges(BehaviorMonitoringModeChange[] aModeChanges) 
-	{
-		itsModeChanges = aModeChanges;
-		itsHasModeChanges = itsModeChanges != null;
 	}
 	
 	String _getSMAP()

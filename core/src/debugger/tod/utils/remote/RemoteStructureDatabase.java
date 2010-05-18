@@ -46,8 +46,6 @@ import tod.core.database.structure.SourceRange;
 import tod.core.database.structure.IBehaviorInfo.BytecodeRole;
 import tod.core.database.structure.IClassInfo.Bytecode;
 import tod.core.database.structure.ILocationInfo.ISerializableLocationInfo;
-import tod.core.database.structure.IMutableStructureDatabase.LastIds;
-import tod.core.database.structure.IStructureDatabase.BehaviorMonitoringModeChange;
 import tod.core.database.structure.IStructureDatabase.LineNumberInfo;
 import tod.core.database.structure.IStructureDatabase.LocalVariableInfo;
 import tod.core.database.structure.IStructureDatabase.ProbeInfo;
@@ -265,11 +263,6 @@ public class RemoteStructureDatabase implements RIStructureDatabase
 		return itsSource._getClassBytecode(aClassId);
 	}
 	
-	public BehaviorMonitoringModeChange[] _getModeChanges(int aClassId)
-	{
-		return itsSource._getModeChanges(aClassId);
-	}
-
 	public String _getClassSMAP(int aClassId)
 	{
 		return itsSource._getClassSMAP(aClassId);
@@ -598,6 +591,11 @@ public class RemoteStructureDatabase implements RIStructureDatabase
 			return StructureDatabaseUtils.getBehaviorId(this, aClassName, aMethodName, aMethodSignature);
 		}
 		
+		public int getBehaviorSignatureId(IBehaviorInfo aBehavior)
+		{
+			throw new UnsupportedOperationException();
+		}
+
 		public ProbeInfo getProbeInfo(int aProbeId)
 		{
 			if (aProbeId >= itsProbes.size())
@@ -711,12 +709,6 @@ public class RemoteStructureDatabase implements RIStructureDatabase
 			return itsDatabase._getClassBytecode(aClassId);
 		}
 		
-		public BehaviorMonitoringModeChange[] _getModeChanges(int aClassId)
-		{
-			System.out.println("Retrieving mode changes for class: "+aClassId);
-			return itsDatabase._getModeChanges(aClassId);
-		}
-
 		public String _getClassSMAP(int aClassId)
 		{
 			System.out.println("Retrieving SMAP for class: "+aClassId);
@@ -743,11 +735,6 @@ public class RemoteStructureDatabase implements RIStructureDatabase
 			throw new UnsupportedOperationException();
 		}
 
-		public BehaviorMonitoringModeChange getBehaviorMonitoringModeChange(int aVersion)
-		{
-			throw new UnsupportedOperationException();
-		}
-
 		public boolean isInIdScope(String aClassName)
 		{
 			throw new UnsupportedOperationException();
@@ -758,16 +745,6 @@ public class RemoteStructureDatabase implements RIStructureDatabase
 			throw new UnsupportedOperationException();
 		}
 
-		public LastIds getLastIds()
-		{
-			throw new UnsupportedOperationException();
-		}
-
-		public void setLastIds(LastIds aIds)
-		{
-			throw new UnsupportedOperationException();
-		}
-		
 		public void replayModeChanges(int aClassId)
 		{
 			throw new UnsupportedOperationException();

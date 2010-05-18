@@ -52,7 +52,6 @@ namespace fs = boost::filesystem;
 // Outgoing commands
 const char EXCEPTION_GENERATED = 20;
 const char INSTRUMENT_CLASS = 50;
-const char SYNC_CACHE_IDS = 51;
 const char USE_CACHED_CLASS = 52;
 const char FLUSH = 99;
 
@@ -71,20 +70,21 @@ bool cfgIsJVM14 = false;
 int cfgCaptureExceptions = 0;
 int cfgHostBits = 8; // Number of bits used to encode host id.
 int cfgHostId = 0; // A host id assigned by the TODServer - not the "real" host id used in events.
-char* cfgCachePath = 0;
+const char* cfgCachePath = 0;
 
 // System properties configuration data.
-char* propHost = NULL;
-char* propClientName = NULL;
-char* propPort = NULL;
-char* _propVerbose = NULL;
+const char* propHost = NULL;
+const char* propClientName = NULL;
+const char* propPort = NULL;
+const char* _propVerbose = NULL;
 int propVerbose = 2;
 
 // Class and method references
 StaticVoidMethod* ExceptionGeneratedReceiver_exceptionGenerated;
 int isInitializingExceptionMethods = 0;
 
-StaticVoidMethod* TracedMethods_setMode;
+StaticVoidMethod* MethodGroupManager_classLoaded;
+StaticVoidMethod* MethodGroupManager_setup;
 StaticVoidMethod* TOD_enable;
 StaticVoidMethod* TOD_start;
 StaticLongMethod* ObjectIdentity_nextId;
@@ -95,25 +95,18 @@ jmethodID ignoredExceptionMethods[3];
 // Mutex for class load callback
 t_mutex loadMutex;
 
-struct TracedMethodInfo
-{
-	jint behaviorId;
-	jbyte instrumentationMode;
-	jbyte callMode;
-};
+struct ClassInfo;
 
-// This vector holds traced methods ids for methods
+// This vector holds class infos for classes
 // that are registered prior to VM initialization.
-// The two lower order bits of each int represent 
-// the monitoring mode -- the higher order bits are the method id
-std::vector<TracedMethodInfo> tmpTracedMethods;
+std::vector<ClassInfo*> classInfoBuffer;
 
 /*
 Connects to the instrumenting host
 host: host to connect to
 hostname: name of this host, sent to the peer.
 */
-void agentConnect(char* host, char* port, char* clientName)
+void agentConnect(const char* host, const char* port, const char* clientName)
 {
 	if (propVerbose >=1) printf("Connecting to %s:%s\n", host, port);
 	fflush(stdout);
@@ -130,47 +123,8 @@ void agentConnect(char* host, char* port, char* clientName)
 	flush(gSocket);
 	
 	cfgHostId = readInt(gSocket);
-	if (propVerbose>=1) printf("Assigned host id: %ld\n", cfgHostId);
+	if (propVerbose>=1) printf("Assigned host id: %d\n", cfgHostId);
 	fflush(stdout);
-}
-
-void syncCache()
-{
-	if (propVerbose >= 1) printf("Synchronizing class cache\n");
-	
-	// Read last ids from cache
-	fs::path cachePath(cfgCachePath);
-	fs::path idsPath(cachePath / "ids.bin");
-	if (fs::exists(idsPath))
-	{
-		fs::ifstream idsFile(idsPath);
-		int lastClassId = readInt(&idsFile);
-		int lastBehaviorId = readInt(&idsFile);
-		int lastFieldId = readInt(&idsFile);
-		idsFile.close();
-		
-		if (propVerbose >= 2) printf("Ids: %d, %d, %d\n", lastClassId, lastBehaviorId, lastFieldId);
-		writeByte(gSocket, SYNC_CACHE_IDS);
-		writeInt(gSocket, lastClassId);
-		writeInt(gSocket, lastBehaviorId);
-		writeInt(gSocket, lastFieldId);
-		flush(gSocket);
-	}
-	
-	fflush(stdout);
-}
-
-void writeIds(int classId, int behaviorId, int fieldId)
-{
-	fs::path cachePath(cfgCachePath);
-	fs::path idsPath(cachePath / "ids.bin");
-	fs::ofstream idsFile(idsPath);
-	
-	writeInt(&idsFile, classId);
-	writeInt(&idsFile, behaviorId);
-	writeInt(&idsFile, fieldId);
-	
-	idsFile.close();
 }
 
 void agentConfigure()
@@ -207,9 +161,6 @@ void agentConfigure()
 					cfgHostId = 0;
 				}
 				
-				// Synchronize class cache
-				if (cfgCachePath) syncCache();
-				
 				if (propVerbose >= 1) printf("Config done.\n");
 				return;
 				
@@ -220,73 +171,66 @@ void agentConfigure()
 	}
 }
 
-void registerTracedMethod(JNIEnv* jni, TracedMethodInfo& info)
+struct ClassInfo
 {
-	if (propVerbose>=2) printf(
-		"Trying: %d -> (%d, %d)\n", 
-		info.behaviorId, 
-		info.instrumentationMode, 
-		info.callMode);
-	TracedMethods_setMode->invoke(jni, info.behaviorId, (jint)info.instrumentationMode, (jint)info.callMode);
-	if (propVerbose>=2) printf(
-		"Registered traced method: %d -> (%d, %d)\n", 
-		info.behaviorId, 
-		info.instrumentationMode, 
-		info.callMode);
+	jint id;
+	
+	jbyte* bytecode;
+	jint bytecodeLen;
+	
+	jbyte* info;
+	jint infoLen;
+};
+
+void registerClassInfoNow(JNIEnv* jni, ClassInfo* classInfo)
+{
+	if (propVerbose>=2) printf("Trying: %d\n", classInfo->id);
+	
+	jbyteArray array = jni->NewByteArray(classInfo->infoLen);
+	jni->SetByteArrayRegion(array, 0, classInfo->infoLen, classInfo->info);
+	MethodGroupManager_classLoaded->invoke(jni, classInfo->id, array);
+	
+	if (propVerbose>=2) printf("Registered class info: %d\n", classInfo->id);
+
+// 	printf("Freeing...\n");
+// 	delete classInfo->bytecode;
+// 	delete classInfo->info;
+// 	delete classInfo;
+// 	printf("Freed.\n");
 }
 
 /**
 Registers the traced methods that were registered in tmpTracedMethods
 */ 
-void registerTmpTracedMethods(JNIEnv* jni)
+void registerBufferedClassInfo(JNIEnv* jni)
 {
-	if (propVerbose>=1) printf("Registering %d buffered traced methods\n", tmpTracedMethods.size());
-	std::vector<TracedMethodInfo>::iterator iter = tmpTracedMethods.begin();
-	std::vector<TracedMethodInfo>::iterator end = tmpTracedMethods.end();
+	if (propVerbose>=1) printf("Registering %d buffered class infos\n", classInfoBuffer.size());
+	std::vector<ClassInfo*>::iterator iter = classInfoBuffer.begin();
+	std::vector<ClassInfo*>::iterator end = classInfoBuffer.end();
 	
-	if (propVerbose>=1) printf("Yeah, now starting\n");
-	while (iter != end) registerTracedMethod(jni, *iter++);
+	while (iter != end) 
+	{
+		ClassInfo* classInfo = *iter++;
+		if (propVerbose>=2) printf("Doing: %d\n", classInfo->id);
+		registerClassInfoNow(jni, classInfo);
+		if (propVerbose>=2) printf("Done: %d, remaining: %d\n", classInfo->id, classInfoBuffer.size());
+	}
 	
-	tmpTracedMethods.clear();
+	classInfoBuffer.clear();
 }
 
-void registerTracedMethods(JNIEnv* jni, int nTracedMethods, TracedMethodInfo* tracedMethods)
+void registerClassInfo(JNIEnv* jni, ClassInfo* classInfo)
 {
-	if (AGENT_STARTED)
+	if (CAPTURE_STARTED)
 	{
-		if (propVerbose>=1 && nTracedMethods>0) printf("Registering %d traced methods\n", nTracedMethods);
-		for (int i=0;i<nTracedMethods;i++) registerTracedMethod(jni, tracedMethods[i]);
+		if (propVerbose>=1) printf("Registering class info\n");
+		registerClassInfoNow(jni, classInfo);
 	}
 	else
 	{
-		if (propVerbose>=1 && nTracedMethods>0) printf("Buffering %d traced methods, will register later\n", nTracedMethods);
-		for (int i=0;i<nTracedMethods;i++) tmpTracedMethods.push_back(tracedMethods[i]);
+		if (propVerbose>=1) printf("Buffering class info, will register later\n");
+		classInfoBuffer.push_back(classInfo);
 	}
-}
-
-struct ClassInfo
-{
-	jint id;
-	
-	unsigned char* data;
-	jint dataLen;
-	
-	TracedMethodInfo* tracedMethods;
-	int nTracedMethods;
-};
-
-void readTracedMethodInfo(std::istream* file, TracedMethodInfo& info)
-{
-	info.behaviorId = readInt(file);
-	info.instrumentationMode = readByte(file);
-	info.callMode = readByte(file);
-}
-
-void writeTracedMethodInfo(std::ostream* file, TracedMethodInfo& info)
-{
-	writeInt(file, info.behaviorId);
-	writeByte(file, info.instrumentationMode);
-	writeByte(file, info.callMode);
 }
 
 ClassInfo* checkCacheInfo(
@@ -310,17 +254,16 @@ ClassInfo* checkCacheInfo(
 			if (propVerbose>=1) printf("Found valid in cache: %s\n", name);
 			
 			jint id = readInt(&infoFile);
-			
-			int nTracedMethods = readInt(&infoFile);
-			TracedMethodInfo* tracedMethods = new TracedMethodInfo[nTracedMethods];
-			for (int i=0;i<nTracedMethods;i++) readTracedMethodInfo(&infoFile, tracedMethods[i]);
+			jint infoLen = readInt(&infoFile);
+			jbyte* info = (jbyte*) malloc_f(infoLen);
+			readBytes(&infoFile, infoLen, info);
 			
 			fs::ifstream classFile(classPath);
-			jint len = fs::file_size(classPath);
-			unsigned char* data = (unsigned char*) malloc_f(len);
-			readBytes(&classFile, len, data);
+			jint bytecodeLen = fs::file_size(classPath);
+			jbyte* bytecode = (jbyte*) malloc_f(bytecodeLen);
+			readBytes(&classFile, bytecodeLen, bytecode);
 			
-			return new ClassInfo { id, data, len, tracedMethods, nTracedMethods };
+			return new ClassInfo { id, bytecode, bytecodeLen, info, infoLen };
 		}
 	}
 	
@@ -345,29 +288,23 @@ ClassInfo* requestInstrumentation(
 	writeBytes(gSocket, len, data);
 	flush(gSocket);
 	
-	jint instrLen = readInt(gSocket);
+	jint bytecodeLen = readInt(gSocket);
 	
-	if (instrLen > 0)
+	if (bytecodeLen > 0)
 	{
 		if (propVerbose>=1) printf("Instrumented: %s\n", name);
 
-		unsigned char* instrData = (unsigned char*) malloc_f(instrLen);
-		
-		readBytes(gSocket, instrLen, instrData);
+		jbyte* bytecode = (jbyte*) malloc_f(bytecodeLen);
+		readBytes(gSocket, bytecodeLen, bytecode);
 
 		if (gSocket->eof()) fatal_ioerror("fread");
 		if (propVerbose>=2) printf("Class definition downloaded.\n");
 		
 		jint id = readInt(gSocket);
 		
-		int nTracedMethods = readInt(gSocket);
-		TracedMethodInfo* tracedMethods = new TracedMethodInfo[nTracedMethods];
-		for (int i=0;i<nTracedMethods;i++) readTracedMethodInfo(gSocket, tracedMethods[i]);
-		
-		int lastClassId = readInt(gSocket);
-		int lastBehaviorId = readInt(gSocket);
-		int lastFieldId = readInt(gSocket);
-		writeIds(lastClassId, lastBehaviorId, lastFieldId);
+		int infoLen = readInt(gSocket);
+		jbyte* info = (jbyte*) malloc_f(infoLen);
+		readBytes(gSocket, infoLen, info);
 		
 		// Write cache
 		fs::path cachePath(cfgCachePath);
@@ -376,22 +313,21 @@ ClassInfo* requestInstrumentation(
 		fs::path infoPath(cachePath / name / "info");
 		
 		fs::ofstream classFile(classPath);
-		writeBytes(&classFile, instrLen, instrData);
+		writeBytes(&classFile, bytecodeLen, bytecode);
 		classFile.close();
 		
 		fs::ofstream infoFile(infoPath);
 		writeBytes(&infoFile, 16, md5Buffer_in);
 		writeInt(&infoFile, id);
-		writeInt(&infoFile, nTracedMethods);
-		for (int i=0;i<nTracedMethods;i++) writeTracedMethodInfo(&infoFile, tracedMethods[i]);
+		writeInt(&infoFile, infoLen);
+		writeBytes(&infoFile, infoLen, info);
 		infoFile.close();
 		
 		if (propVerbose>=2) std::cout << "Stored cache: " << infoPath << std::endl;
 
-
-		return new ClassInfo { id, instrData, instrLen, tracedMethods, nTracedMethods };
+		return new ClassInfo { id, bytecode, bytecodeLen, info, infoLen };
 	}
-	else if (instrLen == -1)
+	else if (bytecodeLen == -1)
 	{
 		char* errorString = readUTF(gSocket);
 		fatal_error(errorString);
@@ -426,6 +362,7 @@ void agentClassFileLoadHook(
 
 			CAPTURE_STARTED = 1;
 			TOD_start->invoke(jni);
+			registerBufferedClassInfo(jni);
 		}
 	}
 
@@ -435,9 +372,6 @@ void agentClassFileLoadHook(
 		fflush(stdout);
 	}
 
-	int* tracedMethods = NULL;
-	int nTracedMethods = 0;
-	
 	// Compute MD5 sum
 	char md5Buffer[16];
 	char md5String[33];
@@ -459,20 +393,18 @@ void agentClassFileLoadHook(
 	
 		if (info != NULL)
 		{
-			*new_class_data = info->data;
-			*new_class_data_len = info->dataLen;
+			*new_class_data = (unsigned char*) info->bytecode;
+			*new_class_data_len = info->bytecodeLen;
 				
 			// Register traced methods
-			registerTracedMethods(jni, info->nTracedMethods, info->tracedMethods);
-			delete info->tracedMethods;
-			delete info;
+			registerClassInfo(jni, info);
 		}
 	}
 	
 	fflush(stdout);
 }
 
-void ignoreMethod(JNIEnv* jni, int index, char* className, char* methodName, char* signature)
+void ignoreMethod(JNIEnv* jni, int index, const char* className, const char* methodName, const char* signature)
 {
 	if (propVerbose>=2) printf("Loading (jni-ignore) %s\n", className);
 	jclass clazz = jni->FindClass(className);
@@ -560,19 +492,19 @@ void agentStart(JNIEnv* jni)
 	// Initialize the classes and method ids that will be used
 	// for registering traced methods
 	
-	TracedMethods_setMode = new StaticVoidMethod(jni, "java/tod/TracedMethods", "setMode", "(III)V");
+	MethodGroupManager_classLoaded = new StaticVoidMethod(jni, "java/tod/MethodGroupManager", "classLoaded", "(I[B)V");
+	MethodGroupManager_setup = new StaticVoidMethod(jni, "java/tod/MethodGroupManager", "setup", "()V");
 	TOD_enable = new StaticVoidMethod(jni, "java/tod/AgentReady", "nativeAgentLoaded", "()V");	
 	TOD_start = new StaticVoidMethod(jni, "java/tod/AgentReady", "start", "()V");	
 	ObjectIdentity_nextId = new StaticLongMethod(jni, "java/tod/ObjectIdentity", "nextId", "()J");
 
+	MethodGroupManager_setup->invoke(jni);
 	TOD_enable->invoke(jni);
 	
 	if (propVerbose>=1) printf("Agent start - done\n");
 	fflush(stdout);
 	
 	AGENT_STARTED = 1;
-	
-	registerTmpTracedMethods(jni);
 }
 
 void agentInit(
@@ -582,7 +514,7 @@ void agentInit(
 	char* aPropCachePath,
 	char* aPropClientName)
 {
-	printf("Loading TOD agent - v4.0.6\n");
+	printf("Loading TOD agent - v5.0.1\n");
 
 	if (aPropVerbose)
 	{

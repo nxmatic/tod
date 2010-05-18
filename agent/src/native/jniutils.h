@@ -32,18 +32,18 @@ class StaticMethod
 
 	public: StaticMethod(
 		JNIEnv* jni, 
-		char* aClassName, 
-		char* aMethodName, 
-		char* aMethodSignature);
+		const char* aClassName, 
+		const char* aMethodName, 
+		const char* aMethodSignature);
 };
 
 class StaticVoidMethod : StaticMethod
 {
 	public: StaticVoidMethod(
 		JNIEnv* jni, 
-		char* aClassName, 
-		char* aMethodName, 
-		char* aMethodSignature);
+		const char* aClassName, 
+		const char* aMethodName, 
+		const char* aMethodSignature) : StaticMethod(jni, aClassName, aMethodName, aMethodSignature) {};
 	
 	public: void invoke(JNIEnv* jni, ...);
 };
@@ -52,11 +52,22 @@ class StaticLongMethod : StaticMethod
 {
 	public: StaticLongMethod(
 		JNIEnv* jni, 
-		char* aClassName, 
-		char* aMethodName, 
-		char* aMethodSignature);
+		const char* aClassName, 
+		const char* aMethodName, 
+		const char* aMethodSignature) : StaticMethod(jni, aClassName, aMethodName, aMethodSignature) {};
 	
 	public: jlong invoke(JNIEnv* jni, ...);
+};
+
+class StaticObjectMethod : StaticMethod
+{
+	public: StaticObjectMethod(
+		JNIEnv* jni, 
+		const char* aClassName, 
+		const char* aMethodName, 
+		const char* aMethodSignature) : StaticMethod(jni, aClassName, aMethodName, aMethodSignature) {};
+	
+	public: jobject invoke(JNIEnv* jni, ...);
 };
 
 #endif

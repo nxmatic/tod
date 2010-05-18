@@ -46,12 +46,8 @@ import org.objectweb.asm.tree.ClassNode;
 import tod.core.bci.IInstrumenter;
 import tod.core.bci.IInstrumenter.InstrumentedClass;
 import tod.core.config.TODConfig;
-import tod.core.database.browser.LocationUtils;
-import tod.core.database.structure.IBehaviorInfo;
 import tod.core.database.structure.IStructureDatabase;
-import tod.core.database.structure.IStructureDatabase.BehaviorMonitoringModeChange;
 import tod.impl.database.structure.standard.StructureDatabase;
-import tod2.agent.MonitoringMode;
 import zz.utils.Utils;
 
 public class ASM2Test
@@ -134,12 +130,6 @@ public class ASM2Test
 		System.out.println("  Found class: "+theName);
 		
 		InstrumentedClass theInstrumentedClass = aInstrumenter.instrumentClass(theName, aData, false);
-		
-		for(BehaviorMonitoringModeChange theMode : theInstrumentedClass.modeChanges)
-		{
-			IBehaviorInfo theBehavior = aDatabase.getBehavior(theMode.behaviorId, true);
-			Utils.println("  %s -> %s", LocationUtils.toString(theBehavior), MonitoringMode.toString(theMode.instrumentationMode));
-		}
 		
 		System.out.println("  Done.");
 	}

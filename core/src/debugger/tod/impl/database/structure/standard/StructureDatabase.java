@@ -23,6 +23,7 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 package tod.impl.database.structure.standard;
 
 import gnu.trove.TLongArrayList;
+import gnu.trove.TObjectIntHashMap;
 
 import java.io.File;
 import java.io.IOException;
@@ -93,7 +94,7 @@ implements IShareableStructureDatabase
 	
 	private final TODConfig itsConfig;
 	
-	private final String itsId;
+	private String itsId;
 	
 	private final boolean itsAllowHomonymClasses;
 	
@@ -136,25 +137,26 @@ implements IShareableStructureDatabase
 	
 	private transient List<Listener> itsListeners = new ArrayList<Listener>();
 	
-	private MethodGroupManager itsMethodGroupManager; 
+	/**
+	 * Maps method signatures to their ids.
+	 */
+	private TObjectIntHashMap<String> itsSignatureIdMap;
+	
+	private String itsGlobalSelectorString;
+	private String itsTraceSelectorString;
+	private String itsIdSelectorString;
 	
 	private transient ClassSelector itsGlobalSelector;
 	private transient ClassSelector itsTraceSelector;
 	private transient ClassSelector itsIdSelector;
 	
-	protected StructureDatabase(TODConfig aConfig, String aId, File aFile, Ids aIds, boolean aForReplay) throws IOException
+	protected StructureDatabase(TODConfig aConfig, File aFile, Ids aIds, boolean aForReplay) throws IOException
 	{
 		itsConfig = aConfig;
 		itsAllowHomonymClasses = itsConfig.get(TODConfig.ALLOW_HOMONYM_CLASSES);
-		itsId = aId;
 		boolean theFileExists = aFile.exists();
 		itsFile = new RandomAccessFile(aFile, aForReplay ? "r" : "rw");
 		itsIds = aIds;
-		
-		itsTraceSelector = parseWorkingSet(itsConfig.get(TODConfig.SCOPE_TRACE_FILTER));
-		itsGlobalSelector = parseWorkingSet(itsConfig.get(TODConfig.SCOPE_GLOBAL_FILTER));
-		itsIdSelector = parseWorkingSet(itsConfig.get(TODConfig.SCOPE_ID_FILTER));
-		System.out.println("SCOPE_ID_FILTER: "+itsConfig.get(TODConfig.SCOPE_ID_FILTER));
 		
 		itsClassNameInfos = itsAllowHomonymClasses ? new HashMap<String, ClassNameInfo>(1000) : null;
 		itsClassInfos = itsAllowHomonymClasses ? null : new HashMap<String, ClassInfo>(1000);
@@ -162,19 +164,48 @@ implements IShareableStructureDatabase
 		if (theFileExists) 
 		{
 			load();
-//			if (! aForReplay) itsMethodGroupManager.clearChanges();
 		}
 		else 
 		{
 			if (aForReplay) throw new RuntimeException("Database file not found: "+aFile);
 			itsFile.seek(8); // The first long is used to store the offset of the serialized data
-			itsMethodGroupManager = new MethodGroupManager(this);
+			itsSignatureIdMap = new TObjectIntHashMap<String>();
 			itsBehaviors = new ArrayList<BehaviorInfo>(10000);
 			itsFields = new ArrayList<FieldInfo>(10000);
 			itsClasses = new ArrayList<ClassInfo>(1000);
 			
 			itsProbes = new ArrayList<ProbeInfo>(10000);
 			itsProbes.add(null);
+			
+			// Generate a new id.
+			long theTime = System.nanoTime();
+			itsId = Utils.md5String(BigInteger.valueOf(theTime).toByteArray());
+			
+			// Take scope from config
+			itsTraceSelectorString = itsConfig.get(TODConfig.SCOPE_TRACE_FILTER);
+			itsGlobalSelectorString = itsConfig.get(TODConfig.SCOPE_GLOBAL_FILTER);
+			itsIdSelectorString = itsConfig.get(TODConfig.SCOPE_ID_FILTER);
+		}
+		
+		itsTraceSelector = parseWorkingSet(itsTraceSelectorString);
+		itsGlobalSelector = parseWorkingSet(itsGlobalSelectorString);
+		itsIdSelector = parseWorkingSet(itsIdSelectorString);
+		System.out.println("SCOPE_ID_FILTER: "+itsConfig.get(TODConfig.SCOPE_ID_FILTER));
+
+	}
+	
+	/**
+	 * Check that the scope of this database is the same as the configured scope.
+	 * Doesn't solve the problem of changing the scope, but avoid surprises by
+	 * detecting a mismatch.
+	 */
+	private void checkScope()
+	{
+		if (! itsTraceSelectorString.equals(itsConfig.get(TODConfig.SCOPE_TRACE_FILTER))
+				|| ! itsGlobalSelectorString.equals(itsConfig.get(TODConfig.SCOPE_GLOBAL_FILTER))
+				|| ! itsIdSelectorString.equals(itsConfig.get(TODConfig.SCOPE_ID_FILTER)))
+		{
+			throw new RuntimeException("Scope mismatch");
 		}
 	}
 	
@@ -189,13 +220,19 @@ implements IShareableStructureDatabase
 		
 		try
 		{
+			itsId = ois.readUTF();
 			itsByteCodeOffsets = (TLongArrayList) ois.readObject();
 			System.out.println("Got "+itsByteCodeOffsets.size()+" bytecode offsets.");
 			itsBehaviors = (List<BehaviorInfo>) ois.readObject();
 			itsFields = (List<FieldInfo>) ois.readObject();
 			itsClasses = (List<ClassInfo>) ois.readObject();
 			itsProbes = (List<ProbeInfo>) ois.readObject();
-			itsMethodGroupManager = (MethodGroupManager) ois.readObject();
+			itsSignatureIdMap = (TObjectIntHashMap<String>) ois.readObject();
+			itsTraceSelectorString = ois.readUTF();
+			itsGlobalSelectorString = ois.readUTF();
+			itsIdSelectorString = ois.readUTF();
+			
+			checkScope();
 			
 			if (! itsAllowHomonymClasses)
 			{
@@ -237,13 +274,17 @@ implements IShareableStructureDatabase
 		{
 			SAVING.set(true);
 			
+			oos.writeUTF(itsId);
 			oos.writeObject(itsByteCodeOffsets);
 			System.out.println("Saved "+itsByteCodeOffsets.size()+" bytecode offsets.");
 			oos.writeObject(itsBehaviors);
 			oos.writeObject(itsFields);
 			oos.writeObject(itsClasses);
 			oos.writeObject(itsProbes);			
-			oos.writeObject(itsMethodGroupManager);
+			oos.writeObject(itsSignatureIdMap);
+			oos.writeUTF(itsTraceSelectorString);
+			oos.writeUTF(itsGlobalSelectorString);
+			oos.writeUTF(itsIdSelectorString);
 		}
 		finally
 		{
@@ -253,7 +294,7 @@ implements IShareableStructureDatabase
 	
 
 	
-	private static String transformClassName(String aName)
+	public static String transformClassName(String aName)
 	{
 		return aName.replace('.', '/');
 	}
@@ -280,7 +321,6 @@ implements IShareableStructureDatabase
 	/**
 	 * Creates a new structure database at the specified location.
 	 * @param aFile Location where the structure database must be stored.
-	 * The file should not exist.
 	 */
 	public static StructureDatabase create(TODConfig aConfig, File aFile, boolean aForReplay)
 	{
@@ -288,11 +328,7 @@ implements IShareableStructureDatabase
 		{
 			aFile.getParentFile().mkdirs();
 			
-			// Generate a new id.
-			long theTime = System.nanoTime();
-			String theId = Utils.md5String(BigInteger.valueOf(theTime).toByteArray());
-			
-			StructureDatabase theDatabase = new StructureDatabase(aConfig, theId, aFile, new Ids(), aForReplay);
+			StructureDatabase theDatabase = new StructureDatabase(aConfig, aFile, new Ids(), aForReplay);
 			return theDatabase;
 		}
 		catch (Exception e)
@@ -321,8 +357,6 @@ implements IShareableStructureDatabase
 		{
 			theField.setDatabase(this, true);
 		}
-		
-		itsMethodGroupManager.setDatabase(this);
 	}
 	
 	public String getId()
@@ -347,11 +381,6 @@ implements IShareableStructureDatabase
 		}
 	}
 	
-	void fireMonitoringModeChanged(BehaviorMonitoringModeChange aChange)
-	{
-		for (Listener theListener : itsListeners) theListener.monitoringModeChanged(aChange);
-	}
-
 	public IClassInfo getClass(String aName, String aChecksum, boolean aFailIfAbsent)
 	{
 		aName = transformClassName(aName);
@@ -637,8 +666,39 @@ implements IShareableStructureDatabase
 		return theClasses.toArray(new IClassInfo[theClasses.size()]);
 	}
 	
-
+	public static String getSignature(IBehaviorInfo aBehavior)
+	{
+		String theName = aBehavior.getName();
+		if ("<init>".equals(theName)) theName = "<init_"+ClassInfo.getTypeChars(aBehavior.getDeclaringType())+">";
+		if ("<clinit>".equals(theName)) theName = "<clinit_"+ClassInfo.getTypeChars(aBehavior.getDeclaringType())+">";
+		
+		StringBuilder theBuilder = new StringBuilder(theName);
+		theBuilder.append('|');
+		for(ITypeInfo theType : aBehavior.getArgumentTypes()) theBuilder.append(ClassInfo.getTypeChars(theType));
+		return theBuilder.toString();
+	}
 	
+	public static boolean isSkipped(String aClassName)
+	{
+		if (aClassName.startsWith("java/lang/ref/")) return true;
+		return false;
+	}
+
+
+
+	public int getBehaviorSignatureId(IBehaviorInfo aBehavior)
+	{
+		String theSignature = getSignature(aBehavior);
+		int theId = itsSignatureIdMap.get(theSignature);
+		if (theId == 0)
+		{
+			theId = itsSignatureIdMap.size() + 1;
+			itsSignatureIdMap.put(theSignature, theId);
+		}
+		
+		return theId;
+	}
+
 	public Stats getStats()
 	{
 		return new Stats(itsClasses.size(), itsBehaviors.size(), itsFields.size(), itsProbes.size());
@@ -713,19 +773,6 @@ implements IShareableStructureDatabase
 	public int getProbeCount()
 	{
 		return itsProbes.size();
-	}
-	
-	public BehaviorMonitoringModeChange getBehaviorMonitoringModeChange(int aVersion)
-	{
-		return itsMethodGroupManager.getChange(aVersion);
-	}
-	
-	public void replayModeChanges(int aClassId)
-	{
-		ClassInfo theClass = getClass(aClassId, true);
-		BehaviorMonitoringModeChange[] theModeChanges = theClass.getModeChanges();
-		if (theModeChanges != null) for (BehaviorMonitoringModeChange theChange : theModeChanges) 
-			itsMethodGroupManager.addChange(theChange);
 	}
 
 	public IAdviceInfo getAdvice(int aAdviceId)
@@ -811,17 +858,6 @@ implements IShareableStructureDatabase
 		}
 	}
 	
-	
-	
-	/**
-	 * This method is used to retrieve the value of transient fields on the remote side
-	 * (see {@link RemoteStructureDatabase}).
-	 */
-	public BehaviorMonitoringModeChange[] _getModeChanges(int aClassId)
-	{
-		return getClass(aClassId, true)._getModeChanges();
-	}
-
 	/**
 	 * This method is used to retrieve the value of transient fields on the remote side
 	 * (see {@link RemoteStructureDatabase}).
@@ -918,20 +954,6 @@ implements IShareableStructureDatabase
 	{
 		return itsIds;
 	}
-
-	public LastIds getLastIds()
-	{
-		return new LastIds(itsIds.getLastClassId(), itsIds.getLastBehaviorId(), itsIds.getLastFieldId());
-	}
-
-	public void setLastIds(LastIds aIds)
-	{
-		itsIds.setLastClassId(aIds.classId);
-		itsIds.setLastBehaviorId(aIds.behaviorId);
-		itsIds.setLastFieldId(aIds.fieldId);
-	}
-
-
 
 	static class Ids implements Serializable
 	{

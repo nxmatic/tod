@@ -32,8 +32,8 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 typedef boost::recursive_mutex t_mutex;
 typedef boost::recursive_mutex::scoped_lock t_lock;
 
-void fatal_error(char*);
-void fatal_ioerror(char*);
+void fatal_error(const char*);
+void fatal_ioerror(const char*);
 
 void writeByte(std::ostream* f, const int i);
 void writeBytes(std::ostream* f, const int n, const void* buffer);

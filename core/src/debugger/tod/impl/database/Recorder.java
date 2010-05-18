@@ -114,7 +114,7 @@ public class Recorder extends Server
 	{
 		public MyNativePeer(Socket aSocket, int aHostId)
 		{
-			super(itsConfig, aSocket, itsInstrumenter, aHostId);
+			super(itsConfig, itsStructureDatabase.getId(), aSocket, itsInstrumenter, aHostId);
 		}
 		
 		@Override

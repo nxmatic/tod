@@ -22,6 +22,7 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 */
 package tod.core.database.structure;
 
+import java.tod.MethodGroupManager;
 import java.util.Map;
 
 import tod.core.database.structure.IBehaviorInfo.BytecodeRole;
@@ -68,6 +69,12 @@ public interface IMutableStructureDatabase extends IStructureDatabase
 	 * Override so as to provide mutable version.
 	 */
 	public IMutableBehaviorInfo getBehavior(int aId, boolean aFailIfAbsent);
+	
+	/**
+	 * Returns the signature id of the behavior, or assigns a new one if necessary.
+	 * @see MethodGroupManager
+	 */
+	public int getBehaviorSignatureId(IBehaviorInfo aBehavior);
 
 	/**
 	 * Creates a new probe and returns its id. 
@@ -98,33 +105,4 @@ public interface IMutableStructureDatabase extends IStructureDatabase
 	 * inconsistency.
 	 */
 	public void setAdviceSourceMap(Map<Integer, SourceRange> aMap);
-	
-	/**
-	 * Informs the database about the last used ids that can be found in
-	 * the client's cache.
-	 */
-	public void setLastIds(LastIds aIds);
-	
-	public LastIds getLastIds();
-	
-	/**
-	 * Replays the mode changes associated to the given class so that
-	 * version numbers are synchronized with the client.
-	 */
-	public void replayModeChanges(int aClassId);
-	
-	public static class LastIds
-	{
-		public final int classId;
-		public final int behaviorId;
-		public final int fieldId;
-		
-		public LastIds(int aClassId, int aBehaviorId, int aFieldId)
-		{
-			classId = aClassId;
-			behaviorId = aBehaviorId;
-			fieldId = aFieldId;
-		}
-	}
-
 }

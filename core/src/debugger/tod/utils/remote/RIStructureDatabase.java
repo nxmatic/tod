@@ -34,7 +34,6 @@ import tod.core.database.structure.IMutableFieldInfo;
 import tod.core.database.structure.IStructureDatabase;
 import tod.core.database.structure.ITypeInfo;
 import tod.core.database.structure.IClassInfo.Bytecode;
-import tod.core.database.structure.IStructureDatabase.BehaviorMonitoringModeChange;
 import tod.core.database.structure.IStructureDatabase.LineNumberInfo;
 import tod.core.database.structure.IStructureDatabase.LocalVariableInfo;
 import tod.core.database.structure.IStructureDatabase.ProbeInfo;
@@ -68,7 +67,6 @@ public interface RIStructureDatabase extends IRemote
 	public Map<String, IAspectInfo> getAspectInfoMap();
 	
 	public Bytecode _getClassBytecode(int aClassId);
-	public BehaviorMonitoringModeChange[] _getModeChanges(int aClassId);
 	public String _getClassSMAP(int aClassId);
 	public Map<String, IMutableFieldInfo> _getClassFieldMap(int aClassId);
 	public Map<String, IMutableBehaviorInfo> _getClassBehaviorsMap(int aClassId);

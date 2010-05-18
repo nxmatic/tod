@@ -37,6 +37,8 @@ import gnu.trove.TLongArrayList;
 import gnu.trove.TLongHashSet;
 import gnu.trove.TLongIterator;
 import tod.core.database.structure.ObjectId;
+import tod.impl.replay2.EventCollector;
+import zz.utils.Utils;
 
 public class ObjectAccessDistributionEventCollector extends CounterEventCollector
 {
@@ -45,8 +47,10 @@ public class ObjectAccessDistributionEventCollector extends CounterEventCollecto
 	private final int itsThreadId;
 	private TLongHashSet itsObjectsSet = new TLongHashSet();
 	
-	private long itsTotal = 0;
+	private long itsTotalUniqueObjects = 0;
+	private long itsTotalAccesses = 0;
 	private int itsBlocks = 0;
+	private int itsSyncs = 0;
 
 	public ObjectAccessDistributionEventCollector(int aThreadId)
 	{
@@ -54,95 +58,50 @@ public class ObjectAccessDistributionEventCollector extends CounterEventCollecto
 	}
 
 	@Override
-	public String toString()
+	public void fieldRead(ObjectId aTarget, int aFieldId)
 	{
-		float theAverage = itsTotal*1f/itsBlocks;
-		return String.format("Thread %d: %d - %.2f", itsThreadId, N, theAverage*100/N);
+		super.fieldRead(aTarget, aFieldId);
+//		fieldAccess(aTarget, aFieldId);
+	}
+
+	@Override
+	public void fieldWrite(ObjectId aTarget, int aFieldId)
+	{
+		super.fieldWrite(aTarget, aFieldId);
+		fieldAccess(aTarget, aFieldId);
 	}
 	
 	protected void fieldAccess(ObjectId aTarget, int aFieldId)
 	{
 		long id = aTarget != null ? aTarget.getId() : -1;
 		itsObjectsSet.add(id);
-		long theCount = getCount();
-		if (theCount == N)
+		itsTotalAccesses++;
+	}
+
+
+	@Override
+	public void sync(long aTimestamp)
+	{
+		super.sync(aTimestamp);
+		itsSyncs++;
+		if (itsSyncs % 50 == 0)
 		{
-			resetCount();
-			itsTotal += itsObjectsSet.size();
-			itsBlocks++;
+			itsTotalUniqueObjects += itsObjectsSet.size();
 			itsObjectsSet.clear();
+			itsBlocks++;
 			
-			if (itsBlocks % 100 == 0) System.out.println("[TOD] Access distribution: "+this);
+			if (itsBlocks % 10 == 0) 
+			{
+				float avgUniqueObjects = 1f*itsTotalUniqueObjects/itsBlocks;
+				float avgAccesses = 1f*itsTotalAccesses/itsBlocks;
+				float avgEvents = 1f*getCount()/itsBlocks;
+				Utils.println(
+						"[TOD] Access distribution: uobj: %.2f, acc: %.2f, ev: %.2f - u/a: %.2f%%", 
+						avgUniqueObjects,
+						avgAccesses,
+						avgEvents,
+						100f*avgUniqueObjects/avgAccesses);
+			}
 		}
-	}
-
-	@Override
-	public void fieldRead(ObjectId aTarget, int aFieldId, double aValue)
-	{
-		super.fieldRead(aTarget, aFieldId, aValue);
-		fieldAccess(aTarget, aFieldId);
-	}
-
-	@Override
-	public void fieldRead(ObjectId aTarget, int aFieldId, float aValue)
-	{
-		super.fieldRead(aTarget, aFieldId, aValue);
-		fieldAccess(aTarget, aFieldId);
-	}
-
-	@Override
-	public void fieldRead(ObjectId aTarget, int aFieldId, int aValue)
-	{
-		super.fieldRead(aTarget, aFieldId, aValue);
-		fieldAccess(aTarget, aFieldId);
-	}
-
-	@Override
-	public void fieldRead(ObjectId aTarget, int aFieldId, long aValue)
-	{
-		super.fieldRead(aTarget, aFieldId, aValue);
-		fieldAccess(aTarget, aFieldId);
-	}
-
-	@Override
-	public void fieldRead(ObjectId aTarget, int aFieldId, ObjectId aValue)
-	{
-		super.fieldRead(aTarget, aFieldId, aValue);
-		fieldAccess(aTarget, aFieldId);
-	}
-
-	@Override
-	public void fieldWrite(ObjectId aTarget, int aFieldId, double aValue)
-	{
-		super.fieldWrite(aTarget, aFieldId, aValue);
-		fieldAccess(aTarget, aFieldId);
-	}
-
-	@Override
-	public void fieldWrite(ObjectId aTarget, int aFieldId, float aValue)
-	{
-		super.fieldWrite(aTarget, aFieldId, aValue);
-		fieldAccess(aTarget, aFieldId);
-	}
-
-	@Override
-	public void fieldWrite(ObjectId aTarget, int aFieldId, int aValue)
-	{
-		super.fieldWrite(aTarget, aFieldId, aValue);
-		fieldAccess(aTarget, aFieldId);
-	}
-
-	@Override
-	public void fieldWrite(ObjectId aTarget, int aFieldId, long aValue)
-	{
-		super.fieldWrite(aTarget, aFieldId, aValue);
-		fieldAccess(aTarget, aFieldId);
-	}
-
-	@Override
-	public void fieldWrite(ObjectId aTarget, int aFieldId, ObjectId aValue)
-	{
-		super.fieldWrite(aTarget, aFieldId, aValue);
-		fieldAccess(aTarget, aFieldId);
 	}
 }

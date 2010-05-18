@@ -29,9 +29,9 @@ extern int propVerbose;
 
 StaticMethod::StaticMethod(
 	JNIEnv* jni,
-	char* aClassName, 
-	char* aMethodName, 
-	char* aMethodSignature)
+	const char* aClassName, 
+	const char* aMethodName, 
+	const char* aMethodSignature)
 {
 	if (propVerbose>=2) printf("Loading (jni) %s\n", aClassName);
 	jclass theClass = jni->FindClass(aClassName);
@@ -42,27 +42,11 @@ StaticMethod::StaticMethod(
 	if (itsMethod == NULL) printf("Could not find method %s %s!\n", aMethodName, aMethodSignature);	
 }
 
-StaticVoidMethod::StaticVoidMethod(
-	JNIEnv* jni,
-	char* aClassName, 
-	char* aMethodName, 
-	char* aMethodSignature) : StaticMethod(jni, aClassName, aMethodName, aMethodSignature)
-{
-}
-
 void StaticVoidMethod::invoke(JNIEnv* jni, ...)
 {
 	va_list args;
 	va_start(args, jni);
 	jni->CallStaticVoidMethodV(itsClass, itsMethod, args);
-}
-
-StaticLongMethod::StaticLongMethod(
-	JNIEnv* jni,
-	char* aClassName, 
-	char* aMethodName, 
-	char* aMethodSignature) : StaticMethod(jni, aClassName, aMethodName, aMethodSignature)
-{
 }
 
 jlong StaticLongMethod::invoke(JNIEnv* jni, ...)
@@ -71,3 +55,11 @@ jlong StaticLongMethod::invoke(JNIEnv* jni, ...)
 	va_start(args, jni);
 	return jni->CallStaticLongMethodV(itsClass, itsMethod, args);
 }
+
+jobject StaticObjectMethod::invoke(JNIEnv* jni, ...)
+{
+	va_list args;
+	va_start(args, jni);
+	return jni->CallStaticObjectMethodV(itsClass, itsMethod, args);
+}
+
