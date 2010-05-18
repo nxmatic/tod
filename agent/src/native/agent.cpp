@@ -360,9 +360,9 @@ void agentClassFileLoadHook(
 			printf("[TOD] Starting capture (%s).\n", name);
 			fflush(stdout);
 
+			registerBufferedClassInfo(jni);
 			CAPTURE_STARTED = 1;
 			TOD_start->invoke(jni);
-			registerBufferedClassInfo(jni);
 		}
 	}
 

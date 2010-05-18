@@ -40,9 +40,8 @@ import java.tod.gnu.trove.TIntProcedure;
 import java.tod.gnu.trove.TObjectProcedure;
 import java.tod.io._IO;
 import java.tod.util._ArrayList;
-import java.util.ArrayList;
-import java.util.List;
 
+import tod2.agent.AgentConfig;
 import tod2.agent.MonitoringMode;
 import tod2.agent.io._ByteBuffer;
 import tod2.agent.io._GrowingByteBuffer;
@@ -65,7 +64,7 @@ public class MethodGroupManager
 	
 	private static final boolean ECHO = true;
 
-	private final int itsObjectClassId = 1;
+	private static final int itsObjectClassId = AgentConfig.FIRST_CLASS_ID;
 	
 	private _ArrayList<ClassInfo> itsClasses = new _ArrayList<ClassInfo>();
 	private _ArrayList<MethodInfo> itsMethods = new _ArrayList<MethodInfo>();
@@ -127,7 +126,7 @@ public class MethodGroupManager
 		byte theMode = itsModes.get0(aBehaviorId);
 		if (ECHO)
 		{
-			_IO.outi("[MGM] addChange. {Original mode, c.im, c.cm}: ", theMode, aInstrumentationMode, aCallMode);
+			_IO.outi("[MGM] addChange. {bid, Original mode, c.im, c.cm, v}: ", aBehaviorId, theMode, aInstrumentationMode, aCallMode, TracedMethods.version);
 		}
 		
 		if (aInstrumentationMode >= 0) 
@@ -235,7 +234,6 @@ public class MethodGroupManager
 	
 	private void classLoaded0(int aId, byte[] aClassInfo)
 	{
-		_IO.outi("MGM - a");
 		ClassInfo theClass = parseClassInfo(aId, aClassInfo);
 		
 		if (ECHO) _IO.outi("[MGM] classLoaded: ", theClass != null ? theClass.id : -1);
@@ -251,6 +249,7 @@ public class MethodGroupManager
 		{
 			public boolean execute(final MethodSignatureGroup theSignatureGroup)
 			{
+				if (theSignatureGroup == null) return true;
 				theGroups.clear();
 				theHierarchy.forEach(new TIntProcedure()
 				{
@@ -266,14 +265,11 @@ public class MethodGroupManager
 				return true;
 			}
 		});
-		_IO.outi("MGM - e");
 
 		for(MethodInfo theMethod : theClass.methods) behaviorLoaded(theClass, theMethod);
-		_IO.outi("MGM - f");
 
 		// Send mode changes to server
 		EventCollector.INSTANCE.sendModeChanges(getChangesAndReset());
-		_IO.outi("MGM - g");
 	}
 
 	/**
@@ -332,9 +328,12 @@ public class MethodGroupManager
 			public boolean execute(int aTypeId)
 			{
 				ClassInfo theType = MethodGroupManager.this.getClass(aTypeId);
-				MethodGroup theGroup = aSignatureGroup.getGroup(theType.id);
-				if (theGroup != null) theGroups.add(theGroup);
-				return false;
+				if (theType != null)
+				{
+					MethodGroup theGroup = aSignatureGroup.getGroup(theType.id);
+					if (theGroup != null) theGroups.add(theGroup);
+				}
+				return true;
 			}
 		});
 		
@@ -356,6 +355,8 @@ public class MethodGroupManager
 	
 	private void fillAncestors(TIntHashSet aTypes, ClassInfo aType)
 	{
+		if (aType == null) return;
+		
 		int theSupertypeId = aType.superId;		
 		
 		if (theSupertypeId != 0)
@@ -373,6 +374,8 @@ public class MethodGroupManager
 
 	private void fillDescendants(TIntHashSet aTypes, ClassInfo aType)
 	{
+		if (aType == null) return;
+
 		TIntHashSet theChildren = itsChildrenMap.getSet(aType.id);
 		if (theChildren != null) 
 		{

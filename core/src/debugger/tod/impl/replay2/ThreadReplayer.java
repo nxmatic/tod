@@ -54,7 +54,7 @@ import zz.utils.primitive.ByteArray;
 
 public class ThreadReplayer
 {
-	public static final boolean ECHO = false;
+	public static final boolean ECHO = true;
 	public static boolean ECHO_FORREAL = true;
 
 	private final int itsThreadId;
@@ -219,12 +219,15 @@ public class ThreadReplayer
 	
 	private void processTracedMethodsVersion(int aVersion)
 	{
+		if (ThreadReplayer.ECHO && ThreadReplayer.ECHO_FORREAL)
+			System.out.println("Traced methods version: "+aVersion);
+		
 		for(int i=itsCurrentMonitoringModeVersion;i<aVersion;i++)
 		{
 			ModeChange theChange = ModeChangesList.get(i);
 			itsMonitoringModes.set(theChange.behaviorId, theChange.mode);
 			if (ThreadReplayer.ECHO && ThreadReplayer.ECHO_FORREAL) 
-				System.out.println("Mode changed: "+theChange.behaviorId+" -> "+LocationUtils.toMonitoringModeString(theChange.mode));
+				System.out.println("Mode changed: "+theChange.behaviorId+" -> "+theChange.mode+" ("+LocationUtils.toMonitoringModeString(theChange.mode)+")");
 		}
 		
 		itsCurrentMonitoringModeVersion = aVersion;

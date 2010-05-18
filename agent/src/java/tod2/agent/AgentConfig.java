@@ -61,4 +61,9 @@ public class AgentConfig
 	 * Size of {@link SocketCollector} buffer. 
 	 */
 	public static final int COLLECTOR_BUFFER_SIZE = 16384;
+	
+	/**
+	 * Class ids below this value are reserved.
+	 */
+	public static final int FIRST_CLASS_ID = 100;
 }

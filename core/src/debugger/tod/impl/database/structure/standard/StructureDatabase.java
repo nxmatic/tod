@@ -63,6 +63,7 @@ import tod.tools.parsers.ParseException;
 import tod.tools.parsers.workingset.WorkingSetFactory;
 import tod.utils.TODUtils;
 import tod.utils.remote.RemoteStructureDatabase;
+import tod2.agent.AgentConfig;
 import zz.utils.RandomAccessInputStream;
 import zz.utils.RandomAccessOutputStream;
 import zz.utils.Utils;
@@ -85,13 +86,6 @@ implements IShareableStructureDatabase
 		}
 	};
 	
-
-
-	/**
-	 * Class ids below this value are reserved.
-	 */
-	public static final int FIRST_CLASS_ID = 100;
-	
 	private final TODConfig itsConfig;
 	
 	private String itsId;
@@ -111,7 +105,7 @@ implements IShareableStructureDatabase
 	/**
 	 * Next free ids.
 	 */
-	private final Ids itsIds;
+	private Ids itsIds;
 	
 	/**
 	 * Maps class names to {@link ClassNameInfo} objects that keep track
@@ -150,13 +144,12 @@ implements IShareableStructureDatabase
 	private transient ClassSelector itsTraceSelector;
 	private transient ClassSelector itsIdSelector;
 	
-	protected StructureDatabase(TODConfig aConfig, File aFile, Ids aIds, boolean aForReplay) throws IOException
+	protected StructureDatabase(TODConfig aConfig, File aFile, boolean aForReplay) throws IOException
 	{
 		itsConfig = aConfig;
 		itsAllowHomonymClasses = itsConfig.get(TODConfig.ALLOW_HOMONYM_CLASSES);
 		boolean theFileExists = aFile.exists();
 		itsFile = new RandomAccessFile(aFile, aForReplay ? "r" : "rw");
-		itsIds = aIds;
 		
 		itsClassNameInfos = itsAllowHomonymClasses ? new HashMap<String, ClassNameInfo>(1000) : null;
 		itsClassInfos = itsAllowHomonymClasses ? null : new HashMap<String, ClassInfo>(1000);
@@ -169,6 +162,8 @@ implements IShareableStructureDatabase
 		{
 			if (aForReplay) throw new RuntimeException("Database file not found: "+aFile);
 			itsFile.seek(8); // The first long is used to store the offset of the serialized data
+			
+			itsIds = new Ids();
 			itsSignatureIdMap = new TObjectIntHashMap<String>();
 			itsBehaviors = new ArrayList<BehaviorInfo>(10000);
 			itsFields = new ArrayList<FieldInfo>(10000);
@@ -221,6 +216,7 @@ implements IShareableStructureDatabase
 		try
 		{
 			itsId = ois.readUTF();
+			itsIds = (Ids) ois.readObject();
 			itsByteCodeOffsets = (TLongArrayList) ois.readObject();
 			System.out.println("Got "+itsByteCodeOffsets.size()+" bytecode offsets.");
 			itsBehaviors = (List<BehaviorInfo>) ois.readObject();
@@ -275,6 +271,7 @@ implements IShareableStructureDatabase
 			SAVING.set(true);
 			
 			oos.writeUTF(itsId);
+			oos.writeObject(itsIds);
 			oos.writeObject(itsByteCodeOffsets);
 			System.out.println("Saved "+itsByteCodeOffsets.size()+" bytecode offsets.");
 			oos.writeObject(itsBehaviors);
@@ -285,6 +282,8 @@ implements IShareableStructureDatabase
 			oos.writeUTF(itsTraceSelectorString);
 			oos.writeUTF(itsGlobalSelectorString);
 			oos.writeUTF(itsIdSelectorString);
+			
+			oos.flush();
 		}
 		finally
 		{
@@ -328,7 +327,7 @@ implements IShareableStructureDatabase
 		{
 			aFile.getParentFile().mkdirs();
 			
-			StructureDatabase theDatabase = new StructureDatabase(aConfig, aFile, new Ids(), aForReplay);
+			StructureDatabase theDatabase = new StructureDatabase(aConfig, aFile, aForReplay);
 			return theDatabase;
 		}
 		catch (Exception e)
@@ -455,6 +454,7 @@ implements IShareableStructureDatabase
 	
 	protected void registerClass(IClassInfo aClass)
 	{
+		Utils.println("[StructureDatabase] registering class %d: %s", aClass.getId(), aClass.getName());
 		itsIds.registerClassId(aClass.getId());
 		Utils.listSet(itsClasses, aClass.getId(), (ClassInfo) aClass);
 		
@@ -962,7 +962,7 @@ implements IShareableStructureDatabase
 		/**
 		 * Ids below FIRST_CLASS_ID are reserved; Ids 1 to 9 are for primitive types.
 		 */
-		private int itsNextFreeClassId = FIRST_CLASS_ID;
+		private int itsNextFreeClassId = AgentConfig.FIRST_CLASS_ID;
 		private int itsNextFreeBehaviorId = 1;
 		private int itsNextFreeFieldId = 1;
 		private int itsNextFreeAspectId = 1;

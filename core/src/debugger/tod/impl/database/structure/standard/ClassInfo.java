@@ -46,6 +46,7 @@ import tod.core.database.structure.IShareableStructureDatabase;
 import tod.core.database.structure.ITypeInfo;
 import tod.core.database.structure.ILocationInfo.ISerializableLocationInfo;
 import tod.impl.database.structure.standard.StructureDatabase.ClassNameInfo;
+import tod2.agent.AgentConfig;
 import zz.utils.Utils;
 
 /**
@@ -111,7 +112,7 @@ implements IMutableClassInfo, ISerializableLocationInfo
 	{
 		super(aDatabase, aId, aName);
 		assert aDatabase != null;
-		assert aId > 1 || "java/lang/Object".equals(StructureDatabase.transformClassName(aName)): aName+" - "+aId;
+		assert aId != AgentConfig.FIRST_CLASS_ID || "java/lang/Object".equals(StructureDatabase.transformClassName(aName)): aName+" - "+aId;
 		itsClassNameInfo = aClassNameInfo;
 		//Thread.currentThread().getContextClassLoader().
 		itsJvmName = Type.getObjectType(getName().replace('.', '/')).getDescriptor();

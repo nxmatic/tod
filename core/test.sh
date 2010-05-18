@@ -21,7 +21,7 @@ VMARGS="$VMARGS -ea"
 VMARGS="$VMARGS -server" 
 VMARGS="$VMARGS -Xmx256m" 
 VMARGS="$VMARGS -XX:MaxPermSize=128m"
-VMARGS="$VMARGS -Dagent-verbose=2"
+VMARGS="$VMARGS -Dagent-verbose=0"
 #VMARGS="$VMARGS -Xcheck:jni"
 #VMARGS="$VMARGS -Dagent-cache-path=/home/gpothier/tmp/tod"
 #VMARGS="$VMARGS -Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=8000"
@@ -29,8 +29,8 @@ VMARGS="$VMARGS -Dagent-verbose=2"
 #VMARGS="$VMARGS -Dcom.sun.management.jmxremote=true"
 
 #valgrind --leak-check=yes --smc-check=all \
-java $VMARGS -cp ./bin dummy.CloneCrashTest
-#~/apps/eclipse-3.5.2/eclipse  -data ~/devel/ws-todtest -consolelog -vmargs $VMARGS
+#java $VMARGS -cp ./bin dummy.CloneCrashTest
+~/apps/eclipse-3.5.2/eclipse  -data ~/devel/ws-todtest -consolelog -vmargs $VMARGS
 
 # /home/gpothier/apps/java/jdk1.6.0_01/bin/java $VMARGS -jar /home/gpothier/apps/eclipse-3.3.1.1/plugins/org.eclipse.equinox.launcher_1.0.1.R33x_v20070828.jar -os linux -ws gtk -arch x86 -showsplash -launcher /home/gpothier/apps/eclipse-3.3.1.1/eclipse -name Eclipse --launcher.library /home/gpothier/apps/eclipse-3.3.1.1/plugins/org.eclipse.equinox.launcher.gtk.linux.x86_1.0.2.R331_v20071019/eclipse_1021.so -startup /home/gpothier/apps/eclipse-3.3.1.1/plugins/org.eclipse.equinox.launcher_1.0.1.R33x_v20070828.jar -exitdata 2d88001 -data ~/eclipse/ws-tod -consolelog -vm /home/gpothier/apps/java/jdk1.5.0_08/bin/java -vmargs -Xmx256m -XX:MaxPermSize=128m -jar /home/gpothier/apps/eclipse-3.3.1.1/plugins/org.eclipse.equinox.launcher_1.0.1.R33x_v20070828.jar
 

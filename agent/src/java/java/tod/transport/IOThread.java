@@ -369,9 +369,7 @@ public class IOThread extends Thread
 	 */
 	public void pushPacket(Packet aPacket) 
 	{
-		_IO.out("pp1");
 		itsPendingPackets.add(aPacket);
-		_IO.out("pp2");
 	}
 	
 	/**
