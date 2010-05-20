@@ -39,4 +39,9 @@ public class UnexpectedMessageException extends RuntimeException
 	{
 		super(Message._NAMES[aMessage]);
 	}
+
+	public UnexpectedMessageException(byte aMessage, String aDescription)
+	{
+		super(Message._NAMES[aMessage] + " " + aDescription);
+	}
 }

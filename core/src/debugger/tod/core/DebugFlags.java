@@ -129,9 +129,9 @@ public class DebugFlags
 //		createStream(HOME+"/tmp/tod/collector.log");
 
 	/**
-	 * Whether a message should be printed whenever a new behavior is registered
+	 * Whether information about structural elements should be printed
 	 */
-	public static final boolean LOG_REGISTERED_BEHAVIORS = false;
+	public static final boolean LOG_STRUCTURE = true;
 	
 	/**
 	 * Whether timestamps should be pretty printed if {@link #COLLECTOR_LOG}

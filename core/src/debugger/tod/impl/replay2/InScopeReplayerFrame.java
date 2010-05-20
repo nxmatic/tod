@@ -270,7 +270,7 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 				getNextMessage();
 				return getReplayer().createEnveloppeFrame(this, getReplayer().getBehaviorReturnType(aBehaviorId), "bid: "+aBehaviorId);
 				
-			default: throw new UnexpectedMessageException(aMessage);
+			default: throw new UnexpectedMessageException(aMessage, "bid: "+aBehaviorId);
 		}
 	}
 	

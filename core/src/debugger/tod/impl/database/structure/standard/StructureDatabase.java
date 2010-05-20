@@ -246,6 +246,24 @@ implements IShareableStructureDatabase
 		}
 		
 		itsFile.seek(theOffset); // Continue writing at the old location
+		
+		if (DebugFlags.LOG_STRUCTURE)
+		{
+			System.out.println("Database loaded, registered elements:");
+			for (IClassInfo theClass : getClasses())
+			{
+				if (theClass != null) Utils.println("Class %d: %s", theClass.getId(), theClass.getName());
+			}
+			
+			for(IBehaviorInfo theBehavior : getBehaviors())
+			{
+				if (theBehavior != null) Utils.println(
+						"Behavior %d: %s.%s",
+						theBehavior.getId(),
+						theBehavior.getDeclaringType().getName(),
+						Util.getFullName(theBehavior));
+			}
+		}
 	}
 	
 	
@@ -454,7 +472,14 @@ implements IShareableStructureDatabase
 	
 	protected void registerClass(IClassInfo aClass)
 	{
-		Utils.println("[StructureDatabase] registering class %d: %s", aClass.getId(), aClass.getName());
+		if (DebugFlags.LOG_STRUCTURE) 
+		{
+			System.out.println(String.format(
+					"Reg.c. %d: %s",
+					aClass.getId(),
+					aClass.getName()));
+		}
+
 		itsIds.registerClassId(aClass.getId());
 		Utils.listSet(itsClasses, aClass.getId(), (ClassInfo) aClass);
 		
@@ -551,7 +576,7 @@ implements IShareableStructureDatabase
 		itsIds.registerBehaviorId(aBehavior.getId());
 
 		Utils.listSet(itsBehaviors, aBehavior.getId(), (BehaviorInfo) aBehavior);
-		if (DebugFlags.LOG_REGISTERED_BEHAVIORS) 
+		if (DebugFlags.LOG_STRUCTURE) 
 		{
 			System.out.println(String.format(
 					"Reg.b. %d: %s.%s",

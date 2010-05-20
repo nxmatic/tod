@@ -54,7 +54,7 @@ import zz.utils.primitive.ByteArray;
 
 public class ThreadReplayer
 {
-	public static final boolean ECHO = true;
+	public static final boolean ECHO = false;
 	public static boolean ECHO_FORREAL = true;
 
 	private final int itsThreadId;
@@ -227,7 +227,7 @@ public class ThreadReplayer
 			ModeChange theChange = ModeChangesList.get(i);
 			itsMonitoringModes.set(theChange.behaviorId, theChange.mode);
 			if (ThreadReplayer.ECHO && ThreadReplayer.ECHO_FORREAL) 
-				System.out.println("Mode changed: "+theChange.behaviorId+" -> "+theChange.mode+" ("+LocationUtils.toMonitoringModeString(theChange.mode)+")");
+				Utils.println("Mode changed (%d): %d -> %d (%s)", itsThreadId, theChange.behaviorId, theChange.mode, LocationUtils.toMonitoringModeString(theChange.mode));
 		}
 		
 		itsCurrentMonitoringModeVersion = aVersion;

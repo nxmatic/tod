@@ -79,6 +79,12 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 	private MethodInfo itsMethodInfo;
 	
 	private Label lExit = new Label();
+	
+	/**
+	 * Contains the classes whose loading has already been forced.
+	 */
+	private final Set<String> itsLoadedClasses = new HashSet<String>();
+
 
 	public MethodInstrumenter_InScope(ClassInstrumenter aClassInstrumenter, MethodNode aNode, IMutableBehaviorInfo aBehavior)
 	{
@@ -91,6 +97,15 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		itsTmpValueVar = nextFreeVar(2);
 		
 		getNode().maxStack += 3; // This is the max we add to the stack
+		
+		// Mark classes that are known to be already loaded as loaded
+		itsLoadedClasses.add(getClassNode().name);
+		itsLoadedClasses.add("java/lang/Object");
+		itsLoadedClasses.add("java/lang/String");
+		itsLoadedClasses.add("java/lang/StringBuffer");
+		itsLoadedClasses.add("java/lang/StringBuilder");
+		itsLoadedClasses.add("java/lang/System");
+		itsLoadedClasses.add("java/lang/Class");
 	}
 	
 	@Override
@@ -378,9 +393,24 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		return theBehavior.getId();
 	}
 	
+	private void forceLoad(String aClass, SyntaxInsnList s)
+	{
+		if (! itsLoadedClasses.add(aClass)) return;
+
+		s.LDC(Type.getObjectType(aClass));
+		s.POP();
+		
+		if ((getClassNode().version & 0xffff) < 49) getClassNode().version = 49; // Needed for LDC <class>
+	}
+	
+
+	
 	private void processInvoke(MethodInsnNode aNode)
 	{
 		SyntaxInsnList s = new SyntaxInsnList();
+		
+		// Force the loading of the class so that its scope is known
+		forceLoad(aNode.owner, s);
 		
 		Label lCheckChaining = new Label();
 		

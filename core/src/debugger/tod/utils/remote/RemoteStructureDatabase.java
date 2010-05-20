@@ -56,6 +56,7 @@ import tod.impl.database.structure.standard.PrimitiveTypeInfo;
 import tod.impl.database.structure.standard.StructureDatabase;
 import tod.impl.database.structure.standard.StructureDatabaseUtils;
 import tod.impl.database.structure.standard.TagMap;
+import tod2.agent.AgentConfig;
 import zz.utils.Utils;
 import zz.utils.primitive.IntArray;
 
@@ -541,7 +542,7 @@ public class RemoteStructureDatabase implements RIStructureDatabase
 		{
 			updateStats();
 			IntArray theMissingIds = new IntArray();
-			for (int i=StructureDatabase.FIRST_CLASS_ID;i<getStats().nTypes;i++)
+			for (int i=AgentConfig.FIRST_CLASS_ID;i<getStats().nTypes;i++)
 			{
 				IMutableClassInfo theClass = Utils.listGet(itsClasses, i);
 				if (theClass == null) theMissingIds.add(i);
@@ -551,7 +552,7 @@ public class RemoteStructureDatabase implements RIStructureDatabase
 			for (IClassInfo theClass : theClasses) cacheClass((IMutableClassInfo) theClass, false);
 			
 			List<IClassInfo> theResult = new ArrayList<IClassInfo>();
-			for (int i=StructureDatabase.FIRST_CLASS_ID;i<getStats().nTypes;i++)
+			for (int i=AgentConfig.FIRST_CLASS_ID;i<getStats().nTypes;i++)
 			{
 				IMutableClassInfo theClass = Utils.listGet(itsClasses, i);
 				if (theClass != null) theResult.add(theClass);
