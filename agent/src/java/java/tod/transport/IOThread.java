@@ -56,6 +56,8 @@ import tod2.agent.io._ByteBuffer;
  */
 public class IOThread extends Thread
 {
+	private static final boolean PRINT_STATS_ON_SHUTDOWN = false;
+	
 	private _SocketChannel itsChannel;
 	
 	/**
@@ -502,10 +504,10 @@ public class IOThread extends Thread
 				if (theThreadData == null) continue;
 				
 				theThreadData.flushBuffer(); // TODO: see how to properly synchronize this.
-				theThreadData.printStats();
+				if (PRINT_STATS_ON_SHUTDOWN) theThreadData.printStats();
 			}
 			
-			printStats();
+			if (PRINT_STATS_ON_SHUTDOWN) printStats();
 			
 			_IO.out("[TOD] Flushing buffers...");
 			try

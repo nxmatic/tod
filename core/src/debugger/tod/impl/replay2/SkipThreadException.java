@@ -31,71 +31,11 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.replay2;
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-
-import tod.core.config.TODConfig;
-import tod.core.database.structure.IStructureDatabase;
-import tod.impl.server.BufferStream;
-
 /**
- * Wraps a {@link ThreadReplayer} so as to solve the classloading issue (existing classes such
- * as {@link ReplayerFrame} are modified on the fly).
+ * Used to signal that the replaying of the current thread should be abandonned.
  * @author gpothier
  */
-public class ReplayerWrapper
+public class SkipThreadException extends RuntimeException
 {
-	private final ReplayerLoader itsLoader;
-	private final Object itsReplayer;
-	
-	public ReplayerWrapper(
-			ReplayerLoader aLoader,
-			int aThreadId,
-			TODConfig aConfig, 
-			IStructureDatabase aDatabase, 
-			EventCollector aCollector,
-			TmpIdManager aTmpIdManager,
-			BufferStream aBuffer)
-	{
-		try
-		{
-			itsLoader = aLoader;
-			itsReplayer = itsLoader.createReplayer(true, aThreadId, aConfig, aDatabase, aCollector, aTmpIdManager, aBuffer);
-		}
-		catch (Exception e)
-		{
-			throw new RuntimeException(e);
-		}
-
-	}
-	
-	public void replay()
-	{
-		try
-		{
-			Method theMethod = itsReplayer.getClass().getMethod("replay");
-			try
-			{
-				theMethod.invoke(itsReplayer);
-			}
-			catch (InvocationTargetException e)
-			{
-				String theExceptionName = e.getTargetException().getClass().getName();
-				if (SkipThreadException.class.getName().equals(theExceptionName)) // Because of class loading, we must compare by name
-					throw new SkipThreadException();
-				else throw e.getTargetException();
-			}
-		}
-		catch (SkipThreadException e)
-		{
-			System.out.println("Thread skipped");
-		}
-		catch (Throwable e)
-		{
-			throw new RuntimeException(e);
-		}
-	}
-	
 
 }

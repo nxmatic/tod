@@ -62,7 +62,7 @@ public class MethodGroupManager
 {
 	private static final MethodGroupManager INSTANCE = new MethodGroupManager();
 	
-	private static final boolean ECHO = true;
+	private static final boolean ECHO = false;
 
 	private static final int itsObjectClassId = AgentConfig.FIRST_CLASS_ID;
 	

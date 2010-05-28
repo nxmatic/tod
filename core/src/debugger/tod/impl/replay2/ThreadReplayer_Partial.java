@@ -31,71 +31,54 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.replay2;
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-
 import tod.core.config.TODConfig;
 import tod.core.database.structure.IStructureDatabase;
 import tod.impl.server.BufferStream;
 
-/**
- * Wraps a {@link ThreadReplayer} so as to solve the classloading issue (existing classes such
- * as {@link ReplayerFrame} are modified on the fly).
- * @author gpothier
- */
-public class ReplayerWrapper
+public class ThreadReplayer_Partial extends ThreadReplayer
 {
-	private final ReplayerLoader itsLoader;
-	private final Object itsReplayer;
-	
-	public ReplayerWrapper(
+	public ThreadReplayer_Partial(
 			ReplayerLoader aLoader,
 			int aThreadId,
-			TODConfig aConfig, 
-			IStructureDatabase aDatabase, 
+			TODConfig aConfig,
+			IStructureDatabase aDatabase,
 			EventCollector aCollector,
 			TmpIdManager aTmpIdManager,
 			BufferStream aBuffer)
 	{
-		try
-		{
-			itsLoader = aLoader;
-			itsReplayer = itsLoader.createReplayer(true, aThreadId, aConfig, aDatabase, aCollector, aTmpIdManager, aBuffer);
-		}
-		catch (Exception e)
-		{
-			throw new RuntimeException(e);
-		}
-
+		super(aLoader, aThreadId, aConfig, aDatabase, aCollector, aTmpIdManager, aBuffer);
+		
 	}
-	
+
+	@Override
+	public boolean isSnapshotDue()
+	{
+		throw new UnsupportedOperationException();
+	}
+
+	@Override
+	public void registerSnapshot(LocalsSnapshot aSnapshot)
+	{
+		throw new UnsupportedOperationException();
+	}
+
+	public LocalsSnapshot createSnapshot(int aProbeId)
+	{
+		throw new UnsupportedOperationException();
+	}
+
+	public int getSnapshotSeq()
+	{
+		throw new UnsupportedOperationException();
+	}
+
+	public LocalsSnapshot getSnapshotForResume()
+	{
+		throw new UnsupportedOperationException();
+	}
+
 	public void replay()
 	{
-		try
-		{
-			Method theMethod = itsReplayer.getClass().getMethod("replay");
-			try
-			{
-				theMethod.invoke(itsReplayer);
-			}
-			catch (InvocationTargetException e)
-			{
-				String theExceptionName = e.getTargetException().getClass().getName();
-				if (SkipThreadException.class.getName().equals(theExceptionName)) // Because of class loading, we must compare by name
-					throw new SkipThreadException();
-				else throw e.getTargetException();
-			}
-		}
-		catch (SkipThreadException e)
-		{
-			System.out.println("Thread skipped");
-		}
-		catch (Throwable e)
-		{
-			throw new RuntimeException(e);
-		}
+		throw new UnsupportedOperationException();
 	}
-	
-
 }

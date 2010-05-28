@@ -4,7 +4,6 @@
 package tod2.agent.io;
 
 import java.io.DataInputStream;
-import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 
@@ -164,6 +163,29 @@ public class _ByteBuffer
 		itsPos = thePos+4;
 	}
 	
+	public final void putInts(int[] v)
+	{
+		putInts(v, 0, v.length);
+	}
+	
+	public final void putInts(int[] v, int aOffset, int aCount)
+	{
+		checkRemaining(4*aCount);
+		int thePos = itsPos;
+		for(int i=aOffset;i<aOffset+aCount;i++)
+		{
+			int c = v[i];
+			itsBytes[thePos + 0] = int0(c);
+			itsBytes[thePos + 1] = int1(c);
+			itsBytes[thePos + 2] = int2(c);
+			itsBytes[thePos + 3] = int3(c);
+			thePos += 4;
+		}
+		itsPos = thePos;
+	}
+	
+
+	
 	public final int getInt()
 	{
 		checkRemaining(4);
@@ -193,6 +215,31 @@ public class _ByteBuffer
 		itsPos = thePos+8;
 	}
 	
+	public final void putLongs(long[] v)
+	{
+		putLongs(v, 0, v.length);
+	}
+	
+	public final void putLongs(long[] v, int aOffset, int aCount)
+	{
+		checkRemaining(8*aCount);
+		int thePos = itsPos;
+		for(int i=aOffset;i<aOffset+aCount;i++)
+		{
+			long c = v[i];
+			itsBytes[thePos + 0] = long0(c);
+			itsBytes[thePos + 1] = long1(c);
+			itsBytes[thePos + 2] = long2(c);
+			itsBytes[thePos + 3] = long3(c);
+			itsBytes[thePos + 4] = long4(c);
+			itsBytes[thePos + 5] = long5(c);
+			itsBytes[thePos + 6] = long6(c);
+			itsBytes[thePos + 7] = long7(c);
+			thePos += 8;
+		}
+		itsPos = thePos;
+	}
+	
 	public final long getLong()
 	{
 		checkRemaining(8);
@@ -216,6 +263,17 @@ public class _ByteBuffer
 		putInt(Float.floatToRawIntBits(v));
 	}
 	
+	public final void putFloats(float[] v)
+	{
+		putFloats(v, 0, v.length);
+	}
+	
+	public final void putFloats(float[] v, int aOffset, int aCount)
+	{
+		checkRemaining(4*aCount);
+		for(int i=aOffset;i<aOffset+aCount;i++) putFloat(v[i]);
+	}
+	
 	public final float getFloat()
 	{
 		return Float.intBitsToFloat(getInt());
@@ -224,6 +282,17 @@ public class _ByteBuffer
 	public final void putDouble(double v)
 	{
 		putLong(Double.doubleToRawLongBits(v));
+	}
+	
+	public final void putDoubles(double[] v)
+	{
+		putDoubles(v, 0, v.length);
+	}
+	
+	public final void putDoubles(double[] v, int aOffset, int aCount)
+	{
+		checkRemaining(8*aCount);
+		for(int i=aOffset;i<aOffset+aCount;i++) putDouble(v[i]);
 	}
 	
 	public final double getDouble()

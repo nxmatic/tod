@@ -36,6 +36,12 @@ import tod2.agent.Message;
 public class ClassloaderWrapperReplayerFrame extends UnmonitoredReplayerFrame
 {
 	@Override
+	public boolean isInScope()
+	{
+		return false;
+	}
+	
+	@Override
 	protected boolean replay(byte aMessage)
 	{
 		switch(aMessage)

@@ -56,6 +56,7 @@ import org.objectweb.asm.util.TraceMethodVisitor;
 import tod.core.config.ClassSelector;
 import tod.core.database.structure.ObjectId;
 import tod.impl.database.structure.standard.PrimitiveTypeInfo;
+import tod.impl.replay2.LocalsSnapshot;
 import tod.impl.replay2.TmpObjectId;
 import zz.utils.Utils;
 
@@ -82,6 +83,8 @@ public class BCIUtils implements Opcodes
 	public static final String CLS_TMPOBJECTID = getJvmClassName(TmpObjectId.class);
 	public static final String DSC_TMPOBJECTID = "L"+CLS_TMPOBJECTID+";";
 	public static final String CLS_THREAD = getJvmClassName(Thread.class);
+	public static final String CLS_LOCALSSNAPSHOT = getJvmClassName(LocalsSnapshot.class);
+	public static final String DSC_LOCALSSNAPSHOT = "L"+CLS_LOCALSSNAPSHOT+";";
 
 	private static final Type[] TYPE_FOR_SORT = new Type[11];
 	static

@@ -31,6 +31,8 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.server;
 
+import java.util.concurrent.ArrayBlockingQueue;
+
 import tod2.agent.io._ByteBuffer;
 
 /**
@@ -41,59 +43,57 @@ import tod2.agent.io._ByteBuffer;
  */
 public class BufferStream 
 {
-	private _ByteBuffer itsOldBuffer;
-	private _ByteBuffer itsCurrentBuffer;
-	private volatile _ByteBuffer itsNextBuffer;
+	private static final PacketBuffer EOF = new PacketBuffer(new byte[0], -1);
+	
+	private ArrayBlockingQueue<PacketBuffer> itsBuffers = new ArrayBlockingQueue<PacketBuffer>(8);
+	private PacketBuffer itsCurrentBuffer;
 	private boolean itsFinished = false;
 	
-	public BufferStream(_ByteBuffer aBuffer)
+	/**
+	 * Returns the offset from the beginning of the file of the currently processed packet.
+	 */
+	public long getPacketStartOffset()
 	{
-		itsCurrentBuffer = aBuffer;
+		return itsCurrentBuffer.getPacketStartOffset();
 	}
-
+	
 	private void checkBuffer()
 	{
 		if (itsCurrentBuffer == null || itsCurrentBuffer.remaining() == 0)
 		{
-			_ByteBuffer theOld = itsCurrentBuffer; // Do not put into itsOldBuffer yet in case there is already an old buffer
-			itsCurrentBuffer = getNextBuffer();
-			itsOldBuffer = theOld;
+			try
+			{
+				if (! itsFinished || ! itsBuffers.isEmpty()) 
+				{
+					itsCurrentBuffer = itsBuffers.take();
+					if (itsCurrentBuffer == EOF) itsCurrentBuffer = null;
+				}
+				else itsCurrentBuffer = null;
+			}
+			catch (InterruptedException e)
+			{
+				throw new RuntimeException(e);
+			}
 		}
-	}
-	
-	private synchronized _ByteBuffer getNextBuffer()
-	{
-		if (itsFinished) return null;
-		try
-		{
-			while (itsNextBuffer == null && ! itsFinished) wait();
-		}
-		catch (InterruptedException e)
-		{
-			throw new RuntimeException(e);
-		}
-
-		_ByteBuffer theBuffer = itsNextBuffer;
-		itsNextBuffer = null;
-		notifyAll();
-		return theBuffer;
 	}
 	
 	/**
 	 * Makes a new source buffer available to the stream. 
-	 * @return The previous buffer
+	 * @return A free buffer, if available
 	 */
-	synchronized _ByteBuffer pushBuffer(_ByteBuffer aBuffer)
+	public void pushBuffer(PacketBuffer aBuffer)
 	{
 		try
 		{
-			while (itsNextBuffer != null) wait();
-			itsNextBuffer = aBuffer;
-			if (aBuffer == null) itsFinished = true;
-			notifyAll();
-			_ByteBuffer theOldBuffer = itsOldBuffer;
-			itsOldBuffer = null;
-			return theOldBuffer;
+			if (aBuffer == null)
+			{
+				itsFinished = true;
+				itsBuffers.put(EOF);
+			}
+			else if (! itsFinished)
+			{
+				itsBuffers.put(aBuffer);
+			}
 		}
 		catch (InterruptedException e)
 		{
@@ -104,7 +104,7 @@ public class BufferStream
 	public final int remaining()
 	{
 		checkBuffer();
-		return itsFinished ? 0 : Integer.MAX_VALUE;
+		return itsCurrentBuffer == null && itsFinished ? 0 : Integer.MAX_VALUE;
 	}
 	
 	public final int position()
@@ -173,5 +173,12 @@ public class BufferStream
 	{
 		checkBuffer();
 		return itsCurrentBuffer.getString();
+	}
+	
+	public void skipAll()
+	{
+		itsFinished = true;
+		itsBuffers.clear();
+		itsCurrentBuffer = null;
 	}
 }

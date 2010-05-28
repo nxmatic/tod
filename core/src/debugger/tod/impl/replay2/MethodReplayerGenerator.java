@@ -127,6 +127,22 @@ public class MethodReplayerGenerator
 	 */
 	private int[] itsTmpTargetVars;
 	
+	private int itsSnapshotRetVar;
+	private int itsSnapshotProbeIdVar;
+	private int itsSnapshotVar;
+	
+	/**
+	 * Maintains a mapping of local variable signature (ie. one character per live local slot indicating 
+	 * its current type) to the label of a subroutine that performs a snapshot/resume for locals of this type. 
+	 */
+	private Map<String, Label> itsLocalsSigToLabel = new HashMap<String, Label>();
+	
+	/**
+	 * Additional instructions that should be added at the end of the main method
+	 * after instrumentation is completed.
+	 */
+	private InsnList itsAdditionalInstructions = new InsnList();
+	
 	/**
 	 * For each original NEW instruction, maps to the last instruction of the block that replaces it.
 	 */
@@ -235,6 +251,9 @@ public class MethodReplayerGenerator
 		itsTmpVar = nextFreeVar(2);
 		itsTmpTargetVar = nextFreeVar(1);
 		itsTmpValueVar = nextFreeVar(2);
+		itsSnapshotRetVar = nextFreeVar(1);
+		itsSnapshotProbeIdVar = nextFreeVar(1);
+		itsSnapshotVar = nextFreeVar(1);
 		
 		itsTmpTargetVars = new int[itsMethodInfo.getMaxNewInvokeNesting()+1];
 //		for (int i=0;i<itsTmpTargetVars.length;i++) itsTmpTargetVars[i] = nextFreeVar(1);
@@ -254,8 +273,9 @@ public class MethodReplayerGenerator
 		itsMethodNode.instructions.add(nEnd);
 		
 		// Setup/cleanup/handlers
-		addExceptionHandling();
+		addExceptionHandling(itsMethodNode.instructions);
 		itsMethodNode.instructions.insert(itsMethodInfo.getFieldCacheInitInstructions());
+		itsMethodNode.instructions.add(itsAdditionalInstructions);
 
 		// Setup infrastructure
 		String[] theSignature = getInvokeMethodSignature(itsStatic, itsArgTypes, itsReturnType);
@@ -416,7 +436,7 @@ public class MethodReplayerGenerator
 	 * Replaces the exception types for every handler 
 	 * (uses {@link HandlerReachedException}), and fixes the handler code as needed.
 	 */
-	private void addExceptionHandling()
+	private void addExceptionHandling(InsnList aInsns)
 	{
 		final Map<Label, Integer> theHandlerIds = new HashMap<Label, Integer>();
 		SetMap<String, TryCatchBlockNode> theRegionData = new SetMap<String, TryCatchBlockNode>();
@@ -500,13 +520,15 @@ public class MethodReplayerGenerator
 		
 		s.label(lExitException);
 		s.ALOAD(0);
+		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "popped", "()V");
+		s.ALOAD(0);
 		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "expectException", "()V");
 		s.pushDefaultValue(itsReturnType);
 		s.RETURN(itsReturnType);
 
 		itsMethodNode.visitTryCatchBlock(lCodeStart, lCodeEnd, lExitException, CLS_BEHAVIOREXITEXCEPTION);
 
-		itsMethodNode.instructions.add(s);
+		aInsns.add(s);
 	}
 	
 	private int getFieldCacheSlot(FieldInsnNode aNode)
@@ -689,6 +711,12 @@ public class MethodReplayerGenerator
 
 	private void processReturn(InsnList aInsns, InsnNode aNode)
 	{
+		SList s = new SList();
+
+		s.ALOAD(0);
+		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "popped", "()V");
+
+		aInsns.insertBefore(aNode, s);
 	}
 	
 	private void processThrow(InsnList aInsns, InsnNode aNode)
@@ -1213,5 +1241,194 @@ public class MethodReplayerGenerator
 		
 		aInsns.insert(aNode, s);
 		aInsns.remove(aNode);
+	}
+	
+	private void insertSnapshotProbe(SList s, AbstractInsnNode aReferenceNode)
+	{
+		String theLocalsSig = getLocalsSig(aReferenceNode);
+		Label lCheckSnapshot = itsLocalsSigToLabel.get(theLocalsSig);
+		if (lCheckSnapshot == null)
+		{
+			lCheckSnapshot = makeSnapshotChecker(aReferenceNode);
+			itsLocalsSigToLabel.put(theLocalsSig, lCheckSnapshot);
+		}
+		
+		Label lNoCheck = new Label();
+		
+		s.ALOAD(0);
+		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "isSnapshotDue", "()Z");
+		s.IFfalse(lNoCheck);
+		s.LDC(0); // TODO: use probe id
+		s.JSR(lCheckSnapshot);
+		s.label(lNoCheck);
+	}
+	
+	private Label makeSnapshotChecker(AbstractInsnNode aReferenceNode)
+	{
+		BCIFrame theFrame = itsMethodInfo.getFrame(aReferenceNode);
+		int theLocals = theFrame.getLocals();
+
+		Label lCheckSnapshot = new Label();
+		Label lResumeFromSnapshot = new Label();
+		
+		SList s = new SList();
+		
+		s.label(lCheckSnapshot);
+		
+		s.ASTORE(itsSnapshotRetVar); // Store return address var
+		s.ISTORE(itsSnapshotProbeIdVar); // Store probe id
+		
+		s.ALOAD(0);
+		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "getSnapshotForResume", "()"+DSC_LOCALSSNAPSHOT);
+		s.DUP();
+		s.ASTORE(itsSnapshotVar);
+		s.IFNONNULL(lResumeFromSnapshot);
+		
+		// Take snapshot
+		s.ALOAD(0);
+		s.ILOAD(itsSnapshotProbeIdVar);
+		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "createSnapshot", "(I)"+DSC_LOCALSSNAPSHOT);
+		s.ASTORE(itsSnapshotVar);
+
+		for(int i=0;i<theLocals;i++)
+		{
+			Type theType = theFrame.getLocal(i).getType();
+			s.ALOAD(itsSnapshotVar);
+			s.ILOAD(theType, i); // TODO: adjust for big slots
+			invokeSnapshotPush(s, theType);
+		}
+
+		s.ALOAD(0);
+		s.ALOAD(itsSnapshotVar);
+		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "registerSnapshot", "("+DSC_LOCALSSNAPSHOT+")V");
+
+		s.RET(itsSnapshotRetVar);
+		
+		// Resume from snapshot
+		s.label(lResumeFromSnapshot);
+		
+		for(int i=0;i<theLocals;i++)
+		{
+			Type theType = theFrame.getLocal(i).getType();
+			s.ALOAD(itsSnapshotVar);
+			invokeSnapshotPop(s, theType);
+			s.ISTORE(theType, i); // TODO: adjust for big slots
+		}
+
+		s.RET(itsSnapshotRetVar);
+		
+		itsAdditionalInstructions.add(s);
+		
+		return lCheckSnapshot;
+	}
+	
+	private String getLocalsSig(AbstractInsnNode aNode)
+	{
+		BCIFrame theFrame = itsMethodInfo.getFrame(aNode);
+		int theLocals = theFrame.getLocals();
+		char[] theChars = new char[theLocals];
+		for(int i=0;i<theLocals;i++)
+		{
+			Type theType = theFrame.getLocal(i).getType();
+			theChars[i] = getTypeChar(theType);
+		}
+		return new String(theChars);
+	}
+	
+	private static char getTypeChar(Type aType)
+	{
+		switch(aType.getSort())
+		{
+		case Type.ARRAY:
+		case Type.OBJECT:
+			return 'L';
+			
+		case Type.BOOLEAN:
+		case Type.BYTE:
+		case Type.CHAR:
+		case Type.INT:
+		case Type.SHORT:
+			return 'I';
+			
+		case Type.DOUBLE:
+			return 'D';
+			
+		case Type.FLOAT:
+			return 'F';
+			
+		case Type.LONG:
+			return 'J';
+
+		default:
+			throw new RuntimeException("Not handled: "+aType);	
+		}
+	}
+	
+	private static void invokeSnapshotPush(SList s, Type aType)
+	{
+		switch(aType.getSort())
+		{
+		case Type.ARRAY:
+		case Type.OBJECT:
+			s.INVOKEVIRTUAL(CLS_LOCALSSNAPSHOT, "pushRef", "("+DSC_LOCALSSNAPSHOT+")V");
+			break;
+			
+		case Type.BOOLEAN:
+		case Type.BYTE:
+		case Type.CHAR:
+		case Type.INT:
+		case Type.SHORT:
+			s.INVOKEVIRTUAL(CLS_LOCALSSNAPSHOT, "pushInt", "(I)V");
+			break;
+			
+		case Type.DOUBLE:
+			s.INVOKEVIRTUAL(CLS_LOCALSSNAPSHOT, "pushDouble", "(D)V");
+			break;
+			
+		case Type.FLOAT:
+			s.INVOKEVIRTUAL(CLS_LOCALSSNAPSHOT, "pushFloat", "(F)V");
+			break;
+			
+		case Type.LONG:
+			s.INVOKEVIRTUAL(CLS_LOCALSSNAPSHOT, "pushLong", "(J)V");
+			break;
+
+		default:
+			throw new RuntimeException("Not handled: "+aType);	
+		}
+	}
+	
+	private static void invokeSnapshotPop(SList s, Type aType)
+	{
+		switch(aType.getSort())
+		{
+		case Type.ARRAY:
+		case Type.OBJECT:
+			s.INVOKEVIRTUAL(CLS_LOCALSSNAPSHOT, "popRef", "()"+DSC_LOCALSSNAPSHOT);
+			break;
+			
+		case Type.BOOLEAN:
+		case Type.BYTE:
+		case Type.CHAR:
+		case Type.INT:
+		case Type.SHORT:
+			s.INVOKEVIRTUAL(CLS_LOCALSSNAPSHOT, "popInt", "()I");
+			break;
+			
+		case Type.DOUBLE:
+			s.INVOKEVIRTUAL(CLS_LOCALSSNAPSHOT, "popDouble", "()D");
+			break;
+			
+		case Type.FLOAT:
+			s.INVOKEVIRTUAL(CLS_LOCALSSNAPSHOT, "popFloat", "()F");
+			break;
+			
+		case Type.LONG:
+			s.INVOKEVIRTUAL(CLS_LOCALSSNAPSHOT, "popLong", "()J");
+			break;
+			
+		default:
+			throw new RuntimeException("Not handled: "+aType);	
+		}
 	}
 }

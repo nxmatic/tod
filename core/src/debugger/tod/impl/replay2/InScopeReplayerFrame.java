@@ -52,6 +52,12 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 	{
 	}
 	
+	@Override
+	public boolean isInScope()
+	{
+		return true;
+	}
+	
 	public void setSignature(int aId, String aName, int aAccess, Type[] aArgTypes, Type aReturnType)
 	{
 		if (ThreadReplayer.ECHO && ThreadReplayer.ECHO_FORREAL) System.out.println("InScopeReplayerFrame.InScopeReplayerFrame(): "+aName);
@@ -336,6 +342,21 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 		if (id1 == null && id2 == null) return true;
 		if (id1 == null || id2 == null) return false;
 		return id1.getId() == id2.getId();
+	}
+	
+	public LocalsSnapshot createSnapshot(int aProbeId)
+	{
+		return getReplayer().createSnapshot(aProbeId);
+	}
+	
+	public boolean isSnapshotDue()
+	{
+		return getReplayer().isSnapshotDue();
+	}
+	
+	public LocalsSnapshot getSnapshotForResume()
+	{
+		return getReplayer().getSnapshotForResume();
 	}
 
 	/**

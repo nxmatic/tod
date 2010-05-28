@@ -40,7 +40,7 @@ import tod2.agent.Message;
  * @author gpothier
  */
 @SuppressWarnings("serial")
-public class HandlerReachedException extends RuntimeException
+public class HandlerReachedException extends ReplayerException
 {
 	public final ObjectId exception;
 	public final int handlerId;

@@ -81,6 +81,8 @@ public abstract class ReplayerFrame
 		return itsFromScope;
 	}
 	
+	public abstract boolean isInScope();
+	
 	public Type getReturnType()
 	{
 		return itsReturnType;
@@ -200,4 +202,11 @@ public abstract class ReplayerFrame
 		return new UnsupportedOperationException(aMessage);
 	}
 	
+	/**
+	 * Called by subclasses when the frame is popped from the stack.
+	 */
+	protected void popped()
+	{
+		getReplayer().popped();
+	}
 }

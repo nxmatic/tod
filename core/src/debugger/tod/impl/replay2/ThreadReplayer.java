@@ -47,13 +47,16 @@ import tod.impl.server.ModeChangesList.ModeChange;
 import tod2.agent.Message;
 import tod2.agent.MonitoringMode;
 import tod2.agent.ValueType;
-import zz.utils.ArrayStack;
-import zz.utils.Stack;
 import zz.utils.Utils;
 import zz.utils.primitive.ByteArray;
+import zz.utils.primitive.IntStack;
 
-public class ThreadReplayer
+public abstract class ThreadReplayer
 {
+	private static final int FRAMETYPE_UNMONITORED = -1;
+	private static final int FRAMETYPE_ENVELOPPE = -2;
+	private static final int FRAMETYPE_CLASSLOADERWRAPPER = -3;
+	
 	public static final boolean ECHO = false;
 	public static boolean ECHO_FORREAL = true;
 
@@ -62,7 +65,7 @@ public class ThreadReplayer
 	private final IStructureDatabase itsDatabase;
 	
 	private int itsMessageCount = 0;
-	private Stack<ReplayerFrame> itsStack = new ArrayStack<ReplayerFrame>();
+	private IntStack itsStack = new IntStack();
 
 	private BufferStream itsStream;
 	private final TmpIdManager itsTmpIdManager;
@@ -102,12 +105,14 @@ public class ThreadReplayer
 		itsGenerator = new ReplayerGenerator(aLoader, itsConfig, itsDatabase);
 	}
 	
-	public void replay()
+	protected BufferStream getStream()
 	{
-		UnmonitoredReplayerFrame theRootFrame = createUnmonitoredFrame(null, null, null);
-		theRootFrame.setRootFrame(true);
-		theRootFrame.invoke_OOS();		
-		System.out.println("ThreadReplayer.replay()");
+		return itsStream;
+	}
+	
+	public IntStack getStack()
+	{
+		return itsStack;
 	}
 	
 	public IStructureDatabase getDatabase()
@@ -122,9 +127,17 @@ public class ThreadReplayer
 	
 	public final void echo(String aText, Object... aArgs)
 	{
-		Utils.printlnIndented(itsStack.size()*2, aText, aArgs);
+//		Utils.printlnIndented(itsStack.size()*2, aText, aArgs);
+		Utils.println(aText, aArgs);
 	}
 	
+	public abstract void replay();
+	
+	public abstract LocalsSnapshot createSnapshot(int aProbeId);
+	
+	public abstract boolean isSnapshotDue();
+	public abstract LocalsSnapshot getSnapshotForResume();
+	public abstract void registerSnapshot(LocalsSnapshot aSnapshot);
 
 	public byte getNextMessage()
 	{
@@ -281,6 +294,13 @@ public class ThreadReplayer
 		long theId = aBuffer.getLong();
 		String theName = aBuffer.getString();
 		
+		if ("DestroyJavaVM".equals(theName))
+		{
+			// Temporary hack: the destroyer thread is not recorded until the end, so just skip it
+			getStream().skipAll();
+			throw new SkipThreadException();
+		}
+		
 		// TODO: register
 	}
 	
@@ -301,38 +321,52 @@ public class ThreadReplayer
 		// TODO: register
 	}
 	
-	private void processSync(BufferStream aBuffer)
+	protected void processSync(BufferStream aBuffer)
 	{
 		long theTimestamp = aBuffer.getLong();
 		itsCollector.sync(theTimestamp);
 	}
 	
+	private static boolean isInScope(ReplayerFrame aFrame)
+	{
+		return aFrame != null ? aFrame.isInScope() : false;
+	}
+	
 	public InScopeReplayerFrame createInScopeFrame(ReplayerFrame aParent, int aBehaviorId, String aDebugInfo)
 	{
 		InScopeReplayerFrame theFrame = itsGenerator.createInScopeFrame(aBehaviorId);
-		theFrame.setup(this, itsStream, aDebugInfo, aParent instanceof InScopeReplayerFrame, null);
+		theFrame.setup(this, itsStream, aDebugInfo, isInScope(aParent), null);
+		itsStack.push(aBehaviorId);
 		return theFrame;
 	}
 	
 	public EnveloppeReplayerFrame createEnveloppeFrame(ReplayerFrame aParent, Type aReturnType, String aDebugInfo)
 	{
 		EnveloppeReplayerFrame theFrame = itsGenerator.createEnveloppeFrame();
-		theFrame.setup(this, itsStream, aDebugInfo, aParent instanceof InScopeReplayerFrame, aReturnType);
+		theFrame.setup(this, itsStream, aDebugInfo, isInScope(aParent), aReturnType);
+		itsStack.push(FRAMETYPE_ENVELOPPE);
 		return theFrame;
 	}
 	
 	public UnmonitoredReplayerFrame createUnmonitoredFrame(ReplayerFrame aParent, Type aReturnType, String aDebugInfo)
 	{
 		UnmonitoredReplayerFrame theFrame = itsGenerator.createUnmonitoredFrame();
-		theFrame.setup(this, itsStream, aDebugInfo, aParent instanceof InScopeReplayerFrame, aReturnType);
+		theFrame.setup(this, itsStream, aDebugInfo, isInScope(aParent), aReturnType);
+		itsStack.push(FRAMETYPE_UNMONITORED);
 		return theFrame;
 	}
 	
 	public ClassloaderWrapperReplayerFrame createClassloaderFrame(ReplayerFrame aParent, String aDebugInfo)
 	{
 		ClassloaderWrapperReplayerFrame theFrame = itsGenerator.createClassloaderWrapperFrame();
-		theFrame.setup(this, itsStream, aDebugInfo, aParent instanceof InScopeReplayerFrame, null);
+		theFrame.setup(this, itsStream, aDebugInfo, isInScope(aParent), null);
+		itsStack.push(FRAMETYPE_CLASSLOADERWRAPPER);
 		return theFrame;
+	}
+	
+	public void popped()
+	{
+		itsStack.pop();
 	}
 	
 	public IntDeltaReceiver getBehIdReceiver()

@@ -33,6 +33,11 @@ package tod.impl.replay2;
 
 import tod2.agent.Message;
 
+/**
+ * Note: this is not a {@link ReplayerException} as this is not an "expected" exception.
+ * @author gpothier
+ */
+@SuppressWarnings("serial")
 public class UnexpectedMessageException extends RuntimeException
 {
 	public UnexpectedMessageException(byte aMessage)

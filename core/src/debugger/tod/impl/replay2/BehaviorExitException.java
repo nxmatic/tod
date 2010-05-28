@@ -39,7 +39,7 @@ import tod2.agent.Message;
  * @author gpothier
  */
 @SuppressWarnings("serial")
-public class BehaviorExitException extends RuntimeException
+public class BehaviorExitException extends ReplayerException
 {
 
 }

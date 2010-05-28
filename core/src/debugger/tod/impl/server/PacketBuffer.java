@@ -29,73 +29,25 @@ POSSIBILITY OF SUCH DAMAGE.
 Parts of this work rely on the MD5 algorithm "derived from the RSA Data Security, 
 Inc. MD5 Message-Digest Algorithm".
 */
-package tod.impl.replay2;
+package tod.impl.server;
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
+import tod2.agent.io._ByteBuffer;
 
-import tod.core.config.TODConfig;
-import tod.core.database.structure.IStructureDatabase;
-import tod.impl.server.BufferStream;
-
-/**
- * Wraps a {@link ThreadReplayer} so as to solve the classloading issue (existing classes such
- * as {@link ReplayerFrame} are modified on the fly).
- * @author gpothier
- */
-public class ReplayerWrapper
+public class PacketBuffer extends _ByteBuffer
 {
-	private final ReplayerLoader itsLoader;
-	private final Object itsReplayer;
-	
-	public ReplayerWrapper(
-			ReplayerLoader aLoader,
-			int aThreadId,
-			TODConfig aConfig, 
-			IStructureDatabase aDatabase, 
-			EventCollector aCollector,
-			TmpIdManager aTmpIdManager,
-			BufferStream aBuffer)
-	{
-		try
-		{
-			itsLoader = aLoader;
-			itsReplayer = itsLoader.createReplayer(true, aThreadId, aConfig, aDatabase, aCollector, aTmpIdManager, aBuffer);
-		}
-		catch (Exception e)
-		{
-			throw new RuntimeException(e);
-		}
+	/**
+	 * The offset in the file where this packet starts
+	 */
+	private long itsPacketStartOffset;
 
-	}
-	
-	public void replay()
+	public PacketBuffer(byte[] aBytes, long aPacketStartOffset)
 	{
-		try
-		{
-			Method theMethod = itsReplayer.getClass().getMethod("replay");
-			try
-			{
-				theMethod.invoke(itsReplayer);
-			}
-			catch (InvocationTargetException e)
-			{
-				String theExceptionName = e.getTargetException().getClass().getName();
-				if (SkipThreadException.class.getName().equals(theExceptionName)) // Because of class loading, we must compare by name
-					throw new SkipThreadException();
-				else throw e.getTargetException();
-			}
-		}
-		catch (SkipThreadException e)
-		{
-			System.out.println("Thread skipped");
-		}
-		catch (Throwable e)
-		{
-			throw new RuntimeException(e);
-		}
+		super(aBytes);
+		itsPacketStartOffset = aPacketStartOffset;
 	}
-	
 
+	public long getPacketStartOffset()
+	{
+		return itsPacketStartOffset;
+	}
 }

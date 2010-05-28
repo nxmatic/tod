@@ -31,71 +31,86 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.replay2;
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-
 import tod.core.config.TODConfig;
 import tod.core.database.structure.IStructureDatabase;
 import tod.impl.server.BufferStream;
 
-/**
- * Wraps a {@link ThreadReplayer} so as to solve the classloading issue (existing classes such
- * as {@link ReplayerFrame} are modified on the fly).
- * @author gpothier
- */
-public class ReplayerWrapper
+public class ThreadReplayer_1stPass extends ThreadReplayer
 {
-	private final ReplayerLoader itsLoader;
-	private final Object itsReplayer;
+	/**
+	 * Minimum number of messages between snapshots.
+	 * Usually snapshots are taken (roughly) after each SYNC, but if there are too few
+	 * messages since the previous SYNC, the snapshot is deferred.
+	 */
+	private static final int MIN_MESSAGES_BETWEEN_SNAPSHOTS = 1000;
 	
-	public ReplayerWrapper(
+	private boolean itsSnapshotDue = true;
+	private int itsMessagesSinceLastSnapshot = 0;
+	
+	public ThreadReplayer_1stPass(
 			ReplayerLoader aLoader,
 			int aThreadId,
-			TODConfig aConfig, 
-			IStructureDatabase aDatabase, 
+			TODConfig aConfig,
+			IStructureDatabase aDatabase,
 			EventCollector aCollector,
 			TmpIdManager aTmpIdManager,
 			BufferStream aBuffer)
 	{
-		try
-		{
-			itsLoader = aLoader;
-			itsReplayer = itsLoader.createReplayer(true, aThreadId, aConfig, aDatabase, aCollector, aTmpIdManager, aBuffer);
-		}
-		catch (Exception e)
-		{
-			throw new RuntimeException(e);
-		}
+		super(aLoader, aThreadId, aConfig, aDatabase, aCollector, aTmpIdManager, aBuffer);
+	}
 
+	@Override
+	public byte getNextMessage()
+	{
+		itsMessagesSinceLastSnapshot++;
+		return super.getNextMessage();
 	}
 	
+	@Override
+	public LocalsSnapshot createSnapshot(int aProbeId)
+	{
+		return new LocalsSnapshot(
+				getStream().getPacketStartOffset(), 
+				getStream().position(), 
+				aProbeId,
+				0, // TODO: compress stacks
+				getStack().toArray());
+	}
+
+	@Override
+	public boolean isSnapshotDue()
+	{
+		return itsSnapshotDue;
+	}
+	
+	@Override
+	public LocalsSnapshot getSnapshotForResume()
+	{
+		return null;
+	}
+	
+	@Override
+	public void registerSnapshot(LocalsSnapshot aSnapshot)
+	{
+		getCollector().localsSnapshot(aSnapshot);
+		itsSnapshotDue = false;
+		itsMessagesSinceLastSnapshot = 0;
+	}
+	
+	@Override
 	public void replay()
 	{
-		try
-		{
-			Method theMethod = itsReplayer.getClass().getMethod("replay");
-			try
-			{
-				theMethod.invoke(itsReplayer);
-			}
-			catch (InvocationTargetException e)
-			{
-				String theExceptionName = e.getTargetException().getClass().getName();
-				if (SkipThreadException.class.getName().equals(theExceptionName)) // Because of class loading, we must compare by name
-					throw new SkipThreadException();
-				else throw e.getTargetException();
-			}
-		}
-		catch (SkipThreadException e)
-		{
-			System.out.println("Thread skipped");
-		}
-		catch (Throwable e)
-		{
-			throw new RuntimeException(e);
-		}
+		UnmonitoredReplayerFrame theRootFrame = createUnmonitoredFrame(null, null, null);
+		theRootFrame.setRootFrame(true);
+		theRootFrame.invoke_OOS();		
+		System.out.println("ThreadReplayer.replay()");
 	}
 	
+	@Override
+	protected void processSync(BufferStream aBuffer)
+	{
+		super.processSync(aBuffer);
+		if (itsMessagesSinceLastSnapshot >= MIN_MESSAGES_BETWEEN_SNAPSHOTS) itsSnapshotDue = true;
+	}
 
 }

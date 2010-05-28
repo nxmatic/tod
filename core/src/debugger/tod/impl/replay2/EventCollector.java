@@ -70,4 +70,11 @@ public abstract class EventCollector
 	public void value(double aValue)
 	{
 	}
+
+	/**
+	 * Called whenever a snapshot of local variables is taken.
+	 */
+	public void localsSnapshot(LocalsSnapshot aSnapshot)
+	{
+	}
 }

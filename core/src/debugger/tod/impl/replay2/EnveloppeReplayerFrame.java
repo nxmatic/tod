@@ -38,6 +38,13 @@ import tod2.agent.Message;
 public class EnveloppeReplayerFrame extends UnmonitoredReplayerFrame
 {
 	@Override
+	public boolean isInScope()
+	{
+		return false;
+	}
+	
+
+	@Override
 	protected boolean replay(byte aMessage)
 	{
 		switch(aMessage)

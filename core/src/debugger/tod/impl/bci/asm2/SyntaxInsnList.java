@@ -839,14 +839,54 @@ public class SyntaxInsnList extends InsnList
 		itsVisitor.visitJumpInsn(Opcodes.IF_ICMPEQ, label);
 	}
 	
+	public void IF_ICMPNE(Label label) 
+	{
+		itsVisitor.visitJumpInsn(Opcodes.IF_ICMPNE, label);
+	}
+	
+	public void IF_ICMPLT(Label label) 
+	{
+		itsVisitor.visitJumpInsn(Opcodes.IF_ICMPLT, label);
+	}
+	
+	public void IF_ICMPGE(Label label) 
+	{
+		itsVisitor.visitJumpInsn(Opcodes.IF_ICMPGE, label);
+	}
+	
+	public void IF_ICMPGT(Label label) 
+	{
+		itsVisitor.visitJumpInsn(Opcodes.IF_ICMPGT, label);
+	}
+	
+	public void IF_ICMPLE(Label label) 
+	{
+		itsVisitor.visitJumpInsn(Opcodes.IF_ICMPLE, label);
+	}
+	
 	public void IF_ACMPEQ(Label label) 
 	{
 		itsVisitor.visitJumpInsn(Opcodes.IF_ACMPEQ, label);
 	}
 	
+	public void IFNULL(Label label)
+	{
+		itsVisitor.visitJumpInsn(Opcodes.IFNULL, label);
+	}
+	
+	public void IFNONNULL(Label label)
+	{
+		itsVisitor.visitJumpInsn(Opcodes.IFNONNULL, label);
+	}
+	
 	public void GOTO(Label label) 
 	{
 		itsVisitor.visitJumpInsn(Opcodes.GOTO, label);
+	}
+	
+	public void JSR(Label label)
+	{
+		itsVisitor.visitJumpInsn(Opcodes.JSR, label);
 	}
 	
 	/*

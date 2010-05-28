@@ -55,14 +55,28 @@ public class UnmonitoredReplayerFrame extends ReplayerFrame
 		itsRootFrame = aRootFrame;
 	}
 	
+	@Override
+	public boolean isInScope()
+	{
+		return false;
+	}
+	
 	protected void replay()
 	{
-		while(! itsRootFrame || hasMoreMessages())
+		try
 		{
-			byte m = getNextMessage();
-			
-			boolean theContinue = replay(m);
-			if (! theContinue) break;
+			while(! itsRootFrame || hasMoreMessages())
+			{
+				byte m = getNextMessage();
+				
+				boolean theContinue = replay(m);
+				if (! theContinue) break;
+			}
+		}
+		catch (ReplayerException e)
+		{
+			popped();
+			throw e;
 		}
 	}
 	

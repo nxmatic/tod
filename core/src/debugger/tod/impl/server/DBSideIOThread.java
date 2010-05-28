@@ -36,7 +36,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -46,6 +45,7 @@ import tod.core.config.TODConfig;
 import tod.core.database.structure.IStructureDatabase;
 import tod.impl.database.structure.standard.StructureDatabase;
 import tod.impl.replay2.EventCollector;
+import tod.impl.replay2.ReplayerLoader;
 import tod.impl.replay2.ReplayerWrapper;
 import tod.impl.replay2.TmpIdManager;
 import tod2.agent.Message;
@@ -58,35 +58,27 @@ import zz.utils.Utils;
  */
 public abstract class DBSideIOThread
 {
+	private static final int BUFFER_SIZE = 4096;
+	
 	private final TODConfig itsConfig;
 	private final IStructureDatabase itsDatabase;
 	
 	private final InputStream itsIn;
-	private final OutputStream itsOut;
 	
+	private final ReplayerLoader itsLoader;
 	private final List<ThreadReplayerThread> itsReplayerThreads = new ArrayList<ThreadReplayerThread>();
 	private final TmpIdManager itsTmpIdManager = new TmpIdManager();
 	
 	private long itsProcessedSize = 0;
 	
-	private ArrayList<_ByteBuffer> itsBufferPool = new ArrayList<_ByteBuffer>();
-	
-	public DBSideIOThread(TODConfig aConfig, IStructureDatabase aDatabase, InputStream aIn, OutputStream aOut)
+	public DBSideIOThread(TODConfig aConfig, IStructureDatabase aDatabase, InputStream aIn)
 	{
 		itsConfig = aConfig;
 		itsDatabase = aDatabase;
 		itsIn = aIn;
-		itsOut = aOut;
-		
-		for(int i=0;i<4;i++) itsBufferPool.add(createBuffer());
+		itsLoader = new ReplayerLoader(getClass().getClassLoader(), aDatabase);
 	}
 	
-	private static _ByteBuffer createBuffer()
-	{
-		byte[] theData = new byte[4096];
-		return _ByteBuffer.wrap(theData);		
-	}
-
 	public void run()
 	{
 		try
@@ -140,7 +132,7 @@ public abstract class DBSideIOThread
 		if (theThread == null)
 		{
 			EventCollector theCollector = createCollector(aThreadId);
-			theThread = new ThreadReplayerThread(aThreadId, itsConfig, itsDatabase, theCollector, itsTmpIdManager);
+			theThread = new ThreadReplayerThread(aThreadId, theCollector);
 			Utils.listSet(itsReplayerThreads, aThreadId, theThread);
 		}
 		return theThread;
@@ -168,13 +160,12 @@ public abstract class DBSideIOThread
 		int theThreadId = _ByteBuffer.getIntL(itsIn);
 		int theLength = _ByteBuffer.getIntL(itsIn);
 		
-		_ByteBuffer theBuffer = ! itsBufferPool.isEmpty() ? itsBufferPool.remove(itsBufferPool.size()-1) : createBuffer();
+		PacketBuffer theBuffer = new PacketBuffer(new byte[BUFFER_SIZE], itsProcessedSize);
 		readFully(theBuffer.array(), theLength);
 		theBuffer.position(0);
 		theBuffer.limit(theLength);
 		
-		theBuffer = getReplayerThread(theThreadId).push(theBuffer);
-		if (theBuffer != null) itsBufferPool.add(theBuffer);
+		getReplayerThread(theThreadId).push(theBuffer);
 		
 		itsProcessedSize += 8 + theLength;
 	}
@@ -219,7 +210,7 @@ public abstract class DBSideIOThread
 			
 			final Map<Integer, EventCollector> theCollectors = new HashMap<Integer, EventCollector>();  
 			
-			DBSideIOThread theIOThread = new DBSideIOThread(theConfig, theDatabase, new FileInputStream(theEventsFile), null)
+			DBSideIOThread theIOThread = new DBSideIOThread(theConfig, theDatabase, new FileInputStream(theEventsFile))
 			{
 				@Override
 				protected EventCollector createCollector(int aThreadId)
@@ -245,49 +236,38 @@ public abstract class DBSideIOThread
 		System.err.println("END");
 	}
 	
-	private static class ThreadReplayerThread extends Thread
+	private class ThreadReplayerThread extends Thread
 	{
 		private final int itsThreadId;
-		private final TODConfig itsConfig;
-		private final IStructureDatabase itsDatabase;
 		private final EventCollector itsCollector;
-		private final TmpIdManager itsTmpIdManager;
 		
-		private BufferStream itsStream;
+		private final BufferStream itsStream = new BufferStream();
 		private ReplayerWrapper itsReplayer;
 		
-		public ThreadReplayerThread(
-				int aThreadId,
-				TODConfig aConfig, 
-				IStructureDatabase aDatabase,
-				EventCollector aCollector,
-				TmpIdManager aTmpIdManager)
+		public ThreadReplayerThread(int aThreadId, EventCollector aCollector)
 		{
 			super(ThreadReplayerThread.class.getName()+"-"+aThreadId);
 			setDaemon(true);
 			
 			itsThreadId = aThreadId;
-			itsConfig = aConfig;
-			itsDatabase = aDatabase;
 			itsCollector = aCollector;
-			itsTmpIdManager = aTmpIdManager;
+
+			itsReplayer = new ReplayerWrapper(
+					itsLoader, 
+					itsThreadId, 
+					itsConfig, 
+					itsDatabase, 
+					itsCollector, 
+					itsTmpIdManager, 
+					itsStream);
+
+			start();
 		}
 
-		public _ByteBuffer push(_ByteBuffer aBuffer)
+		public void push(PacketBuffer aBuffer)
 		{
 //			if (itsThreadId != 1) return aBuffer;
-			
-			if (itsStream == null)
-			{
-				itsStream = new BufferStream(aBuffer);
-				itsReplayer = new ReplayerWrapper(itsThreadId, itsConfig, itsDatabase, itsCollector, itsTmpIdManager, itsStream);
-				start();
-				return null;
-			}
-			else
-			{
-				return itsStream.pushBuffer(aBuffer);
-			}
+			itsStream.pushBuffer(aBuffer);
 		}
 		
 		@Override
