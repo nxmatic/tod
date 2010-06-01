@@ -56,14 +56,22 @@ import org.objectweb.asm.util.TraceMethodVisitor;
 import tod.core.config.ClassSelector;
 import tod.core.database.structure.ObjectId;
 import tod.impl.database.structure.standard.PrimitiveTypeInfo;
+import tod.impl.replay2.BehaviorExitException;
+import tod.impl.replay2.EventCollector;
+import tod.impl.replay2.HandlerReachedException;
+import tod.impl.replay2.InScopeReplayerFrame;
 import tod.impl.replay2.LocalsSnapshot;
+import tod.impl.replay2.ReplayerFrame;
 import tod.impl.replay2.TmpObjectId;
+import tod.impl.replay2.UnmonitoredBehaviorCallException;
 import zz.utils.Utils;
 
 public class BCIUtils implements Opcodes
 {
-	public static final String CLS_EVENTCOLLECTOR = "java/tod/EventCollector";
-	public static final String DSC_EVENTCOLLECTOR = "L"+CLS_EVENTCOLLECTOR+";";
+    public static final Type TYPE_OBJECTID = Type.getType(ObjectId.class);
+
+	public static final String CLS_EVENTCOLLECTOR_AGENT = "java/tod/EventCollector";
+	public static final String DSC_EVENTCOLLECTOR_AGENT = "L"+CLS_EVENTCOLLECTOR_AGENT+";";
 	public static final String CLS_AGENTREADY = "java/tod/AgentReady";
 	public static final String CLS_EXCEPTIONGENERATEDRECEIVER = "java/tod/ExceptionGeneratedReceiver";
 	public static final String CLS_TRACEDMETHODS = "java/tod/TracedMethods";
@@ -85,6 +93,14 @@ public class BCIUtils implements Opcodes
 	public static final String CLS_THREAD = getJvmClassName(Thread.class);
 	public static final String CLS_LOCALSSNAPSHOT = getJvmClassName(LocalsSnapshot.class);
 	public static final String DSC_LOCALSSNAPSHOT = "L"+CLS_LOCALSSNAPSHOT+";";
+	public static final String CLS_REPLAYERFRAME = BCIUtils.getJvmClassName(ReplayerFrame.class);
+	public static final String DSC_REPLAYERFRAME = "L"+CLS_REPLAYERFRAME+";";
+	public static final String CLS_INSCOPEREPLAYERFRAME = BCIUtils.getJvmClassName(InScopeReplayerFrame.class);
+	public static final String CLS_HANDLERREACHED = BCIUtils.getJvmClassName(HandlerReachedException.class);
+	public static final String CLS_BEHAVIOREXITEXCEPTION = BCIUtils.getJvmClassName(BehaviorExitException.class);
+	public static final String CLS_UNMONITOREDCALLEXCEPTION = BCIUtils.getJvmClassName(UnmonitoredBehaviorCallException.class);
+	public static final String CLS_EVENTCOLLECTOR_REPLAY = BCIUtils.getJvmClassName(EventCollector.class);
+	public static final String DSC_EVENTCOLLECTOR_REPLAY = "L"+CLS_EVENTCOLLECTOR_REPLAY+";";
 
 	private static final Type[] TYPE_FOR_SORT = new Type[11];
 	static

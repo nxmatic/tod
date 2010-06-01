@@ -119,6 +119,7 @@ implements IShareableStructureDatabase
 	private List<ClassInfo> itsClasses;
 	
 	private List<ProbeInfo> itsProbes;
+	private List<SnapshotProbeInfo> itsSnapshotProbes;
 	
 	private Map<Long, ProbeInfo> itsExceptionProbesMap = new HashMap<Long, ProbeInfo>();
 	
@@ -172,6 +173,9 @@ implements IShareableStructureDatabase
 			itsProbes = new ArrayList<ProbeInfo>(10000);
 			itsProbes.add(null);
 			
+			itsSnapshotProbes = new ArrayList<SnapshotProbeInfo>(10000);
+			itsSnapshotProbes.add(null);
+			
 			// Generate a new id.
 			long theTime = System.nanoTime();
 			itsId = Utils.md5String(BigInteger.valueOf(theTime).toByteArray());
@@ -223,6 +227,7 @@ implements IShareableStructureDatabase
 			itsFields = (List<FieldInfo>) ois.readObject();
 			itsClasses = (List<ClassInfo>) ois.readObject();
 			itsProbes = (List<ProbeInfo>) ois.readObject();
+			itsSnapshotProbes = (List<SnapshotProbeInfo>) ois.readObject();
 			itsSignatureIdMap = (TObjectIntHashMap<String>) ois.readObject();
 			itsTraceSelectorString = ois.readUTF();
 			itsGlobalSelectorString = ois.readUTF();
@@ -295,7 +300,8 @@ implements IShareableStructureDatabase
 			oos.writeObject(itsBehaviors);
 			oos.writeObject(itsFields);
 			oos.writeObject(itsClasses);
-			oos.writeObject(itsProbes);			
+			oos.writeObject(itsProbes);		
+			oos.writeObject(itsSnapshotProbes);
 			oos.writeObject(itsSignatureIdMap);
 			oos.writeUTF(itsTraceSelectorString);
 			oos.writeUTF(itsGlobalSelectorString);
@@ -779,6 +785,16 @@ implements IShareableStructureDatabase
 		ProbeInfo theProbe = new ProbeInfo(aProbeId, aBehaviorId, aBytecodeIndex, aRole, aAdviceSourceId);
 		itsProbes.set(aProbeId, theProbe);
 		registerProbe(theProbe);
+	}
+	
+	
+
+	public int addSnapshotProbe(int aBehaviorId, int aProbeIndex)
+	{
+		int theId = itsSnapshotProbes.size(); // we add a null element in the constructor, so first id is 1
+		SnapshotProbeInfo theProbe = new SnapshotProbeInfo(theId, aBehaviorId, aProbeIndex);
+		itsSnapshotProbes.add(theProbe);
+		return theId;
 	}
 
 	public ProbeInfo getNewExceptionProbe(int aBehaviorId, int aBytecodeIndex)

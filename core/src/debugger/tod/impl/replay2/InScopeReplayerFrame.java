@@ -344,19 +344,46 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 		return id1.getId() == id2.getId();
 	}
 	
-	public LocalsSnapshot createSnapshot(int aProbeId)
+	public LocalsSnapshot createSnapshot(
+			int aProbeId,
+			int aIntValuesCount, 
+			int aLongValuesCount, 
+			int aFloatValuesCount, 
+			int aDoubleValuesCount, 
+			int aRefValuesCount)
 	{
-		return getReplayer().createSnapshot(aProbeId);
+		LocalsSnapshot theSnapshot = getReplayer().createSnapshot(aProbeId);
+		theSnapshot.alloc(aIntValuesCount, aLongValuesCount, aFloatValuesCount, aDoubleValuesCount, aRefValuesCount);
+		return theSnapshot;
 	}
 	
-	public boolean isSnapshotDue()
+	public void registerSnapshot(LocalsSnapshot aSnapshot)
 	{
-		return getReplayer().isSnapshotDue();
+		getCollector().localsSnapshot(aSnapshot);
+	}
+	
+	/**
+	 * Shortcut for registering a snapshot when there are no locals.
+	 */
+	public void registerEmptySnapshot(int aProbeId)
+	{
+		LocalsSnapshot theSnapshot = getReplayer().createSnapshot(aProbeId);
+		getCollector().localsSnapshot(theSnapshot);
+	}
+	
+	public int getSnapshotSeq()
+	{
+		return getReplayer().getSnapshotSeq();
 	}
 	
 	public LocalsSnapshot getSnapshotForResume()
 	{
 		return getReplayer().getSnapshotForResume();
+	}
+	
+	public int getStartProbe()
+	{
+		return getReplayer().getStartProbe();
 	}
 
 	/**

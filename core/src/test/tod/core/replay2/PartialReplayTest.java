@@ -38,6 +38,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import tod.core.config.TODConfig;
+import tod.core.database.structure.IMutableStructureDatabase;
 import tod.core.database.structure.IStructureDatabase;
 import tod.impl.database.structure.standard.StructureDatabase;
 import tod.impl.replay2.EventCollector;
@@ -66,7 +67,7 @@ public class PartialReplayTest
 		String theScopeMD5 = Utils.md5String(theConfig.get(TODConfig.SCOPE_TRACE_FILTER).getBytes());
 		File theDbFile = new File(theConfig.get(TODConfig.DB_RAW_EVENTS_DIR)+"/db-"+theScopeMD5+".raw");
 
-		IStructureDatabase theDatabase = StructureDatabase.create(theConfig, theDbFile, true);
+		IMutableStructureDatabase theDatabase = StructureDatabase.create(theConfig, theDbFile, true);
 
 		try
 		{

@@ -32,7 +32,7 @@ Inc. MD5 Message-Digest Algorithm".
 package tod.impl.replay2;
 
 import tod.core.config.TODConfig;
-import tod.core.database.structure.IStructureDatabase;
+import tod.core.database.structure.IMutableStructureDatabase;
 import tod.impl.server.BufferStream;
 
 public class ThreadReplayer_1stPass extends ThreadReplayer
@@ -44,14 +44,14 @@ public class ThreadReplayer_1stPass extends ThreadReplayer
 	 */
 	private static final int MIN_MESSAGES_BETWEEN_SNAPSHOTS = 1000;
 	
-	private boolean itsSnapshotDue = true;
+	private int itsSnapshotSeq = 1;
 	private int itsMessagesSinceLastSnapshot = 0;
 	
 	public ThreadReplayer_1stPass(
 			ReplayerLoader aLoader,
 			int aThreadId,
 			TODConfig aConfig,
-			IStructureDatabase aDatabase,
+			IMutableStructureDatabase aDatabase,
 			EventCollector aCollector,
 			TmpIdManager aTmpIdManager,
 			BufferStream aBuffer)
@@ -78,9 +78,9 @@ public class ThreadReplayer_1stPass extends ThreadReplayer
 	}
 
 	@Override
-	public boolean isSnapshotDue()
+	public int getSnapshotSeq()
 	{
-		return itsSnapshotDue;
+		return itsSnapshotSeq;
 	}
 	
 	@Override
@@ -90,10 +90,15 @@ public class ThreadReplayer_1stPass extends ThreadReplayer
 	}
 	
 	@Override
+	public int getStartProbe()
+	{
+		return 0;
+	}
+	
+	@Override
 	public void registerSnapshot(LocalsSnapshot aSnapshot)
 	{
 		getCollector().localsSnapshot(aSnapshot);
-		itsSnapshotDue = false;
 		itsMessagesSinceLastSnapshot = 0;
 	}
 	
@@ -110,7 +115,7 @@ public class ThreadReplayer_1stPass extends ThreadReplayer
 	protected void processSync(BufferStream aBuffer)
 	{
 		super.processSync(aBuffer);
-		if (itsMessagesSinceLastSnapshot >= MIN_MESSAGES_BETWEEN_SNAPSHOTS) itsSnapshotDue = true;
+		if (itsMessagesSinceLastSnapshot >= MIN_MESSAGES_BETWEEN_SNAPSHOTS) itsSnapshotSeq++;
 	}
 
 }

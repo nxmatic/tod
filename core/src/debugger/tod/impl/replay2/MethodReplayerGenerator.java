@@ -31,7 +31,8 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.replay2;
 
-import static tod.impl.bci.asm2.BCIUtils.*;
+import static tod.impl.bci.asm2.BCIUtils.DSC_OBJECTID;
+import static tod.impl.bci.asm2.BCIUtils.DSC_TMPOBJECTID;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -70,9 +71,10 @@ import tod.core.config.TODConfig;
 import tod.core.database.structure.IBehaviorInfo;
 import tod.core.database.structure.IClassInfo;
 import tod.core.database.structure.IFieldInfo;
-import tod.core.database.structure.IStructureDatabase;
+import tod.core.database.structure.IMutableStructureDatabase;
 import tod.core.database.structure.ObjectId;
 import tod.impl.bci.asm2.BCIUtils;
+import static tod.impl.bci.asm2.BCIUtils.*;
 import tod.impl.bci.asm2.MethodInfo;
 import tod.impl.bci.asm2.SyntaxInsnList;
 import tod.impl.bci.asm2.MethodInfo.BCIFrame;
@@ -81,23 +83,15 @@ import tod.impl.database.structure.standard.StructureDatabaseUtils;
 import tod2.agent.Message;
 import zz.utils.SetMap;
 
-public class MethodReplayerGenerator
+public abstract class MethodReplayerGenerator
 {
-	public static final Type TYPE_OBJECTID = Type.getType(ObjectId.class);
-	public static final String CLS_REPLAYERFRAME = BCIUtils.getJvmClassName(ReplayerFrame.class);
-	public static final String DSC_REPLAYERFRAME = "L"+CLS_REPLAYERFRAME+";";
-	public static final String CLS_EVENTCOLLECTOR = BCIUtils.getJvmClassName(EventCollector.class);
-	public static final String DSC_EVENTCOLLECTOR = "L"+CLS_EVENTCOLLECTOR+";";
-	public static final String CLS_INSCOPEREPLAYERFRAME = BCIUtils.getJvmClassName(InScopeReplayerFrame.class);
-	public static final String CLS_HANDLERREACHED = BCIUtils.getJvmClassName(HandlerReachedException.class);
-	public static final String CLS_BEHAVIOREXITEXCEPTION = BCIUtils.getJvmClassName(BehaviorExitException.class);
-	public static final String CLS_UNMONITOREDCALLEXCEPTION = BCIUtils.getJvmClassName(UnmonitoredBehaviorCallException.class);
 
 	private final TODConfig itsConfig;
-	private final IStructureDatabase itsDatabase;
+	private final IMutableStructureDatabase itsDatabase;
 	private final ReplayerGenerator itsGenerator;
 	private final ClassNode itsTarget;
 	
+	private final int itsBehaviorId;
 	private final ClassNode itsClassNode;
 	private final MethodNode itsMethodNode;
 	
@@ -127,16 +121,6 @@ public class MethodReplayerGenerator
 	 */
 	private int[] itsTmpTargetVars;
 	
-	private int itsSnapshotRetVar;
-	private int itsSnapshotProbeIdVar;
-	private int itsSnapshotVar;
-	
-	/**
-	 * Maintains a mapping of local variable signature (ie. one character per live local slot indicating 
-	 * its current type) to the label of a subroutine that performs a snapshot/resume for locals of this type. 
-	 */
-	private Map<String, Label> itsLocalsSigToLabel = new HashMap<String, Label>();
-	
 	/**
 	 * Additional instructions that should be added at the end of the main method
 	 * after instrumentation is completed.
@@ -159,14 +143,16 @@ public class MethodReplayerGenerator
 	
 	public MethodReplayerGenerator(
 			TODConfig aConfig, 
-			IStructureDatabase aDatabase,
+			IMutableStructureDatabase aDatabase,
 			ReplayerGenerator aGenerator,
+			int aBehaviorId,
 			ClassNode aClassNode, 
 			MethodNode aMethodNode)
 	{
 		itsConfig = aConfig;
 		itsDatabase = aDatabase;
 		itsGenerator = aGenerator;
+		itsBehaviorId = aBehaviorId;
 		itsClassNode = aClassNode;
 		itsMethodNode = aMethodNode;
 		
@@ -186,6 +172,21 @@ public class MethodReplayerGenerator
 		itsMethodInfo = new MethodInfo(itsDatabase, itsClassNode, itsMethodNode);
 	}
 	
+	protected MethodInfo getMethodInfo()
+	{
+		return itsMethodInfo;
+	}
+	
+	protected MethodNode getMethodNode()
+	{
+		return itsMethodNode;
+	}
+	
+	protected int getBehaviorId()
+	{
+		return itsBehaviorId;
+	}
+
 	/**
 	 * Computes the maximum number of local slots needed to save invocation
 	 * arguments.
@@ -222,7 +223,7 @@ public class MethodReplayerGenerator
 		return itsConfig;
 	}
 	
-	public IStructureDatabase getDatabase()
+	public IMutableStructureDatabase getDatabase()
 	{
 		return itsDatabase;
 	}
@@ -248,12 +249,7 @@ public class MethodReplayerGenerator
 		
 		itsSaveArgsSlots = nextFreeVar(computeMaxSaveArgsSpace(itsMethodNode.instructions));
 
-		itsTmpVar = nextFreeVar(2);
-		itsTmpTargetVar = nextFreeVar(1);
-		itsTmpValueVar = nextFreeVar(2);
-		itsSnapshotRetVar = nextFreeVar(1);
-		itsSnapshotProbeIdVar = nextFreeVar(1);
-		itsSnapshotVar = nextFreeVar(1);
+		allocVars();
 		
 		itsTmpTargetVars = new int[itsMethodInfo.getMaxNewInvokeNesting()+1];
 //		for (int i=0;i<itsTmpTargetVars.length;i++) itsTmpTargetVars[i] = nextFreeVar(1);
@@ -273,6 +269,7 @@ public class MethodReplayerGenerator
 		itsMethodNode.instructions.add(nEnd);
 		
 		// Setup/cleanup/handlers
+		addSnapshotSetup(itsMethodNode.instructions);
 		addExceptionHandling(itsMethodNode.instructions);
 		itsMethodNode.instructions.insert(itsMethodInfo.getFieldCacheInitInstructions());
 		itsMethodNode.instructions.add(itsAdditionalInstructions);
@@ -317,6 +314,18 @@ public class MethodReplayerGenerator
 		}
 		
 		return theBytecode;
+	}
+	
+	protected void allocVars()
+	{
+		itsTmpVar = nextFreeVar(2);
+		itsTmpTargetVar = nextFreeVar(1);
+		itsTmpValueVar = nextFreeVar(2);
+	}
+	
+	protected Label getCodeStartLabel()
+	{
+		return lCodeStart;
 	}
 	
 	/**
@@ -531,6 +540,11 @@ public class MethodReplayerGenerator
 		aInsns.add(s);
 	}
 	
+	protected void addAdditionalInstructions(InsnList aInsns)
+	{
+		itsAdditionalInstructions.add(aInsns);
+	}
+	
 	private int getFieldCacheSlot(FieldInsnNode aNode)
 	{
 		Integer theSlot = itsFieldCacheMap.get(getFieldKey(aNode));
@@ -547,7 +561,7 @@ public class MethodReplayerGenerator
 		return aNode.owner+"_"+aNode.name;
 	}
 
-	private int nextFreeVar(int aSize)
+	protected int nextFreeVar(int aSize)
 	{
 		int theVar = itsMethodNode.maxLocals;
 		itsMethodNode.maxLocals += aSize;
@@ -560,7 +574,7 @@ public class MethodReplayerGenerator
 	private static void pushCollector(SList s)
 	{
 		s.ALOAD(0);
-		s.INVOKEVIRTUAL(CLS_REPLAYERFRAME, "getCollector", "()"+DSC_EVENTCOLLECTOR);
+		s.INVOKEVIRTUAL(CLS_REPLAYERFRAME, "getCollector", "()"+DSC_EVENTCOLLECTOR_REPLAY);
 	}
 
 	/**
@@ -570,7 +584,7 @@ public class MethodReplayerGenerator
 	 */
 	private static void invokeValue(SList s, Type aType)
 	{
-		s.INVOKEVIRTUAL(CLS_EVENTCOLLECTOR, "value", "("+getActualType(aType).getDescriptor()+")V");
+		s.INVOKEVIRTUAL(CLS_EVENTCOLLECTOR_REPLAY, "value", "("+getActualType(aType).getDescriptor()+")V");
 
 	}
 	
@@ -796,10 +810,15 @@ public class MethodReplayerGenerator
 			String[] theSignature = getInvokeMethodSignature(theStatic, theArgTypes, theReturnType);
 			s.label(lHnStart);
 			s.INVOKEVIRTUAL(CLS_REPLAYERFRAME, theSignature[0], theSignature[1]);
+			insertSnapshotProbe(s, aNode);
 			s.GOTO(lHnAfter);
 			s.label(lHnEnd);
 			
-			s.label(lHnException);
+			// The handler must be here in case it itself throws an exception
+			//(otherwise it would be outside of the corresponding try-catch block) 
+			s.label(lHnException);  
+			s.POP();
+			insertSnapshotProbe(s, aNode);
 			s.ALOAD(0);
 			s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "expectException", "()V");
 			s.pushDefaultValue(itsReturnType);
@@ -1061,7 +1080,7 @@ public class MethodReplayerGenerator
 		
 		s.ALOAD(itsTmpTargetVar);
 		s.LDC(StructureDatabaseUtils.getFieldId(itsDatabase, aNode.owner, aNode.name, false));
-		s.INVOKEVIRTUAL(CLS_EVENTCOLLECTOR, "fieldRead", "("+DSC_OBJECTID+"I)V");
+		s.INVOKEVIRTUAL(CLS_EVENTCOLLECTOR_REPLAY, "fieldRead", "("+DSC_OBJECTID+"I)V");
 		
 		s.ILOAD(theType, itsTmpValueVar);
 		invokeValue(s, theType);
@@ -1087,7 +1106,7 @@ public class MethodReplayerGenerator
 		
 		s.ALOAD(itsTmpTargetVar);
 		s.LDC(StructureDatabaseUtils.getFieldId(itsDatabase, aNode.owner, aNode.name, false));
-		s.INVOKEVIRTUAL(CLS_EVENTCOLLECTOR, "fieldWrite", "("+DSC_OBJECTID+"I)V");
+		s.INVOKEVIRTUAL(CLS_EVENTCOLLECTOR_REPLAY, "fieldWrite", "("+DSC_OBJECTID+"I)V");
 		
 		s.ILOAD(theType, itsTmpValueVar);
 		invokeValue(s, theType);
@@ -1242,193 +1261,7 @@ public class MethodReplayerGenerator
 		aInsns.insert(aNode, s);
 		aInsns.remove(aNode);
 	}
-	
-	private void insertSnapshotProbe(SList s, AbstractInsnNode aReferenceNode)
-	{
-		String theLocalsSig = getLocalsSig(aReferenceNode);
-		Label lCheckSnapshot = itsLocalsSigToLabel.get(theLocalsSig);
-		if (lCheckSnapshot == null)
-		{
-			lCheckSnapshot = makeSnapshotChecker(aReferenceNode);
-			itsLocalsSigToLabel.put(theLocalsSig, lCheckSnapshot);
-		}
-		
-		Label lNoCheck = new Label();
-		
-		s.ALOAD(0);
-		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "isSnapshotDue", "()Z");
-		s.IFfalse(lNoCheck);
-		s.LDC(0); // TODO: use probe id
-		s.JSR(lCheckSnapshot);
-		s.label(lNoCheck);
-	}
-	
-	private Label makeSnapshotChecker(AbstractInsnNode aReferenceNode)
-	{
-		BCIFrame theFrame = itsMethodInfo.getFrame(aReferenceNode);
-		int theLocals = theFrame.getLocals();
 
-		Label lCheckSnapshot = new Label();
-		Label lResumeFromSnapshot = new Label();
-		
-		SList s = new SList();
-		
-		s.label(lCheckSnapshot);
-		
-		s.ASTORE(itsSnapshotRetVar); // Store return address var
-		s.ISTORE(itsSnapshotProbeIdVar); // Store probe id
-		
-		s.ALOAD(0);
-		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "getSnapshotForResume", "()"+DSC_LOCALSSNAPSHOT);
-		s.DUP();
-		s.ASTORE(itsSnapshotVar);
-		s.IFNONNULL(lResumeFromSnapshot);
-		
-		// Take snapshot
-		s.ALOAD(0);
-		s.ILOAD(itsSnapshotProbeIdVar);
-		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "createSnapshot", "(I)"+DSC_LOCALSSNAPSHOT);
-		s.ASTORE(itsSnapshotVar);
-
-		for(int i=0;i<theLocals;i++)
-		{
-			Type theType = theFrame.getLocal(i).getType();
-			s.ALOAD(itsSnapshotVar);
-			s.ILOAD(theType, i); // TODO: adjust for big slots
-			invokeSnapshotPush(s, theType);
-		}
-
-		s.ALOAD(0);
-		s.ALOAD(itsSnapshotVar);
-		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "registerSnapshot", "("+DSC_LOCALSSNAPSHOT+")V");
-
-		s.RET(itsSnapshotRetVar);
-		
-		// Resume from snapshot
-		s.label(lResumeFromSnapshot);
-		
-		for(int i=0;i<theLocals;i++)
-		{
-			Type theType = theFrame.getLocal(i).getType();
-			s.ALOAD(itsSnapshotVar);
-			invokeSnapshotPop(s, theType);
-			s.ISTORE(theType, i); // TODO: adjust for big slots
-		}
-
-		s.RET(itsSnapshotRetVar);
-		
-		itsAdditionalInstructions.add(s);
-		
-		return lCheckSnapshot;
-	}
-	
-	private String getLocalsSig(AbstractInsnNode aNode)
-	{
-		BCIFrame theFrame = itsMethodInfo.getFrame(aNode);
-		int theLocals = theFrame.getLocals();
-		char[] theChars = new char[theLocals];
-		for(int i=0;i<theLocals;i++)
-		{
-			Type theType = theFrame.getLocal(i).getType();
-			theChars[i] = getTypeChar(theType);
-		}
-		return new String(theChars);
-	}
-	
-	private static char getTypeChar(Type aType)
-	{
-		switch(aType.getSort())
-		{
-		case Type.ARRAY:
-		case Type.OBJECT:
-			return 'L';
-			
-		case Type.BOOLEAN:
-		case Type.BYTE:
-		case Type.CHAR:
-		case Type.INT:
-		case Type.SHORT:
-			return 'I';
-			
-		case Type.DOUBLE:
-			return 'D';
-			
-		case Type.FLOAT:
-			return 'F';
-			
-		case Type.LONG:
-			return 'J';
-
-		default:
-			throw new RuntimeException("Not handled: "+aType);	
-		}
-	}
-	
-	private static void invokeSnapshotPush(SList s, Type aType)
-	{
-		switch(aType.getSort())
-		{
-		case Type.ARRAY:
-		case Type.OBJECT:
-			s.INVOKEVIRTUAL(CLS_LOCALSSNAPSHOT, "pushRef", "("+DSC_LOCALSSNAPSHOT+")V");
-			break;
-			
-		case Type.BOOLEAN:
-		case Type.BYTE:
-		case Type.CHAR:
-		case Type.INT:
-		case Type.SHORT:
-			s.INVOKEVIRTUAL(CLS_LOCALSSNAPSHOT, "pushInt", "(I)V");
-			break;
-			
-		case Type.DOUBLE:
-			s.INVOKEVIRTUAL(CLS_LOCALSSNAPSHOT, "pushDouble", "(D)V");
-			break;
-			
-		case Type.FLOAT:
-			s.INVOKEVIRTUAL(CLS_LOCALSSNAPSHOT, "pushFloat", "(F)V");
-			break;
-			
-		case Type.LONG:
-			s.INVOKEVIRTUAL(CLS_LOCALSSNAPSHOT, "pushLong", "(J)V");
-			break;
-
-		default:
-			throw new RuntimeException("Not handled: "+aType);	
-		}
-	}
-	
-	private static void invokeSnapshotPop(SList s, Type aType)
-	{
-		switch(aType.getSort())
-		{
-		case Type.ARRAY:
-		case Type.OBJECT:
-			s.INVOKEVIRTUAL(CLS_LOCALSSNAPSHOT, "popRef", "()"+DSC_LOCALSSNAPSHOT);
-			break;
-			
-		case Type.BOOLEAN:
-		case Type.BYTE:
-		case Type.CHAR:
-		case Type.INT:
-		case Type.SHORT:
-			s.INVOKEVIRTUAL(CLS_LOCALSSNAPSHOT, "popInt", "()I");
-			break;
-			
-		case Type.DOUBLE:
-			s.INVOKEVIRTUAL(CLS_LOCALSSNAPSHOT, "popDouble", "()D");
-			break;
-			
-		case Type.FLOAT:
-			s.INVOKEVIRTUAL(CLS_LOCALSSNAPSHOT, "popFloat", "()F");
-			break;
-			
-		case Type.LONG:
-			s.INVOKEVIRTUAL(CLS_LOCALSSNAPSHOT, "popLong", "()J");
-			break;
-			
-		default:
-			throw new RuntimeException("Not handled: "+aType);	
-		}
-	}
+	protected abstract void addSnapshotSetup(InsnList aInsns);
+	protected abstract void insertSnapshotProbe(SList s, AbstractInsnNode aReferenceNode);
 }

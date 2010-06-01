@@ -84,7 +84,7 @@ public class MethodInstrumenter_ClassLoader extends MethodInstrumenter
 			// Monitoring enabled
 			{
 				// Store ThreadData object
-				s.INVOKESTATIC(BCIUtils.CLS_EVENTCOLLECTOR, "_getThreadData", "()"+BCIUtils.DSC_THREADDATA);
+				s.INVOKESTATIC(BCIUtils.CLS_EVENTCOLLECTOR_AGENT, "_getThreadData", "()"+BCIUtils.DSC_THREADDATA);
 				s.DUP();
 				s.ASTORE(getThreadDataVar());
 				

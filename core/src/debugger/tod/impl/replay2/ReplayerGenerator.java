@@ -48,15 +48,17 @@ import tod.core.config.TODConfig;
 import tod.core.database.browser.LocationUtils;
 import tod.core.database.structure.IBehaviorInfo;
 import tod.core.database.structure.IClassInfo;
-import tod.core.database.structure.IStructureDatabase;
+import tod.core.database.structure.IMutableStructureDatabase;
 import tod.impl.bci.asm2.BCIUtils;
 import tod.impl.replay2.InScopeReplayerFrame.Factory;
 import zz.utils.Utils;
 
 public class ReplayerGenerator
 {
+	public static final String SNAPSHOT_METHOD_NAME = "snapshot";
+	
 	private final TODConfig itsConfig;
-	private final IStructureDatabase itsDatabase;
+	private final IMutableStructureDatabase itsDatabase;
 	private final ReplayerLoader itsLoader;
 
 	
@@ -65,14 +67,14 @@ public class ReplayerGenerator
 	 */
 	private List<InScopeReplayerFrame.Factory> itsInScopeFrameFactories = new ArrayList<InScopeReplayerFrame.Factory>();
 
-	public ReplayerGenerator(ReplayerLoader aLoader, TODConfig aConfig, IStructureDatabase aDatabase)
+	public ReplayerGenerator(ReplayerLoader aLoader, TODConfig aConfig, IMutableStructureDatabase aDatabase)
 	{
 		itsLoader = aLoader;
 		itsConfig = aConfig;
 		itsDatabase = aDatabase;
 	}
 
-	public static final boolean USE_SHORT_NAMES = true;
+	public static final boolean USE_SHORT_NAMES = false;
 	
 	public static final String REPLAYER_NAME_PREFIX = "$tdrpl$";
 	
@@ -158,14 +160,15 @@ public class ReplayerGenerator
 			
 			theBehavior = LocationUtils.getBehavior(itsDatabase, theClass, theMethodName, theMethodDesc, false);
 
-			MethodReplayerGenerator theGenerator = new MethodReplayerGenerator(
+			MethodReplayerGenerator theGenerator_1stPass = new MethodReplayerGenerator_1stPass(
 					itsConfig, 
 					itsDatabase, 
 					this,
+					theBehavior.getId(),
 					theClassNode, 
 					theMethodNode);
 			
-			byte[] theReplayerBytecode = theGenerator.generate();
+			byte[] theReplayerBytecode_1stPass = theGenerator_1stPass.generate();
 			
 			String theFrameClassJVMName = makeReplayerClassName(
 					theClassNode.name, 
@@ -174,7 +177,7 @@ public class ReplayerGenerator
 			
 			String theFrameClassName = theFrameClassJVMName.replace('/', '.');
 			
-			itsLoader.addClass(theFrameClassName, theReplayerBytecode);
+			itsLoader.addClass(theFrameClassName, theReplayerBytecode_1stPass);
 						
 			theFactory = createFactory(theFrameClassJVMName);
 			theFactory.setSignature(theBehavior.getId(), theMethodName, theMethodNode.access, theMethodDesc);

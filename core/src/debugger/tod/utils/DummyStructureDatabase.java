@@ -199,6 +199,11 @@ implements IMutableStructureDatabase
 	{
 	}
 
+	public int addSnapshotProbe(int aBehaviorId, int aProbeIndex)
+	{
+		return 0;
+	}
+
 	public void addListener(Listener aListener)
 	{
 	}

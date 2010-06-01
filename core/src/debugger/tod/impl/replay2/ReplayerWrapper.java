@@ -31,12 +31,11 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.replay2;
 
-import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
 import tod.core.config.TODConfig;
-import tod.core.database.structure.IStructureDatabase;
+import tod.core.database.structure.IMutableStructureDatabase;
 import tod.impl.server.BufferStream;
 
 /**
@@ -53,7 +52,7 @@ public class ReplayerWrapper
 			ReplayerLoader aLoader,
 			int aThreadId,
 			TODConfig aConfig, 
-			IStructureDatabase aDatabase, 
+			IMutableStructureDatabase aDatabase, 
 			EventCollector aCollector,
 			TmpIdManager aTmpIdManager,
 			BufferStream aBuffer)

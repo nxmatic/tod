@@ -92,6 +92,11 @@ public interface IMutableStructureDatabase extends IStructureDatabase
 	public void setProbe(int aProbeId, int aBehaviorId, int aBytecodeIndex, BytecodeRole aRole, int aAdviceSourceId);
 	
 	/**
+	 * Creates a new snapshot probe and returns its id.
+	 */
+	public int addSnapshotProbe(int aBehaviorId, int aProbeIndex);
+	
+	/**
 	 * Retrieves the probe at the given location, or create a new one if necessary.
 	 * The probes created by this method should only be used for exception processing
 	 * (when an exception generated event is received, we have no probe id, but we

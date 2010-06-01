@@ -65,7 +65,8 @@ public class ReplayerVerifier extends SimpleVerifier
 				b.node(Type.getType(ObjectId.class),
 						b.leaf(Type.getType(TmpObjectId.class))),
 				b.leaf(Type.getType(String.class)),
-				b.leaf(Type.getType(EventCollector.class)));
+				b.leaf(Type.getType(EventCollector.class)),
+				b.leaf(Type.getType(LocalsSnapshot.class)));
 	}
 	
 	

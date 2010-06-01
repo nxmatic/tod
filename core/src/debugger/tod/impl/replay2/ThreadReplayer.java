@@ -39,6 +39,7 @@ import org.objectweb.asm.Type;
 import tod.core.config.TODConfig;
 import tod.core.database.browser.LocationUtils;
 import tod.core.database.structure.IBehaviorInfo;
+import tod.core.database.structure.IMutableStructureDatabase;
 import tod.core.database.structure.IStructureDatabase;
 import tod.core.database.structure.ObjectId;
 import tod.impl.server.BufferStream;
@@ -57,12 +58,12 @@ public abstract class ThreadReplayer
 	private static final int FRAMETYPE_ENVELOPPE = -2;
 	private static final int FRAMETYPE_CLASSLOADERWRAPPER = -3;
 	
-	public static final boolean ECHO = false;
+	public static final boolean ECHO = true;
 	public static boolean ECHO_FORREAL = true;
 
 	private final int itsThreadId;
 	private final TODConfig itsConfig;
-	private final IStructureDatabase itsDatabase;
+	private final IMutableStructureDatabase itsDatabase;
 	
 	private int itsMessageCount = 0;
 	private IntStack itsStack = new IntStack();
@@ -91,7 +92,7 @@ public abstract class ThreadReplayer
 			ReplayerLoader aLoader,
 			int aThreadId,
 			TODConfig aConfig, 
-			IStructureDatabase aDatabase, 
+			IMutableStructureDatabase aDatabase, 
 			EventCollector aCollector,
 			TmpIdManager aTmpIdManager,
 			BufferStream aBuffer)
@@ -135,9 +136,10 @@ public abstract class ThreadReplayer
 	
 	public abstract LocalsSnapshot createSnapshot(int aProbeId);
 	
-	public abstract boolean isSnapshotDue();
+	public abstract int getSnapshotSeq();
 	public abstract LocalsSnapshot getSnapshotForResume();
 	public abstract void registerSnapshot(LocalsSnapshot aSnapshot);
+	public abstract int getStartProbe();
 
 	public byte getNextMessage()
 	{

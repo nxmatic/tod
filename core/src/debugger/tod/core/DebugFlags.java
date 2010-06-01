@@ -131,7 +131,7 @@ public class DebugFlags
 	/**
 	 * Whether information about structural elements should be printed
 	 */
-	public static final boolean LOG_STRUCTURE = true;
+	public static final boolean LOG_STRUCTURE = false;
 	
 	/**
 	 * Whether timestamps should be pretty printed if {@link #COLLECTOR_LOG}

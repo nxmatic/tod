@@ -32,7 +32,7 @@ Inc. MD5 Message-Digest Algorithm".
 package tod.impl.replay2;
 
 import tod.core.config.TODConfig;
-import tod.core.database.structure.IStructureDatabase;
+import tod.core.database.structure.IMutableStructureDatabase;
 import tod.impl.server.BufferStream;
 
 public class ThreadReplayer_Partial extends ThreadReplayer
@@ -41,7 +41,7 @@ public class ThreadReplayer_Partial extends ThreadReplayer
 			ReplayerLoader aLoader,
 			int aThreadId,
 			TODConfig aConfig,
-			IStructureDatabase aDatabase,
+			IMutableStructureDatabase aDatabase,
 			EventCollector aCollector,
 			TmpIdManager aTmpIdManager,
 			BufferStream aBuffer)
@@ -51,32 +51,36 @@ public class ThreadReplayer_Partial extends ThreadReplayer
 	}
 
 	@Override
-	public boolean isSnapshotDue()
-	{
-		throw new UnsupportedOperationException();
-	}
-
-	@Override
 	public void registerSnapshot(LocalsSnapshot aSnapshot)
 	{
 		throw new UnsupportedOperationException();
 	}
 
+	@Override
 	public LocalsSnapshot createSnapshot(int aProbeId)
 	{
 		throw new UnsupportedOperationException();
 	}
 
+	@Override
 	public int getSnapshotSeq()
 	{
 		throw new UnsupportedOperationException();
 	}
 
+	@Override
 	public LocalsSnapshot getSnapshotForResume()
 	{
 		throw new UnsupportedOperationException();
 	}
+	
+	@Override
+	public int getStartProbe()
+	{
+		throw new UnsupportedOperationException();
+	}
 
+	@Override
 	public void replay()
 	{
 		throw new UnsupportedOperationException();

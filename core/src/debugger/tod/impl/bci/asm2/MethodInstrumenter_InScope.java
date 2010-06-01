@@ -156,7 +156,7 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 			s.add(itsMethodInfo.getFieldCacheInitInstructions());
 			
 			// Store ThreadData object
-			s.INVOKESTATIC(BCIUtils.CLS_EVENTCOLLECTOR, "_getThreadData", "()"+BCIUtils.DSC_THREADDATA); // ThD
+			s.INVOKESTATIC(BCIUtils.CLS_EVENTCOLLECTOR_AGENT, "_getThreadData", "()"+BCIUtils.DSC_THREADDATA); // ThD
 			s.DUP(); // ThD ThD
 			s.DUP(); // ThD ThD ThD
 			s.ASTORE(getThreadDataVar()); // ThD ThD

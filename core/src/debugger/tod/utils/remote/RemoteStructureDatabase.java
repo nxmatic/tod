@@ -633,6 +633,11 @@ public class RemoteStructureDatabase implements RIStructureDatabase
 			throw new UnsupportedOperationException();
 		}
 
+		public int addSnapshotProbe(int aBehaviorId, int aProbeIndex)
+		{
+			throw new UnsupportedOperationException();
+		}
+
 		public ProbeInfo getNewExceptionProbe(int aBehaviorId, int aBytecodeIndex)
 		{
 			int theProbeId = itsDatabase.getNewExceptionProbeInfo(aBehaviorId, aBytecodeIndex);

@@ -457,4 +457,35 @@ public interface IStructureDatabase
 		}
 	}
 
+	/**
+	 * Records the information about a snapshot probe location
+	 * @author gpothier
+	 */
+	public class SnapshotProbeInfo implements Serializable
+	{
+		private static final long serialVersionUID = 1387373781939875L;
+
+		public static final SnapshotProbeInfo NULL = new SnapshotProbeInfo(-1, -1, -1);
+
+		public final int id;
+		
+		/**
+		 * The behavior that contains the probe
+		 */
+		public final int behaviorId;
+		
+		/**
+		 * Index of the probe within the behavior
+		 */
+		public final int probeIndex;
+
+		public SnapshotProbeInfo(int aId, int aBehaviorId, int aProbeIndex)
+		{
+			id = aId;
+			behaviorId = aBehaviorId;
+			probeIndex = aProbeIndex;
+		}
+
+	}
+
 }

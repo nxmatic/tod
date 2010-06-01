@@ -31,21 +31,30 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.replay2;
 
+import static tod.impl.bci.asm2.BCIUtils.CLS_INSCOPEREPLAYERFRAME;
+import static tod.impl.bci.asm2.BCIUtils.CLS_LOCALSSNAPSHOT;
+import static tod.impl.bci.asm2.BCIUtils.DSC_LOCALSSNAPSHOT;
+import static tod.impl.bci.asm2.BCIUtils.DSC_OBJECTID;
+import static tod.impl.bci.asm2.BCIUtils.TYPE_OBJECTID;
+
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Constructor;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Label;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.ClassNode;
@@ -53,6 +62,7 @@ import org.objectweb.asm.tree.MethodNode;
 
 import tod.core.config.TODConfig;
 import tod.core.database.structure.IBehaviorInfo;
+import tod.core.database.structure.IMutableStructureDatabase;
 import tod.core.database.structure.IStructureDatabase;
 import tod.impl.bci.asm2.BCIUtils;
 import tod.impl.server.BufferStream;
@@ -78,7 +88,7 @@ public class ReplayerLoader extends ClassLoader
 					ReplayerLoader.class, 
 					int.class,
 					TODConfig.class, 
-					IStructureDatabase.class, 
+					IMutableStructureDatabase.class, 
 					EventCollector.class,
 					TmpIdManager.class, 
 					BufferStream.class);
@@ -88,7 +98,7 @@ public class ReplayerLoader extends ClassLoader
 					ReplayerLoader.class, 
 					int.class,
 					TODConfig.class, 
-					IStructureDatabase.class, 
+					IMutableStructureDatabase.class, 
 					EventCollector.class,
 					TmpIdManager.class, 
 					BufferStream.class);
@@ -103,7 +113,7 @@ public class ReplayerLoader extends ClassLoader
 			boolean a1stPass,
 			int aThreadId,
 			TODConfig aConfig,
-			IStructureDatabase aDatabase,
+			IMutableStructureDatabase aDatabase,
 			EventCollector aCollector,
 			TmpIdManager aTmpIdManager,
 			BufferStream aBuffer)
@@ -242,6 +252,147 @@ public class ReplayerLoader extends ClassLoader
 		addClass(theClassNode);
 	}
 	
+	private void modifyInScopeReplayerFrame()
+	{
+		ClassNode theClassNode = getOriginalClass(BCIUtils.getJvmClassName(InScopeReplayerFrame.class));
+		modifyInScopeReplayerFrame_addSnapshotMethods(theClassNode);
+		addClass(theClassNode);
+	}
+	
+	private void modifyInScopeReplayerFrame_addSnapshotMethods(ClassNode aClassNode)
+	{
+		modifyInScopeReplayerFrame_addSnapshotMethod(aClassNode, "I");
+		modifyInScopeReplayerFrame_addSnapshotMethod(aClassNode, "II");
+		modifyInScopeReplayerFrame_addSnapshotMethod(aClassNode, "III");
+		modifyInScopeReplayerFrame_addSnapshotMethod(aClassNode, "L");
+		modifyInScopeReplayerFrame_addSnapshotMethod(aClassNode, "LL");
+		modifyInScopeReplayerFrame_addSnapshotMethod(aClassNode, "LLL");
+	}
+	
+	private void modifyInScopeReplayerFrame_addSnapshotMethod(ClassNode aClassNode, String aSnapshotSig)
+	{
+		Type[] theSignature = new Type[aSnapshotSig.length()];
+		for(int i=0;i<theSignature.length;i++) theSignature[i] = getTypeForSig(aSnapshotSig.charAt(i));
+		MethodNode theMethod = createSnapshotMethod(aClassNode, theSignature);
+		aClassNode.methods.add(theMethod);
+	}
+	
+	private static Type getTypeForSig(char aSig)
+	{
+		switch(aSig)
+		{
+		case 'I': return Type.INT_TYPE;
+		case 'J': return Type.LONG_TYPE;
+		case 'F': return Type.FLOAT_TYPE;
+		case 'D': return Type.DOUBLE_TYPE;
+		case 'L': return TYPE_OBJECTID;
+		default: throw new RuntimeException("Not handled: "+aSig);
+		}
+	}
+	
+	private MethodNode createSnapshotMethod(ClassNode aClassNode, Type[] aSnapshotSignature)
+	{
+		MethodNode theMethodNode = new MethodNode();
+		theMethodNode.name = ReplayerGenerator.SNAPSHOT_METHOD_NAME;
+		theMethodNode.maxLocals = 3;
+
+		LocalsMapInfo theLocalsMapInfo = new LocalsMapInfo();
+		List<Type> theArgTypes = new ArrayList<Type>();
+		theArgTypes.add(Type.INT_TYPE); // Current snapshot seq 
+		theArgTypes.add(Type.INT_TYPE); // Probe id
+		for (Type theType : aSnapshotSignature) 
+		{
+			theMethodNode.maxLocals += theType.getSize();
+			theArgTypes.add(theType);
+			theLocalsMapInfo.add(theType);
+		}
+		
+		theMethodNode.desc = Type.getMethodDescriptor(Type.INT_TYPE, theArgTypes.toArray(new Type[theArgTypes.size()]));
+		theMethodNode.exceptions = Collections.EMPTY_LIST;
+		theMethodNode.access = Opcodes.ACC_PUBLIC;
+		theMethodNode.tryCatchBlocks = Collections.EMPTY_LIST;
+		
+		int vSnapshotSeq = theMethodNode.maxLocals++;
+		int vSnapshot = theMethodNode.maxLocals++;
+
+		Label lNoSnapshot = new Label();
+		SList s = new SList();
+		
+		s.ALOAD(0);
+		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "getSnapshotSeq", "()I");
+		s.DUP();
+		s.ISTORE(vSnapshotSeq);
+		s.ILOAD(1); // Passed seq
+		s.IF_ICMPLE(lNoSnapshot);
+		
+		// Perform snapshot
+		s.ALOAD(0);
+		s.ILOAD(2);
+		s.pushInt(theLocalsMapInfo.intValuesCount);
+		s.pushInt(theLocalsMapInfo.longValuesCount);
+		s.pushInt(theLocalsMapInfo.floatValuesCount);
+		s.pushInt(theLocalsMapInfo.doubleValuesCount);
+		s.pushInt(theLocalsMapInfo.refValuesCount);
+		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "createSnapshot", "(IIIIII)"+DSC_LOCALSSNAPSHOT);
+		s.ASTORE(vSnapshot);
+		
+		int theSlot = 3;
+		for (Type theType : aSnapshotSignature) 
+		{
+			s.ALOAD(vSnapshot);
+			s.ILOAD(theType, theSlot);
+			invokeSnapshotPush(s, theType);
+			theSlot += theType.getSize();
+		}
+		
+		s.ALOAD(0);
+		s.ALOAD(vSnapshot);
+		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "registerSnapshot", "("+DSC_LOCALSSNAPSHOT+")V");
+		
+		s.label(lNoSnapshot);
+		s.ILOAD(vSnapshotSeq);
+		s.IRETURN();
+		
+		theMethodNode.instructions = s;
+		
+		return theMethodNode;
+	}
+	
+	private static void invokeSnapshotPush(SList s, Type aType)
+	{
+		switch(aType.getSort())
+		{
+		case Type.ARRAY:
+		case Type.OBJECT:
+			s.INVOKEVIRTUAL(CLS_LOCALSSNAPSHOT, "pushRef", "("+DSC_OBJECTID+")V");
+			break;
+			
+		case Type.BOOLEAN:
+		case Type.BYTE:
+		case Type.CHAR:
+		case Type.INT:
+		case Type.SHORT:
+			s.INVOKEVIRTUAL(CLS_LOCALSSNAPSHOT, "pushInt", "(I)V");
+			break;
+			
+		case Type.DOUBLE:
+			s.INVOKEVIRTUAL(CLS_LOCALSSNAPSHOT, "pushDouble", "(D)V");
+			break;
+			
+		case Type.FLOAT:
+			s.INVOKEVIRTUAL(CLS_LOCALSSNAPSHOT, "pushFloat", "(F)V");
+			break;
+			
+		case Type.LONG:
+			s.INVOKEVIRTUAL(CLS_LOCALSSNAPSHOT, "pushLong", "(J)V");
+			break;
+
+		default:
+			throw new RuntimeException("Not handled: "+aType);	
+		}
+	}
+	
+
 	private void modifyUnmonitoredReplayerFrame(Set<MethodDescriptor> aUsedDescriptors)
 	{
 		modifyUnmonitoredReplayerFrame(aUsedDescriptors, "tod/impl/replay2/UnmonitoredReplayerFrame");
@@ -276,7 +427,7 @@ public class ReplayerLoader extends ClassLoader
 			{
 			case Type.OBJECT:
 			case Type.ARRAY:
-				s.GETFIELD(aClassName, "itsRefResult", MethodReplayerGenerator.TYPE_OBJECTID.getDescriptor());
+				s.GETFIELD(aClassName, "itsRefResult", TYPE_OBJECTID.getDescriptor());
 				s.ARETURN();
 				
 			case Type.BOOLEAN:
@@ -360,6 +511,57 @@ public class ReplayerLoader extends ClassLoader
 			throw new RuntimeException(e);
 		}
 	}
+	
+	private static class LocalsMapInfo
+	{
+		public int intValuesCount;
+		public int longValuesCount;
+		public int floatValuesCount;
+		public int doubleValuesCount;
+		public int refValuesCount;
+		
+		public boolean isEmpty()
+		{
+			return intValuesCount + longValuesCount + floatValuesCount + doubleValuesCount + refValuesCount == 0;
+		}
+		
+		public void add(Type aType)
+		{
+			switch(aType.getSort())
+			{
+			case Type.ARRAY:
+			case Type.OBJECT:
+				refValuesCount++;
+				break;
+				
+			case Type.BOOLEAN:
+			case Type.BYTE:
+			case Type.CHAR:
+			case Type.INT:
+			case Type.SHORT:
+				intValuesCount++;
+				break;
+				
+			case Type.DOUBLE:
+				doubleValuesCount++;
+				break;
+				
+			case Type.FLOAT:
+				floatValuesCount++;
+				break;
+				
+			case Type.LONG:
+				longValuesCount++;
+				break;
+				
+			default:
+				throw new RuntimeException("Not handled: "+aType);	
+			}
+		}
+		
+
+	}
+
 
 	/**
 	 * Represents a method descriptor (argument types).

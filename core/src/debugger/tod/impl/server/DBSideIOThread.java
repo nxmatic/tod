@@ -42,7 +42,7 @@ import java.util.List;
 import java.util.Map;
 
 import tod.core.config.TODConfig;
-import tod.core.database.structure.IStructureDatabase;
+import tod.core.database.structure.IMutableStructureDatabase;
 import tod.impl.database.structure.standard.StructureDatabase;
 import tod.impl.replay2.EventCollector;
 import tod.impl.replay2.ReplayerLoader;
@@ -61,7 +61,7 @@ public abstract class DBSideIOThread
 	private static final int BUFFER_SIZE = 4096;
 	
 	private final TODConfig itsConfig;
-	private final IStructureDatabase itsDatabase;
+	private final IMutableStructureDatabase itsDatabase;
 	
 	private final InputStream itsIn;
 	
@@ -71,7 +71,7 @@ public abstract class DBSideIOThread
 	
 	private long itsProcessedSize = 0;
 	
-	public DBSideIOThread(TODConfig aConfig, IStructureDatabase aDatabase, InputStream aIn)
+	public DBSideIOThread(TODConfig aConfig, IMutableStructureDatabase aDatabase, InputStream aIn)
 	{
 		itsConfig = aConfig;
 		itsDatabase = aDatabase;
@@ -206,7 +206,7 @@ public abstract class DBSideIOThread
 			String theScopeMD5 = Utils.md5String(theConfig.get(TODConfig.SCOPE_TRACE_FILTER).getBytes());
 			File theDbFile = new File(theConfig.get(TODConfig.DB_RAW_EVENTS_DIR)+"/db-"+theScopeMD5+".raw");
 
-			IStructureDatabase theDatabase = StructureDatabase.create(theConfig, theDbFile, true);
+			IMutableStructureDatabase theDatabase = StructureDatabase.create(theConfig, theDbFile, true);
 			
 			final Map<Integer, EventCollector> theCollectors = new HashMap<Integer, EventCollector>();  
 			
