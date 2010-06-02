@@ -31,11 +31,7 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.replay2;
 
-import static tod.impl.bci.asm2.BCIUtils.CLS_INSCOPEREPLAYERFRAME;
-import static tod.impl.bci.asm2.BCIUtils.CLS_LOCALSSNAPSHOT;
-import static tod.impl.bci.asm2.BCIUtils.DSC_LOCALSSNAPSHOT;
-import static tod.impl.bci.asm2.BCIUtils.DSC_OBJECTID;
-import static tod.impl.bci.asm2.BCIUtils.TYPE_OBJECTID;
+import static tod.impl.bci.asm2.BCIUtils.*;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -71,6 +67,7 @@ import zz.utils.Utils;
 public class ReplayerLoader extends ClassLoader
 {
 	private final ClassLoader itsParent;
+	private final IStructureDatabase itsDatabase;
 	private final Map<String, byte[]> itsClassesMap = new HashMap<String, byte[]>();
 	
 	private Constructor its1stPassReplayerCtor;
@@ -79,6 +76,7 @@ public class ReplayerLoader extends ClassLoader
 	public ReplayerLoader(ClassLoader aParent, IStructureDatabase aDatabase)
 	{
 		itsParent = aParent;
+		itsDatabase = aDatabase;
 		modifyBaseClasses(aDatabase);
 		
 		try
@@ -139,6 +137,7 @@ public class ReplayerLoader extends ClassLoader
 		return aName.startsWith("tod.impl.replay2.") 
 			&& ! aName.equals(getClass().getName())
 			&& ! aName.equals(TmpIdManager.class.getName())
+			&& ! aName.equals(LocalsSnapshot.class.getName())
 			&& ! aName.equals(EventCollector.class.getName());
 	}
 	
@@ -179,6 +178,7 @@ public class ReplayerLoader extends ClassLoader
 		Set<MethodDescriptor> theUsedDescriptors = getUsedDescriptors(aDatabase);
 		
 		modifyReplayerFrame(theUsedDescriptors);
+		modifyInScopeReplayerFrame();
 		modifyUnmonitoredReplayerFrame(theUsedDescriptors);
 		modifyClassloaderWrapperReplayerFrame(theUsedDescriptors);
 	}
@@ -261,33 +261,18 @@ public class ReplayerLoader extends ClassLoader
 	
 	private void modifyInScopeReplayerFrame_addSnapshotMethods(ClassNode aClassNode)
 	{
-		modifyInScopeReplayerFrame_addSnapshotMethod(aClassNode, "I");
-		modifyInScopeReplayerFrame_addSnapshotMethod(aClassNode, "II");
-		modifyInScopeReplayerFrame_addSnapshotMethod(aClassNode, "III");
-		modifyInScopeReplayerFrame_addSnapshotMethod(aClassNode, "L");
-		modifyInScopeReplayerFrame_addSnapshotMethod(aClassNode, "LL");
-		modifyInScopeReplayerFrame_addSnapshotMethod(aClassNode, "LLL");
+		for (String theSignature : itsDatabase.getRegisteredSnapshotLocalsSignatures())
+		{
+			modifyInScopeReplayerFrame_addSnapshotMethod(aClassNode, theSignature);
+		}
 	}
 	
 	private void modifyInScopeReplayerFrame_addSnapshotMethod(ClassNode aClassNode, String aSnapshotSig)
 	{
 		Type[] theSignature = new Type[aSnapshotSig.length()];
-		for(int i=0;i<theSignature.length;i++) theSignature[i] = getTypeForSig(aSnapshotSig.charAt(i));
+		for(int i=0;i<theSignature.length;i++) theSignature[i] = BCIUtils.getTypeForSig(aSnapshotSig.charAt(i));
 		MethodNode theMethod = createSnapshotMethod(aClassNode, theSignature);
 		aClassNode.methods.add(theMethod);
-	}
-	
-	private static Type getTypeForSig(char aSig)
-	{
-		switch(aSig)
-		{
-		case 'I': return Type.INT_TYPE;
-		case 'J': return Type.LONG_TYPE;
-		case 'F': return Type.FLOAT_TYPE;
-		case 'D': return Type.DOUBLE_TYPE;
-		case 'L': return TYPE_OBJECTID;
-		default: throw new RuntimeException("Not handled: "+aSig);
-		}
 	}
 	
 	private MethodNode createSnapshotMethod(ClassNode aClassNode, Type[] aSnapshotSignature)

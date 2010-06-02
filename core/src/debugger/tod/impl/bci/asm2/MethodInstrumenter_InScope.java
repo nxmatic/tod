@@ -407,6 +407,8 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 	
 	private void processInvoke(MethodInsnNode aNode)
 	{
+		getDatabase().registerSnapshotLocalsSignature(BCIUtils.getLocalsSig(itsMethodInfo.getFrame(aNode)));
+		
 		SyntaxInsnList s = new SyntaxInsnList();
 		
 		// Force the loading of the class so that its scope is known

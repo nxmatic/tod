@@ -47,6 +47,8 @@ import org.objectweb.asm.tree.MethodNode;
 
 import tod.core.config.TODConfig;
 import tod.core.database.structure.IMutableStructureDatabase;
+import tod.core.database.structure.IStructureDatabase.SnapshotProbeInfo;
+import tod.impl.bci.asm2.BCIUtils;
 import tod.impl.bci.asm2.MethodInfo.BCIFrame;
 
 public class MethodReplayerGenerator_Partial extends MethodReplayerGenerator
@@ -110,7 +112,7 @@ public class MethodReplayerGenerator_Partial extends MethodReplayerGenerator
 	@Override
 	protected void insertSnapshotProbe(SList s, AbstractInsnNode aReferenceNode)
 	{
-		String theLocalsSig = getLocalsSig(aReferenceNode);
+		String theLocalsSig = BCIUtils.getLocalsSig(getMethodInfo().getFrame(aReferenceNode));
 		Label lCheckSnapshot = itsLocalsSigToLabel.get(theLocalsSig);
 		if (lCheckSnapshot == null)
 		{
@@ -123,16 +125,14 @@ public class MethodReplayerGenerator_Partial extends MethodReplayerGenerator
 		
 		int theProbeIndex = itsSnapshotProbes.size();
 		itsSnapshotProbes.add(lProbe);
-		int theProbeId = getDatabase().addSnapshotProbe(getBehaviorId(), theProbeIndex);
+		SnapshotProbeInfo theProbe = getDatabase().getNewSnapshotProbe(getBehaviorId(), theProbeIndex, theLocalsSig);
 		
 		s.label(lProbe);
-		s.LDC(theLocalsSig);
-		s.POP();
 		s.ALOAD(0);
 		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "getSnapshotSeq", "()I");
 		s.ILOAD(itsSnapshotSeqVar);
 		s.IF_ICMPLE(lNoCheck);
-		s.LDC(theProbeId);
+		s.LDC(theProbe.id);
 		s.JSR(lCheckSnapshot);
 		s.label(lNoCheck);
 	}
@@ -226,49 +226,6 @@ public class MethodReplayerGenerator_Partial extends MethodReplayerGenerator
 		addAdditionalInstructions(s);
 		
 		return lCheckSnapshot;
-	}
-	
-	private String getLocalsSig(AbstractInsnNode aNode)
-	{
-		BCIFrame theFrame = getMethodInfo().getFrame(aNode);
-		int theLocals = theFrame.getLocals();
-		char[] theChars = new char[theLocals];
-		theChars[0] = (char) theFrame.getStackSize();
-		for(int i=1;i<theLocals;i++) // The first slot is the frame
-		{
-			Type theType = theFrame.getLocal(i).getType();
-			theChars[i] = theType != null ? getTypeChar(theType) : (char)0;
-		}
-		return new String(theChars);
-	}
-	
-	private static char getTypeChar(Type aType)
-	{
-		switch(aType.getSort())
-		{
-		case Type.ARRAY:
-		case Type.OBJECT:
-			return 'L';
-			
-		case Type.BOOLEAN:
-		case Type.BYTE:
-		case Type.CHAR:
-		case Type.INT:
-		case Type.SHORT:
-			return 'I';
-			
-		case Type.DOUBLE:
-			return 'D';
-			
-		case Type.FLOAT:
-			return 'F';
-			
-		case Type.LONG:
-			return 'J';
-
-		default:
-			throw new RuntimeException("Not handled: "+aType);	
-		}
 	}
 	
 	private static void invokeSnapshotPush(SList s, Type aType)

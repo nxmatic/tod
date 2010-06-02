@@ -44,14 +44,15 @@ import org.objectweb.asm.tree.MethodNode;
 
 import tod.core.config.TODConfig;
 import tod.core.database.structure.IMutableStructureDatabase;
+import tod.impl.bci.asm2.BCIUtils;
 import tod.impl.bci.asm2.MethodInfo.BCIFrame;
 
 public class MethodReplayerGenerator_1stPass extends MethodReplayerGenerator
 {
 	private int itsSnapshotSeqVar;
-
-	private int itsProbesCount = 0;
 	
+	private int itsProbeIndex = 0;
+
 	public MethodReplayerGenerator_1stPass(
 			TODConfig aConfig,
 			IMutableStructureDatabase aDatabase,
@@ -85,9 +86,11 @@ public class MethodReplayerGenerator_1stPass extends MethodReplayerGenerator
 	@Override
 	protected void insertSnapshotProbe(SList s, AbstractInsnNode aReferenceNode)
 	{
+		String theLocalsSig = BCIUtils.getLocalsSig(getMethodInfo().getFrame(aReferenceNode));
+
 		s.ALOAD(0);
 		s.ILOAD(itsSnapshotSeqVar);
-		s.pushInt(itsProbesCount++);
+		s.pushInt(getDatabase().getNewSnapshotProbe(getBehaviorId(), itsProbeIndex++, theLocalsSig).id);
 
 		BCIFrame theFrame = getMethodInfo().getFrame(aReferenceNode);
 		int theLocals = theFrame.getLocals();
@@ -96,15 +99,13 @@ public class MethodReplayerGenerator_1stPass extends MethodReplayerGenerator
 		theArgTypes.add(Type.INT_TYPE); // Snapshot seq
 		theArgTypes.add(Type.INT_TYPE); // Probe id
 
-		int theSlot = 1;
-		for(int i=1;i<theLocals;i++) // The first slot is the frame
+		for(int i=0;i<theLocals;i++) 
 		{
 			Type theType = theFrame.getLocal(i).getType();
 			if (theType == null) continue;
 
 			theArgTypes.add(getActualType(theType));
-			s.ILOAD(theType, theSlot);
-			theSlot += theType.getSize();
+			s.ILOAD(theType, i+1);
 		}
 		
 		String theDesc = Type.getMethodDescriptor(Type.INT_TYPE, theArgTypes.toArray(new Type[theArgTypes.size()]));

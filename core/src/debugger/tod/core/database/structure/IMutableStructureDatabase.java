@@ -92,9 +92,12 @@ public interface IMutableStructureDatabase extends IStructureDatabase
 	public void setProbe(int aProbeId, int aBehaviorId, int aBytecodeIndex, BytecodeRole aRole, int aAdviceSourceId);
 	
 	/**
-	 * Creates a new snapshot probe and returns its id.
+	 * Returns the snapshot probe for the specified behavior and index, or creates one
+	 * if necessary.
 	 */
-	public int addSnapshotProbe(int aBehaviorId, int aProbeIndex);
+	public SnapshotProbeInfo getNewSnapshotProbe(int aBehaviorId, int aProbeIndex, String aLocalsSignature);
+	
+	public void registerSnapshotLocalsSignature(String aLocalsSignature);
 	
 	/**
 	 * Retrieves the probe at the given location, or create a new one if necessary.

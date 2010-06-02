@@ -37,6 +37,7 @@ import tod.core.database.structure.IMutableStructureDatabase;
 import tod.core.database.structure.ITypeInfo;
 import tod.core.database.structure.SourceRange;
 import tod.core.database.structure.IBehaviorInfo.BytecodeRole;
+import tod.core.database.structure.IStructureDatabase.SnapshotProbeInfo;
 
 public class DummyStructureDatabase 
 implements IMutableStructureDatabase
@@ -199,9 +200,18 @@ implements IMutableStructureDatabase
 	{
 	}
 
-	public int addSnapshotProbe(int aBehaviorId, int aProbeIndex)
+	public SnapshotProbeInfo getNewSnapshotProbe(int aBehaviorId, int aProbeIndex, String aLocalsSignature)
 	{
-		return 0;
+		return null;
+	}
+
+	public void registerSnapshotLocalsSignature(String aLocalsSignature)
+	{
+	}
+
+	public Iterable<String> getRegisteredSnapshotLocalsSignatures()
+	{
+		return null;
 	}
 
 	public void addListener(Listener aListener)

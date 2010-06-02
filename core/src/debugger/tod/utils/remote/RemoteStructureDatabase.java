@@ -49,6 +49,7 @@ import tod.core.database.structure.ILocationInfo.ISerializableLocationInfo;
 import tod.core.database.structure.IStructureDatabase.LineNumberInfo;
 import tod.core.database.structure.IStructureDatabase.LocalVariableInfo;
 import tod.core.database.structure.IStructureDatabase.ProbeInfo;
+import tod.core.database.structure.IStructureDatabase.SnapshotProbeInfo;
 import tod.core.database.structure.IStructureDatabase.Stats;
 import tod.impl.database.structure.standard.ArrayTypeInfo;
 import tod.impl.database.structure.standard.ClassInfo;
@@ -633,7 +634,17 @@ public class RemoteStructureDatabase implements RIStructureDatabase
 			throw new UnsupportedOperationException();
 		}
 
-		public int addSnapshotProbe(int aBehaviorId, int aProbeIndex)
+		public SnapshotProbeInfo getNewSnapshotProbe(int aBehaviorId, int aProbeIndex, String aLocalsSignature)
+		{
+			throw new UnsupportedOperationException();
+		}
+
+		public void registerSnapshotLocalsSignature(String aLocalsSignature)
+		{
+			throw new UnsupportedOperationException();
+		}
+
+		public Iterable<String> getRegisteredSnapshotLocalsSignatures()
 		{
 			throw new UnsupportedOperationException();
 		}

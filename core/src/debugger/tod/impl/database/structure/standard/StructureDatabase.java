@@ -23,6 +23,7 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 package tod.impl.database.structure.standard;
 
 import gnu.trove.TLongArrayList;
+import gnu.trove.TLongObjectHashMap;
 import gnu.trove.TObjectIntHashMap;
 
 import java.io.File;
@@ -34,8 +35,10 @@ import java.io.Serializable;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.objectweb.asm.Type;
 
@@ -119,7 +122,8 @@ implements IShareableStructureDatabase
 	private List<ClassInfo> itsClasses;
 	
 	private List<ProbeInfo> itsProbes;
-	private List<SnapshotProbeInfo> itsSnapshotProbes;
+	private TLongObjectHashMap<SnapshotProbeInfo> itsSnapshotProbesMap;
+	private Set<String> itsSnapshotLocalsSignaturesSet; 
 	
 	private Map<Long, ProbeInfo> itsExceptionProbesMap = new HashMap<Long, ProbeInfo>();
 	
@@ -173,8 +177,8 @@ implements IShareableStructureDatabase
 			itsProbes = new ArrayList<ProbeInfo>(10000);
 			itsProbes.add(null);
 			
-			itsSnapshotProbes = new ArrayList<SnapshotProbeInfo>(10000);
-			itsSnapshotProbes.add(null);
+			itsSnapshotProbesMap = new TLongObjectHashMap<SnapshotProbeInfo>();
+			itsSnapshotLocalsSignaturesSet = new HashSet<String>();
 			
 			// Generate a new id.
 			long theTime = System.nanoTime();
@@ -227,7 +231,8 @@ implements IShareableStructureDatabase
 			itsFields = (List<FieldInfo>) ois.readObject();
 			itsClasses = (List<ClassInfo>) ois.readObject();
 			itsProbes = (List<ProbeInfo>) ois.readObject();
-			itsSnapshotProbes = (List<SnapshotProbeInfo>) ois.readObject();
+			itsSnapshotProbesMap = (TLongObjectHashMap<SnapshotProbeInfo>) ois.readObject();
+			itsSnapshotLocalsSignaturesSet = (Set<String>) ois.readObject();
 			itsSignatureIdMap = (TObjectIntHashMap<String>) ois.readObject();
 			itsTraceSelectorString = ois.readUTF();
 			itsGlobalSelectorString = ois.readUTF();
@@ -301,7 +306,8 @@ implements IShareableStructureDatabase
 			oos.writeObject(itsFields);
 			oos.writeObject(itsClasses);
 			oos.writeObject(itsProbes);		
-			oos.writeObject(itsSnapshotProbes);
+			oos.writeObject(itsSnapshotProbesMap);
+			oos.writeObject(itsSnapshotLocalsSignaturesSet);
 			oos.writeObject(itsSignatureIdMap);
 			oos.writeUTF(itsTraceSelectorString);
 			oos.writeUTF(itsGlobalSelectorString);
@@ -786,15 +792,31 @@ implements IShareableStructureDatabase
 		itsProbes.set(aProbeId, theProbe);
 		registerProbe(theProbe);
 	}
-	
-	
 
-	public int addSnapshotProbe(int aBehaviorId, int aProbeIndex)
+	public SnapshotProbeInfo getNewSnapshotProbe(int aBehaviorId, int aProbeIndex, String aLocalsSignature)
 	{
-		int theId = itsSnapshotProbes.size(); // we add a null element in the constructor, so first id is 1
-		SnapshotProbeInfo theProbe = new SnapshotProbeInfo(theId, aBehaviorId, aProbeIndex);
-		itsSnapshotProbes.add(theProbe);
-		return theId;
+		registerSnapshotLocalsSignature(aLocalsSignature);
+		long theKey = ((long) aBehaviorId) << 32 | aProbeIndex;
+		SnapshotProbeInfo theProbe = itsSnapshotProbesMap.get(theKey);
+		if (theProbe == null)
+		{
+			int theId = itsSnapshotProbesMap.size() + 1; 
+			theProbe = new SnapshotProbeInfo(theId, aBehaviorId, aProbeIndex, aLocalsSignature);
+			itsSnapshotProbesMap.put(theKey, theProbe);
+		}
+		else assert aLocalsSignature.equals(theProbe.localsSignature);
+		
+		return theProbe;
+	}
+
+	public void registerSnapshotLocalsSignature(String aLocalsSignature)
+	{
+		itsSnapshotLocalsSignaturesSet.add(aLocalsSignature);
+	}
+	
+	public Iterable<String> getRegisteredSnapshotLocalsSignatures()
+	{
+		return itsSnapshotLocalsSignaturesSet;
 	}
 
 	public ProbeInfo getNewExceptionProbe(int aBehaviorId, int aBytecodeIndex)

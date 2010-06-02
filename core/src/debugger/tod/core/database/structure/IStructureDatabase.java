@@ -166,6 +166,8 @@ public interface IStructureDatabase
 	 */
 	public int getProbeCount();
 	
+	public Iterable<String> getRegisteredSnapshotLocalsSignatures();
+	
 	/**
 	 * Returns the information (location of the source code) for the specified advice source id.
 	 * @param aAdviceId An advice source id.
@@ -465,8 +467,6 @@ public interface IStructureDatabase
 	{
 		private static final long serialVersionUID = 1387373781939875L;
 
-		public static final SnapshotProbeInfo NULL = new SnapshotProbeInfo(-1, -1, -1);
-
 		public final int id;
 		
 		/**
@@ -478,14 +478,16 @@ public interface IStructureDatabase
 		 * Index of the probe within the behavior
 		 */
 		public final int probeIndex;
+		
+		public final String localsSignature;
 
-		public SnapshotProbeInfo(int aId, int aBehaviorId, int aProbeIndex)
+		public SnapshotProbeInfo(int aId, int aBehaviorId, int aProbeIndex, String aLocalsSignature)
 		{
 			id = aId;
 			behaviorId = aBehaviorId;
 			probeIndex = aProbeIndex;
+			localsSignature = aLocalsSignature;
 		}
-
 	}
 
 }

@@ -22,6 +22,8 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
  */
 package tod.impl.bci.asm2;
 
+import static tod.impl.bci.asm2.BCIUtils.TYPE_OBJECTID;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -55,6 +57,7 @@ import org.objectweb.asm.util.TraceMethodVisitor;
 
 import tod.core.config.ClassSelector;
 import tod.core.database.structure.ObjectId;
+import tod.impl.bci.asm2.MethodInfo.BCIFrame;
 import tod.impl.database.structure.standard.PrimitiveTypeInfo;
 import tod.impl.replay2.BehaviorExitException;
 import tod.impl.replay2.EventCollector;
@@ -677,6 +680,60 @@ public class BCIUtils implements Opcodes
 			}
 			
 			return theNode;
+		}
+	}
+
+	public static Type getTypeForSig(char aSig)
+	{
+		switch(aSig)
+		{
+		case 'I': return Type.INT_TYPE;
+		case 'J': return Type.LONG_TYPE;
+		case 'F': return Type.FLOAT_TYPE;
+		case 'D': return Type.DOUBLE_TYPE;
+		case 'L': return TYPE_OBJECTID;
+		default: throw new RuntimeException("Not handled: "+aSig);
+		}
+	}
+
+	public static String getLocalsSig(BCIFrame aFrame)
+	{
+		int theLocals = aFrame.getLocals();
+		StringBuilder theBuilder = new StringBuilder();
+		for(int i=0;i<theLocals;i++) 
+		{
+			Type theType = aFrame.getLocal(i).getType();
+			if (theType != null) theBuilder.append(getSigForType(theType));
+		}
+		return theBuilder.toString();
+	}
+
+	public static char getSigForType(Type aType)
+	{
+		switch(aType.getSort())
+		{
+		case Type.ARRAY:
+		case Type.OBJECT:
+			return 'L';
+			
+		case Type.BOOLEAN:
+		case Type.BYTE:
+		case Type.CHAR:
+		case Type.INT:
+		case Type.SHORT:
+			return 'I';
+			
+		case Type.DOUBLE:
+			return 'D';
+			
+		case Type.FLOAT:
+			return 'F';
+			
+		case Type.LONG:
+			return 'J';
+	
+		default:
+			throw new RuntimeException("Not handled: "+aType);	
 		}
 	}
 
