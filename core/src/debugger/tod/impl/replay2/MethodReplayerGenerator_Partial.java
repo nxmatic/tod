@@ -103,9 +103,9 @@ public class MethodReplayerGenerator_Partial extends MethodReplayerGenerator
 	}
 	
 	@Override
-	protected void insertSnapshotProbe(SList s, AbstractInsnNode aReferenceNode)
+	protected void insertSnapshotProbe(SList s, AbstractInsnNode aReferenceNode, boolean aSaveStack)
 	{
-		String theLocalsSig = BCIUtils.getLocalsSig(getMethodInfo().getFrame(aReferenceNode));
+		String theLocalsSig = BCIUtils.getSnapshotSig(getMethodInfo().getFrame(aReferenceNode));
 		Label lCheckSnapshot = itsLocalsSigToLabel.get(theLocalsSig);
 		if (lCheckSnapshot == null)
 		{

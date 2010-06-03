@@ -95,9 +95,9 @@ public interface IMutableStructureDatabase extends IStructureDatabase
 	 * Returns the snapshot probe for the specified behavior and index, or creates one
 	 * if necessary.
 	 */
-	public SnapshotProbeInfo getNewSnapshotProbe(int aBehaviorId, int aProbeIndex, String aLocalsSignature);
+	public SnapshotProbeInfo getNewSnapshotProbe(int aBehaviorId, int aProbeIndex, String aSignature);
 	
-	public void registerSnapshotLocalsSignature(String aLocalsSignature);
+	public void registerSnapshotSignature(String aSignature);
 	
 	/**
 	 * Retrieves the probe at the given location, or create a new one if necessary.

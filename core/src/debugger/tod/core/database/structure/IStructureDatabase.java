@@ -166,7 +166,7 @@ public interface IStructureDatabase
 	 */
 	public int getProbeCount();
 	
-	public Iterable<String> getRegisteredSnapshotLocalsSignatures();
+	public Iterable<String> getRegisteredSnapshotSignatures();
 	
 	/**
 	 * Returns the information (location of the source code) for the specified advice source id.

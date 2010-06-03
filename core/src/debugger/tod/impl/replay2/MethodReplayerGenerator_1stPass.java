@@ -84,33 +84,42 @@ public class MethodReplayerGenerator_1stPass extends MethodReplayerGenerator
 	}
 	
 	@Override
-	protected void insertSnapshotProbe(SList s, AbstractInsnNode aReferenceNode)
+	protected void insertSnapshotProbe(SList s, AbstractInsnNode aReferenceNode, boolean aSaveStack)
 	{
-		String theLocalsSig = BCIUtils.getLocalsSig(getMethodInfo().getFrame(aReferenceNode));
+		BCIFrame theFrame = getMethodInfo().getFrame(aReferenceNode.getNext());
+		String theLocalsSig = BCIUtils.getSnapshotSig(theFrame, aSaveStack);
+		List<Type> theArgTypes = new ArrayList<Type>();
+		theArgTypes.add(Type.INT_TYPE); // Snapshot seq
+		theArgTypes.add(Type.INT_TYPE); // Probe id
+		Type[] theStackTypes = aSaveStack ? getStackTypes(theFrame) : null;
+		
+		if (aSaveStack) genSaveStack(s, theStackTypes);
 
 		s.ALOAD(0);
 		s.ILOAD(itsSnapshotSeqVar);
 		s.pushInt(getDatabase().getNewSnapshotProbe(getBehaviorId(), itsProbeIndex++, theLocalsSig).id);
-
-		BCIFrame theFrame = getMethodInfo().getFrame(aReferenceNode);
+		
 		int theLocals = theFrame.getLocals();
-
-		List<Type> theArgTypes = new ArrayList<Type>();
-		theArgTypes.add(Type.INT_TYPE); // Snapshot seq
-		theArgTypes.add(Type.INT_TYPE); // Probe id
-
 		for(int i=0;i<theLocals;i++) 
 		{
 			Type theType = theFrame.getLocal(i).getType();
 			if (theType == null) continue;
 
-			theArgTypes.add(getActualType(theType));
+			theArgTypes.add(BCIUtils.getActualReplayType(theType));
 			s.ILOAD(theType, i+1);
 		}
-		
+
+		if (aSaveStack) 
+		{
+			genLoadStack(s, theStackTypes);
+			for(Type theType : theStackTypes) theArgTypes.add(theType);
+		}
+
 		String theDesc = Type.getMethodDescriptor(Type.INT_TYPE, theArgTypes.toArray(new Type[theArgTypes.size()]));
 
 		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, ReplayerGenerator.SNAPSHOT_METHOD_NAME, theDesc);
 		s.ISTORE(itsSnapshotSeqVar);
+		
+		if (aSaveStack) genLoadStack(s, theStackTypes);
 	}
 }

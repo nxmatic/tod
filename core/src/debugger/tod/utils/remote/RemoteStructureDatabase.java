@@ -634,17 +634,17 @@ public class RemoteStructureDatabase implements RIStructureDatabase
 			throw new UnsupportedOperationException();
 		}
 
-		public SnapshotProbeInfo getNewSnapshotProbe(int aBehaviorId, int aProbeIndex, String aLocalsSignature)
+		public SnapshotProbeInfo getNewSnapshotProbe(int aBehaviorId, int aProbeIndex, String aSignature)
 		{
 			throw new UnsupportedOperationException();
 		}
 
-		public void registerSnapshotLocalsSignature(String aLocalsSignature)
+		public void registerSnapshotSignature(String aSignature)
 		{
 			throw new UnsupportedOperationException();
 		}
 
-		public Iterable<String> getRegisteredSnapshotLocalsSignatures()
+		public Iterable<String> getRegisteredSnapshotSignatures()
 		{
 			throw new UnsupportedOperationException();
 		}

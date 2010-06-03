@@ -200,16 +200,16 @@ implements IMutableStructureDatabase
 	{
 	}
 
-	public SnapshotProbeInfo getNewSnapshotProbe(int aBehaviorId, int aProbeIndex, String aLocalsSignature)
+	public SnapshotProbeInfo getNewSnapshotProbe(int aBehaviorId, int aProbeIndex, String aSignature)
 	{
 		return null;
 	}
 
-	public void registerSnapshotLocalsSignature(String aLocalsSignature)
+	public void registerSnapshotSignature(String aSignature)
 	{
 	}
 
-	public Iterable<String> getRegisteredSnapshotLocalsSignatures()
+	public Iterable<String> getRegisteredSnapshotSignatures()
 	{
 		return null;
 	}

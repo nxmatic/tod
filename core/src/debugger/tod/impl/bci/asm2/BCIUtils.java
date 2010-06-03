@@ -22,8 +22,6 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
  */
 package tod.impl.bci.asm2;
 
-import static tod.impl.bci.asm2.BCIUtils.TYPE_OBJECTID;
-
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -696,15 +694,29 @@ public class BCIUtils implements Opcodes
 		}
 	}
 
-	public static String getLocalsSig(BCIFrame aFrame)
+	public static String getSnapshotSig(BCIFrame aFrame, boolean aIncludeStack)
 	{
-		int theLocals = aFrame.getLocals();
 		StringBuilder theBuilder = new StringBuilder();
+		
+		// Locals
+		int theLocals = aFrame.getLocals();
 		for(int i=0;i<theLocals;i++) 
 		{
 			Type theType = aFrame.getLocal(i).getType();
 			if (theType != null) theBuilder.append(getSigForType(theType));
 		}
+		
+		// Stack
+		if (aIncludeStack)
+		{
+			int theStack = aFrame.getStackSize();
+			for(int i=1;i<theStack;i++)
+			{
+				Type theType = aFrame.getStack(i).getType();
+				if (theType != null) theBuilder.append(getSigForType(theType));
+			}
+		}
+		
 		return theBuilder.toString();
 	}
 
@@ -736,5 +748,35 @@ public class BCIUtils implements Opcodes
 			throw new RuntimeException("Not handled: "+aType);	
 		}
 	}
+
+	/**
+	 * Returns the actual type to use for the given type (all refs are folded into ObjectId)
+	 */
+	public static Type getActualReplayType(Type aType)
+	{
+		return ACTUALTYPE_FOR_SORT[aType.getSort()];
+	}
+	
+	public static Type getActualReplayType(int aSort)
+	{
+		return ACTUALTYPE_FOR_SORT[aSort];
+	}
+	
+	private static final Type[] ACTUALTYPE_FOR_SORT = new Type[11];
+	static
+	{
+		ACTUALTYPE_FOR_SORT[Type.OBJECT] = TYPE_OBJECTID;
+		ACTUALTYPE_FOR_SORT[Type.ARRAY] = TYPE_OBJECTID;
+		ACTUALTYPE_FOR_SORT[Type.BOOLEAN] = Type.INT_TYPE;
+		ACTUALTYPE_FOR_SORT[Type.BYTE] = Type.INT_TYPE;
+		ACTUALTYPE_FOR_SORT[Type.CHAR] = Type.INT_TYPE;
+		ACTUALTYPE_FOR_SORT[Type.DOUBLE] = Type.DOUBLE_TYPE;
+		ACTUALTYPE_FOR_SORT[Type.FLOAT] = Type.FLOAT_TYPE;
+		ACTUALTYPE_FOR_SORT[Type.INT] = Type.INT_TYPE;
+		ACTUALTYPE_FOR_SORT[Type.LONG] = Type.LONG_TYPE;
+		ACTUALTYPE_FOR_SORT[Type.SHORT] = Type.INT_TYPE;
+		ACTUALTYPE_FOR_SORT[Type.VOID] = Type.VOID_TYPE;
+	}
+
 
 }

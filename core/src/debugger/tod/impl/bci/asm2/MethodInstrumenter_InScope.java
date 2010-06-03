@@ -52,6 +52,7 @@ import org.objectweb.asm.tree.TypeInsnNode;
 import tod.Util;
 import tod.core.database.structure.IMutableBehaviorInfo;
 import tod.core.database.structure.IMutableClassInfo;
+import tod.impl.bci.asm2.MethodInfo.BCIFrame;
 import tod.impl.bci.asm2.MethodInfo.NewInvokeLink;
 import tod.impl.replay2.SList;
 
@@ -407,7 +408,9 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 	
 	private void processInvoke(MethodInsnNode aNode)
 	{
-		getDatabase().registerSnapshotLocalsSignature(BCIUtils.getLocalsSig(itsMethodInfo.getFrame(aNode)));
+		BCIFrame theFrame = itsMethodInfo.getFrame(aNode);
+		getDatabase().registerSnapshotSignature(BCIUtils.getSnapshotSig(theFrame, true)); // For the after call
+		getDatabase().registerSnapshotSignature(BCIUtils.getSnapshotSig(theFrame, false)); // For the after throws
 		
 		SyntaxInsnList s = new SyntaxInsnList();
 		

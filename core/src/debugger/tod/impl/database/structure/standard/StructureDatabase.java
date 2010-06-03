@@ -793,28 +793,28 @@ implements IShareableStructureDatabase
 		registerProbe(theProbe);
 	}
 
-	public SnapshotProbeInfo getNewSnapshotProbe(int aBehaviorId, int aProbeIndex, String aLocalsSignature)
+	public SnapshotProbeInfo getNewSnapshotProbe(int aBehaviorId, int aProbeIndex, String aSignature)
 	{
-		registerSnapshotLocalsSignature(aLocalsSignature);
+		registerSnapshotSignature(aSignature);
 		long theKey = ((long) aBehaviorId) << 32 | aProbeIndex;
 		SnapshotProbeInfo theProbe = itsSnapshotProbesMap.get(theKey);
 		if (theProbe == null)
 		{
 			int theId = itsSnapshotProbesMap.size() + 1; 
-			theProbe = new SnapshotProbeInfo(theId, aBehaviorId, aProbeIndex, aLocalsSignature);
+			theProbe = new SnapshotProbeInfo(theId, aBehaviorId, aProbeIndex, aSignature);
 			itsSnapshotProbesMap.put(theKey, theProbe);
 		}
-		else assert aLocalsSignature.equals(theProbe.localsSignature);
+		else assert aSignature.equals(theProbe.localsSignature);
 		
 		return theProbe;
 	}
 
-	public void registerSnapshotLocalsSignature(String aLocalsSignature)
+	public void registerSnapshotSignature(String aSignature)
 	{
-		itsSnapshotLocalsSignaturesSet.add(aLocalsSignature);
+		itsSnapshotLocalsSignaturesSet.add(aSignature);
 	}
 	
-	public Iterable<String> getRegisteredSnapshotLocalsSignatures()
+	public Iterable<String> getRegisteredSnapshotSignatures()
 	{
 		return itsSnapshotLocalsSignaturesSet;
 	}

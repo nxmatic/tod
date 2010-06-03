@@ -31,8 +31,7 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.replay2;
 
-import static tod.impl.bci.asm2.BCIUtils.DSC_OBJECTID;
-import static tod.impl.bci.asm2.BCIUtils.DSC_TMPOBJECTID;
+import static tod.impl.bci.asm2.BCIUtils.*;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -74,7 +73,6 @@ import tod.core.database.structure.IFieldInfo;
 import tod.core.database.structure.IMutableStructureDatabase;
 import tod.core.database.structure.ObjectId;
 import tod.impl.bci.asm2.BCIUtils;
-import static tod.impl.bci.asm2.BCIUtils.*;
 import tod.impl.bci.asm2.MethodInfo;
 import tod.impl.bci.asm2.SyntaxInsnList;
 import tod.impl.bci.asm2.MethodInfo.BCIFrame;
@@ -584,7 +582,7 @@ public abstract class MethodReplayerGenerator
 	 */
 	private static void invokeValue(SList s, Type aType)
 	{
-		s.INVOKEVIRTUAL(CLS_EVENTCOLLECTOR_REPLAY, "value", "("+getActualType(aType).getDescriptor()+")V");
+		s.INVOKEVIRTUAL(CLS_EVENTCOLLECTOR_REPLAY, "value", "("+getActualReplayType(aType).getDescriptor()+")V");
 
 	}
 	
@@ -810,7 +808,7 @@ public abstract class MethodReplayerGenerator
 			String[] theSignature = getInvokeMethodSignature(theStatic, theArgTypes, theReturnType);
 			s.label(lHnStart);
 			s.INVOKEVIRTUAL(CLS_REPLAYERFRAME, theSignature[0], theSignature[1]);
-			insertSnapshotProbe(s, aNode);
+			insertSnapshotProbe(s, aNode, true);
 			s.GOTO(lHnAfter);
 			s.label(lHnEnd);
 			
@@ -818,7 +816,7 @@ public abstract class MethodReplayerGenerator
 			//(otherwise it would be outside of the corresponding try-catch block) 
 			s.label(lHnException);  
 			s.POP();
-			insertSnapshotProbe(s, aNode);
+			insertSnapshotProbe(s, aNode, false);
 			s.ALOAD(0);
 			s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "expectException", "()V");
 			s.pushDefaultValue(itsReturnType);
@@ -863,6 +861,25 @@ public abstract class MethodReplayerGenerator
 		aInsns.remove(aNode);
 	}
 	
+	/**
+	 * Returns the type of all the stack slots in the given frame.
+	 */
+	protected static Type[] getStackTypes(BCIFrame aFrame)
+	{
+		int theSize = aFrame.getStackSize();
+		Type[] theResult = new Type[theSize];
+		for(int i=0;i<theSize;i++) theResult[i] = getActualReplayType(aFrame.getStack(i).getType());
+		return theResult;
+	}
+	
+	/**
+	 * Saves as many stack slots as there are items in the types array.
+	 */
+	protected void genSaveStack(SList s, Type[] aSlotTypes)
+	{
+		genSaveArgs(s, aSlotTypes, true);
+	}
+	
 	private void genSaveArgs(SList s, Type[] aArgTypes, boolean aStatic)
 	{
 		int theSlot = itsSaveArgsSlots;
@@ -873,6 +890,14 @@ public abstract class MethodReplayerGenerator
 			theSlot += theType.getSize();
 		}
 		if (! aStatic) s.ASTORE(theSlot);
+	}
+	
+	/**
+	 * Loads as many stack slots as there are items in the types array.
+	 */
+	protected void genLoadStack(SList s, Type[] aSlotTypes)
+	{
+		genLoadArgs(s, aSlotTypes, true);
 	}
 	
 	private void genLoadArgs(SList s, Type[] aArgTypes, boolean aStatic)
@@ -891,42 +916,18 @@ public abstract class MethodReplayerGenerator
 	public static String[] getInvokeMethodSignature(boolean aStatic, Type[] aArgTypes, Type aReturnType)
 	{
 		List<Type> theArgTypes = new ArrayList<Type>();
-		if (! aStatic) theArgTypes.add(ACTUALTYPE_FOR_SORT[Type.OBJECT]); // First arg is the target
-		for (Type theType : aArgTypes) theArgTypes.add(getActualType(theType));
+		if (! aStatic) theArgTypes.add(TYPE_OBJECTID); // First arg is the target
+		for (Type theType : aArgTypes) theArgTypes.add(getActualReplayType(theType));
 		
 		return new String[] {
 				"invoke"+SUFFIX_FOR_SORT[aReturnType.getSort()]+(aStatic ? "_S" : ""),
 				Type.getMethodDescriptor(
-						getActualType(aReturnType), 
+						getActualReplayType(aReturnType), 
 						theArgTypes.toArray(new Type[theArgTypes.size()]))
 						
 		};
 	}
 	
-	/**
-	 * Returns the actual type to use for the given type (all refs are folded into ObjectId)
-	 */
-	public static Type getActualType(Type aType)
-	{
-		return ACTUALTYPE_FOR_SORT[aType.getSort()];
-	}
-	
-	public static final Type[] ACTUALTYPE_FOR_SORT = new Type[11];
-	static
-	{
-		ACTUALTYPE_FOR_SORT[Type.OBJECT] = TYPE_OBJECTID;
-		ACTUALTYPE_FOR_SORT[Type.ARRAY] = TYPE_OBJECTID;
-		ACTUALTYPE_FOR_SORT[Type.BOOLEAN] = Type.INT_TYPE;
-		ACTUALTYPE_FOR_SORT[Type.BYTE] = Type.INT_TYPE;
-		ACTUALTYPE_FOR_SORT[Type.CHAR] = Type.INT_TYPE;
-		ACTUALTYPE_FOR_SORT[Type.DOUBLE] = Type.DOUBLE_TYPE;
-		ACTUALTYPE_FOR_SORT[Type.FLOAT] = Type.FLOAT_TYPE;
-		ACTUALTYPE_FOR_SORT[Type.INT] = Type.INT_TYPE;
-		ACTUALTYPE_FOR_SORT[Type.LONG] = Type.LONG_TYPE;
-		ACTUALTYPE_FOR_SORT[Type.SHORT] = Type.INT_TYPE;
-		ACTUALTYPE_FOR_SORT[Type.VOID] = Type.VOID_TYPE;
-	}
-
 	private static final String[] SUFFIX_FOR_SORT = new String[11];
 	private boolean itsStatic;
 	private boolean itsConstructor;
@@ -1263,5 +1264,5 @@ public abstract class MethodReplayerGenerator
 	}
 
 	protected abstract void addSnapshotSetup(InsnList aInsns);
-	protected abstract void insertSnapshotProbe(SList s, AbstractInsnNode aReferenceNode);
+	protected abstract void insertSnapshotProbe(SList s, AbstractInsnNode aReferenceNode, boolean aSaveStack);
 }

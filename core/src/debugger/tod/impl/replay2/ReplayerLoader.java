@@ -261,7 +261,7 @@ public class ReplayerLoader extends ClassLoader
 	
 	private void modifyInScopeReplayerFrame_addSnapshotMethods(ClassNode aClassNode)
 	{
-		for (String theSignature : itsDatabase.getRegisteredSnapshotLocalsSignatures())
+		for (String theSignature : itsDatabase.getRegisteredSnapshotSignatures())
 		{
 			modifyInScopeReplayerFrame_addSnapshotMethod(aClassNode, theSignature);
 		}
@@ -577,7 +577,7 @@ public class ReplayerLoader extends ClassLoader
 		
 		private static byte getSort(Type aType)
 		{
-			int theSort = MethodReplayerGenerator.getActualType(aType).getSort();
+			int theSort = BCIUtils.getActualReplayType(aType).getSort();
 			assert theSort <= Byte.MAX_VALUE;
 			return (byte) theSort;
 		}
@@ -589,10 +589,10 @@ public class ReplayerLoader extends ClassLoader
 		{
 			if (itsSignature == null)
 			{
-				Type theReturnType = MethodReplayerGenerator.ACTUALTYPE_FOR_SORT[itsReturnSort];
+				Type theReturnType = BCIUtils.getActualReplayType(itsReturnSort);
 				Type[] theArgTypes = new Type[itsArgSorts.length];
 				for(int i=0;i<theArgTypes.length;i++) theArgTypes[i] = 
-					MethodReplayerGenerator.ACTUALTYPE_FOR_SORT[itsArgSorts[i]];
+					BCIUtils.getActualReplayType(itsArgSorts[i]);
 				itsSignature = MethodReplayerGenerator.getInvokeMethodSignature(itsStatic, theArgTypes, theReturnType);
 			}
 			return itsSignature;

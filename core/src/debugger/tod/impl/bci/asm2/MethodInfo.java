@@ -843,6 +843,12 @@ public class MethodInfo
 			else if (!itsSourceValue.equals(other.itsSourceValue)) return false;
 			return true;
 		}
+		
+		@Override
+		public String toString()
+		{
+			return itsBasicValue.toString();
+		}
 	}
 	
 	public static class Node extends Frame 
