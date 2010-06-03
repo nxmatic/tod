@@ -49,11 +49,12 @@ import tod.core.database.browser.LocationUtils;
 import tod.core.database.structure.IBehaviorInfo;
 import tod.core.database.structure.IClassInfo;
 import tod.core.database.structure.IMutableStructureDatabase;
+import tod.core.database.structure.IStructureDatabase;
 import tod.impl.bci.asm2.BCIUtils;
 import tod.impl.replay2.InScopeReplayerFrame.Factory;
 import zz.utils.Utils;
 
-public class ReplayerGenerator
+public abstract class ReplayerGenerator
 {
 	public static final String SNAPSHOT_METHOD_NAME = "snapshot";
 	
@@ -61,7 +62,6 @@ public class ReplayerGenerator
 	private final IMutableStructureDatabase itsDatabase;
 	private final ReplayerLoader itsLoader;
 
-	
 	/**
 	 * The cached replayer class factories, indexed by behavior id.
 	 */
@@ -130,7 +130,6 @@ public class ReplayerGenerator
 		String theName = aType.getClassName();
 		return theName.startsWith(REPLAYER_NAME_PREFIX) && ! theName.endsWith("_Factory");
 	}
-
 	
 	/**
 	 * Returns the replayer class used to replay the given behavior.
@@ -160,15 +159,14 @@ public class ReplayerGenerator
 			
 			theBehavior = LocationUtils.getBehavior(itsDatabase, theClass, theMethodName, theMethodDesc, false);
 
-			MethodReplayerGenerator theGenerator_1stPass = new MethodReplayerGenerator_1stPass(
+			MethodReplayerGenerator theGenerator = createGenerator(
 					itsConfig, 
 					itsDatabase, 
-					this,
 					theBehavior.getId(),
 					theClassNode, 
 					theMethodNode);
 			
-			byte[] theReplayerBytecode_1stPass = theGenerator_1stPass.generate();
+			byte[] theReplayerBytecode = theGenerator.generate();
 			
 			String theFrameClassJVMName = makeReplayerClassName(
 					theClassNode.name, 
@@ -177,7 +175,7 @@ public class ReplayerGenerator
 			
 			String theFrameClassName = theFrameClassJVMName.replace('/', '.');
 			
-			itsLoader.addClass(theFrameClassName, theReplayerBytecode_1stPass);
+			itsLoader.addClass(theFrameClassName, theReplayerBytecode);
 						
 			theFactory = createFactory(theFrameClassJVMName);
 			theFactory.setSignature(theBehavior.getId(), theMethodName, theMethodNode.access, theMethodDesc);
@@ -186,6 +184,15 @@ public class ReplayerGenerator
 		
 		return Utils.listGet(itsInScopeFrameFactories, aBehaviorId);
 	}
+	
+	protected abstract MethodReplayerGenerator createGenerator(
+			TODConfig aConfig, 
+			IMutableStructureDatabase aDatabase, 
+			int aBehaviorId, 
+			ClassNode aClassNode, 
+			MethodNode aMethodNode);
+	
+	protected abstract String getReplayerClassName(String aJvmClassName, String aJvmMethodName, String aDesc);
 	
 	private InScopeReplayerFrame.Factory createFactory(String aFrameClassJVMName) 
 	{
@@ -253,7 +260,6 @@ public class ReplayerGenerator
 			e.printStackTrace();
 		}
 
-
 		String theFactoryClassName = classNode.name.replace('/', '.');
 		itsLoader.addClass(theFactoryClassName, theBytecode);
 
@@ -289,5 +295,64 @@ public class ReplayerGenerator
 	public ClassloaderWrapperReplayerFrame createClassloaderWrapperFrame()
 	{
 		return new ClassloaderWrapperReplayerFrame();
+	}
+	
+	public static class FirstPass extends ReplayerGenerator
+	{
+		public FirstPass(ReplayerLoader aLoader, TODConfig aConfig, IMutableStructureDatabase aDatabase)
+		{
+			super(aLoader, aConfig, aDatabase);
+		}
+
+		@Override
+		protected MethodReplayerGenerator createGenerator(
+				TODConfig aConfig,
+				IMutableStructureDatabase aDatabase,
+				int aBehaviorId,
+				ClassNode aClassNode,
+				MethodNode aMethodNode)
+		{
+			return new MethodReplayerGenerator_1stPass(aConfig, aDatabase, this, aBehaviorId, aClassNode, aMethodNode);
+		}
+
+		@Override
+		protected String getReplayerClassName(
+				String aJvmClassName,
+				String aJvmMethodName,
+				String aDesc)
+		{
+			return makeReplayerClassName(aJvmClassName, aJvmMethodName, aDesc);
+		}
+	}
+	
+	public static class Partial extends ReplayerGenerator
+	{
+		public Partial(
+				ReplayerLoader aLoader,
+				TODConfig aConfig,
+				IMutableStructureDatabase aDatabase)
+		{
+			super(aLoader, aConfig, aDatabase);
+		}
+
+		@Override
+		protected MethodReplayerGenerator createGenerator(
+				TODConfig aConfig,
+				IMutableStructureDatabase aDatabase,
+				int aBehaviorId,
+				ClassNode aClassNode,
+				MethodNode aMethodNode)
+		{
+			return new MethodReplayerGenerator_Partial(aConfig, aDatabase, this, aBehaviorId, aClassNode, aMethodNode);
+		}
+
+		@Override
+		protected String getReplayerClassName(
+				String aJvmClassName,
+				String aJvmMethodName,
+				String aDesc)
+		{
+			return makeReplayerClassName("_rr_"+aJvmClassName, aJvmMethodName, aDesc);
+		}
 	}
 }

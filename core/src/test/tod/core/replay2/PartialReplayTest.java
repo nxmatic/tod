@@ -39,7 +39,6 @@ import java.util.List;
 
 import tod.core.config.TODConfig;
 import tod.core.database.structure.IMutableStructureDatabase;
-import tod.core.database.structure.IStructureDatabase;
 import tod.impl.database.structure.standard.StructureDatabase;
 import tod.impl.replay2.EventCollector;
 import tod.impl.replay2.LocalsSnapshot;
@@ -49,13 +48,25 @@ import zz.utils.Utils;
 public class PartialReplayTest
 {
 	
-	private static void partialReplay(File aEventsFile, IStructureDatabase aDatabase, LocalsSnapshot aSnapshot) throws IOException
+	private static void partialReplay(File aEventsFile, TODConfig aConfig, IMutableStructureDatabase aDatabase, LocalsSnapshot aSnapshot) throws IOException
 	{
 		FileInputStream fis = new FileInputStream(aEventsFile);
 		long theBytesToSkip = aSnapshot.getPacketStartOffset();
 		while(theBytesToSkip > 0) theBytesToSkip -= fis.skip(theBytesToSkip);
 		
+		DBSideIOThread theIOThread = new DBSideIOThread(aConfig, aDatabase, fis, false)
+		{
+			@Override
+			protected EventCollector createCollector(int aThreadId)
+			{
+				MyEventCollector theCollector = new MyEventCollector();
+//				theCollectors.add(theCollector);
+				return theCollector;
+			}
+		};
 		
+		theIOThread.setInitialSkip(aSnapshot.getPacketOffset());
+		theIOThread.run();
 	}
 	
 	public static void main(String[] args) throws Exception
@@ -71,8 +82,7 @@ public class PartialReplayTest
 
 		try
 		{
-			
-			DBSideIOThread theIOThread = new DBSideIOThread(theConfig, theDatabase, new FileInputStream(theEventsFile))
+			DBSideIOThread theIOThread = new DBSideIOThread(theConfig, theDatabase, new FileInputStream(theEventsFile), true)
 			{
 				@Override
 				protected EventCollector createCollector(int aThreadId)
@@ -95,7 +105,7 @@ public class PartialReplayTest
 		{
 			for(LocalsSnapshot theSnapshot : theCollector.getSnapshots())
 			{
-				partialReplay(theEventsFile, theDatabase, theSnapshot);
+				partialReplay(theEventsFile, theConfig, theDatabase, theSnapshot);
 			}
 		}
 

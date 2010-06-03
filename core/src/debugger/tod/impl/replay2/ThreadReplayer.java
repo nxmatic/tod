@@ -103,8 +103,10 @@ public abstract class ThreadReplayer
 		itsCollector = aCollector;
 		itsTmpIdManager = aTmpIdManager;
 		itsStream = aBuffer;
-		itsGenerator = new ReplayerGenerator(aLoader, itsConfig, itsDatabase);
+		itsGenerator = createReplayerGenerator(aLoader, itsConfig, itsDatabase);
 	}
+	
+	protected abstract ReplayerGenerator createReplayerGenerator(ReplayerLoader aLoader, TODConfig aConfig, IMutableStructureDatabase aDatabase);
 	
 	protected BufferStream getStream()
 	{

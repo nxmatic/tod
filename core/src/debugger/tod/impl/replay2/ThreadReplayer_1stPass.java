@@ -60,6 +60,15 @@ public class ThreadReplayer_1stPass extends ThreadReplayer
 	}
 
 	@Override
+	protected ReplayerGenerator createReplayerGenerator(
+			ReplayerLoader aLoader,
+			TODConfig aConfig,
+			IMutableStructureDatabase aDatabase)
+	{
+		return new ReplayerGenerator.FirstPass(aLoader, aConfig, aDatabase);
+	}
+
+	@Override
 	public byte getNextMessage()
 	{
 		itsMessagesSinceLastSnapshot++;

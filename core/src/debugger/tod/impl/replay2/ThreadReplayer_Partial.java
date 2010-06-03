@@ -47,7 +47,15 @@ public class ThreadReplayer_Partial extends ThreadReplayer
 			BufferStream aBuffer)
 	{
 		super(aLoader, aThreadId, aConfig, aDatabase, aCollector, aTmpIdManager, aBuffer);
-		
+	}
+
+	@Override
+	protected ReplayerGenerator createReplayerGenerator(
+			ReplayerLoader aLoader,
+			TODConfig aConfig,
+			IMutableStructureDatabase aDatabase)
+	{
+		return new ReplayerGenerator.Partial(aLoader, aConfig, aDatabase);
 	}
 
 	@Override

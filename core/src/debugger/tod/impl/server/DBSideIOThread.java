@@ -62,8 +62,18 @@ public abstract class DBSideIOThread
 	
 	private final TODConfig itsConfig;
 	private final IMutableStructureDatabase itsDatabase;
-	
 	private final InputStream itsIn;
+	private final boolean itsFirstPass;
+	
+	/**
+	 * If not 0, the id of the only thread to replay.
+	 */
+	private int itsReplayThreadId;
+	
+	/**
+	 * Number of bytes to skip from the first thread packet (for partial replay)
+	 */
+	private int itsInitialSkip;
 	
 	private final ReplayerLoader itsLoader;
 	private final List<ThreadReplayerThread> itsReplayerThreads = new ArrayList<ThreadReplayerThread>();
@@ -71,12 +81,23 @@ public abstract class DBSideIOThread
 	
 	private long itsProcessedSize = 0;
 	
-	public DBSideIOThread(TODConfig aConfig, IMutableStructureDatabase aDatabase, InputStream aIn)
+	public DBSideIOThread(TODConfig aConfig, IMutableStructureDatabase aDatabase, InputStream aIn, boolean aFirstPass)
 	{
 		itsConfig = aConfig;
 		itsDatabase = aDatabase;
 		itsIn = aIn;
+		itsFirstPass = aFirstPass;
 		itsLoader = new ReplayerLoader(getClass().getClassLoader(), aDatabase);
+	}
+
+	public void setInitialSkip(int aInitialSkip)
+	{
+		itsInitialSkip = aInitialSkip;
+	}
+	
+	public void setReplayThreadId(int aReplayThreadId)
+	{
+		itsReplayThreadId = aReplayThreadId;
 	}
 	
 	public void run()
@@ -160,10 +181,16 @@ public abstract class DBSideIOThread
 		int theThreadId = _ByteBuffer.getIntL(itsIn);
 		int theLength = _ByteBuffer.getIntL(itsIn);
 		
-		PacketBuffer theBuffer = new PacketBuffer(new byte[BUFFER_SIZE], itsProcessedSize);
+		PacketBuffer theBuffer = new PacketBuffer(new byte[BUFFER_SIZE], itsProcessedSize-1);
 		readFully(theBuffer.array(), theLength);
 		theBuffer.position(0);
 		theBuffer.limit(theLength);
+		
+		if (itsInitialSkip > 0)
+		{
+			theBuffer.position(itsInitialSkip);
+			itsInitialSkip = 0;
+		}
 		
 		getReplayerThread(theThreadId).push(theBuffer);
 		
@@ -210,7 +237,7 @@ public abstract class DBSideIOThread
 			
 			final Map<Integer, EventCollector> theCollectors = new HashMap<Integer, EventCollector>();  
 			
-			DBSideIOThread theIOThread = new DBSideIOThread(theConfig, theDatabase, new FileInputStream(theEventsFile))
+			DBSideIOThread theIOThread = new DBSideIOThread(theConfig, theDatabase, new FileInputStream(theEventsFile), true)
 			{
 				@Override
 				protected EventCollector createCollector(int aThreadId)
@@ -255,6 +282,7 @@ public abstract class DBSideIOThread
 			itsReplayer = new ReplayerWrapper(
 					itsLoader, 
 					itsThreadId, 
+					itsFirstPass,
 					itsConfig, 
 					itsDatabase, 
 					itsCollector, 
@@ -266,7 +294,8 @@ public abstract class DBSideIOThread
 
 		public void push(PacketBuffer aBuffer)
 		{
-//			if (itsThreadId != 1) return aBuffer;
+//			if (itsThreadId != 1) return;
+			if (itsReplayThreadId > 0 && itsReplayThreadId != itsThreadId) return;
 			itsStream.pushBuffer(aBuffer);
 		}
 		

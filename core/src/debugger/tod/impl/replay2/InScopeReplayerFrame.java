@@ -359,7 +359,7 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 	
 	public void registerSnapshot(LocalsSnapshot aSnapshot)
 	{
-		getCollector().localsSnapshot(aSnapshot);
+		getReplayer().registerSnapshot(aSnapshot);
 	}
 	
 	/**

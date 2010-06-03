@@ -524,6 +524,8 @@ public class IOThread extends Thread
 				e.printStackTrace();
 			}
 			
+			_IO.out("[TOD] Goodbye.");
+			
 //			
 //			EventCollector.INSTANCE.end();
 //			

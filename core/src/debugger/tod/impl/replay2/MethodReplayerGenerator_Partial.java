@@ -53,10 +53,8 @@ import tod.impl.bci.asm2.MethodInfo.BCIFrame;
 
 public class MethodReplayerGenerator_Partial extends MethodReplayerGenerator
 {
-	private int itsStartProbeVar;
-	private int itsSnapshotSeqVar;
 	private int itsSnapshotRetVar;
-	private int itsSnapshotProbeIdVar;
+	private int itsStartProbeIdVar;
 	private int itsSnapshotVar;
 	
 	private List<Label> itsSnapshotProbes = new ArrayList<Label>();
@@ -81,28 +79,23 @@ public class MethodReplayerGenerator_Partial extends MethodReplayerGenerator
 	@Override
 	protected void addSnapshotSetup(InsnList aInsns)
 	{
-		itsSnapshotSeqVar = nextFreeVar(1);
 		itsSnapshotRetVar = nextFreeVar(1);
-		itsSnapshotProbeIdVar = nextFreeVar(1);
+		itsStartProbeIdVar = nextFreeVar(1);
 		itsSnapshotVar = nextFreeVar(1);
 
 		SList s = new SList();
 
-		s.ALOAD(0);
-		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "getSnapshotSeq", "()I");
-		s.ISTORE(itsSnapshotSeqVar);
-		
 		Label lBadProbeId = new Label();
 		
 		itsSnapshotProbes.add(0, getCodeStartLabel());
 		s.ALOAD(0);
 		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "getStartProbe", "()I");
 		s.DUP();
-		s.ISTORE(itsStartProbeVar);
+		s.ISTORE(itsStartProbeIdVar);
 		s.TABLESWITCH(0, itsSnapshotProbes.size()-1, lBadProbeId, itsSnapshotProbes.toArray(new Label[itsSnapshotProbes.size()]));
 		
 		s.label(lBadProbeId);
-		s.ILOAD(itsStartProbeVar);
+		s.ILOAD(itsStartProbeIdVar);
 		s.createRTExArg("No such probe: ");
 		s.ATHROW();
 		
