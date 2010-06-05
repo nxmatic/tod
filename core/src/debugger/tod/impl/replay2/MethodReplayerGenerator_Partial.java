@@ -34,9 +34,7 @@ package tod.impl.replay2;
 import static tod.impl.bci.asm2.BCIUtils.*;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import org.objectweb.asm.Label;
 import org.objectweb.asm.Type;
@@ -56,14 +54,9 @@ public class MethodReplayerGenerator_Partial extends MethodReplayerGenerator
 	private int itsSnapshotRetVar;
 	private int itsStartProbeIdVar;
 	private int itsSnapshotVar;
+	private int itsStartedVar;
 	
 	private List<Label> itsSnapshotProbes = new ArrayList<Label>();
-	
-	/**
-	 * Maintains a mapping of local variable signature (ie. one character per live local slot indicating 
-	 * its current type) to the label of a subroutine that performs a snapshot/resume for locals of this type. 
-	 */
-	private Map<String, Label> itsLocalsSigToLabel = new HashMap<String, Label>();
 	
 	public MethodReplayerGenerator_Partial(
 			TODConfig aConfig,
@@ -82,16 +75,19 @@ public class MethodReplayerGenerator_Partial extends MethodReplayerGenerator
 		itsSnapshotRetVar = nextFreeVar(1);
 		itsStartProbeIdVar = nextFreeVar(1);
 		itsSnapshotVar = nextFreeVar(1);
+		itsStartedVar = nextFreeVar(1);
 
 		SList s = new SList();
 
 		Label lBadProbeId = new Label();
-		
-		itsSnapshotProbes.add(0, getCodeStartLabel());
+
+		s.pushInt(0);
+		s.ISTORE(itsStartedVar); // Mark replay as not started yet
 		s.ALOAD(0);
 		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "getStartProbe", "()I");
 		s.DUP();
 		s.ISTORE(itsStartProbeIdVar);
+		itsSnapshotProbes.add(0, getCodeStartLabel());
 		s.TABLESWITCH(0, itsSnapshotProbes.size()-1, lBadProbeId, itsSnapshotProbes.toArray(new Label[itsSnapshotProbes.size()]));
 		
 		s.label(lBadProbeId);
@@ -105,14 +101,9 @@ public class MethodReplayerGenerator_Partial extends MethodReplayerGenerator
 	@Override
 	protected void insertSnapshotProbe(SList s, AbstractInsnNode aReferenceNode, boolean aSaveStack)
 	{
-		String theLocalsSig = BCIUtils.getSnapshotSig(getMethodInfo().getFrame(aReferenceNode));
-		Label lCheckSnapshot = itsLocalsSigToLabel.get(theLocalsSig);
-		if (lCheckSnapshot == null)
-		{
-			lCheckSnapshot = makeSnapshotChecker(theLocalsSig, aReferenceNode);
-			itsLocalsSigToLabel.put(theLocalsSig, lCheckSnapshot);
-		}
-		
+		BCIFrame theFrame = getMethodInfo().getFrame(aReferenceNode.getNext());
+		String theLocalsSig = BCIUtils.getSnapshotSig(theFrame, aSaveStack);
+
 		Label lNoCheck = new Label();
 		Label lProbe = new Label();
 		
@@ -121,138 +112,38 @@ public class MethodReplayerGenerator_Partial extends MethodReplayerGenerator
 		SnapshotProbeInfo theProbe = getDatabase().getNewSnapshotProbe(getBehaviorId(), theProbeIndex, theLocalsSig);
 		
 		s.label(lProbe);
-		s.ALOAD(0);
-		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "getSnapshotSeq", "()I");
-		s.ILOAD(itsSnapshotSeqVar);
-		s.IF_ICMPLE(lNoCheck);
-		s.LDC(theProbe.id);
-		s.JSR(lCheckSnapshot);
-		s.label(lNoCheck);
-	}
-	
-	private Label makeSnapshotChecker(String aLocalsSig, AbstractInsnNode aReferenceNode)
-	{
-		BCIFrame theFrame = getMethodInfo().getFrame(aReferenceNode);
-		int theLocals = theFrame.getLocals();
-
-		Label lCheckSnapshot = new Label();
-		Label lResumeFromSnapshot = new Label();
+		s.ILOAD(itsStartedVar);
+		s.IFtrue(lNoCheck);
 		
-		SList s = new SList();
-		
-		s.label(lCheckSnapshot);
-		s.LDC(aLocalsSig);
-		s.POP();
-		
-		s.ASTORE(itsSnapshotRetVar); // Store return address var
-		s.ISTORE(itsSnapshotProbeIdVar); // Store probe id
+		s.pushInt(1);
+		s.ISTORE(itsStartedVar); // mark replay as started
 		
 		s.ALOAD(0);
 		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "getSnapshotForResume", "()"+DSC_LOCALSSNAPSHOT);
-		s.DUP();
 		s.ASTORE(itsSnapshotVar);
-		s.IFNONNULL(lResumeFromSnapshot);
 		
-		// Take snapshot
-		
-		LocalsMapInfo theLocalsMapInfo = new LocalsMapInfo();
-		for(int i=1;i<theLocals;i++) // First slot is the frame
+		if (aSaveStack)
 		{
-			Type theType = theFrame.getLocal(i).getType();
-			if (theType == null) continue;
-			updateLocalsMapInfo(theLocalsMapInfo, theType);
-		}
-		
-		if (theLocalsMapInfo.isEmpty())
-		{
-			s.ALOAD(0);
-			s.ILOAD(itsSnapshotProbeIdVar);
-			s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "registerEmptySnapshot", "(I)V");
-		}
-		else
-		{
-			s.ALOAD(0);
-			s.ILOAD(itsSnapshotProbeIdVar);
-			s.pushInt(theLocalsMapInfo.intValuesCount);
-			s.pushInt(theLocalsMapInfo.longValuesCount);
-			s.pushInt(theLocalsMapInfo.floatValuesCount);
-			s.pushInt(theLocalsMapInfo.doubleValuesCount);
-			s.pushInt(theLocalsMapInfo.refValuesCount);
-			s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "createSnapshot", "(IIIIII)"+DSC_LOCALSSNAPSHOT);
-			s.ASTORE(itsSnapshotVar);
-			
-			for(int i=1;i<theLocals;i++) // First slot is the frame
+			Type[] theStackTypes = getStackTypes(theFrame);
+			for(Type theType : theStackTypes) 
 			{
-				Type theType = theFrame.getLocal(i).getType();
-				if (theType == null) continue;
 				s.ALOAD(itsSnapshotVar);
-				s.ILOAD(theType, i); // TODO: adjust for big slots
-				invokeSnapshotPush(s, theType);
+				invokeSnapshotPop(s, theType);
 			}
-			
-			s.ALOAD(0);
-			s.ALOAD(itsSnapshotVar);
-			s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "registerSnapshot", "("+DSC_LOCALSSNAPSHOT+")V");
 		}
 
-		// Update seq
-		s.ALOAD(0);
-		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "getSnapshotSeq", "()I");
-		s.ISTORE(itsSnapshotSeqVar);
-
-		s.RET(itsSnapshotRetVar);
-		
-		// Resume from snapshot
-		s.label(lResumeFromSnapshot);
-		
-		for(int i=1;i<theLocals;i++) // First slot is the frame
+		int theLocals = theFrame.getLocals();
+		for(int i=theLocals-1;i>=0;i--) 
 		{
 			Type theType = theFrame.getLocal(i).getType();
 			if (theType == null) continue;
+
 			s.ALOAD(itsSnapshotVar);
 			invokeSnapshotPop(s, theType);
-			s.ISTORE(theType, i); // TODO: adjust for big slots
+			s.ISTORE(theType, i+1);
 		}
-
-		s.RET(itsSnapshotRetVar);
-		
-		addAdditionalInstructions(s);
-		
-		return lCheckSnapshot;
-	}
 	
-	private static void invokeSnapshotPush(SList s, Type aType)
-	{
-		switch(aType.getSort())
-		{
-		case Type.ARRAY:
-		case Type.OBJECT:
-			s.INVOKEVIRTUAL(CLS_LOCALSSNAPSHOT, "pushRef", "("+DSC_OBJECTID+")V");
-			break;
-			
-		case Type.BOOLEAN:
-		case Type.BYTE:
-		case Type.CHAR:
-		case Type.INT:
-		case Type.SHORT:
-			s.INVOKEVIRTUAL(CLS_LOCALSSNAPSHOT, "pushInt", "(I)V");
-			break;
-			
-		case Type.DOUBLE:
-			s.INVOKEVIRTUAL(CLS_LOCALSSNAPSHOT, "pushDouble", "(D)V");
-			break;
-			
-		case Type.FLOAT:
-			s.INVOKEVIRTUAL(CLS_LOCALSSNAPSHOT, "pushFloat", "(F)V");
-			break;
-			
-		case Type.LONG:
-			s.INVOKEVIRTUAL(CLS_LOCALSSNAPSHOT, "pushLong", "(J)V");
-			break;
-
-		default:
-			throw new RuntimeException("Not handled: "+aType);	
-		}
+		s.label(lNoCheck);
 	}
 	
 	private static void invokeSnapshotPop(SList s, Type aType)
@@ -289,52 +180,4 @@ public class MethodReplayerGenerator_Partial extends MethodReplayerGenerator
 		}
 	}
 	
-	private static void updateLocalsMapInfo(LocalsMapInfo aInfo, Type aType)
-	{
-		switch(aType.getSort())
-		{
-		case Type.ARRAY:
-		case Type.OBJECT:
-			aInfo.refValuesCount++;
-			break;
-			
-		case Type.BOOLEAN:
-		case Type.BYTE:
-		case Type.CHAR:
-		case Type.INT:
-		case Type.SHORT:
-			aInfo.intValuesCount++;
-			break;
-			
-		case Type.DOUBLE:
-			aInfo.doubleValuesCount++;
-			break;
-			
-		case Type.FLOAT:
-			aInfo.floatValuesCount++;
-			break;
-			
-		case Type.LONG:
-			aInfo.longValuesCount++;
-			break;
-			
-		default:
-			throw new RuntimeException("Not handled: "+aType);	
-		}
-	}
-	
-	private static class LocalsMapInfo
-	{
-		public int intValuesCount;
-		public int longValuesCount;
-		public int floatValuesCount;
-		public int doubleValuesCount;
-		public int refValuesCount;
-		
-		public boolean isEmpty()
-		{
-			return intValuesCount + longValuesCount + floatValuesCount + doubleValuesCount + refValuesCount == 0;
-		}
-	}
-
 }

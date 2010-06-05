@@ -54,7 +54,7 @@ public class PartialReplayTest
 		long theBytesToSkip = aSnapshot.getPacketStartOffset();
 		while(theBytesToSkip > 0) theBytesToSkip -= fis.skip(theBytesToSkip);
 		
-		DBSideIOThread theIOThread = new DBSideIOThread(aConfig, aDatabase, fis, false)
+		DBSideIOThread theIOThread = new DBSideIOThread(aConfig, aDatabase, fis, aSnapshot)
 		{
 			@Override
 			protected EventCollector createCollector(int aThreadId)
@@ -82,7 +82,7 @@ public class PartialReplayTest
 
 		try
 		{
-			DBSideIOThread theIOThread = new DBSideIOThread(theConfig, theDatabase, new FileInputStream(theEventsFile), true)
+			DBSideIOThread theIOThread = new DBSideIOThread(theConfig, theDatabase, new FileInputStream(theEventsFile), null)
 			{
 				@Override
 				protected EventCollector createCollector(int aThreadId)

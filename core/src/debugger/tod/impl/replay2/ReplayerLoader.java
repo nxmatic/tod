@@ -99,7 +99,8 @@ public class ReplayerLoader extends ClassLoader
 					IMutableStructureDatabase.class, 
 					EventCollector.class,
 					TmpIdManager.class, 
-					BufferStream.class);
+					BufferStream.class,
+					LocalsSnapshot.class);
 		}
 		catch (Exception e)
 		{
@@ -108,7 +109,7 @@ public class ReplayerLoader extends ClassLoader
 	}
 	
 	public Object createReplayer(
-			boolean a1stPass,
+			LocalsSnapshot aSnapshot,
 			int aThreadId,
 			TODConfig aConfig,
 			IMutableStructureDatabase aDatabase,
@@ -118,8 +119,14 @@ public class ReplayerLoader extends ClassLoader
 	{
 		try
 		{
-			Constructor theCtor = a1stPass ? its1stPassReplayerCtor : itsPartialReplayerCtor;
-			return theCtor.newInstance(this, aThreadId, aConfig, aDatabase, aCollector, aTmpIdManager, aBuffer);
+			if (aSnapshot == null)
+			{
+				return its1stPassReplayerCtor.newInstance(this, aThreadId, aConfig, aDatabase, aCollector, aTmpIdManager, aBuffer);
+			}
+			else
+			{
+				return itsPartialReplayerCtor.newInstance(this, aThreadId, aConfig, aDatabase, aCollector, aTmpIdManager, aBuffer, aSnapshot);
+			}
 		}
 		catch (Exception e)
 		{
@@ -263,6 +270,7 @@ public class ReplayerLoader extends ClassLoader
 	{
 		for (String theSignature : itsDatabase.getRegisteredSnapshotSignatures())
 		{
+			System.out.println("Adding snapshot method: "+theSignature);
 			modifyInScopeReplayerFrame_addSnapshotMethod(aClassNode, theSignature);
 		}
 	}

@@ -45,6 +45,7 @@ import tod.core.config.TODConfig;
 import tod.core.database.structure.IMutableStructureDatabase;
 import tod.impl.database.structure.standard.StructureDatabase;
 import tod.impl.replay2.EventCollector;
+import tod.impl.replay2.LocalsSnapshot;
 import tod.impl.replay2.ReplayerLoader;
 import tod.impl.replay2.ReplayerWrapper;
 import tod.impl.replay2.TmpIdManager;
@@ -63,7 +64,7 @@ public abstract class DBSideIOThread
 	private final TODConfig itsConfig;
 	private final IMutableStructureDatabase itsDatabase;
 	private final InputStream itsIn;
-	private final boolean itsFirstPass;
+	private final LocalsSnapshot itsSnapshot;
 	
 	/**
 	 * If not 0, the id of the only thread to replay.
@@ -81,12 +82,12 @@ public abstract class DBSideIOThread
 	
 	private long itsProcessedSize = 0;
 	
-	public DBSideIOThread(TODConfig aConfig, IMutableStructureDatabase aDatabase, InputStream aIn, boolean aFirstPass)
+	public DBSideIOThread(TODConfig aConfig, IMutableStructureDatabase aDatabase, InputStream aIn, LocalsSnapshot aSnapshot)
 	{
 		itsConfig = aConfig;
 		itsDatabase = aDatabase;
 		itsIn = aIn;
-		itsFirstPass = aFirstPass;
+		itsSnapshot = aSnapshot;
 		itsLoader = new ReplayerLoader(getClass().getClassLoader(), aDatabase);
 	}
 
@@ -237,7 +238,7 @@ public abstract class DBSideIOThread
 			
 			final Map<Integer, EventCollector> theCollectors = new HashMap<Integer, EventCollector>();  
 			
-			DBSideIOThread theIOThread = new DBSideIOThread(theConfig, theDatabase, new FileInputStream(theEventsFile), true)
+			DBSideIOThread theIOThread = new DBSideIOThread(theConfig, theDatabase, new FileInputStream(theEventsFile), null)
 			{
 				@Override
 				protected EventCollector createCollector(int aThreadId)
@@ -282,7 +283,7 @@ public abstract class DBSideIOThread
 			itsReplayer = new ReplayerWrapper(
 					itsLoader, 
 					itsThreadId, 
-					itsFirstPass,
+					itsSnapshot,
 					itsConfig, 
 					itsDatabase, 
 					itsCollector, 

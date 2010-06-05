@@ -91,7 +91,9 @@ public class ExceptionGeneratedReceiver
 		catch (Throwable e)
 		{
 			_IO.err("[TOD] Exception in ExceptionGeneratedReceiver.exceptionGenerated:");
-			e.printStackTrace();
+			_IO.err(e.getClass().getName());
+			_IO.err(e.getMessage());
+//			e.printStackTrace();
 			System.exit(1);
 		}
 	}

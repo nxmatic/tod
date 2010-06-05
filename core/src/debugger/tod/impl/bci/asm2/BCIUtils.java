@@ -709,11 +709,12 @@ public class BCIUtils implements Opcodes
 		// Stack
 		if (aIncludeStack)
 		{
+			// Stack is passed in reverse order for simper resuming from snapshot
 			int theStack = aFrame.getStackSize();
-			for(int i=1;i<theStack;i++)
+			for(int i=theStack-1;i>=0;i--)
 			{
 				Type theType = aFrame.getStack(i).getType();
-				if (theType != null) theBuilder.append(getSigForType(theType));
+				theBuilder.append(getSigForType(theType));
 			}
 		}
 		

@@ -23,6 +23,7 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 package tod2.agent;
 
 import java.tod.util._ArrayList;
+import java.tod.util._StringBuilder;
 
 public class AgentUtils
 {
@@ -219,6 +220,20 @@ public class AgentUtils
 		catch (ClassNotFoundException e)
 		{
 			System.err.println("[TOD] Info: could not preload "+aName+". Consider disabling class preloading in the configuration.");
+		}
+	}
+	
+	public static void printStackTrace(Throwable aThrowable)
+	{
+		_StringBuilder b = new _StringBuilder();
+		
+		while(aThrowable != null)
+		{
+			b.append(aThrowable.getClass().getName());
+			b.append(": ");
+			b.append(aThrowable.getMessage());
+			
+			aThrowable = aThrowable.getCause();
 		}
 	}
 }

@@ -51,7 +51,7 @@ public class ReplayerWrapper
 	public ReplayerWrapper(
 			ReplayerLoader aLoader,
 			int aThreadId,
-			boolean aFirstPass,
+			LocalsSnapshot aSnapshot,
 			TODConfig aConfig, 
 			IMutableStructureDatabase aDatabase, 
 			EventCollector aCollector,
@@ -61,7 +61,7 @@ public class ReplayerWrapper
 		try
 		{
 			itsLoader = aLoader;
-			itsReplayer = itsLoader.createReplayer(aFirstPass, aThreadId, aConfig, aDatabase, aCollector, aTmpIdManager, aBuffer);
+			itsReplayer = itsLoader.createReplayer(aSnapshot, aThreadId, aConfig, aDatabase, aCollector, aTmpIdManager, aBuffer);
 		}
 		catch (Exception e)
 		{

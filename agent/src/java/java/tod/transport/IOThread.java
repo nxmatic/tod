@@ -513,7 +513,7 @@ public class IOThread extends Thread
 			try
 			{
 				while(! itsPendingPackets.isEmpty()) Thread.sleep(100);
-				itsChannel.flush();
+				itsChannel.close();
 			}
 			catch (_IOException e)
 			{

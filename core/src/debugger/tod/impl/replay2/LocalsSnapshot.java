@@ -164,6 +164,21 @@ public class LocalsSnapshot
 		return itsPacketOffset;
 	}
 	
+	public int getProbeId()
+	{
+		return itsProbeId;
+	}
+	
+	public int[] getResidualStack()
+	{
+		return itsResidualStack;
+	}
+	
+	public int getKeptStack()
+	{
+		return itsKeptStack;
+	}
+	
 	public void alloc(
 			int aIntValuesCount, 
 			int aLongValuesCount, 

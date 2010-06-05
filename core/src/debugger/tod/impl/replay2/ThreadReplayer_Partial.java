@@ -37,6 +37,8 @@ import tod.impl.server.BufferStream;
 
 public class ThreadReplayer_Partial extends ThreadReplayer
 {
+	private final LocalsSnapshot itsSnapshot;
+
 	public ThreadReplayer_Partial(
 			ReplayerLoader aLoader,
 			int aThreadId,
@@ -44,9 +46,11 @@ public class ThreadReplayer_Partial extends ThreadReplayer
 			IMutableStructureDatabase aDatabase,
 			EventCollector aCollector,
 			TmpIdManager aTmpIdManager,
-			BufferStream aBuffer)
+			BufferStream aBuffer,
+			LocalsSnapshot aSnapshot)
 	{
 		super(aLoader, aThreadId, aConfig, aDatabase, aCollector, aTmpIdManager, aBuffer);
+		itsSnapshot = aSnapshot;
 	}
 
 	@Override
@@ -79,18 +83,21 @@ public class ThreadReplayer_Partial extends ThreadReplayer
 	@Override
 	public LocalsSnapshot getSnapshotForResume()
 	{
-		throw new UnsupportedOperationException();
+		return itsSnapshot;
 	}
 	
 	@Override
 	public int getStartProbe()
 	{
-		throw new UnsupportedOperationException();
+		return itsSnapshot.getProbeId();
 	}
 
 	@Override
 	public void replay()
 	{
-		throw new UnsupportedOperationException();
+		int[] theStack = itsSnapshot.getResidualStack();
+		int theBehaviorId = theStack[theStack.length-1];
+		InScopeReplayerFrame theFrame = createInScopeFrame(null, theBehaviorId, "resume");
+		theFrame.invoke_OOS();
 	}
 }

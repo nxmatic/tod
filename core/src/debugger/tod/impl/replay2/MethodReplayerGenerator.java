@@ -913,6 +913,17 @@ public abstract class MethodReplayerGenerator
 		}
 	}
 	
+	protected void genReverseLoadStack(SList s, Type[] aArgTypes)
+	{
+		int theSlot = itsSaveArgsSlots;
+		for(int i=aArgTypes.length-1;i>=0;i--)
+		{
+			Type theType = aArgTypes[i];
+			s.ILOAD(theType, theSlot);
+			theSlot += theType.getSize();
+		}
+	}
+	
 	public static String[] getInvokeMethodSignature(boolean aStatic, Type[] aArgTypes, Type aReturnType)
 	{
 		List<Type> theArgTypes = new ArrayList<Type>();

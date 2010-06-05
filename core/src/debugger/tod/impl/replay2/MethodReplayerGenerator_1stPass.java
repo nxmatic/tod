@@ -46,6 +46,7 @@ import tod.core.config.TODConfig;
 import tod.core.database.structure.IMutableStructureDatabase;
 import tod.impl.bci.asm2.BCIUtils;
 import tod.impl.bci.asm2.MethodInfo.BCIFrame;
+import zz.utils.Utils;
 
 public class MethodReplayerGenerator_1stPass extends MethodReplayerGenerator
 {
@@ -111,10 +112,11 @@ public class MethodReplayerGenerator_1stPass extends MethodReplayerGenerator
 
 		if (aSaveStack) 
 		{
-			genLoadStack(s, theStackTypes);
+			genReverseLoadStack(s, theStackTypes);
 			for(Type theType : theStackTypes) theArgTypes.add(theType);
 		}
 
+		Utils.println("Sig: [%s] %s | %s", aSaveStack, theLocalsSig, theArgTypes);
 		String theDesc = Type.getMethodDescriptor(Type.INT_TYPE, theArgTypes.toArray(new Type[theArgTypes.size()]));
 
 		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, ReplayerGenerator.SNAPSHOT_METHOD_NAME, theDesc);

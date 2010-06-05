@@ -408,9 +408,9 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 	
 	private void processInvoke(MethodInsnNode aNode)
 	{
-		BCIFrame theFrame = itsMethodInfo.getFrame(aNode);
-		getDatabase().registerSnapshotSignature(BCIUtils.getSnapshotSig(theFrame, true)); // For the after call
-		getDatabase().registerSnapshotSignature(BCIUtils.getSnapshotSig(theFrame, false)); // For the after throws
+		BCIFrame theNextFrame = itsMethodInfo.getFrame(aNode.getNext());
+		getDatabase().registerSnapshotSignature(BCIUtils.getSnapshotSig(theNextFrame, true)); // For the after call
+		getDatabase().registerSnapshotSignature(BCIUtils.getSnapshotSig(theNextFrame, false)); // For the after throws
 		
 		SyntaxInsnList s = new SyntaxInsnList();
 		
