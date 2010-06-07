@@ -171,7 +171,7 @@ public class IOThread extends Thread
 			itsLastEnabled = ! AgentReady.CAPTURE_ENABLED; 
 			itsSentPackets = 0;
 			
-			while(true)
+			while(!hasShutdownStarted())
 			{
 //				_IO.out("PacketBufferSender.run() - sentBuffers: "+sentBuffers);
 				Packet thePacket = popPacket();
@@ -371,6 +371,7 @@ public class IOThread extends Thread
 	 */
 	public void pushPacket(Packet aPacket) 
 	{
+		if (hasShutdownStarted()) return;
 		itsPendingPackets.add(aPacket);
 	}
 	
@@ -496,7 +497,6 @@ public class IOThread extends Thread
 		public void run()
 		{
 			_IO.out("[TOD] Shutting down...");
-			itsShutdownStarted = true;
 			for(int i=0;i<itsThreadDatas.size();i++)
 			{
 				WeakReference<ThreadData> theRef = itsThreadDatas.get(i); 
@@ -513,6 +513,8 @@ public class IOThread extends Thread
 			try
 			{
 				while(! itsPendingPackets.isEmpty()) Thread.sleep(100);
+				itsShutdownStarted = true;
+				Thread.sleep(100); // False synchronization...
 				itsChannel.close();
 			}
 			catch (_IOException e)
