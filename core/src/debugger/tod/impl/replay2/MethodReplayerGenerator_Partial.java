@@ -33,9 +33,6 @@ package tod.impl.replay2;
 
 import static tod.impl.bci.asm2.BCIUtils.*;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import org.objectweb.asm.Label;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
@@ -51,12 +48,13 @@ import tod.impl.bci.asm2.MethodInfo.BCIFrame;
 
 public class MethodReplayerGenerator_Partial extends MethodReplayerGenerator
 {
-	private int itsSnapshotRetVar;
 	private int itsStartProbeIdVar;
 	private int itsSnapshotVar;
-	private int itsStartedVar;
+	private final LocalsSnapshot itsSnapshot;
+	private final SnapshotProbeInfo itsSnapshotProbeInfo;
 	
-	private List<Label> itsSnapshotProbes = new ArrayList<Label>();
+	private int itsProbeIndex = 0;
+	private Label itsStartProbe;
 	
 	public MethodReplayerGenerator_Partial(
 			TODConfig aConfig,
@@ -64,59 +62,53 @@ public class MethodReplayerGenerator_Partial extends MethodReplayerGenerator
 			ReplayerGenerator aGenerator,
 			int aBehaviorId,
 			ClassNode aClassNode,
-			MethodNode aMethodNode)
+			MethodNode aMethodNode,
+			LocalsSnapshot aSnapshot)
 	{
 		super(aConfig, aDatabase, aGenerator, aBehaviorId, aClassNode, aMethodNode);
+		itsSnapshot = aSnapshot;
+		itsSnapshotProbeInfo = getDatabase().getSnapshotProbeInfo(itsSnapshot.getProbeId());
 	}
 
 	@Override
-	protected void addSnapshotSetup(InsnList aInsns)
+	protected String getClassDumpSubpath()
 	{
-		itsSnapshotRetVar = nextFreeVar(1);
+		return "partial";
+	}
+
+	@Override
+	protected void allocVars()
+	{
+		super.allocVars();
 		itsStartProbeIdVar = nextFreeVar(1);
 		itsSnapshotVar = nextFreeVar(1);
-		itsStartedVar = nextFreeVar(1);
-
+	}
+	
+	@Override
+	protected void addSnapshotSetup(InsnList aInsns)
+	{
+		if (getBehaviorId() != itsSnapshotProbeInfo.behaviorId) return;
+		
 		SList s = new SList();
-
-		Label lBadProbeId = new Label();
-
-		s.pushInt(0);
-		s.ISTORE(itsStartedVar); // Mark replay as not started yet
-		s.ALOAD(0);
-		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "getStartProbe", "()I");
-		s.DUP();
-		s.ISTORE(itsStartProbeIdVar);
-		itsSnapshotProbes.add(0, getCodeStartLabel());
-		s.TABLESWITCH(0, itsSnapshotProbes.size()-1, lBadProbeId, itsSnapshotProbes.toArray(new Label[itsSnapshotProbes.size()]));
-		
-		s.label(lBadProbeId);
-		s.ILOAD(itsStartProbeIdVar);
-		s.createRTExArg("No such probe: ");
-		s.ATHROW();
-		
+		s.GOTO(itsStartProbe);
 		aInsns.insert(s);
 	}
 	
 	@Override
 	protected void insertSnapshotProbe(SList s, AbstractInsnNode aReferenceNode, boolean aSaveStack)
 	{
+		if (getBehaviorId() != itsSnapshotProbeInfo.behaviorId) return;
+		itsProbeIndex++;
+		if (itsProbeIndex != itsSnapshotProbeInfo.probeIndex) return;
+		
 		BCIFrame theFrame = getMethodInfo().getFrame(aReferenceNode.getNext());
 		String theLocalsSig = BCIUtils.getSnapshotSig(theFrame, aSaveStack);
 
-		Label lNoCheck = new Label();
 		Label lProbe = new Label();
-		
-		int theProbeIndex = itsSnapshotProbes.size();
-		itsSnapshotProbes.add(lProbe);
-		SnapshotProbeInfo theProbe = getDatabase().getNewSnapshotProbe(getBehaviorId(), theProbeIndex, theLocalsSig);
+
+		itsStartProbe = lProbe;
 		
 		s.label(lProbe);
-		s.ILOAD(itsStartedVar);
-		s.IFtrue(lNoCheck);
-		
-		s.pushInt(1);
-		s.ISTORE(itsStartedVar); // mark replay as started
 		
 		s.ALOAD(0);
 		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "getSnapshotForResume", "()"+DSC_LOCALSSNAPSHOT);
@@ -142,8 +134,6 @@ public class MethodReplayerGenerator_Partial extends MethodReplayerGenerator
 			invokeSnapshotPop(s, theType);
 			s.ISTORE(theType, i+1);
 		}
-	
-		s.label(lNoCheck);
 	}
 	
 	private static void invokeSnapshotPop(SList s, Type aType)
@@ -152,7 +142,7 @@ public class MethodReplayerGenerator_Partial extends MethodReplayerGenerator
 		{
 		case Type.ARRAY:
 		case Type.OBJECT:
-			s.INVOKEVIRTUAL(CLS_LOCALSSNAPSHOT, "popRef", "()"+DSC_LOCALSSNAPSHOT);
+			s.INVOKEVIRTUAL(CLS_LOCALSSNAPSHOT, "popRef", "()"+DSC_OBJECTID);
 			break;
 			
 		case Type.BOOLEAN:

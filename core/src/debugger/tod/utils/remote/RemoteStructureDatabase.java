@@ -639,6 +639,11 @@ public class RemoteStructureDatabase implements RIStructureDatabase
 			throw new UnsupportedOperationException();
 		}
 
+		public SnapshotProbeInfo getSnapshotProbeInfo(int aProbeId)
+		{
+			throw new UnsupportedOperationException();
+		}
+
 		public void registerSnapshotSignature(String aSignature)
 		{
 			throw new UnsupportedOperationException();

@@ -161,6 +161,8 @@ public interface IStructureDatabase
 	 */
 	public ProbeInfo getProbeInfo(int aProbeId);
 	
+	public SnapshotProbeInfo getSnapshotProbeInfo(int aProbeId);
+	
 	/**
 	 * Returns the number of installed probes.
 	 */

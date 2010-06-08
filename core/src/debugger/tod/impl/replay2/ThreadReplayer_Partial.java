@@ -33,6 +33,7 @@ package tod.impl.replay2;
 
 import tod.core.config.TODConfig;
 import tod.core.database.structure.IMutableStructureDatabase;
+import tod.core.database.structure.IStructureDatabase.SnapshotProbeInfo;
 import tod.impl.server.BufferStream;
 
 public class ThreadReplayer_Partial extends ThreadReplayer
@@ -59,7 +60,7 @@ public class ThreadReplayer_Partial extends ThreadReplayer
 			TODConfig aConfig,
 			IMutableStructureDatabase aDatabase)
 	{
-		return new ReplayerGenerator.Partial(aLoader, aConfig, aDatabase);
+		return new ReplayerGenerator.Partial(aLoader, aConfig, aDatabase, itsSnapshot);
 	}
 
 	@Override
@@ -95,8 +96,8 @@ public class ThreadReplayer_Partial extends ThreadReplayer
 	@Override
 	public void replay()
 	{
-		int[] theStack = itsSnapshot.getResidualStack();
-		int theBehaviorId = theStack[theStack.length-1];
+		SnapshotProbeInfo theSnapshotProbeInfo = getDatabase().getSnapshotProbeInfo(itsSnapshot.getProbeId());
+		int theBehaviorId = theSnapshotProbeInfo.behaviorId;
 		InScopeReplayerFrame theFrame = createInScopeFrame(null, theBehaviorId, "resume");
 		theFrame.invoke_OOS();
 	}

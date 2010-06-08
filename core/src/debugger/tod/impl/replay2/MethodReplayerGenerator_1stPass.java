@@ -66,6 +66,13 @@ public class MethodReplayerGenerator_1stPass extends MethodReplayerGenerator
 	}
 	
 	@Override
+	protected String getClassDumpSubpath()
+	{
+		return "first";
+	}
+
+
+	@Override
 	protected void allocVars()
 	{
 		super.allocVars();
@@ -98,7 +105,7 @@ public class MethodReplayerGenerator_1stPass extends MethodReplayerGenerator
 
 		s.ALOAD(0);
 		s.ILOAD(itsSnapshotSeqVar);
-		s.pushInt(getDatabase().getNewSnapshotProbe(getBehaviorId(), itsProbeIndex++, theLocalsSig).id);
+		s.pushInt(getDatabase().getNewSnapshotProbe(getBehaviorId(), ++itsProbeIndex, theLocalsSig).id);
 		
 		int theLocals = theFrame.getLocals();
 		for(int i=0;i<theLocals;i++) 

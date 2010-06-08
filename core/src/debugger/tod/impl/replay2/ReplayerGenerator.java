@@ -327,12 +327,16 @@ public abstract class ReplayerGenerator
 	
 	public static class Partial extends ReplayerGenerator
 	{
+		private final LocalsSnapshot itsSnapshot;
+
 		public Partial(
 				ReplayerLoader aLoader,
 				TODConfig aConfig,
-				IMutableStructureDatabase aDatabase)
+				IMutableStructureDatabase aDatabase,
+				LocalsSnapshot aSnapshot)
 		{
 			super(aLoader, aConfig, aDatabase);
+			itsSnapshot = aSnapshot;
 		}
 
 		@Override
@@ -343,7 +347,7 @@ public abstract class ReplayerGenerator
 				ClassNode aClassNode,
 				MethodNode aMethodNode)
 		{
-			return new MethodReplayerGenerator_Partial(aConfig, aDatabase, this, aBehaviorId, aClassNode, aMethodNode);
+			return new MethodReplayerGenerator_Partial(aConfig, aDatabase, this, aBehaviorId, aClassNode, aMethodNode, itsSnapshot);
 		}
 
 		@Override

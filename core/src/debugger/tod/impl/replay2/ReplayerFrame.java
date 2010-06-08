@@ -182,6 +182,15 @@ public abstract class ReplayerFrame
 		throw new UnsupportedOperationException("Should be overridden: "+this);
 	}
 	
+	/**
+	 * Calls the appropriate invoke method, passing dummy arguments 
+	 * (as they will be overwritten by the snapshot resuming code).
+	 */
+	public void invoke_PartialReplay()
+	{
+		throw new UnsupportedOperationException("Should be overridden: "+this);
+	}
+	
 	public static Exception createRtEx(int aArg, String aMessage)
 	{
 		return new RuntimeException(aMessage+": "+aArg);

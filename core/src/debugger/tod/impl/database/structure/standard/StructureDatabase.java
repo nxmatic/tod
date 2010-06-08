@@ -61,6 +61,7 @@ import tod.core.database.structure.ITypeInfo;
 import tod.core.database.structure.SourceRange;
 import tod.core.database.structure.IBehaviorInfo.BytecodeRole;
 import tod.core.database.structure.IClassInfo.Bytecode;
+import tod.core.database.structure.IStructureDatabase.SnapshotProbeInfo;
 import tod.impl.bci.asm2.BCIUtils;
 import tod.tools.parsers.ParseException;
 import tod.tools.parsers.workingset.WorkingSetFactory;
@@ -122,7 +123,8 @@ implements IShareableStructureDatabase
 	private List<ClassInfo> itsClasses;
 	
 	private List<ProbeInfo> itsProbes;
-	private TLongObjectHashMap<SnapshotProbeInfo> itsSnapshotProbesMap;
+	private transient TLongObjectHashMap<SnapshotProbeInfo> itsSnapshotProbesMap;
+	private List<SnapshotProbeInfo> itsSnapshotProbes;
 	private Set<String> itsSnapshotLocalsSignaturesSet; 
 	
 	private Map<Long, ProbeInfo> itsExceptionProbesMap = new HashMap<Long, ProbeInfo>();
@@ -178,6 +180,7 @@ implements IShareableStructureDatabase
 			itsProbes.add(null);
 			
 			itsSnapshotProbesMap = new TLongObjectHashMap<SnapshotProbeInfo>();
+			itsSnapshotProbes = new ArrayList<SnapshotProbeInfo>();
 			itsSnapshotLocalsSignaturesSet = new HashSet<String>();
 			
 			// Generate a new id.
@@ -231,7 +234,7 @@ implements IShareableStructureDatabase
 			itsFields = (List<FieldInfo>) ois.readObject();
 			itsClasses = (List<ClassInfo>) ois.readObject();
 			itsProbes = (List<ProbeInfo>) ois.readObject();
-			itsSnapshotProbesMap = (TLongObjectHashMap<SnapshotProbeInfo>) ois.readObject();
+			itsSnapshotProbes = (List<SnapshotProbeInfo>) ois.readObject();
 			itsSnapshotLocalsSignaturesSet = (Set<String>) ois.readObject();
 			itsSignatureIdMap = (TObjectIntHashMap<String>) ois.readObject();
 			itsTraceSelectorString = ois.readUTF();
@@ -246,6 +249,14 @@ implements IShareableStructureDatabase
 				{
 					if (theClass != null) itsClassInfos.put(theClass.getName(), theClass);
 				}
+			}
+			
+			// Restore probes map
+			itsSnapshotProbesMap = new TLongObjectHashMap<SnapshotProbeInfo>();
+			for (SnapshotProbeInfo theProbe : itsSnapshotProbes)
+			{
+				long theKey = getSnapshotProbeKey(theProbe.behaviorId, theProbe.probeIndex);
+				itsSnapshotProbesMap.put(theKey, theProbe);
 			}
 			
 			reown();
@@ -306,7 +317,7 @@ implements IShareableStructureDatabase
 			oos.writeObject(itsFields);
 			oos.writeObject(itsClasses);
 			oos.writeObject(itsProbes);		
-			oos.writeObject(itsSnapshotProbesMap);
+			oos.writeObject(itsSnapshotProbes);
 			oos.writeObject(itsSnapshotLocalsSignaturesSet);
 			oos.writeObject(itsSignatureIdMap);
 			oos.writeUTF(itsTraceSelectorString);
@@ -793,20 +804,31 @@ implements IShareableStructureDatabase
 		registerProbe(theProbe);
 	}
 
+	private static long getSnapshotProbeKey(int aBehaviorId, int aProbeIndex)
+	{
+		return ((long) aBehaviorId) << 32 | aProbeIndex;
+	}
+	
 	public SnapshotProbeInfo getNewSnapshotProbe(int aBehaviorId, int aProbeIndex, String aSignature)
 	{
 		registerSnapshotSignature(aSignature);
-		long theKey = ((long) aBehaviorId) << 32 | aProbeIndex;
+		long theKey = getSnapshotProbeKey(aBehaviorId, aProbeIndex);
 		SnapshotProbeInfo theProbe = itsSnapshotProbesMap.get(theKey);
 		if (theProbe == null)
 		{
 			int theId = itsSnapshotProbesMap.size() + 1; 
 			theProbe = new SnapshotProbeInfo(theId, aBehaviorId, aProbeIndex, aSignature);
 			itsSnapshotProbesMap.put(theKey, theProbe);
+			Utils.listSet(itsSnapshotProbes, theId, theProbe);
 		}
 		else assert aSignature.equals(theProbe.localsSignature);
 		
 		return theProbe;
+	}
+	
+	public SnapshotProbeInfo getSnapshotProbeInfo(int aProbeId)
+	{
+		return Utils.listGet(itsSnapshotProbes, aProbeId);
 	}
 
 	public void registerSnapshotSignature(String aSignature)

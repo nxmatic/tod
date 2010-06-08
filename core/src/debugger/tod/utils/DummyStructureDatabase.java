@@ -205,6 +205,11 @@ implements IMutableStructureDatabase
 		return null;
 	}
 
+	public SnapshotProbeInfo getSnapshotProbeInfo(int aProbeId)
+	{
+		return null;
+	}
+
 	public void registerSnapshotSignature(String aSignature)
 	{
 	}

@@ -80,6 +80,7 @@ public class LocalsSnapshot
 	public LocalsSnapshot(
 			long aPacketStartOffset,
 			int aPacketOffset,
+			int aBehaviorId,
 			int aProbeId,
 			int aKeptStack,
 			int[] aResidualStack)

@@ -81,6 +81,7 @@ public class ThreadReplayer_1stPass extends ThreadReplayer
 		return new LocalsSnapshot(
 				getStream().getPacketStartOffset(), 
 				getStream().position(), 
+				getStack().peek(),
 				aProbeId,
 				0, // TODO: compress stacks
 				getStack().toArray());

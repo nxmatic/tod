@@ -75,8 +75,11 @@ public class UnmonitoredReplayerFrame extends ReplayerFrame
 		}
 		catch (ReplayerException e)
 		{
-			popped();
 			throw e;
+		}
+		finally
+		{
+			popped();
 		}
 	}
 	

@@ -84,9 +84,10 @@ public abstract class ThreadReplayer
 
 	private ExceptionInfo itsLastException;
 	
-	private final ReplayerGenerator itsGenerator;
+	private ReplayerGenerator itsGenerator;
 	
 	private final EventCollector itsCollector;
+	private final ReplayerLoader itsLoader;
 	
 	public ThreadReplayer(
 			ReplayerLoader aLoader,
@@ -97,17 +98,24 @@ public abstract class ThreadReplayer
 			TmpIdManager aTmpIdManager,
 			BufferStream aBuffer)
 	{
+		itsLoader = aLoader;
 		itsThreadId = aThreadId;
 		itsConfig = aConfig;
 		itsDatabase = aDatabase;
 		itsCollector = aCollector;
 		itsTmpIdManager = aTmpIdManager;
 		itsStream = aBuffer;
-		itsGenerator = createReplayerGenerator(aLoader, itsConfig, itsDatabase);
 	}
 	
 	protected abstract ReplayerGenerator createReplayerGenerator(ReplayerLoader aLoader, TODConfig aConfig, IMutableStructureDatabase aDatabase);
 	
+	private ReplayerGenerator getGenerator()
+	{
+		// Lazy init because createReplayerGenerator may need fields initialized by subclasses
+		if (itsGenerator == null) itsGenerator = createReplayerGenerator(itsLoader, itsConfig, itsDatabase);
+		return itsGenerator;
+	}
+
 	protected BufferStream getStream()
 	{
 		return itsStream;
@@ -338,7 +346,7 @@ public abstract class ThreadReplayer
 	
 	public InScopeReplayerFrame createInScopeFrame(ReplayerFrame aParent, int aBehaviorId, String aDebugInfo)
 	{
-		InScopeReplayerFrame theFrame = itsGenerator.createInScopeFrame(aBehaviorId);
+		InScopeReplayerFrame theFrame = getGenerator().createInScopeFrame(aBehaviorId);
 		theFrame.setup(this, itsStream, aDebugInfo, isInScope(aParent), null);
 		itsStack.push(aBehaviorId);
 		return theFrame;
@@ -346,7 +354,7 @@ public abstract class ThreadReplayer
 	
 	public EnveloppeReplayerFrame createEnveloppeFrame(ReplayerFrame aParent, Type aReturnType, String aDebugInfo)
 	{
-		EnveloppeReplayerFrame theFrame = itsGenerator.createEnveloppeFrame();
+		EnveloppeReplayerFrame theFrame = getGenerator().createEnveloppeFrame();
 		theFrame.setup(this, itsStream, aDebugInfo, isInScope(aParent), aReturnType);
 		itsStack.push(FRAMETYPE_ENVELOPPE);
 		return theFrame;
@@ -354,7 +362,7 @@ public abstract class ThreadReplayer
 	
 	public UnmonitoredReplayerFrame createUnmonitoredFrame(ReplayerFrame aParent, Type aReturnType, String aDebugInfo)
 	{
-		UnmonitoredReplayerFrame theFrame = itsGenerator.createUnmonitoredFrame();
+		UnmonitoredReplayerFrame theFrame = getGenerator().createUnmonitoredFrame();
 		theFrame.setup(this, itsStream, aDebugInfo, isInScope(aParent), aReturnType);
 		itsStack.push(FRAMETYPE_UNMONITORED);
 		return theFrame;
@@ -362,7 +370,7 @@ public abstract class ThreadReplayer
 	
 	public ClassloaderWrapperReplayerFrame createClassloaderFrame(ReplayerFrame aParent, String aDebugInfo)
 	{
-		ClassloaderWrapperReplayerFrame theFrame = itsGenerator.createClassloaderWrapperFrame();
+		ClassloaderWrapperReplayerFrame theFrame = getGenerator().createClassloaderWrapperFrame();
 		theFrame.setup(this, itsStream, aDebugInfo, isInScope(aParent), null);
 		itsStack.push(FRAMETYPE_CLASSLOADERWRAPPER);
 		return theFrame;
