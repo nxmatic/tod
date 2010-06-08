@@ -78,6 +78,7 @@ public class ThreadReplayer_1stPass extends ThreadReplayer
 	@Override
 	public LocalsSnapshot createSnapshot(int aProbeId)
 	{
+		System.out.println("Creating snapshot: "+aProbeId);
 		return new LocalsSnapshot(
 				getStream().getPacketStartOffset(), 
 				getStream().position(), 

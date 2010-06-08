@@ -257,6 +257,7 @@ public abstract class MethodReplayerGenerator
 		
 		// Add OOS invoke method
 		addOutOfScopeInvoke();
+		addPartialReplayInvoke();
 		
 		// Modify method
 		processInstructions(itsMethodNode.instructions);
@@ -429,6 +430,50 @@ public abstract class MethodReplayerGenerator
 		if (itsReturnType.getSort() != Type.VOID) s.POP(itsReturnType);
 		s.RETURN();
 
+		theMethod.maxLocals = 1;
+		theMethod.maxStack = theSize;
+		
+		theMethod.instructions = s;
+		itsTarget.methods.add(theMethod);
+	}
+	
+	/**
+	 * Similar to {@link #addOutOfScopeInvoke()}, but passes dummy arguments,
+	 * as actual values will be obtained from a snapshot
+	 */
+	private void addPartialReplayInvoke()
+	{
+		MethodNode theMethod = new MethodNode();
+		
+		String[] theSignature = getInvokeMethodSignature(itsStatic, itsArgTypes, itsReturnType);
+		theMethod.name = "invoke_PartialReplay";
+		theMethod.desc = "()V";
+		theMethod.exceptions = Collections.EMPTY_LIST;
+		theMethod.access = Opcodes.ACC_PUBLIC;
+		theMethod.tryCatchBlocks = Collections.EMPTY_LIST;
+		
+		int theSize = 1;
+		
+		SList s = new SList();
+		
+		s.ALOAD(0);
+		
+		if (! itsStatic)
+		{
+			s.ACONST_NULL();
+			theSize++;
+		}
+		
+		for (Type theType : itsArgTypes)
+		{
+			s.pushDefaultValue(theType);
+			theSize += theType.getSize();
+		}
+		
+		s.INVOKEVIRTUAL(itsTarget.name, theSignature[0], theSignature[1]);
+		if (itsReturnType.getSort() != Type.VOID) s.POP(itsReturnType);
+		s.RETURN();
+		
 		theMethod.maxLocals = 1;
 		theMethod.maxStack = theSize;
 		

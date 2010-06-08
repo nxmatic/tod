@@ -99,6 +99,6 @@ public class ThreadReplayer_Partial extends ThreadReplayer
 		SnapshotProbeInfo theSnapshotProbeInfo = getDatabase().getSnapshotProbeInfo(itsSnapshot.getProbeId());
 		int theBehaviorId = theSnapshotProbeInfo.behaviorId;
 		InScopeReplayerFrame theFrame = createInScopeFrame(null, theBehaviorId, "resume");
-		theFrame.invoke_OOS();
+		theFrame.invoke_PartialReplay();
 	}
 }

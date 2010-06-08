@@ -193,8 +193,12 @@ public abstract class DBSideIOThread
 			itsInitialSkip = 0;
 		}
 		
-		getReplayerThread(theThreadId).push(theBuffer);
-		
+		if (itsReplayThreadId == 0 || itsReplayThreadId == theThreadId) 
+		{
+			ThreadReplayerThread theReplayerThread = getReplayerThread(theThreadId);
+			theReplayerThread.push(theBuffer);
+		}
+
 		itsProcessedSize += 8 + theLength;
 	}
 	
@@ -296,7 +300,6 @@ public abstract class DBSideIOThread
 		public void push(PacketBuffer aBuffer)
 		{
 //			if (itsThreadId != 1) return;
-			if (itsReplayThreadId > 0 && itsReplayThreadId != itsThreadId) return;
 			itsStream.pushBuffer(aBuffer);
 		}
 		

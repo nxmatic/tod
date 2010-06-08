@@ -47,6 +47,7 @@ public class ReplayerWrapper
 {
 	private final ReplayerLoader itsLoader;
 	private final Object itsReplayer;
+	private Method itsReplayMethod;
 	
 	public ReplayerWrapper(
 			ReplayerLoader aLoader,
@@ -62,6 +63,7 @@ public class ReplayerWrapper
 		{
 			itsLoader = aLoader;
 			itsReplayer = itsLoader.createReplayer(aSnapshot, aThreadId, aConfig, aDatabase, aCollector, aTmpIdManager, aBuffer);
+			itsReplayMethod = itsReplayer.getClass().getMethod("replay");
 		}
 		catch (Exception e)
 		{
@@ -74,10 +76,9 @@ public class ReplayerWrapper
 	{
 		try
 		{
-			Method theMethod = itsReplayer.getClass().getMethod("replay");
 			try
 			{
-				theMethod.invoke(itsReplayer);
+				itsReplayMethod.invoke(itsReplayer);
 			}
 			catch (InvocationTargetException e)
 			{
