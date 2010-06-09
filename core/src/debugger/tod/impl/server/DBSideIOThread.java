@@ -46,6 +46,7 @@ import tod.core.database.structure.IMutableStructureDatabase;
 import tod.impl.database.structure.standard.StructureDatabase;
 import tod.impl.replay2.EventCollector;
 import tod.impl.replay2.LocalsSnapshot;
+import tod.impl.replay2.ReplayerGenerator;
 import tod.impl.replay2.ReplayerLoader;
 import tod.impl.replay2.ReplayerWrapper;
 import tod.impl.replay2.TmpIdManager;
@@ -70,6 +71,11 @@ public abstract class DBSideIOThread
 	 * If not 0, the id of the only thread to replay.
 	 */
 	private int itsReplayThreadId;
+	
+	/**
+	 * When replaying a single thread, this flag is set when the replayer terminates
+	 */
+	private boolean itsFinished = false;
 	
 	/**
 	 * Number of bytes to skip from the first thread packet (for partial replay)
@@ -111,7 +117,7 @@ public abstract class DBSideIOThread
 			int thePacketCount = 0;
 			
 			loop:
-			while(true)
+			while(! itsFinished)
 			{
 				int thePacketType = itsIn.read();
 				itsProcessedSize++;
@@ -177,26 +183,35 @@ public abstract class DBSideIOThread
 		}
 	}
 	
+	private void skip(int aCount) throws IOException
+	{
+		while(aCount > 0) aCount -= itsIn.skip(aCount);
+	}
+	
 	private void processThreadPacket() throws IOException
 	{
 		int theThreadId = _ByteBuffer.getIntL(itsIn);
 		int theLength = _ByteBuffer.getIntL(itsIn);
 		
-		PacketBuffer theBuffer = new PacketBuffer(new byte[BUFFER_SIZE], itsProcessedSize-1);
-		readFully(theBuffer.array(), theLength);
-		theBuffer.position(0);
-		theBuffer.limit(theLength);
-		
-		if (itsInitialSkip > 0)
-		{
-			theBuffer.position(itsInitialSkip);
-			itsInitialSkip = 0;
-		}
-		
 		if (itsReplayThreadId == 0 || itsReplayThreadId == theThreadId) 
 		{
+			PacketBuffer theBuffer = new PacketBuffer(new byte[BUFFER_SIZE], itsProcessedSize-1);
+			readFully(theBuffer.array(), theLength);
+			theBuffer.position(0);
+			theBuffer.limit(theLength);
+			
+			if (itsInitialSkip > 0)
+			{
+				theBuffer.position(itsInitialSkip);
+				itsInitialSkip = 0;
+			}
+		
 			ThreadReplayerThread theReplayerThread = getReplayerThread(theThreadId);
 			theReplayerThread.push(theBuffer);
+		}
+		else
+		{
+			skip(theLength);
 		}
 
 		itsProcessedSize += 8 + theLength;
@@ -307,6 +322,7 @@ public abstract class DBSideIOThread
 		public void run()
 		{
 			itsReplayer.replay();
+			if (itsReplayThreadId > 0) itsFinished = true;
 		}
 	}
 	

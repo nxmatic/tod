@@ -58,7 +58,7 @@ public abstract class ThreadReplayer
 	private static final int FRAMETYPE_ENVELOPPE = -2;
 	private static final int FRAMETYPE_CLASSLOADERWRAPPER = -3;
 	
-	public static final boolean ECHO = true;
+	public static final boolean ECHO = false;
 	public static boolean ECHO_FORREAL = true;
 
 	private final int itsThreadId;
@@ -78,7 +78,7 @@ public abstract class ThreadReplayer
 	 * The mode is updated whenever we receive a {@link Message#TRACEDMETHODS_VERSION} message.
 	 */
 	private final ByteArray itsMonitoringModes = new ByteArray();
-	private int itsCurrentMonitoringModeVersion = 0;
+	private int itsCurrentTracedMethodsVersion = 0;
 	
 	private final List<Type> itsBehaviorReturnTypes = new ArrayList<Type>();
 
@@ -246,8 +246,14 @@ public abstract class ThreadReplayer
 	{
 		if (ThreadReplayer.ECHO && ThreadReplayer.ECHO_FORREAL)
 			System.out.println("Traced methods version: "+aVersion);
-		
-		for(int i=itsCurrentMonitoringModeVersion;i<aVersion;i++)
+
+		setTracedMethodsVersion(aVersion);
+	}
+	
+	protected void setTracedMethodsVersion(int aVersion)
+	{
+		assert aVersion >= itsCurrentTracedMethodsVersion;
+		for(int i=itsCurrentTracedMethodsVersion;i<aVersion;i++)
 		{
 			ModeChange theChange = ModeChangesList.get(i);
 			itsMonitoringModes.set(theChange.behaviorId, theChange.mode);
@@ -255,7 +261,12 @@ public abstract class ThreadReplayer
 				Utils.println("Mode changed (%d): %d -> %d (%s)", itsThreadId, theChange.behaviorId, theChange.mode, LocationUtils.toMonitoringModeString(theChange.mode));
 		}
 		
-		itsCurrentMonitoringModeVersion = aVersion;
+		itsCurrentTracedMethodsVersion = aVersion;
+	}
+	
+	public int getTracedMethodsVersion()
+	{
+		return itsCurrentTracedMethodsVersion;
 	}
 	
 	/**

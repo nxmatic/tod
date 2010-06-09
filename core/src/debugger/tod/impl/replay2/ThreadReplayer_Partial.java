@@ -96,9 +96,11 @@ public class ThreadReplayer_Partial extends ThreadReplayer
 	@Override
 	public void replay()
 	{
+		setTracedMethodsVersion(itsSnapshot.getTracedMethodsVersion());
 		SnapshotProbeInfo theSnapshotProbeInfo = getDatabase().getSnapshotProbeInfo(itsSnapshot.getProbeId());
 		int theBehaviorId = theSnapshotProbeInfo.behaviorId;
 		InScopeReplayerFrame theFrame = createInScopeFrame(null, theBehaviorId, "resume");
 		theFrame.invoke_PartialReplay();
+		getStream().skipAll(); // Finishes 
 	}
 }

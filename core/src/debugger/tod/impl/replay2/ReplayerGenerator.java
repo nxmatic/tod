@@ -196,6 +196,8 @@ public abstract class ReplayerGenerator
 	
 	private InScopeReplayerFrame.Factory createFactory(String aFrameClassJVMName) 
 	{
+		Utils.println("Creating factory for '%s' (by %s, loader %s)", aFrameClassJVMName, this, itsLoader);
+		
 		ClassNode classNode = new ClassNode();
 		classNode.name = aFrameClassJVMName+"_Factory";
 		classNode.sourceFile = classNode.name+".class";

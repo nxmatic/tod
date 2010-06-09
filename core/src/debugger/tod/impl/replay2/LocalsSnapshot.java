@@ -62,6 +62,8 @@ public class LocalsSnapshot
 	 */
 	private int[] itsResidualStack;
 	
+	private int itsTracedMethodsVersion;
+	
 	private int itsIntValuesIndex;
 	private int[] itsIntValues;
 	
@@ -83,13 +85,15 @@ public class LocalsSnapshot
 			int aBehaviorId,
 			int aProbeId,
 			int aKeptStack,
-			int[] aResidualStack)
+			int[] aResidualStack,
+			int aTracedMethodsVersion)
 	{
 		itsPacketStartOffset = aPacketStartOffset;
 		itsPacketOffset = aPacketOffset;
 		itsProbeId = aProbeId;
 		itsKeptStack = aKeptStack;
 		itsResidualStack = aResidualStack;
+		itsTracedMethodsVersion = aTracedMethodsVersion;
 	}
 	
 	/**
@@ -101,6 +105,7 @@ public class LocalsSnapshot
 		itsPacketOffset = aBuffer.getInt();
 		itsProbeId = aBuffer.getInt();
 		itsKeptStack = aBuffer.getShort();
+		itsTracedMethodsVersion = aBuffer.getInt();
 		
 		itsResidualStack = new int[aBuffer.getShort()];
 		for(int i=0;i<itsResidualStack.length;i++) itsResidualStack[i] = aBuffer.getInt();
@@ -135,6 +140,7 @@ public class LocalsSnapshot
 		aBuffer.putInt(itsPacketOffset);
 		aBuffer.putInt(itsProbeId);
 		aBuffer.putShort((short) itsKeptStack);
+		aBuffer.putInt(itsTracedMethodsVersion);
 		
 		aBuffer.putShort((short) itsResidualStack.length);
 		aBuffer.putInts(itsResidualStack);
@@ -178,6 +184,11 @@ public class LocalsSnapshot
 	public int getKeptStack()
 	{
 		return itsKeptStack;
+	}
+	
+	public int getTracedMethodsVersion()
+	{
+		return itsTracedMethodsVersion;
 	}
 	
 	public void alloc(

@@ -123,7 +123,6 @@ public class MethodReplayerGenerator_1stPass extends MethodReplayerGenerator
 			for(Type theType : theStackTypes) theArgTypes.add(theType);
 		}
 
-		Utils.println("Sig: [%s] %s | %s", aSaveStack, theLocalsSig, theArgTypes);
 		String theDesc = Type.getMethodDescriptor(Type.INT_TYPE, theArgTypes.toArray(new Type[theArgTypes.size()]));
 
 		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, ReplayerGenerator.SNAPSHOT_METHOD_NAME, theDesc);

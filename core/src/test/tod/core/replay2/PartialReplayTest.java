@@ -50,6 +50,7 @@ public class PartialReplayTest
 	
 	private static void partialReplay(File aEventsFile, TODConfig aConfig, IMutableStructureDatabase aDatabase, LocalsSnapshot aSnapshot) throws IOException
 	{
+		System.out.println("Partial replay of snapshot at: "+aSnapshot.getProbeId());
 		FileInputStream fis = new FileInputStream(aEventsFile);
 		long theBytesToSkip = aSnapshot.getPacketStartOffset();
 		while(theBytesToSkip > 0) theBytesToSkip -= fis.skip(theBytesToSkip);
@@ -67,6 +68,7 @@ public class PartialReplayTest
 		
 		theIOThread.setInitialSkip(aSnapshot.getPacketOffset());
 		theIOThread.run();
+		System.out.println("Done");
 	}
 	
 	public static void main(String[] args) throws Exception

@@ -270,7 +270,6 @@ public class ReplayerLoader extends ClassLoader
 	{
 		for (String theSignature : itsDatabase.getRegisteredSnapshotSignatures())
 		{
-			System.out.println("Adding snapshot method: "+theSignature);
 			modifyInScopeReplayerFrame_addSnapshotMethod(aClassNode, theSignature);
 		}
 	}

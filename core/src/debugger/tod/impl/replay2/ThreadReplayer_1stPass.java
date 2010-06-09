@@ -85,7 +85,8 @@ public class ThreadReplayer_1stPass extends ThreadReplayer
 				getStack().peek(),
 				aProbeId,
 				0, // TODO: compress stacks
-				getStack().toArray());
+				getStack().toArray(),
+				getTracedMethodsVersion());
 	}
 
 	@Override
