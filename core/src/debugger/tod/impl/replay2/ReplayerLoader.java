@@ -72,6 +72,8 @@ public class ReplayerLoader extends ClassLoader
 	
 	private Constructor its1stPassReplayerCtor;
 	private Constructor itsPartialReplayerCtor;
+	
+	private Object itsGenerator;
 
 	public ReplayerLoader(ClassLoader aParent, IStructureDatabase aDatabase)
 	{
@@ -81,7 +83,7 @@ public class ReplayerLoader extends ClassLoader
 		
 		try
 		{
-			Class the1stPassClass = loadClass("tod.impl.replay2.ThreadReplayer_1stPass");
+			Class the1stPassClass = loadClass("tod.impl.replay2.ThreadReplayer_FirstPass");
 			its1stPassReplayerCtor = the1stPassClass.getConstructor(
 					ReplayerLoader.class, 
 					int.class,
@@ -132,6 +134,17 @@ public class ReplayerLoader extends ClassLoader
 		{
 			throw new RuntimeException(e);
 		}
+	}
+	
+	public Object getGenerator()
+	{
+		return itsGenerator;
+	}
+	
+	public void setGenerator(Object aGenerator)
+	{
+		assert itsGenerator == null;
+		itsGenerator = aGenerator;
 	}
 	
 	public void addClass(String aName, byte[] aBytecode)

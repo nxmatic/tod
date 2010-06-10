@@ -160,7 +160,7 @@ public abstract class MethodReplayerGenerator
 		itsConstructor = "<init>".equals(itsMethodNode.name);
 
 		itsTarget = new ClassNode();
-		itsTarget.name = ReplayerGenerator.makeReplayerClassName(itsClassNode.name, itsMethodNode.name, itsMethodNode.desc);
+		itsTarget.name = aGenerator.getReplayerClassName(itsClassNode.name, itsMethodNode.name, itsMethodNode.desc);
 		itsTarget.sourceFile = itsTarget.name+".class";
 		itsTarget.superName = CLS_INSCOPEREPLAYERFRAME;
 		itsTarget.methods.add(itsMethodNode);

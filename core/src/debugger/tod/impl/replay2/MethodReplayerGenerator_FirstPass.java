@@ -48,13 +48,13 @@ import tod.impl.bci.asm2.BCIUtils;
 import tod.impl.bci.asm2.MethodInfo.BCIFrame;
 import zz.utils.Utils;
 
-public class MethodReplayerGenerator_1stPass extends MethodReplayerGenerator
+public class MethodReplayerGenerator_FirstPass extends MethodReplayerGenerator
 {
 	private int itsSnapshotSeqVar;
 	
 	private int itsProbeIndex = 0;
 
-	public MethodReplayerGenerator_1stPass(
+	public MethodReplayerGenerator_FirstPass(
 			TODConfig aConfig,
 			IMutableStructureDatabase aDatabase,
 			ReplayerGenerator aGenerator,
@@ -105,7 +105,8 @@ public class MethodReplayerGenerator_1stPass extends MethodReplayerGenerator
 
 		s.ALOAD(0);
 		s.ILOAD(itsSnapshotSeqVar);
-		s.pushInt(getDatabase().getNewSnapshotProbe(getBehaviorId(), ++itsProbeIndex, theLocalsSig).id);
+		int theProbeId = getDatabase().getNewSnapshotProbe(getBehaviorId(), ++itsProbeIndex, theLocalsSig).id;
+		s.pushInt(theProbeId);
 		
 		int theLocals = theFrame.getLocals();
 		for(int i=0;i<theLocals;i++) 

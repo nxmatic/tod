@@ -35,7 +35,7 @@ import tod.core.config.TODConfig;
 import tod.core.database.structure.IMutableStructureDatabase;
 import tod.impl.server.BufferStream;
 
-public class ThreadReplayer_1stPass extends ThreadReplayer
+public class ThreadReplayer_FirstPass extends ThreadReplayer
 {
 	/**
 	 * Minimum number of messages between snapshots.
@@ -47,7 +47,7 @@ public class ThreadReplayer_1stPass extends ThreadReplayer
 	private int itsSnapshotSeq = 1;
 	private int itsMessagesSinceLastSnapshot = 0;
 	
-	public ThreadReplayer_1stPass(
+	public ThreadReplayer_FirstPass(
 			ReplayerLoader aLoader,
 			int aThreadId,
 			TODConfig aConfig,
@@ -65,7 +65,7 @@ public class ThreadReplayer_1stPass extends ThreadReplayer
 			TODConfig aConfig,
 			IMutableStructureDatabase aDatabase)
 	{
-		return new ReplayerGenerator.FirstPass(aLoader, aConfig, aDatabase);
+		return new ReplayerGenerator_FirstPass(aLoader, aConfig, aDatabase);
 	}
 
 	@Override

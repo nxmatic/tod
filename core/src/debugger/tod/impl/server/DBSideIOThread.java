@@ -78,6 +78,11 @@ public abstract class DBSideIOThread
 	private boolean itsFinished = false;
 	
 	/**
+	 * If a replayer throws an exception, it is stored in this field.
+	 */
+	private Throwable itsThrown = null;
+	
+	/**
 	 * Number of bytes to skip from the first thread packet (for partial replay)
 	 */
 	private int itsInitialSkip;
@@ -102,11 +107,6 @@ public abstract class DBSideIOThread
 		itsInitialSkip = aInitialSkip;
 	}
 	
-	public void setReplayThreadId(int aReplayThreadId)
-	{
-		itsReplayThreadId = aReplayThreadId;
-	}
-	
 	public void run()
 	{
 		try
@@ -117,7 +117,7 @@ public abstract class DBSideIOThread
 			int thePacketCount = 0;
 			
 			loop:
-			while(! itsFinished)
+			while(! itsFinished && itsThrown == null)
 			{
 				int thePacketType = itsIn.read();
 				itsProcessedSize++;
@@ -136,6 +136,8 @@ public abstract class DBSideIOThread
 				if (thePacketCount % 10000 == 0) Utils.println("Processed %d bytes (%d packets)", itsProcessedSize, thePacketCount);
 			}
 			
+			if (itsThrown != null) throw itsThrown;
+			
 			for (ThreadReplayerThread theThread : itsReplayerThreads)
 			{
 				if (theThread != null) theThread.push(null);
@@ -143,12 +145,18 @@ public abstract class DBSideIOThread
 			
 			for (ThreadReplayerThread theThread : itsReplayerThreads) if (theThread != null) theThread.join();
 
+			if (itsThrown != null) throw itsThrown;
+
 			long t1 = System.currentTimeMillis();
 			Utils.println("Replay took %.3fs", 0.001f*(t1-t0));
 		}
-		catch (Exception e)
+		catch (RuntimeException e)
 		{
-			throw new RuntimeException(e);
+			throw e;
+		}
+		catch (Throwable t)
+		{
+			throw new RuntimeException(t);
 		}
 	}
 	
@@ -192,6 +200,9 @@ public abstract class DBSideIOThread
 	{
 		int theThreadId = _ByteBuffer.getIntL(itsIn);
 		int theLength = _ByteBuffer.getIntL(itsIn);
+		
+		// The first thread of a partial replay is the only thread to replay
+		if (itsSnapshot != null && itsReplayThreadId == 0) itsReplayThreadId = theThreadId;
 		
 		if (itsReplayThreadId == 0 || itsReplayThreadId == theThreadId) 
 		{
@@ -321,8 +332,15 @@ public abstract class DBSideIOThread
 		@Override
 		public void run()
 		{
-			itsReplayer.replay();
-			if (itsReplayThreadId > 0) itsFinished = true;
+			try
+			{
+				itsReplayer.replay();
+				if (itsReplayThreadId > 0) itsFinished = true;
+			}
+			catch (Throwable t)
+			{
+				itsThrown = t;
+			}
 		}
 	}
 	

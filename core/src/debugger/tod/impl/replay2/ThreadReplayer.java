@@ -57,8 +57,9 @@ public abstract class ThreadReplayer
 	private static final int FRAMETYPE_UNMONITORED = -1;
 	private static final int FRAMETYPE_ENVELOPPE = -2;
 	private static final int FRAMETYPE_CLASSLOADERWRAPPER = -3;
+	private static final int FRAMETYPE_INITIAL = -4;
 	
-	public static final boolean ECHO = false;
+	public static final boolean ECHO = true;
 	public static boolean ECHO_FORREAL = true;
 
 	private final int itsThreadId;
@@ -84,8 +85,6 @@ public abstract class ThreadReplayer
 
 	private ExceptionInfo itsLastException;
 	
-	private ReplayerGenerator itsGenerator;
-	
 	private final EventCollector itsCollector;
 	private final ReplayerLoader itsLoader;
 	
@@ -109,11 +108,10 @@ public abstract class ThreadReplayer
 	
 	protected abstract ReplayerGenerator createReplayerGenerator(ReplayerLoader aLoader, TODConfig aConfig, IMutableStructureDatabase aDatabase);
 	
-	private ReplayerGenerator getGenerator()
+	protected ReplayerGenerator getGenerator()
 	{
-		// Lazy init because createReplayerGenerator may need fields initialized by subclasses
-		if (itsGenerator == null) itsGenerator = createReplayerGenerator(itsLoader, itsConfig, itsDatabase);
-		return itsGenerator;
+		if (itsLoader.getGenerator() == null) itsLoader.setGenerator(createReplayerGenerator(itsLoader, itsConfig, itsDatabase));
+		return (ReplayerGenerator) itsLoader.getGenerator();
 	}
 
 	protected BufferStream getStream()
@@ -385,6 +383,11 @@ public abstract class ThreadReplayer
 		theFrame.setup(this, itsStream, aDebugInfo, isInScope(aParent), null);
 		itsStack.push(FRAMETYPE_CLASSLOADERWRAPPER);
 		return theFrame;
+	}
+	
+	protected void pushInitialFrame()
+	{
+		itsStack.push(FRAMETYPE_INITIAL);
 	}
 	
 	public void popped()

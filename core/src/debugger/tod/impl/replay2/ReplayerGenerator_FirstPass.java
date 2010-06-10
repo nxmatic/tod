@@ -31,78 +31,36 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.replay2;
 
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
+import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.MethodNode;
 
 import tod.core.config.TODConfig;
 import tod.core.database.structure.IMutableStructureDatabase;
-import tod.impl.server.BufferStream;
 
-/**
- * Wraps a {@link ThreadReplayer} so as to solve the classloading issue (existing classes such
- * as {@link ReplayerFrame} are modified on the fly).
- * @author gpothier
- */
-public class ReplayerWrapper
+public class ReplayerGenerator_FirstPass extends ReplayerGenerator
 {
-	private final ReplayerLoader itsLoader;
-	private final Object itsReplayer;
-	private Method itsReplayMethod;
-	
-	public ReplayerWrapper(
-			ReplayerLoader aLoader,
-			int aThreadId,
-			LocalsSnapshot aSnapshot,
-			TODConfig aConfig, 
-			IMutableStructureDatabase aDatabase, 
-			EventCollector aCollector,
-			TmpIdManager aTmpIdManager,
-			BufferStream aBuffer)
+	public ReplayerGenerator_FirstPass(ReplayerLoader aLoader, TODConfig aConfig, IMutableStructureDatabase aDatabase)
 	{
-		try
-		{
-			itsLoader = aLoader;
-			itsReplayer = itsLoader.createReplayer(aSnapshot, aThreadId, aConfig, aDatabase, aCollector, aTmpIdManager, aBuffer);
-			itsReplayMethod = itsReplayer.getClass().getMethod("replay");
-		}
-		catch (Exception e)
-		{
-			throw new RuntimeException(e);
-		}
-
+		super(aLoader, aConfig, aDatabase);
 	}
-	
-	public void replay()
+
+	@Override
+	protected MethodReplayerGenerator createGenerator(
+			TODConfig aConfig,
+			IMutableStructureDatabase aDatabase,
+			int aBehaviorId,
+			ClassNode aClassNode,
+			MethodNode aMethodNode)
 	{
-		try
-		{
-			try
-			{
-				itsReplayMethod.invoke(itsReplayer);
-			}
-			catch (InvocationTargetException e)
-			{
-				String theExceptionName = e.getTargetException().getClass().getName();
-				if (SkipThreadException.class.getName().equals(theExceptionName)) // Because of class loading, we must compare by name
-					throw new SkipThreadException();
-				else throw e.getTargetException();
-			}
-		}
-		catch (SkipThreadException e)
-		{
-			System.out.println("Thread skipped");
-		}
-		catch (RuntimeException e)
-		{
-			System.err.println("Runtime exception catched by ReplayerWrapper: "+e.getClass()+": "+e.getMessage());
-			throw e;
-		}
-		catch (Throwable e)
-		{
-			System.err.println("Exception catched by ReplayerWrapper: "+e.getClass()+": "+e.getMessage());
-			throw new RuntimeException(e);
-		}
+		return new MethodReplayerGenerator_FirstPass(aConfig, aDatabase, this, aBehaviorId, aClassNode, aMethodNode);
 	}
-	
 
+	@Override
+	protected String getReplayerClassName(
+			String aJvmClassName,
+			String aJvmMethodName,
+			String aDesc)
+	{
+		return makeReplayerClassName(aJvmClassName, aJvmMethodName, aDesc);
+	}
 }

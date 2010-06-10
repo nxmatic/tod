@@ -38,7 +38,7 @@ import tod.impl.server.BufferStream;
 
 public class ThreadReplayer_Partial extends ThreadReplayer
 {
-	private final LocalsSnapshot itsSnapshot;
+	private LocalsSnapshot itsSnapshot;
 
 	public ThreadReplayer_Partial(
 			ReplayerLoader aLoader,
@@ -60,7 +60,7 @@ public class ThreadReplayer_Partial extends ThreadReplayer
 			TODConfig aConfig,
 			IMutableStructureDatabase aDatabase)
 	{
-		return new ReplayerGenerator.Partial(aLoader, aConfig, aDatabase, itsSnapshot);
+		return new ReplayerGenerator_Partial(aLoader, aConfig, aDatabase, itsSnapshot);
 	}
 
 	@Override
@@ -84,7 +84,10 @@ public class ThreadReplayer_Partial extends ThreadReplayer
 	@Override
 	public LocalsSnapshot getSnapshotForResume()
 	{
-		return itsSnapshot;
+		System.out.println("ThreadReplayer_Partial.getSnapshotForResume()");
+		LocalsSnapshot theSnapshot = itsSnapshot;
+		itsSnapshot = null; // Resume only once
+		return theSnapshot;
 	}
 	
 	@Override
@@ -99,8 +102,19 @@ public class ThreadReplayer_Partial extends ThreadReplayer
 		setTracedMethodsVersion(itsSnapshot.getTracedMethodsVersion());
 		SnapshotProbeInfo theSnapshotProbeInfo = getDatabase().getSnapshotProbeInfo(itsSnapshot.getProbeId());
 		int theBehaviorId = theSnapshotProbeInfo.behaviorId;
-		InScopeReplayerFrame theFrame = createInScopeFrame(null, theBehaviorId, "resume");
+		InScopeReplayerFrame theFrame = createInitialFrame(theBehaviorId);
 		theFrame.invoke_PartialReplay();
 		getStream().skipAll(); // Finishes 
 	}
+	
+	private InScopeReplayerFrame createInitialFrame(int aBehaviorId)
+	{
+		ReplayerGenerator_Partial theGenerator = (ReplayerGenerator_Partial) getGenerator();
+		InScopeReplayerFrame theFrame = theGenerator.createInitialFrame(aBehaviorId);
+		theFrame.setup(this, getStream(), "initial", false, null);
+		pushInitialFrame();
+		return theFrame;
+	}
+	
+
 }

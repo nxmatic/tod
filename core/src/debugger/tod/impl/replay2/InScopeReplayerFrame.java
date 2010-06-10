@@ -392,7 +392,7 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 	 */
 	public static abstract class Factory
 	{
-		private int itsId;
+		private int itsBehaviorId;
 		private String itsName;
 		private int itsAccess;
 		private Type[] itsArgTypes;
@@ -400,13 +400,18 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 
 		public void setSignature(int aId, String aName, int aAccess, String aDescriptor)
 		{
-			itsId = aId;
+			itsBehaviorId = aId;
 			itsName = aName;
 			itsAccess = aAccess;
 			itsArgTypes = Type.getArgumentTypes(aDescriptor);
 			itsReturnType = Type.getReturnType(aDescriptor);
 		}
 
+		public int getBehaviorId()
+		{
+			return itsBehaviorId;
+		}
+		
 		public Type[] getArgTypes()
 		{
 			return itsArgTypes;
@@ -420,7 +425,7 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 		public InScopeReplayerFrame create()
 		{
 			InScopeReplayerFrame theFrame = create0();
-			theFrame.setSignature(itsId, itsName, itsAccess, itsArgTypes, itsReturnType);
+			theFrame.setSignature(itsBehaviorId, itsName, itsAccess, itsArgTypes, itsReturnType);
 			return theFrame;
 		}
 		

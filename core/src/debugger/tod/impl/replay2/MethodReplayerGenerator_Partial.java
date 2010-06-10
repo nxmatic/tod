@@ -43,18 +43,17 @@ import org.objectweb.asm.tree.MethodNode;
 import tod.core.config.TODConfig;
 import tod.core.database.structure.IMutableStructureDatabase;
 import tod.core.database.structure.IStructureDatabase.SnapshotProbeInfo;
-import tod.impl.bci.asm2.BCIUtils;
 import tod.impl.bci.asm2.MethodInfo.BCIFrame;
 
 public class MethodReplayerGenerator_Partial extends MethodReplayerGenerator
 {
-	private int itsStartProbeIdVar;
 	private int itsSnapshotVar;
 	private final LocalsSnapshot itsSnapshot;
 	private final SnapshotProbeInfo itsSnapshotProbeInfo;
 	
 	private int itsProbeIndex = 0;
 	private Label itsStartProbe;
+	private InsnList itsResumeCode;
 	
 	public MethodReplayerGenerator_Partial(
 			TODConfig aConfig,
@@ -67,7 +66,7 @@ public class MethodReplayerGenerator_Partial extends MethodReplayerGenerator
 	{
 		super(aConfig, aDatabase, aGenerator, aBehaviorId, aClassNode, aMethodNode);
 		itsSnapshot = aSnapshot;
-		itsSnapshotProbeInfo = getDatabase().getSnapshotProbeInfo(itsSnapshot.getProbeId());
+		itsSnapshotProbeInfo = itsSnapshot != null ? getDatabase().getSnapshotProbeInfo(itsSnapshot.getProbeId()) : null;
 	}
 
 	@Override
@@ -80,16 +79,16 @@ public class MethodReplayerGenerator_Partial extends MethodReplayerGenerator
 	protected void allocVars()
 	{
 		super.allocVars();
-		itsStartProbeIdVar = nextFreeVar(1);
 		itsSnapshotVar = nextFreeVar(1);
 	}
 	
 	@Override
 	protected void addSnapshotSetup(InsnList aInsns)
 	{
-		if (getBehaviorId() != itsSnapshotProbeInfo.behaviorId) return;
+		if (itsSnapshotProbeInfo == null || getBehaviorId() != itsSnapshotProbeInfo.behaviorId) return;
 		
 		SList s = new SList();
+		s.add(itsResumeCode);
 		s.GOTO(itsStartProbe);
 		aInsns.insert(s);
 	}
@@ -97,18 +96,16 @@ public class MethodReplayerGenerator_Partial extends MethodReplayerGenerator
 	@Override
 	protected void insertSnapshotProbe(SList s, AbstractInsnNode aReferenceNode, boolean aSaveStack)
 	{
-		if (getBehaviorId() != itsSnapshotProbeInfo.behaviorId) return;
+		if (itsSnapshotProbeInfo == null || getBehaviorId() != itsSnapshotProbeInfo.behaviorId) return;
 		itsProbeIndex++;
 		if (itsProbeIndex != itsSnapshotProbeInfo.probeIndex) return;
 		
 		BCIFrame theFrame = getMethodInfo().getFrame(aReferenceNode.getNext());
-		String theLocalsSig = BCIUtils.getSnapshotSig(theFrame, aSaveStack);
 
-		Label lProbe = new Label();
-
-		itsStartProbe = lProbe;
+		itsStartProbe = new Label();
+		s.label(itsStartProbe);
 		
-		s.label(lProbe);
+		s = new SList();
 		
 		s.ALOAD(0);
 		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "getSnapshotForResume", "()"+DSC_LOCALSSNAPSHOT);
@@ -134,6 +131,8 @@ public class MethodReplayerGenerator_Partial extends MethodReplayerGenerator
 			invokeSnapshotPop(s, theType);
 			s.ISTORE(theType, i+1);
 		}
+		
+		itsResumeCode = s;
 	}
 	
 	private static void invokeSnapshotPop(SList s, Type aType)
