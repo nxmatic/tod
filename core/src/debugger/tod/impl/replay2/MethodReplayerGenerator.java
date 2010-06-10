@@ -66,6 +66,7 @@ import org.objectweb.asm.tree.TypeInsnNode;
 import org.objectweb.asm.tree.VarInsnNode;
 
 import tod.Util;
+import tod.core.DebugFlags;
 import tod.core.config.TODConfig;
 import tod.core.database.structure.IBehaviorInfo;
 import tod.core.database.structure.IClassInfo;
@@ -78,7 +79,6 @@ import tod.impl.bci.asm2.SyntaxInsnList;
 import tod.impl.bci.asm2.MethodInfo.BCIFrame;
 import tod.impl.bci.asm2.MethodInfo.NewInvokeLink;
 import tod.impl.database.structure.standard.StructureDatabaseUtils;
-import tod2.agent.Message;
 import zz.utils.SetMap;
 
 public abstract class MethodReplayerGenerator
@@ -270,7 +270,7 @@ public abstract class MethodReplayerGenerator
 		// Setup/cleanup/handlers
 		addSnapshotSetup(itsMethodNode.instructions);
 		addExceptionHandling(itsMethodNode.instructions);
-		itsMethodNode.instructions.insert(itsMethodInfo.getFieldCacheInitInstructions());
+		if (DebugFlags.USE_FIELD_CACHE) itsMethodNode.instructions.insert(itsMethodInfo.getFieldCacheInitInstructions());
 		itsMethodNode.instructions.add(itsAdditionalInstructions);
 
 		// Setup infrastructure
@@ -1083,71 +1083,30 @@ public abstract class MethodReplayerGenerator
 	private void processGetField(InsnList aInsns, FieldInsnNode aNode)
 	{
 		Type theType = getTypeOrId(Type.getType(aNode.desc).getSort());
-		Integer theCacheSlot = itsMethodInfo.getCacheSlot(aNode);
 
 		SList s = new SList();
 
-		Label lFieldValue = new Label();
-		Label lFieldValue_Same = new Label();
-		Label lError = new Label();
-		Label lEndIf = new Label();
-		
 		if (aNode.getOpcode() == Opcodes.GETSTATIC) s.ACONST_NULL(); // Push "null" target
 		s.ASTORE(itsTmpTargetVar); // Store target
 		
+		String theExpectMethodName = "expectAndSend"+SUFFIX_FOR_SORT[theType.getSort()]+"FieldRead";
+		
 		s.ALOAD(0);
-		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "getNextMessageConsumingClassloading", "()B");
-		s.ISTORE(itsTmpVar);
-		
-		s.ILOAD(itsTmpVar);
-		s.pushInt(Message.FIELD_READ);
-		s.IF_ICMPEQ(lFieldValue);
-		s.ILOAD(itsTmpVar);
-		s.pushInt(Message.FIELD_READ_SAME);
-		s.IF_ICMPEQ(lFieldValue_Same);
-		
-		// Bad message
-		s.label(lError);
-			s.createRTEx("Unexpected message");
-			s.ATHROW();
-		
-		// FIELD_READ
-		s.label(lFieldValue);
-			s.invokeRead(theType);
-			if (theCacheSlot != null)
-			{
-				s.DUP(theType);
-				s.ISTORE(theType, theCacheSlot);
-			}
-			s.GOTO(lEndIf);
-		
-		// FIELD_READ_SAME
-		s.label(lFieldValue_Same);
-			if (theCacheSlot != null)
-			{
-				s.ILOAD(theType, theCacheSlot);
-			}
-			else
-			{
-				s.GOTO(lError);
-			}
-			
-		s.label(lEndIf);
-
-		s.ISTORE(theType, itsTmpValueVar);
-		
-		// Register event
-		pushCollector(s);
-		s.DUP();
-		
 		s.ALOAD(itsTmpTargetVar);
-		s.LDC(StructureDatabaseUtils.getFieldId(itsDatabase, aNode.owner, aNode.name, false));
-		s.INVOKEVIRTUAL(CLS_EVENTCOLLECTOR_REPLAY, "fieldRead", "("+DSC_OBJECTID+"I)V");
+		s.pushInt(StructureDatabaseUtils.getFieldId(itsDatabase, aNode.owner, aNode.name, false));
 		
-		s.ILOAD(theType, itsTmpValueVar);
-		invokeValue(s, theType);
-		
-		s.ILOAD(theType, itsTmpValueVar);		
+		if (DebugFlags.USE_FIELD_CACHE)
+		{
+			Integer theCacheSlot = itsMethodInfo.getCacheSlot(aNode);
+			s.ILOAD(theCacheSlot);
+			String theExpectMethodDesc = "("+DSC_OBJECTID+"I"+theType.getDescriptor()+")"+theType.getDescriptor();
+			s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, theExpectMethodName, theExpectMethodDesc);
+		}
+		else
+		{
+			String theExpectMethodDesc = "("+DSC_OBJECTID+"I)"+theType.getDescriptor();
+			s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, theExpectMethodName, theExpectMethodDesc);
+		}
 		
 		aInsns.insert(aNode, s);
 		aInsns.remove(aNode);

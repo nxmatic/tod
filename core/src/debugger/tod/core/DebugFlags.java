@@ -104,6 +104,12 @@ public class DebugFlags
 	 * if true, pages are not explicitly marked as used when accessed.
 	 */
 	public static final boolean DISABLE_USE_PAGES = false;
+	
+	/**
+	 * Whether to apply the optimization that checks if field values
+	 * remained the same between accesses.
+	 */
+	public static final boolean USE_FIELD_CACHE = false;
 
 	/**
 	 * Causes the event collector to print the events it receives.

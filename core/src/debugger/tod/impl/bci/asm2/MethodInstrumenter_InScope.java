@@ -50,6 +50,7 @@ import org.objectweb.asm.tree.TryCatchBlockNode;
 import org.objectweb.asm.tree.TypeInsnNode;
 
 import tod.Util;
+import tod.core.DebugFlags;
 import tod.core.database.structure.IMutableBehaviorInfo;
 import tod.core.database.structure.IMutableClassInfo;
 import tod.impl.bci.asm2.MethodInfo.BCIFrame;
@@ -154,7 +155,7 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 			s.ACONST_NULL();
 			s.ASTORE(getThreadDataVar());
 			
-			s.add(itsMethodInfo.getFieldCacheInitInstructions());
+			if (DebugFlags.USE_FIELD_CACHE) s.add(itsMethodInfo.getFieldCacheInitInstructions());
 			
 			// Store ThreadData object
 			s.INVOKESTATIC(BCIUtils.CLS_EVENTCOLLECTOR_AGENT, "_getThreadData", "()"+BCIUtils.DSC_THREADDATA); // ThD
@@ -606,6 +607,28 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 
 	private void processGetField(FieldInsnNode aNode)
 	{
+		if (DebugFlags.USE_FIELD_CACHE) processGetField_Cache(aNode);
+		else processGetField_NoCache(aNode);
+	}
+	
+	private void processGetField_NoCache(FieldInsnNode aNode)
+	{
+		SyntaxInsnList s = new SyntaxInsnList();
+		Type theType = Type.getType(aNode.desc);
+
+		s.ISTORE(theType, itsTmpValueVar);
+		
+		s.ALOAD(getThreadDataVar()); 
+		s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evFieldRead", "()V"); 
+		sendValue(s, itsTmpValueVar, theType);
+		
+		s.ILOAD(theType, itsTmpValueVar);
+		
+		insertAfter(aNode, s);
+	}
+	
+	private void processGetField_Cache(FieldInsnNode aNode)
+	{
 		SyntaxInsnList s = new SyntaxInsnList();
 		Label lSameValue = new Label();
 		Label lEndIf = new Label();
@@ -615,7 +638,6 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		s.ISTORE(theType, itsTmpValueVar);
 		
 		s.ALOAD(getThreadDataVar()); 
-
 		
 		Integer theCacheSlot = itsMethodInfo.getCacheSlot(aNode);
 		if (theCacheSlot != null)
@@ -691,6 +713,8 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 
 	private void processPutField(FieldInsnNode aNode)
 	{
+		if (! DebugFlags.USE_FIELD_CACHE) return;
+			
 		SyntaxInsnList s = new SyntaxInsnList();
 		Type theType = Type.getType(aNode.desc);
 		

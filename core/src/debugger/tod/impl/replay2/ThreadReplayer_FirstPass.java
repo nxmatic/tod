@@ -34,6 +34,7 @@ package tod.impl.replay2;
 import tod.core.config.TODConfig;
 import tod.core.database.structure.IMutableStructureDatabase;
 import tod.impl.server.BufferStream;
+import zz.utils.Utils;
 
 public class ThreadReplayer_FirstPass extends ThreadReplayer
 {
@@ -75,10 +76,12 @@ public class ThreadReplayer_FirstPass extends ThreadReplayer
 		return super.getNextMessage();
 	}
 	
+	int itsSnapshotCount = 0;
+	
 	@Override
 	public LocalsSnapshot createSnapshot(int aProbeId)
 	{
-		System.out.println("Creating snapshot: "+aProbeId);
+		Utils.println("Creating snapshot: probe %d, #%d.", aProbeId, itsSnapshotCount++);
 		return new LocalsSnapshot(
 				getStream().getPacketStartOffset(), 
 				getStream().position(), 
@@ -86,7 +89,9 @@ public class ThreadReplayer_FirstPass extends ThreadReplayer
 				aProbeId,
 				0, // TODO: compress stacks
 				getStack().toArray(),
-				getTracedMethodsVersion());
+				getTracedMethodsVersion(),
+				getBehIdReceiver().getCurrentValue(),
+				getObjIdReceiver().getCurrentValue());
 	}
 
 	@Override

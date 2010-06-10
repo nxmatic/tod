@@ -41,18 +41,28 @@ import tod.impl.server.BufferStream;
  */
 public class IntDeltaReceiver
 {
-	private int itsValue = 0;
+	private int itsCurrentValue = 0;
 	
 	public int receiveFull(BufferStream aBuffer)
 	{
-		itsValue = aBuffer.getInt();
-		return itsValue;
+		itsCurrentValue = aBuffer.getInt();
+		return itsCurrentValue;
 	}
 	
 	public int receiveDelta(BufferStream aBuffer)
 	{
 		byte theDelta = aBuffer.get();
-		itsValue += theDelta;
-		return itsValue;
+		itsCurrentValue += theDelta;
+		return itsCurrentValue;
+	}
+	
+	public int getCurrentValue()
+	{
+		return itsCurrentValue;
+	}
+	
+	public void setCurrentValue(int aCurrentValue)
+	{
+		itsCurrentValue = aCurrentValue;
 	}
 }

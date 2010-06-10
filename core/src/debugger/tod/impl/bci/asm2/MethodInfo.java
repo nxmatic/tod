@@ -63,6 +63,7 @@ import org.objectweb.asm.tree.analysis.SourceInterpreter;
 import org.objectweb.asm.tree.analysis.SourceValue;
 import org.objectweb.asm.tree.analysis.Value;
 
+import tod.core.DebugFlags;
 import tod.core.database.structure.IClassInfo;
 import tod.core.database.structure.IFieldInfo;
 import tod.core.database.structure.IMutableClassInfo;
@@ -100,7 +101,7 @@ public class MethodInfo
 	/**
 	 * Maps field access instructions to the local variable slot that holds the cached value.
 	 */
-	private Map<FieldInsnNode, Integer> itsCachedFieldAccesses = new HashMap<FieldInsnNode, Integer>();
+	private Map<FieldInsnNode, Integer> itsCachedFieldAccesses;
 	
 	/**
 	 * Instructions that initializes each slot of the field cache.
@@ -190,6 +191,9 @@ public class MethodInfo
 	 */
 	public int setupLocalCacheSlots(int aFirstFreeSlot)
 	{
+		if (! DebugFlags.USE_FIELD_CACHE) return 0;
+		
+		itsCachedFieldAccesses = new HashMap<FieldInsnNode, Integer>();
 		int theSlotCount = 0;
 		
 		// Set up the final structure

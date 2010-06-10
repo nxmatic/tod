@@ -105,8 +105,10 @@ public class PartialReplayTest
 		
 		for (MyEventCollector theCollector : theCollectors)
 		{
+			int i=0;
 			for(LocalsSnapshot theSnapshot : theCollector.getSnapshots())
 			{
+				Utils.println("Snapshot #%d", i++);
 				partialReplay(theEventsFile, theConfig, theDatabase, theSnapshot);
 			}
 		}

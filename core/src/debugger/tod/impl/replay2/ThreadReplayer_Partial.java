@@ -100,6 +100,9 @@ public class ThreadReplayer_Partial extends ThreadReplayer
 	public void replay()
 	{
 		setTracedMethodsVersion(itsSnapshot.getTracedMethodsVersion());
+		getBehIdReceiver().setCurrentValue(itsSnapshot.getBehIdCurrentValue());
+		getObjIdReceiver().setCurrentValue(itsSnapshot.getObjIdCurrentValue());
+		
 		SnapshotProbeInfo theSnapshotProbeInfo = getDatabase().getSnapshotProbeInfo(itsSnapshot.getProbeId());
 		int theBehaviorId = theSnapshotProbeInfo.behaviorId;
 		InScopeReplayerFrame theFrame = createInitialFrame(theBehaviorId);

@@ -119,6 +119,169 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 		theChild.invoke_OOS();
 	}
 	
+	protected int expectAndSendIntFieldRead(ObjectId aTarget, int aFieldId)
+	{
+		int theValue;
+		
+		byte m = getNextMessageConsumingClassloading();
+		if (m == Message.FIELD_READ) theValue = readInt();
+		else throw new UnexpectedMessageException(m);
+		
+		getCollector().fieldRead(aTarget, aFieldId);
+		getCollector().value(theValue);
+		
+		return theValue;
+	}
+	
+	protected int expectAndSendIntFieldRead(ObjectId aTarget, int aFieldId, int aCachedValue)
+	{
+		int theValue;
+		
+		byte m = getNextMessageConsumingClassloading();
+		switch(m)
+		{
+		case Message.FIELD_READ: theValue =  readInt(); break;
+		case Message.FIELD_READ_SAME: theValue = aCachedValue; break;
+		default: throw new UnexpectedMessageException(m);
+		}
+		
+		getCollector().fieldRead(aTarget, aFieldId);
+		getCollector().value(theValue);
+		
+		return theValue;
+	}
+	
+	protected long expectAndSendLongFieldRead(ObjectId aTarget, int aFieldId)
+	{
+		long theValue;
+		
+		byte m = getNextMessageConsumingClassloading();
+		if (m == Message.FIELD_READ) theValue = readLong();
+		else throw new UnexpectedMessageException(m);
+		
+		getCollector().fieldRead(aTarget, aFieldId);
+		getCollector().value(theValue);
+		
+		return theValue;
+	}
+	
+	protected long expectAndSendLongFieldRead(ObjectId aTarget, int aFieldId, long aCachedValue)
+	{
+		long theValue;
+		
+		byte m = getNextMessageConsumingClassloading();
+		switch(m)
+		{
+		case Message.FIELD_READ: theValue =  readLong(); break;
+		case Message.FIELD_READ_SAME: theValue = aCachedValue; break;
+		default: throw new UnexpectedMessageException(m);
+		}
+		
+		getCollector().fieldRead(aTarget, aFieldId);
+		getCollector().value(theValue);
+		
+		return theValue;
+	}
+	
+	protected float expectAndSendFloatFieldRead(ObjectId aTarget, int aFieldId)
+	{
+		float theValue;
+		
+		byte m = getNextMessageConsumingClassloading();
+		if (m == Message.FIELD_READ) theValue = readFloat();
+		else throw new UnexpectedMessageException(m);
+		
+		getCollector().fieldRead(aTarget, aFieldId);
+		getCollector().value(theValue);
+		
+		return theValue;
+	}
+	
+	protected float expectAndSendFloatFieldRead(ObjectId aTarget, int aFieldId, float aCachedValue)
+	{
+		float theValue;
+		
+		byte m = getNextMessageConsumingClassloading();
+		switch(m)
+		{
+		case Message.FIELD_READ: theValue =  readFloat(); break;
+		case Message.FIELD_READ_SAME: theValue = aCachedValue; break;
+		default: throw new UnexpectedMessageException(m);
+		}
+		
+		getCollector().fieldRead(aTarget, aFieldId);
+		getCollector().value(theValue);
+		
+		return theValue;
+	}
+	
+	protected double expectAndSendDoubleFieldRead(ObjectId aTarget, int aFieldId)
+	{
+		double theValue;
+		
+		byte m = getNextMessageConsumingClassloading();
+		if (m == Message.FIELD_READ) theValue = readDouble();
+		else throw new UnexpectedMessageException(m);
+		
+		getCollector().fieldRead(aTarget, aFieldId);
+		getCollector().value(theValue);
+		
+		return theValue;
+	}
+	
+	protected double expectAndSendDoubleFieldRead(ObjectId aTarget, int aFieldId, double aCachedValue)
+	{
+		double theValue;
+		
+		byte m = getNextMessageConsumingClassloading();
+		switch(m)
+		{
+		case Message.FIELD_READ: theValue =  readDouble(); break;
+		case Message.FIELD_READ_SAME: theValue = aCachedValue; break;
+		default: throw new UnexpectedMessageException(m);
+		}
+		
+		getCollector().fieldRead(aTarget, aFieldId);
+		getCollector().value(theValue);
+		
+		return theValue;
+	}
+	
+	protected ObjectId expectAndSendRefFieldRead(ObjectId aTarget, int aFieldId)
+	{
+		ObjectId theValue;
+		
+		byte m = getNextMessageConsumingClassloading();
+		if (m == Message.FIELD_READ) theValue = readRef();
+		else throw new UnexpectedMessageException(m);
+		
+		getCollector().fieldRead(aTarget, aFieldId);
+		getCollector().value(theValue);
+		
+		return theValue;
+	}
+	
+	protected ObjectId expectAndSendRefFieldRead(ObjectId aTarget, int aFieldId, ObjectId aCachedValue)
+	{
+		ObjectId theValue;
+		
+		byte m = getNextMessageConsumingClassloading();
+		switch(m)
+		{
+		case Message.FIELD_READ: theValue =  readRef(); break;
+		case Message.FIELD_READ_SAME: theValue = aCachedValue; break;
+		default: throw new UnexpectedMessageException(m);
+		}
+		
+		getCollector().fieldRead(aTarget, aFieldId);
+		getCollector().value(theValue);
+		
+		return theValue;
+	}
+	
+
+	
+	
 	protected void expectException()
 	{
 		byte m = getNextMessage();

@@ -400,6 +400,11 @@ public abstract class ThreadReplayer
 		return itsBehIdReceiver;
 	}
 	
+	public LongDeltaReceiver getObjIdReceiver()
+	{
+		return itsObjIdReceiver;
+	}
+	
 	public TmpIdManager getTmpIdManager()
 	{
 		return itsTmpIdManager;
