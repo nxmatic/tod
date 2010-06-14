@@ -180,6 +180,15 @@ struct ClassInfo
 	
 	jbyte* info;
 	jint infoLen;
+    
+    ClassInfo(jint id, jbyte* bytecode, jint bytecodeLen, jbyte* info, jint infoLen)
+    {
+        this->id = id;
+        this->bytecode = bytecode;
+        this->bytecodeLen = bytecodeLen;
+        this->info = info;
+        this->infoLen = infoLen;
+    }
 };
 
 void registerClassInfoNow(JNIEnv* jni, ClassInfo* classInfo)
@@ -263,7 +272,7 @@ ClassInfo* checkCacheInfo(
 			jbyte* bytecode = (jbyte*) malloc_f(bytecodeLen);
 			readBytes(&classFile, bytecodeLen, bytecode);
 			
-			return new ClassInfo { id, bytecode, bytecodeLen, info, infoLen };
+			return new ClassInfo(id, bytecode, bytecodeLen, info, infoLen);
 		}
 	}
 	
@@ -325,7 +334,7 @@ ClassInfo* requestInstrumentation(
 		
 		if (propVerbose>=2) std::cout << "Stored cache: " << infoPath << std::endl;
 
-		return new ClassInfo { id, bytecode, bytecodeLen, info, infoLen };
+		return new ClassInfo(id, bytecode, bytecodeLen, info, infoLen);
 	}
 	else if (bytecodeLen == -1)
 	{
