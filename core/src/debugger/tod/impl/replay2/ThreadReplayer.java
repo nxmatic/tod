@@ -59,7 +59,7 @@ public abstract class ThreadReplayer
 	private static final int FRAMETYPE_CLASSLOADERWRAPPER = -3;
 	private static final int FRAMETYPE_INITIAL = -4;
 	
-	public static final boolean ECHO = true;
+	public static final boolean ECHO = false;
 	public static boolean ECHO_FORREAL = true;
 
 	private final int itsThreadId;

@@ -32,7 +32,7 @@ import tod.BenchBase.BenchResults;
 public class BurnTest
 {
 	private static int rndSeed = 1234598;
-	private static final int N = 50;
+	private static final int N = 50000;
 	private static Node root;
 	
 	public static void main(String[] args)
@@ -100,8 +100,10 @@ public class BurnTest
 	{
 		Node[] children = new Node[10];
 		if (n == 1) return new Node(parent, null, "leaf");
+//		if (n == 1) return new Node(parent, null, null);
 		
 		Node node = new Node(parent, children, "Subtree size: "+n);
+//		Node node = new Node(parent, children, null);
 		
 		int remaining = n;
 		int i=0;

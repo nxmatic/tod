@@ -25,8 +25,9 @@ VMARGS="$VMARGS -Dagent-verbose=0"
 #VMARGS="$VMARGS -Xcheck:jni"
 #VMARGS="$VMARGS -Dagent-cache-path=/home/gpothier/tmp/tod"
 #VMARGS="$VMARGS -Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=8000"
-#VMARGS="$VMARGS -agentlib:hprof=cpu=samples,depth=3"
+VMARGS="$VMARGS -agentlib:hprof=cpu=samples,depth=3"
 #VMARGS="$VMARGS -Dcom.sun.management.jmxremote=true"
+#VMARGS="$VMARGS -agentpath:/home/gpothier/tmp/yjp-9.0.5/bin/linux-x86-32/libyjpagent.so"
 
 #valgrind --leak-check=yes --smc-check=all \
 java $VMARGS -cp ./bin dummy.BurnTest

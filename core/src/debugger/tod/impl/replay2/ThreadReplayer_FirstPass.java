@@ -43,7 +43,7 @@ public class ThreadReplayer_FirstPass extends ThreadReplayer
 	 * Usually snapshots are taken (roughly) after each SYNC, but if there are too few
 	 * messages since the previous SYNC, the snapshot is deferred.
 	 */
-	private static final int MIN_MESSAGES_BETWEEN_SNAPSHOTS = 1000;
+	private static final int MIN_MESSAGES_BETWEEN_SNAPSHOTS = 100000;
 	
 	private int itsSnapshotSeq = 1;
 	private int itsMessagesSinceLastSnapshot = 0;
@@ -81,7 +81,8 @@ public class ThreadReplayer_FirstPass extends ThreadReplayer
 	@Override
 	public LocalsSnapshot createSnapshot(int aProbeId)
 	{
-		Utils.println("Creating snapshot: probe %d, #%d.", aProbeId, itsSnapshotCount++);
+		if (ThreadReplayer.ECHO && ThreadReplayer.ECHO_FORREAL)
+			Utils.println("Creating snapshot: probe %d, #%d.", aProbeId, itsSnapshotCount++);
 		return new LocalsSnapshot(
 				getStream().getPacketStartOffset(), 
 				getStream().position(), 
