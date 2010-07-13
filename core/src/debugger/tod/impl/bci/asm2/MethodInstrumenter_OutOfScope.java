@@ -78,15 +78,17 @@ public class MethodInstrumenter_OutOfScope extends MethodInstrumenter
 		if ((isConstructor() || isStatic() || isPrivate()) && ! isStaticInitializer()) return;
 		
 		// Temp optimizations (ObjectIdentity uses a WeakHashMap which uses refs)
-		if (StructureDatabase.isSkipped(getClassNode().name)) return;
+		String theClassName = getClassNode().name;
 		
-		if (BCIUtils.CLS_OBJECT.equals(getClassNode().name)) 
+		if (StructureDatabase.isSkipped(theClassName)) return;
+		
+		if (BCIUtils.CLS_OBJECT.equals(theClassName)) 
 		{
 //			if ("equals".equals(getNode().name)) return;
 //			if ("toString".equals(getNode().name)) return;
 			if ("finalize".equals(getNode().name)) return;
-//			if ("wait".equals(getNode().name)) return;
-			System.out.println("Instrumenting: "+getClassNode().name+"."+getNode().name+getNode().desc);
+			if ("wait".equals(getNode().name)) return;
+			System.out.println("Instrumenting: "+theClassName+"."+getNode().name+getNode().desc);
 		}
 		
 		SyntaxInsnList s = new SyntaxInsnList();
@@ -106,14 +108,14 @@ public class MethodInstrumenter_OutOfScope extends MethodInstrumenter
 			
 			// Store ThreadData object
 			s.INVOKESTATIC(BCIUtils.CLS_EVENTCOLLECTOR_AGENT, "_getThreadData", "()"+BCIUtils.DSC_THREADDATA);
-			s.DUP();
+//			s.DUP();
 			s.ASTORE(getThreadDataVar());
 
 			// Send event
-			s.INVOKEVIRTUAL(
-					BCIUtils.CLS_THREADDATA, 
-					isStaticInitializer() ? "evOutOfScopeClinitEnter" : "evOutOfScopeBehaviorEnter", 
-					"()V");
+//			s.INVOKEVIRTUAL(
+//					BCIUtils.CLS_THREADDATA, 
+//					isStaticInitializer() ? "evOutOfScopeClinitEnter" : "evOutOfScopeBehaviorEnter", 
+//					"()V");
 			
 			s.GOTO(lStart);
 		}
@@ -127,23 +129,23 @@ public class MethodInstrumenter_OutOfScope extends MethodInstrumenter
 			s.ILOAD(itsBootstrapVar);
 			s.IFfalse(lReturn);
 			
-			// Send event (the method returns a flag that indicates if the result must be sent)
-			s.ALOAD(getThreadDataVar());
-			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evOutOfScopeBehaviorExit_Normal", "()Z");				
-
-			// Send return value if needed
-			if (theReturnType.getSort() != Type.VOID) 
-			{
-				s.IFfalse(lReturn);
-
-				s.ISTORE(theReturnType, itsResultVar); // We can't use DUP in case of long or double, so we just store the value
-				sendValue(s, itsResultVar, theReturnType);
-				s.ILOAD(theReturnType, itsResultVar);
-			}
-			else
-			{
-				s.POP();
-			}
+//			// Send event (the method returns a flag that indicates if the result must be sent)
+//			s.ALOAD(getThreadDataVar());
+//			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evOutOfScopeBehaviorExit_Normal", "()Z");				
+//
+//			// Send return value if needed
+//			if (theReturnType.getSort() != Type.VOID) 
+//			{
+//				s.IFfalse(lReturn);
+//
+//				s.ISTORE(theReturnType, itsResultVar); // We can't use DUP in case of long or double, so we just store the value
+//				sendValue(s, itsResultVar, theReturnType);
+//				s.ILOAD(theReturnType, itsResultVar);
+//			}
+//			else
+//			{
+//				s.POP();
+//			}
 			
 			s.label(lReturn);
 			s.RETURN(theReturnType);
@@ -157,8 +159,8 @@ public class MethodInstrumenter_OutOfScope extends MethodInstrumenter
 			s.ILOAD(itsBootstrapVar);
 			s.IFfalse(lThrow);
 			
-			s.ALOAD(getThreadDataVar());
-			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evOutOfScopeBehaviorExit_Exception", "()V");
+//			s.ALOAD(getThreadDataVar());
+//			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evOutOfScopeBehaviorExit_Exception", "()V");
 
 			s.label(lThrow);
 			s.ATHROW();

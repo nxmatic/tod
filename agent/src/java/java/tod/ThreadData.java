@@ -965,7 +965,7 @@ public final class ThreadData
 		if (popOutOfScopeAndPeekScope()) 
 		{
 			// For some reason, calling sendRegisteredObjects here makes the VM crash at some point.
-//			sendRegisteredObjects();
+			sendRegisteredObjects();
 			commitBuffer();
 			
 			msgStart(Message.OUTOFSCOPE_BEHAVIOR_EXIT_NORMAL, 0);
@@ -992,7 +992,7 @@ public final class ThreadData
 		
 		if (popOutOfScopeAndPeekScope()) 
 		{
-//			sendRegisteredObjects();
+			sendRegisteredObjects();
 			commitBuffer();
 			
 			msgStart(Message.OUTOFSCOPE_BEHAVIOR_EXIT_EXCEPTION, 0);
