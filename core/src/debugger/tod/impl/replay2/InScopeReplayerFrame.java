@@ -36,7 +36,6 @@ import org.objectweb.asm.Type;
 import tod.core.database.browser.LocationUtils;
 import tod.core.database.structure.ObjectId;
 import tod2.agent.Message;
-import tod2.agent.MonitoringMode;
 import zz.utils.Utils;
 
 public abstract class InScopeReplayerFrame extends ReplayerFrame

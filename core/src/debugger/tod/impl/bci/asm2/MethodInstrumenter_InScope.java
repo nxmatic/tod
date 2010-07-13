@@ -64,11 +64,6 @@ import tod.impl.replay2.SList;
 public class MethodInstrumenter_InScope extends MethodInstrumenter
 {
 	/**
-	 * A boolean that indicates if the method was called from in-scope code.
-	 */
-	private int itsFromScopeVar;
-	
-	/**
 	 * Temporarily holds the return value of called methods
 	 */
 	private int itsTmpValueVar;
@@ -82,12 +77,6 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 	
 	private Label lExit = new Label();
 	
-	/**
-	 * Contains the classes whose loading has already been forced.
-	 */
-	private final Set<String> itsLoadedClasses = new HashSet<String>();
-
-
 	public MethodInstrumenter_InScope(ClassInstrumenter aClassInstrumenter, MethodNode aNode, IMutableBehaviorInfo aBehavior)
 	{
 		super(aClassInstrumenter, aNode, aBehavior);
@@ -95,19 +84,9 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		// At least for now...
 		if (BCIUtils.CLS_OBJECT.equals(getClassNode().name)) throw new RuntimeException("java.lang.Object cannot be in scope!");
 		
-		itsFromScopeVar = nextFreeVar(1);
 		itsTmpValueVar = nextFreeVar(2);
 		
 		getNode().maxStack += 3; // This is the max we add to the stack
-		
-		// Mark classes that are known to be already loaded as loaded
-		itsLoadedClasses.add(getClassNode().name);
-		itsLoadedClasses.add("java/lang/Object");
-		itsLoadedClasses.add("java/lang/String");
-		itsLoadedClasses.add("java/lang/StringBuffer");
-		itsLoadedClasses.add("java/lang/StringBuilder");
-		itsLoadedClasses.add("java/lang/System");
-		itsLoadedClasses.add("java/lang/Class");
 	}
 	
 	@Override
@@ -134,8 +113,9 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		Label lActive = new Label();
 		
 		// Create activation checking code
-		s.pushInt(getBehavior().getId()); 
-		s.INVOKESTATIC(BCIUtils.CLS_TRACEDMETHODS, "traceFull", "(I)Z");
+//		s.pushInt(getBehavior().getId()); 
+//		s.INVOKESTATIC(BCIUtils.CLS_TRACEDMETHODS, "traceFull", "(I)Z");
+		s.pushInt(1); // TODO: See how we do the dynamic scoping
 		s.IFtrue(lActive);
 
 		{
@@ -152,20 +132,14 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		// Insert entry instructions
 		{
 			// Set ThreadData var to null for verifier to work
-			s.ACONST_NULL();
+			s.INVOKESTATIC(BCIUtils.CLS_EVENTCOLLECTOR_AGENT, "_getThreadData", "()"+BCIUtils.DSC_THREADDATA); // ThD
 			s.ASTORE(getThreadDataVar());
 			
 			if (DebugFlags.USE_FIELD_CACHE) s.add(itsMethodInfo.getFieldCacheInitInstructions());
 			
-			// Store ThreadData object
-			s.INVOKESTATIC(BCIUtils.CLS_EVENTCOLLECTOR_AGENT, "_getThreadData", "()"+BCIUtils.DSC_THREADDATA); // ThD
-			s.DUP(); // ThD ThD
-			s.DUP(); // ThD ThD ThD
-			s.ASTORE(getThreadDataVar()); // ThD ThD
-
 			// Store inScope 
-			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "isInScope", "()Z"); // ThD, inScope
-			s.ISTORE(itsFromScopeVar); // ThD
+			s.ALOAD(getThreadDataVar());
+			s.DUP();
 			
 			// Send event
 			s.pushInt(getBehavior().getId()); // ThD, BId 
@@ -176,7 +150,7 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 			
 			//Check if we must send args
 			Label lAfterSendArgs = new Label();
-			s.ILOAD(itsFromScopeVar);
+			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "isInScope", "()Z"); // ThD, inScope
 			s.IFtrue(lAfterSendArgs);
 			sendEnterArgs(s);
 			s.label(lAfterSendArgs);
@@ -395,18 +369,6 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		return theBehavior.getId();
 	}
 	
-	private void forceLoad(String aClass, SyntaxInsnList s)
-	{
-		if (! itsLoadedClasses.add(aClass)) return;
-
-		s.LDC(Type.getObjectType(aClass));
-		s.POP();
-		
-		if ((getClassNode().version & 0xffff) < 49) getClassNode().version = 49; // Needed for LDC <class>
-	}
-	
-
-	
 	private void processInvoke(MethodInsnNode aNode)
 	{
 		BCIFrame theNextFrame = itsMethodInfo.getFrame(aNode.getNext());
@@ -415,27 +377,10 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		
 		SyntaxInsnList s = new SyntaxInsnList();
 		
-		// Force the loading of the class so that its scope is known
-		forceLoad(aNode.owner, s);
-		
-		Label lCheckChaining = new Label();
-		
 		// For constructor calls scope is resolved statically
-		if (BCIUtils.isConstructorCall(aNode)) 
-			processInvoke_TraceEnabled_Constructor(s, aNode, lCheckChaining);
-		else 
-			processInvoke_TraceEnabled_Method(s, aNode, lCheckChaining);
+		if (BCIUtils.isConstructorCall(aNode)) processInvoke_Constructor(s, aNode);
+		else processInvoke_Method(s, aNode);
 		
-		s.label(lCheckChaining);
-		
-		if (itsMethodInfo.isChainingInvocation(aNode))
-		{
-			// Send deferred target
-			s.ALOAD(getThreadDataVar());
-			s.ALOAD(0);
-			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "sendConstructorTarget", "("+BCIUtils.DSC_OBJECT+")V");
-		}
-
 		replace(aNode, s);
 	}
 
@@ -464,108 +409,29 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 				type));
 	}
 	
-	private void processInvoke_TraceEnabled_Method(
-			SyntaxInsnList s, 
-			MethodInsnNode aNode, 
-			Label lCheckChaining)
+	private void processInvoke_Method(SyntaxInsnList s, MethodInsnNode aNode)
 	{
-		Type theReturnType = Type.getReturnType(aNode.desc);
-		
-		MethodInsnNode theMonitoredClone = (MethodInsnNode) aNode.clone(null);
-		MethodInsnNode theUnmonitoredClone = (MethodInsnNode) aNode.clone(null);
-		Label lUnmonitored = new Label(); // Unmonitored path
-
-		// Check if called method is monitored
-		s.pushInt(getBehaviorId(aNode));
-		s.INVOKESTATIC(BCIUtils.CLS_TRACEDMETHODS, "traceUnmonitored", "(I)Z");
-		s.IFtrue(lUnmonitored);
-
-		// Monitored call
-		s.add(theMonitoredClone);				
-		s.GOTO(lCheckChaining);
-		
-		s.label(lUnmonitored);
-		
-		// Unmonitored call
-		Label lHnStart = new Label();
-		Label lHnEnd = new Label();
-		Label lHandler = new Label(); // Exception handler
-		
-		// before call
-		s.ALOAD(getThreadDataVar());
-		s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evUnmonitoredBehaviorCall", "()V");
-		
-		// call
-		s.label(lHnStart);
-		s.add(theUnmonitoredClone);
-		s.label(lHnEnd);
-		
-		// after call
-		s.ALOAD(getThreadDataVar());
-
-		if (theReturnType.getSort() != Type.VOID) 
-		{
-			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evUnmonitoredBehaviorResultNonVoid", "()V");
-			s.ISTORE(theReturnType, itsTmpValueVar);
-			sendValue(s, itsTmpValueVar, theReturnType);
-			s.ILOAD(theReturnType, itsTmpValueVar);
-		}
-		else
-		{
-			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evUnmonitoredBehaviorResultVoid", "()V");
-		}
-		
-		s.GOTO(lCheckChaining);
-		
-		// Exception handler
-		s.label(lHandler);
-		
-		s.ALOAD(getThreadDataVar());
-		s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evUnmonitoredBehaviorException", "()V");
-		s.ATHROW();
-		
-		visitTryCatchBlock(getNode(), lHnStart, lHnEnd, lHandler, null);
+		MethodInsnNode theClone = (MethodInsnNode) aNode.clone(null);
+		s.add(theClone);				
 	}
 
-	private void processInvoke_TraceEnabled_Constructor(
-			SyntaxInsnList s, 
-			MethodInsnNode aNode, 
-			Label lCheckChaining)
+	private void processInvoke_Constructor(SyntaxInsnList s, MethodInsnNode aNode)
 	{
-		Type theReturnType = Type.getReturnType(aNode.desc);
-		
-		MethodInsnNode theMonitoredClone = (MethodInsnNode) aNode.clone(null);
-		MethodInsnNode theUnmonitoredClone = (MethodInsnNode) aNode.clone(null);
+		MethodInsnNode theClone = (MethodInsnNode) aNode.clone(null);
 
-		// Check if called method is monitored
-		if (isCalleeInScope(aNode))
-		{
-			// Monitored call
-			s.add(theMonitoredClone);				
-			s.GOTO(lCheckChaining);
-		}
+		s.add(theClone);				
 		
-		if (!isCalleeInScope(aNode))
+		// Check if called method is monitored
+		if (! isCalleeInScope(aNode))
 		{
-			// Unmonitored call
-			Label lHnStart = new Label();
-			Label lHnEnd = new Label();
-			Label lHandler = new Label(); // Exception handler
-			
-			// before call
-			s.ALOAD(getThreadDataVar());
-			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evUnmonitoredBehaviorCall", "()V");
-			
-			// call
-			s.label(lHnStart);
-			s.add(theUnmonitoredClone);
-			s.label(lHnEnd);
-			
-			s.ALOAD(getThreadDataVar());
-			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evUnmonitoredBehaviorResultVoid", "()V");
-	
-			// Send object initialized
-			if (! itsMethodInfo.isChainingInvocation(aNode))
+			boolean theChaining = itsMethodInfo.isChainingInvocation(aNode);
+			if (theChaining)
+			{
+				s.ALOAD(getThreadDataVar());
+				s.ALOAD(0);
+				s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "sendConstructorTarget", "("+BCIUtils.DSC_OBJECT+")V");				
+			}
+			else
 			{
 				// Save target
 				NewInvokeLink theNewInvokeLink = itsMethodInfo.getNewInvokeLink(aNode);
@@ -579,19 +445,7 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 				s.ALOAD(itsTmpTargetVars[theNewInvokeLink.getNestingLevel()]);
 				s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evObjectInitialized", "("+BCIUtils.DSC_OBJECT+")V");
 			}
-			
-			s.GOTO(lCheckChaining);
-			
-			// Exception handler
-			s.label(lHandler);
-			
-			s.ALOAD(getThreadDataVar());
-			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evUnmonitoredBehaviorException", "()V");
-			s.ATHROW();
-			
-			visitTryCatchBlock(getNode(), lHnStart, lHnEnd, lHandler, null);
 		}
-		
 	}
 	
 	private void processNewArray(AbstractInsnNode aNode)

@@ -51,7 +51,7 @@ public class TOD
 		boolean theEnabled = AgentUtils.readBoolean(AgentConfig.PARAM_CAPTURE_AT_START, true);
 		_IO.out("[TOD] Capture enabled at start: "+theEnabled);
 		CAPTURE_ENABLED = theEnabled ? 1 : 0;
-		AgentReady.CAPTURE_ENABLED = CAPTURE_ENABLED > 0;
+//		AgentReady.CAPTURE_ENABLED = CAPTURE_ENABLED > 0;
 	}
 	
 	/**
@@ -91,13 +91,13 @@ public class TOD
 	public static void enableCapture()
 	{
 		CAPTURE_ENABLED++;
-		AgentReady.CAPTURE_ENABLED = CAPTURE_ENABLED > 0;
+//		AgentReady.CAPTURE_ENABLED = CAPTURE_ENABLED > 0;
 	}
 	
 	public static void disableCapture()
 	{
 		CAPTURE_ENABLED--;
-		AgentReady.CAPTURE_ENABLED = CAPTURE_ENABLED > 0;
+//		AgentReady.CAPTURE_ENABLED = CAPTURE_ENABLED > 0;
 	}
 	
 	static int captureEnabled()

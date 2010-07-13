@@ -33,10 +33,10 @@ package tod.impl.server;
 
 import java.util.concurrent.ArrayBlockingQueue;
 
-import tod2.agent.io._ByteBuffer;
+import tod.utils.ByteBuffer;
 
 /**
- * Mimics the API of {@link _ByteBuffer} but simulates an infinite buffer.
+ * Mimics the API of {@link ByteBuffer} but simulates an infinite buffer.
  * Clients may have to wait while the buffer stream is waiting for a new buffer.
  * The buffer stream assumes that primitive operations do not span multiple buffers.
  * @author gpothier

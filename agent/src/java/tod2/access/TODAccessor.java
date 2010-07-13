@@ -68,4 +68,18 @@ public class TODAccessor
 	{
 		throw new Error("This code is supposed to be replaced by the instrumenter.");
 	}
+
+	/**
+	 * Sets the bootstrap flag in Object.
+	 * See ClassInstrumenter#BOOTSTRAP_FLAG
+	 */
+	public static void setBootstrapFlag(boolean aValue)
+	{
+		throw new Error("This code is supposed to be replaced by the instrumenter.");
+	}
+	
+	public static boolean getBootstrapFlag()
+	{
+		throw new Error("This code is supposed to be replaced by the instrumenter.");
+	}
 }

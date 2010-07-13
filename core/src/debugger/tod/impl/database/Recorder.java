@@ -36,8 +36,8 @@ import tod.core.config.TODConfig;
 import tod.impl.bci.asm2.ASMInstrumenter2;
 import tod.impl.database.structure.standard.StructureDatabase;
 import tod.impl.server.NativeAgentPeer;
+import tod.utils.ByteBuffer;
 import tod2.agent.AgentConfig;
-import tod2.agent.io._ByteBuffer;
 import zz.utils.Utils;
 import zz.utils.net.Server;
 
@@ -144,7 +144,7 @@ public class Recorder extends Server
 		{
 			try
 			{
-				String theHostName = _ByteBuffer.getString(itsDataIn);
+				String theHostName = ByteBuffer.getString(itsDataIn);
 				System.out.println("Received hostname: "+theHostName);
 				
 				long theCount = 0;

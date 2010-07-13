@@ -27,6 +27,8 @@ package java.tod.util;
 import java.tod.io._IO;
 import java.util.Arrays;
 
+import tod2.access.TODAccessor;
+
 
 
 /**
@@ -272,12 +274,14 @@ public final class _StringBuilder
 
 	public _StringBuilder append(String str) {
 		if (str == null) str = "null";
-		int len = str.length();
+		int len = TODAccessor.getStringCount(str);
+		int ofs = TODAccessor.getStringOffset(str);
 		if (len == 0) return this;
 		int newCount = count + len;
 		if (newCount > value.length)
 			expandCapacity(newCount);
-		str.getChars(0, len, value, count);
+		char[] buf = TODAccessor.getStringChars(str);
+		for(int i=0;i<len;i++) value[count+i] = buf[i+ofs];
 		count = newCount;
 		return this;
 	}
@@ -367,7 +371,7 @@ public final class _StringBuilder
 		int newCount = count + str.length;
 		if (newCount > value.length)
 			expandCapacity(newCount);
-		System.arraycopy(str, 0, value, count, str.length);
+		_Arrays.arraycopy(str, 0, value, count, str.length);
 		count = newCount;
 		return this;
 	}
@@ -376,7 +380,7 @@ public final class _StringBuilder
 		int newCount = count + len;
 		if (newCount > value.length)
 			expandCapacity(newCount);
-		System.arraycopy(str, offset, value, count, len);
+		_Arrays.arraycopy(str, offset, value, count, len);
 		count = newCount;
 		return this;
 	}

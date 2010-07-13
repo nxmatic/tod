@@ -78,39 +78,22 @@ public class Message
 	public static final byte OUTOFSCOPE_BEHAVIOR_EXIT_NORMAL = 21;
 	public static final byte OUTOFSCOPE_BEHAVIOR_EXIT_EXCEPTION = 22;
 	
-	/**
-	 * Announces the result of an enveloppe-only method. This message is sent
-	 * only if the method was called from scope.
-	 */
-	public static final byte OUTOFSCOPE_BEHAVIOR_EXIT_RESULT = 23;
+	public static final byte INSTANCEOF_OUTCOME = 23;
 	
-	public static final byte UNMONITORED_BEHAVIOR_CALL = 24;
-	
-	/**
-	 * An unmonitored method call returned normally 
-	 */
-	public static final byte UNMONITORED_BEHAVIOR_CALL_RESULT = 25;
-	
-	public static final byte UNMONITORED_BEHAVIOR_CALL_EXCEPTION = 26;
-	
-	public static final byte INSTANCEOF_OUTCOME = 27;
-	
-	public static final byte REGISTER_OBJECT = 28;
-	public static final byte REGISTER_OBJECT_DELTA = 29;
-	public static final byte REGISTER_REFOBJECT = 30;
-	public static final byte REGISTER_REFOBJECT_DELTA = 31;
-	public static final byte REGISTER_CLASS = 32;
-	public static final byte REGISTER_CLASSLOADER = 33;
-	public static final byte REGISTER_THREAD = 34;
-	
-	public static final byte TRACEDMETHODS_VERSION = 35;
+	public static final byte REGISTER_OBJECT = 24;
+	public static final byte REGISTER_OBJECT_DELTA = 25;
+	public static final byte REGISTER_REFOBJECT = 26;
+	public static final byte REGISTER_REFOBJECT_DELTA = 27;
+	public static final byte REGISTER_CLASS = 28;
+	public static final byte REGISTER_CLASSLOADER = 29;
+	public static final byte REGISTER_THREAD = 30;
 	
 	/**
 	 * Args: timestamp
 	 */
-	public static final byte SYNC = 36;
+	public static final byte SYNC = 31;
 	
-	public static final int MSG_COUNT = 36;
+	public static final int MSG_COUNT = 31;
 	
 	public static final String[] _NAMES = 
 	{
@@ -137,10 +120,6 @@ public class Message
 		"OUTOFSCOPE_CLINIT_ENTER",
 		"OUTOFSCOPE_BEHAVIOR_EXIT_NORMAL",
 		"OUTOFSCOPE_BEHAVIOR_EXIT_EXCEPTION",
-		"OUTOFSCOPE_BEHAVIOR_EXIT_RESULT",
-		"UNMONITORED_BEHAVIOR_CALL",
-		"UNMONITORED_BEHAVIOR_CALL_RESULT",
-		"UNMONITORED_BEHAVIOR_CALL_EXCEPTION",
 		"INSTANCEOF_OUTCOME",
 		"REGISTER_OBJECT",
 		"REGISTER_OBJECT_DELTA",
@@ -149,7 +128,6 @@ public class Message
 		"REGISTER_CLASS",
 		"REGISTER_CLASSLOADER",
 		"REGISTER_THREAD",
-		"TRACEDMETHODS_VERSION",
 		"SYNC"
 	};
 }

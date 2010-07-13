@@ -54,8 +54,8 @@ import tod.core.database.structure.IMutableClassInfo;
 import tod.core.database.structure.IMutableStructureDatabase;
 import tod.core.database.structure.ITypeInfo;
 import tod.impl.database.structure.standard.StructureDatabase;
+import tod.utils.GrowingByteBuffer;
 import tod2.access.TODAccessor;
-import tod2.agent.io._GrowingByteBuffer;
 import zz.utils.Utils;
 
 /**
@@ -75,6 +75,8 @@ public class ClassInstrumenter
 	private static final String OBJID_GETTER = "$tod$getId";
 	public static final String OBJID_RESET = "$tod$resetId";
 	
+	public static final String BOOTSTRAP_FLAG = "$tod$bootstrap";
+	
 	private static final String CLSID_FIELD = "$tod$clsId";
 	private static final String CLSID_GETTER = "$tod$getClsId";
 	
@@ -85,6 +87,8 @@ public class ClassInstrumenter
 	private static final String THREAD_THREADDATAFIELD = "$tod$threadData";
 	private static final String THREAD_GETID = "$tod$getId";
 	private static final String THREAD_GETNAME = "$tod$getName";
+	
+	private static final String NATIVE_METHOD_PREFIX = "$todwrap$";
 	
 	private final ASMInstrumenter2 itsInstrumenter;
 	private final String itsName;
@@ -98,6 +102,8 @@ public class ClassInstrumenter
 	private IClassInfo[] itsInterfaces;
 	
 	private List<IBehaviorInfo> itsBehaviors = new ArrayList<IBehaviorInfo>();
+	
+	private List<MethodNode> itsExtraMethods = new ArrayList<MethodNode>();
 	
 	private boolean itsModified = false;
 	
@@ -158,6 +164,7 @@ public class ClassInstrumenter
 		{
 			addGetIdMethod_Root();
 			addResetIdMethod_Root();
+			addBootstrapField();
 		}
 		else if (BCIUtils.CLS_CLASS.equals(getNode().name)) addGetClsIdMethod();
 		else if (BCIUtils.CLS_STRING.equals(getNode().name)) addStringRawAccess();
@@ -192,7 +199,7 @@ public class ClassInstrumenter
 	
 	private byte[] createClassInfo()
 	{
-		_GrowingByteBuffer b = _GrowingByteBuffer.allocate(1024);
+		GrowingByteBuffer b = GrowingByteBuffer.allocate(1024);
 		
 		// Superclass
 		b.putInt(itsSuperclass != null ? itsSuperclass.getId() : 0);
@@ -234,6 +241,8 @@ public class ClassInstrumenter
 		// Process each method
 		for(MethodNode theNode : (List<MethodNode>) itsNode.methods) processMethod(theNode);
 		
+		itsNode.methods.addAll(itsExtraMethods);
+		
 		// Ensure all the fields are added
 		for(FieldNode theNode : (List<FieldNode>) itsNode.fields) 
 		{
@@ -261,13 +270,65 @@ public class ClassInstrumenter
 		{
 			new MethodInstrumenter_ClassLoader(this, aNode, theBehavior).proceed();
 		}
-		else if (getDatabase().isInScope(itsName)) new MethodInstrumenter_InScope(this, aNode, theBehavior).proceed();
-		else new MethodInstrumenter_OutOfScope(this, aNode, theBehavior).proceed();
+		else if (getDatabase().isInScope(itsName)) 
+		{
+			new MethodInstrumenter_InScope(this, aNode, theBehavior).proceed();
+		}
+		else 
+		{
+			new MethodInstrumenter_OutOfScope(this, aNode, theBehavior).proceed();
+		}
 
-		new MethodInstrumenter_PostprocessClone(this, aNode, theBehavior).proceed();
+		if (BCIUtils.isNative(aNode.access)
+				&& !BCIUtils.isPrivate(aNode.access)
+				&& !BCIUtils.CLS_OBJECT.equals(getNode().name)
+				&& !BCIUtils.CLS_THREAD.equals(getNode().name)
+				&& !BCIUtils.CLS_THROWABLE.equals(getNode().name)
+				&& !"java/lang/ClassLoader$NativeLibrary".equals(getNode().name)) wrapNative(aNode);
 	}
 	
 	
+	/**
+	 * Wraps a native method (based on JVMTI's SetNativeMethodPrefix)
+	 * @param aNode
+	 */
+	private void wrapNative(MethodNode aNode)
+	{
+		System.out.println("Wrapping native: "+itsName+"."+aNode.name+aNode.desc);
+		MethodNode theWrapper = createMethod(itsExtraMethods, aNode.name, aNode.desc, aNode.access & ~Opcodes.ACC_NATIVE);
+		
+		aNode.name = NATIVE_METHOD_PREFIX + aNode.name;
+		aNode.access = (aNode.access & ~(Opcodes.ACC_PUBLIC | Opcodes.ACC_PROTECTED)) | Opcodes.ACC_PRIVATE;
+		
+		boolean theStatic = BCIUtils.isStatic(aNode.access);
+		
+		SyntaxInsnList s = new SyntaxInsnList();
+		
+		// Call original native method
+		Type[] theTypes = Type.getArgumentTypes(aNode.desc);
+		int theIndex = 0;
+		if (! theStatic) s.ALOAD(theIndex++);
+		for (int i = 0; i < theTypes.length; i++)
+		{
+			Type theType = theTypes[i];
+			s.ILOAD(theType, theIndex);
+			theIndex += theType.getSize();
+		}
+		
+		if (theStatic) s.INVOKESTATIC(itsNode.name, aNode.name, aNode.desc);
+		else s.INVOKESPECIAL(itsNode.name, aNode.name, aNode.desc);
+		
+		s.IRETURN(Type.getReturnType(aNode.desc));
+		
+		theWrapper.maxLocals = theIndex;
+		theWrapper.maxStack = theIndex + 2; // +2 to account for the return value, not optimal but easy...
+		theWrapper.instructions = s;
+		
+		// Insert enveloppe instrumentation
+//		IMutableBehaviorInfo theBehavior = itsClassInfo.getNewBehavior(theWrapper.name, theWrapper.desc, theWrapper.access);
+//		new MethodInstrumenter_OutOfScope(this, aNode, theBehavior).proceed();
+	}
+
 	/**
 	 * Replaces the body of {@link TODAccessor#getId(Object)} so that
 	 * it calls the generated Object.$tod$getId method
@@ -294,6 +355,10 @@ public class ClassInstrumenter
 				makeAccessor(theNode, BCIUtils.CLS_THREAD, THREAD_GETNAME, "[C");
 			else if ("getThreadId".equals(theNode.name))
 				makeAccessor(theNode, BCIUtils.CLS_THREAD, THREAD_GETID, "J");
+			else if ("setBootstrapFlag".equals(theNode.name))
+				makeSetBootstrapFlag(theNode);
+			else if ("getBootstrapFlag".equals(theNode.name))
+				makeGetBootstrapFlag(theNode);
 		}
 	}
 	
@@ -341,6 +406,27 @@ public class ClassInstrumenter
 		aNode.maxStack = theType.getSize()*2;
 	}
 	
+	private void makeSetBootstrapFlag(MethodNode aNode)
+	{
+		SyntaxInsnList s = new SyntaxInsnList();
+		s.ILOAD(0);
+		s.PUTSTATIC(BCIUtils.CLS_OBJECT, BOOTSTRAP_FLAG, "Z");
+		s.RETURN();
+		
+		aNode.instructions = s;
+		aNode.maxStack = 1;
+	}
+	
+	private void makeGetBootstrapFlag(MethodNode aNode)
+	{
+		SyntaxInsnList s = new SyntaxInsnList();
+		s.GETSTATIC(BCIUtils.CLS_OBJECT, BOOTSTRAP_FLAG, "Z");
+		s.IRETURN();
+		
+		aNode.instructions = s;
+		aNode.maxStack = 1;
+	}
+	
 	/**
 	 * Adds the $tod$getId method to java.lang.Object
 	 */
@@ -371,6 +457,12 @@ public class ClassInstrumenter
 		SyntaxInsnList s = new SyntaxInsnList();
 		s.RETURN();
 		theGetter.instructions = s;
+	}
+	
+	private void addBootstrapField()
+	{
+		FieldNode theField = new FieldNode(Opcodes.ACC_STATIC | Opcodes.ACC_PUBLIC, BOOTSTRAP_FLAG, "Z", null, false);
+		itsNode.fields.add(theField);
 	}
 	
 	/**
@@ -575,8 +667,13 @@ public class ClassInstrumenter
 	
 	private MethodNode createMethod(String aName, String aDesc, int aAccess)
 	{
+		return createMethod(getNode().methods, aName, aDesc, aAccess);
+	}
+	
+	private MethodNode createMethod(List<MethodNode> aTarget, String aName, String aDesc, int aAccess)
+	{
 		MethodNode theNode = new MethodNode();
-		getNode().methods.add(theNode);
+		aTarget.add(theNode);
 		theNode.access = aAccess;
 		theNode.name = aName;
 		theNode.desc = aDesc;

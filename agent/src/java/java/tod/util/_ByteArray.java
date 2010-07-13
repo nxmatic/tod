@@ -68,14 +68,14 @@ public class _ByteArray
 		
 		int theNewSize = max(aSize, itsData.length*2);
 		byte[] theNewData = new byte[theNewSize];
-		System.arraycopy(itsData, 0, theNewData, 0, itsData.length);
+		_Arrays.arraycopy(itsData, 0, theNewData, 0, itsData.length);
 		itsData = theNewData;
 	}
 
 	public byte[] toArray()
 	{
 		byte[] theResult = new byte[size()];
-		System.arraycopy(itsData, 0, theResult, 0, size());
+		_Arrays.arraycopy(itsData, 0, theResult, 0, size());
 		return theResult;
 	}
 }

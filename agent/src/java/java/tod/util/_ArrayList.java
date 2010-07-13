@@ -67,7 +67,7 @@ public class _ArrayList<T>
 	
 	public void remove(int aIndex)
 	{
-		System.arraycopy(itsData, aIndex+1, itsData, aIndex, itsSize-aIndex-1);
+		_Arrays.arraycopy(itsData, aIndex+1, itsData, aIndex, itsSize-aIndex-1);
 		itsSize--;
 	}
 	
@@ -94,20 +94,20 @@ public class _ArrayList<T>
 		
 		int theNewSize = Math.max(aSize, itsData.length*2);
 		T[] theNewData = (T[]) new Object[theNewSize];
-		System.arraycopy(itsData, 0, theNewData, 0, itsData.length);
+		_Arrays.arraycopy(itsData, 0, theNewData, 0, itsData.length);
 		itsData = theNewData;
 	}
 
 	public T[] toArray()
 	{
 		T[] theResult = (T[]) new Object[size()];
-		System.arraycopy(itsData, 0, theResult, 0, size());
+		_Arrays.arraycopy(itsData, 0, theResult, 0, size());
 		return theResult;
 	}
 	
 	public T[] toArray(T[] aDest)
 	{
-		System.arraycopy(itsData, 0, aDest, 0, size());
+		_Arrays.arraycopy(itsData, 0, aDest, 0, size());
 		return aDest;
 	}
 	

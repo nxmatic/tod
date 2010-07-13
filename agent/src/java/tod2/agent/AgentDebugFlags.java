@@ -40,7 +40,7 @@ public class AgentDebugFlags
 	/**
 	 * Whether profile data should be collected.
 	 */
-	public static final boolean COLLECT_PROFILE = true;
+	public static final boolean COLLECT_PROFILE = false;
 	
 	/**
 	 * If true, {@link ThreadData} prints all the events it receives

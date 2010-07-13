@@ -1,40 +1,38 @@
 /*
  * Created on Jan 12, 2009
  */
-package tod2.agent.io;
+package tod.utils;
 
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.tod.util._Arrays;
-
-import tod2.access.TODAccessor;
+import java.nio.BufferOverflowException;
 
 /**
  * A little-endian byte buffer similar to that of NIO.
  * @author gpothier
  */
-public class _ByteBuffer
+public class ByteBuffer
 {
 	private int itsPos;
 	private int itsMark;
 	private int itsLimit;
 	private byte[] itsBytes;
 	
-	protected _ByteBuffer(byte[] aBytes)
+	protected ByteBuffer(byte[] aBytes)
 	{
 		itsBytes = aBytes;
 		clear();
 	}
 
-	public static _ByteBuffer allocate(int aSize)
+	public static ByteBuffer allocate(int aSize)
 	{
-		return new _ByteBuffer(new byte[aSize]);
+		return new ByteBuffer(new byte[aSize]);
 	}
 	
-	public static _ByteBuffer wrap(byte[] aBuffer)
+	public static ByteBuffer wrap(byte[] aBuffer)
 	{
-		return new _ByteBuffer(aBuffer);
+		return new ByteBuffer(aBuffer);
 	}
 	
 	public final byte[] array()
@@ -49,14 +47,14 @@ public class _ByteBuffer
 	
 	protected void checkRemaining(int aRequested)
 	{
-		if (aRequested > remaining()) throw new _BufferOverflowException();
+		if (aRequested > remaining()) throw new BufferOverflowException();
 	}
 	
 	public final void put(byte[] aBytes, int aOffset, int aLength)
 	{
 		checkRemaining(aLength);
 		int thePos = itsPos;
-		_Arrays.arraycopy(aBytes, aOffset, itsBytes, thePos, aLength);
+		System.arraycopy(aBytes, aOffset, itsBytes, thePos, aLength);
 		itsPos = thePos+aLength;
 	}
 	
@@ -64,7 +62,7 @@ public class _ByteBuffer
 	{
 		checkRemaining(aLength);
 		int thePos = itsPos;
-		_Arrays.arraycopy(itsBytes, thePos, aBuffer, aOffset, aLength);
+		System.arraycopy(itsBytes, thePos, aBuffer, aOffset, aLength);
 		itsPos = thePos+aLength;
 	}
 	
@@ -316,12 +314,13 @@ public class _ByteBuffer
 	 */
 	public final void putString(String aString)
 	{
-		char[] c = TODAccessor.getStringChars(aString);
-		int o = TODAccessor.getStringOffset(aString);
-		int l = TODAccessor.getStringCount(aString);
-		
-		putInt(l);
-		putChars(c, o, l);
+		throw new UnsupportedOperationException("Reimplement");
+//		char[] c = TODAccessor.getStringChars(aString);
+//		int o = TODAccessor.getStringOffset(aString);
+//		int l = TODAccessor.getStringCount(aString);
+//		
+//		putInt(l);
+//		putChars(c, o, l);
 	}
 
 	/**
@@ -442,7 +441,7 @@ public class _ByteBuffer
 		return itsBytes.length;
 	}
 	
-	public final _ByteBuffer flip()
+	public final ByteBuffer flip()
 	{
 		itsLimit = itsPos;
 		itsPos = 0;
@@ -450,7 +449,7 @@ public class _ByteBuffer
 		return this;
 	}
 	
-	public final _ByteBuffer clear()
+	public final ByteBuffer clear()
 	{
 		itsPos = 0;
 		itsLimit = itsBytes.length;
@@ -470,10 +469,10 @@ public class _ByteBuffer
 	public final byte[] toArray()
 	{
 		byte[] theResult = new byte[itsPos];
-		_Arrays.arraycopy(itsBytes, 0, theResult, 0, itsPos);
+		System.arraycopy(itsBytes, 0, theResult, 0, itsPos);
 		return theResult;
 	}
-	
+
 	private static byte int3(int x) { return (byte)(x >> 24); }
 	private static byte int2(int x) { return (byte)(x >> 16); }
 	private static byte int1(int x) { return (byte)(x >>  8); }

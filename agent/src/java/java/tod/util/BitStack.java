@@ -3,28 +3,58 @@
  */
 package java.tod.util;
 
+import java.tod.io._IO;
+
 /**
  * A stack of boolean values
  * @author gpothier
  */
 public class BitStack
 {
-	private _BitSet itsBitSet = new _BitSet();
-	private int itsSize = 0;
+	private int[] itsValues = new int[1024];
+	private int itsMask = 1 << 31;
+	private int itsIndex = -1;
 	
 	public void push(boolean aValue)
 	{
-		itsBitSet.set(itsSize++, aValue);
+		itsMask <<= 1;
+		
+		if (itsMask == 0)
+		{
+			itsIndex++;
+			itsMask = 1;
+		}
+		
+		int theLength = itsValues.length;
+		if (itsIndex >= theLength)
+		{
+			_IO.out("[TOD] Expanding bitstack");
+			int[] newArray = new int[theLength*2];
+			for(int i=0;i<theLength;i++) newArray[i] = itsValues[i];
+			itsValues = newArray;
+		}
+		
+		if (aValue) itsValues[itsIndex] |= itsMask;
+		else itsValues[itsIndex] &= ~itsMask;
+		
 	}
 	
 	public boolean pop()
 	{
-		if (itsSize == 0) throw new RuntimeException("Stack is empty");
-		return itsBitSet.get(--itsSize); 
+		boolean value = (itsValues[itsIndex] & itsMask) != 0;
+		
+		itsMask >>>= 1;
+		if (itsMask == 0)
+		{
+			itsIndex--;
+			itsMask = 1 << 31;
+		}
+		
+		return value;
 	}
 	
 	public boolean peek()
 	{
-		return itsBitSet.get(itsSize-1);
+		return (itsValues[itsIndex] & itsMask) != 0;
 	}
 }

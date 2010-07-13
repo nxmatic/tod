@@ -40,10 +40,9 @@ import tod.core.DebugFlags;
 import tod.core.config.TODConfig;
 import tod.core.database.structure.IStructureDatabase;
 import tod.impl.database.structure.standard.HostInfo;
-import tod.impl.database.structure.standard.StructureDatabaseUtils;
+import tod.utils.ByteBuffer;
 import tod.utils.TODUtils;
 import tod2.agent.Command;
-import tod2.agent.io._ByteBuffer;
 
 /**
  * Receives (low-level) events from the debugged application through a socket.
@@ -283,7 +282,7 @@ public abstract class LogReceiver extends PacketProcessor
 		
 		if (getHostName() == null)
 		{
-			setHostName(_ByteBuffer.getString(aDataIn));
+			setHostName(ByteBuffer.getString(aDataIn));
 			if (getMonitor() != null) getMonitor().started();
 		}
 		

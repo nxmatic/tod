@@ -24,6 +24,8 @@ package java.tod;
 
 import java.tod.io._IO;
 
+import tod2.access.TODAccessor;
+
 
 /**
  * This class provides a method that is called by the JNI side when
@@ -67,9 +69,10 @@ public class ExceptionGeneratedReceiver
 	{
 		try
 		{
+			if (! TODAccessor.getBootstrapFlag()) return;
 			if (getIgnoreExceptions()) return;
 			if (! AgentReady.COLLECTOR_READY) return;
-			if (! AgentReady.CAPTURE_ENABLED) return;
+//			if (! AgentReady.CAPTURE_ENABLED) return;
 			
 			if (isProcessingExceptions()) 
 			{
@@ -79,6 +82,7 @@ public class ExceptionGeneratedReceiver
 			setProcessingExceptions(true);
 			
 //			_IO.out(String.format("Exception generated: %s.%s, %d", aMethodDeclaringClassSignature, aMethodName, aOperationBytecodeIndex));
+
 			EventCollector._getThreadData().evExceptionGenerated(
 					aMethodName,
 					aMethodSignature, 

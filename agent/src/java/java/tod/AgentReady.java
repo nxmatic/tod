@@ -25,6 +25,9 @@ package java.tod;
 import java.tod.io._IO;
 import java.tod.io._SocketChannel;
 
+import tod2.access.TODAccessor;
+
+
 
 /**
  * Contains a few flags that indicate the state of the native & java agent,
@@ -45,13 +48,6 @@ public class AgentReady
 	private static boolean NATIVE_AGENT_LOADED = false;
 	
 	private static boolean STARTED = false;
-	
-	/**
-	 * Whether trace capture is currently enabled.
-	 * @see TOD#enableCapture()
-	 * @see TOD#disableCapture()
-	 */
-	public static transient boolean CAPTURE_ENABLED = false;
 	
 	/**
 	 * Called by the native agent.
@@ -82,9 +78,13 @@ public class AgentReady
 		// Force loading of native methods.
 		_IO.initNatives();
 		_SocketChannel.initNatives();
+		ObjectIdentity.get("!");
 		
 		EventCollector.INSTANCE.init();
 		TOD.loadInitialCaptureState();
+		
+		ThreadData.load();
+		TODAccessor.setBootstrapFlag(true);
 		
 		STARTED = true;
 	}

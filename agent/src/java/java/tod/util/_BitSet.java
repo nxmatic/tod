@@ -712,7 +712,7 @@ public class _BitSet implements Cloneable, java.io.Serializable {
 
 		// Copy any remaining words
 		if (wordsInCommon < set.wordsInUse)
-			System.arraycopy(set.words, wordsInCommon,
+			_Arrays.arraycopy(set.words, wordsInCommon,
 							 words, wordsInCommon,
 							 wordsInUse - wordsInCommon);
 
@@ -748,7 +748,7 @@ public class _BitSet implements Cloneable, java.io.Serializable {
 
 		// Copy any remaining words
 		if (wordsInCommon < set.wordsInUse)
-			System.arraycopy(set.words, wordsInCommon,
+			_Arrays.arraycopy(set.words, wordsInCommon,
 							 words, wordsInCommon,
 							 set.wordsInUse - wordsInCommon);
 

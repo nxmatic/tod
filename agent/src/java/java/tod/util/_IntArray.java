@@ -64,14 +64,14 @@ public class _IntArray
 		
 		int theNewSize = Math.max(aSize, itsData.length*2);
 		int[] theNewData = new int[theNewSize];
-		System.arraycopy(itsData, 0, theNewData, 0, itsData.length);
+		_Arrays.arraycopy(itsData, 0, theNewData, 0, itsData.length);
 		itsData = theNewData;
 	}
 
 	public int[] toArray()
 	{
 		int[] theResult = new int[size()];
-		System.arraycopy(itsData, 0, theResult, 0, size());
+		_Arrays.arraycopy(itsData, 0, theResult, 0, size());
 		return theResult;
 	}
 	

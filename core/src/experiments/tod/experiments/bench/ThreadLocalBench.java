@@ -29,25 +29,101 @@ POSSIBILITY OF SUCH DAMAGE.
 Parts of this work rely on the MD5 algorithm "derived from the RSA Data Security, 
 Inc. MD5 Message-Digest Algorithm".
 */
-package tod.impl.server;
+package tod.experiments.bench;
 
-import tod.utils.ByteBuffer;
+import tod.BenchBase;
+import tod.BenchBase.BenchResults;
+import zz.utils.primitive.ByteArray;
 
-public class PacketBuffer extends ByteBuffer
+public class ThreadLocalBench
 {
-	/**
-	 * The offset in the file where this packet starts
-	 */
-	private long itsPacketStartOffset;
-
-	public PacketBuffer(byte[] aBytes, long aPacketStartOffset)
+	private static int t;
+	private static final long N = 1000000000;
+	
+	private static ThreadLocal<Thread> l = new ThreadLocal<Thread>()
 	{
-		super(aBytes);
-		itsPacketStartOffset = aPacketStartOffset;
+		@Override
+		protected Thread initialValue()
+		{
+			return Thread.currentThread();
+		}
+	};
+	
+	public static void main(String[] args)
+	{
+		System.out.println("Warming up");
+		thread(N);
+		array(N);
+		threadLocal(N);
+		
+		System.out.println("Starting bench");
+		
+		BenchResults b0 = BenchBase.benchmark(new Runnable()
+		{
+			public void run()
+			{
+				thread(N);
+			}
+		});
+		System.out.println("Thread: " + b0);
+		System.out.println(t);
+
+		BenchResults b1 = BenchBase.benchmark(new Runnable()
+		{
+			public void run()
+			{
+				array(N);
+			}
+		});
+		System.out.println("Array: " + b1);
+		System.out.println(t);		
+		
+		BenchResults b2 = BenchBase.benchmark(new Runnable()
+		{
+			public void run()
+			{
+				threadLocal(N);
+			}
+		});
+		System.out.println("ThreadLocal: " + b2);
+		System.out.println(t);
+
+
 	}
-
-	public long getPacketStartOffset()
+	
+	private static void thread(long n) 
 	{
-		return itsPacketStartOffset;
+		for(long i=0;i<n;i++)
+		{
+			Thread th = Thread.currentThread();
+			t += th.getId();
+		}
+	}
+	
+	private static void threadLocal(long n) 
+	{
+		for(long i=0;i<n;i++)
+		{
+			Thread th = l.get();
+			t += th.getId();
+		}
+	}
+	
+	private static void array(long n)
+	{
+		for(long i=0;i<n;i++)
+		{
+			t += B.getMode(3);
+		}
+	}
+	
+	private static class B
+	{
+		private static final ByteArray modes = new ByteArray(16384);
+
+		public static byte getMode(int i)
+		{
+			return modes.get(i);
+		}
 	}
 }

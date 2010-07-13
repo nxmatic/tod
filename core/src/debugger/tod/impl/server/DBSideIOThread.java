@@ -46,12 +46,11 @@ import tod.core.database.structure.IMutableStructureDatabase;
 import tod.impl.database.structure.standard.StructureDatabase;
 import tod.impl.replay2.EventCollector;
 import tod.impl.replay2.LocalsSnapshot;
-import tod.impl.replay2.ReplayerGenerator;
 import tod.impl.replay2.ReplayerLoader;
 import tod.impl.replay2.ReplayerWrapper;
 import tod.impl.replay2.TmpIdManager;
+import tod.utils.ByteBuffer;
 import tod2.agent.Message;
-import tod2.agent.io._ByteBuffer;
 import zz.utils.Utils;
 
 /**
@@ -198,8 +197,8 @@ public abstract class DBSideIOThread
 	
 	private void processThreadPacket() throws IOException
 	{
-		int theThreadId = _ByteBuffer.getIntL(itsIn);
-		int theLength = _ByteBuffer.getIntL(itsIn);
+		int theThreadId = ByteBuffer.getIntL(itsIn);
+		int theLength = ByteBuffer.getIntL(itsIn);
 		
 		// The first thread of a partial replay is the only thread to replay
 		if (itsSnapshot != null && itsReplayThreadId == 0) itsReplayThreadId = theThreadId;
@@ -230,19 +229,19 @@ public abstract class DBSideIOThread
 	
 	private void processStringPacket() throws IOException
 	{
-		long theObjectId = _ByteBuffer.getLongL(itsIn);
-		String theString = _ByteBuffer.getString(itsIn);
+		long theObjectId = ByteBuffer.getLongL(itsIn);
+		String theString = ByteBuffer.getString(itsIn);
 		
 		itsProcessedSize += 8 + 4 + theString.length()*2;
 	}
 	
 	private void processModeChangesPacket() throws IOException
 	{
-		int theLength = _ByteBuffer.getIntL(itsIn);
+		int theLength = ByteBuffer.getIntL(itsIn);
 		byte[] theData = new byte[theLength];
 		Utils.readFully(itsIn, theData);
 		
-		_ByteBuffer b = _ByteBuffer.wrap(theData);
+		ByteBuffer b = ByteBuffer.wrap(theData);
 		while(b.remaining() > 0)
 		{
 			int theBehaviorId = b.getInt();

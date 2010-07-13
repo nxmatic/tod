@@ -32,7 +32,7 @@ Inc. MD5 Message-Digest Algorithm".
 package tod.impl.replay2;
 
 import tod.core.database.structure.ObjectId;
-import tod2.agent.io._ByteBuffer;
+import tod.utils.ByteBuffer;
 
 public class LocalsSnapshot
 {
@@ -115,7 +115,7 @@ public class LocalsSnapshot
 	/**
 	 * Instantiates a snapshot by reading its contents from the given buffer.
 	 */
-	public LocalsSnapshot(_ByteBuffer aBuffer)
+	public LocalsSnapshot(ByteBuffer aBuffer)
 	{
 		itsPacketStartOffset = aBuffer.getLong();
 		itsPacketOffset = aBuffer.getInt();
@@ -152,7 +152,7 @@ public class LocalsSnapshot
 	/**
 	 * Writes this snapshot to the given buffer.
 	 */
-	public void write(_ByteBuffer aBuffer)
+	public void write(ByteBuffer aBuffer)
 	{
 		aBuffer.putLong(itsPacketStartOffset);
 		aBuffer.putInt(itsPacketOffset);

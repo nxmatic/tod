@@ -92,7 +92,7 @@ public class TIntArrayList implements Cloneable {
         if (capacity > _data.length) {
             int newCap = Math.max(_data.length << 1, capacity);
             int[] tmp = new int[newCap];
-            System.arraycopy(_data, 0, tmp, 0, _data.length);
+            _Arrays.arraycopy(_data, 0, tmp, 0, _data.length);
             _data = tmp;
         }
     }
@@ -159,7 +159,7 @@ public class TIntArrayList implements Cloneable {
      */
     public void add(int[] vals, int offset, int length) {
         ensureCapacity(_pos + length);
-        System.arraycopy(vals, offset, _data, _pos, length);
+        _Arrays.arraycopy(vals, offset, _data, _pos, length);
         _pos += length;
     }
 
@@ -178,7 +178,7 @@ public class TIntArrayList implements Cloneable {
         }
         ensureCapacity(_pos + 1);
         // shift right
-        System.arraycopy(_data, offset, _data, offset + 1, _pos - offset);
+        _Arrays.arraycopy(_data, offset, _data, offset + 1, _pos - offset);
         // insert
         _data[offset] = value;
         _pos++;
@@ -215,9 +215,9 @@ public class TIntArrayList implements Cloneable {
 
         ensureCapacity(_pos + len);
         // shift right
-        System.arraycopy(_data, offset, _data, offset + len, _pos - offset);
+        _Arrays.arraycopy(_data, offset, _data, offset + len, _pos - offset);
         // insert
-        System.arraycopy(values, valOffset, _data, offset, len);
+        _Arrays.arraycopy(values, valOffset, _data, offset, len);
         _pos += len;
     }
 
@@ -300,7 +300,7 @@ public class TIntArrayList implements Cloneable {
         if (offset < 0 || offset + length > _pos) {
             throw new ArrayIndexOutOfBoundsException(offset);
         }
-        System.arraycopy(values, valOffset, _data, offset, length);
+        _Arrays.arraycopy(values, valOffset, _data, offset, length);
     }
 
     /**
@@ -390,13 +390,13 @@ public class TIntArrayList implements Cloneable {
 
         if (offset == 0) {
             // data at the front
-            System.arraycopy(_data, length, _data, 0, _pos - length);
+        	_Arrays.arraycopy(_data, length, _data, 0, _pos - length);
         } else if (_pos - length == offset) {
             // no copy to make, decrementing pos "deletes" values at
             // the end
         } else {
             // data in the middle
-            System.arraycopy(_data, offset + length,
+        	_Arrays.arraycopy(_data, offset + length,
                              _data, offset, _pos - (offset + length));
         }
         _pos -= length;
@@ -530,7 +530,7 @@ public class TIntArrayList implements Cloneable {
         if (offset < 0 || offset >= _pos) {
             throw new ArrayIndexOutOfBoundsException(offset);
         }
-        System.arraycopy(_data, offset, dest, 0, len);
+        _Arrays.arraycopy(_data, offset, dest, 0, len);
     }
 
     // comparing

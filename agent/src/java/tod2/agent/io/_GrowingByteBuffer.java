@@ -3,6 +3,8 @@
  */
 package tod2.agent.io;
 
+import java.tod.util._Arrays;
+
 /**
  * A byte buffer that grows as needed
  * @author gpothier
@@ -31,7 +33,7 @@ public class _GrowingByteBuffer extends _ByteBuffer
 		{
 			if (limit() != capacity()) throw new _BufferOverflowException();
 			byte[] theNewBuffer = new byte[Math.max(capacity()*2, remaining()+aRequested+capacity())];
-			System.arraycopy(array(), 0, theNewBuffer, 0, capacity());
+			_Arrays.arraycopy(array(), 0, theNewBuffer, 0, capacity());
 			_array(theNewBuffer);
 			limit(theNewBuffer.length);
 		}

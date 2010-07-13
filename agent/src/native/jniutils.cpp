@@ -35,7 +35,17 @@ StaticMethod::StaticMethod(
 {
 	if (propVerbose>=2) printf("Loading (jni) %s\n", aClassName);
 	jclass theClass = jni->FindClass(aClassName);
-	if (theClass == NULL) printf("Could not load %s!\n", aClassName);
+	if (theClass == NULL) 
+	{
+		printf("Could not load %s!\n", aClassName);
+		jthrowable ex = jni->ExceptionOccurred();
+		if (ex)
+		{
+			printf("Exception!!\n");
+			jni->ExceptionDescribe();
+			return;
+		}
+	}
 	itsClass = (jclass) jni->NewGlobalRef(theClass);
 	
 	itsMethod = jni->GetStaticMethodID(itsClass, aMethodName, aMethodSignature);

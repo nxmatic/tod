@@ -55,11 +55,14 @@ public class MethodInstrumenter_OutOfScope extends MethodInstrumenter
 	 * Temporarily holds the return value of the method
 	 */
 	private int itsResultVar;
+	
+	private int itsBootstrapVar;
 
 	public MethodInstrumenter_OutOfScope(ClassInstrumenter aClassInstrumenter, MethodNode aNode, IMutableBehaviorInfo aBehavior)
 	{
 		super(aClassInstrumenter, aNode, aBehavior);
 		itsResultVar = nextFreeVar(2); //result might need two slots.
+		itsBootstrapVar = nextFreeVar(1);
 		getNode().maxStack += 3; // This is the max we add to the stack
 	}
 
@@ -82,7 +85,7 @@ public class MethodInstrumenter_OutOfScope extends MethodInstrumenter
 //			if ("equals".equals(getNode().name)) return;
 //			if ("toString".equals(getNode().name)) return;
 			if ("finalize".equals(getNode().name)) return;
-			if ("wait".equals(getNode().name)) return;
+//			if ("wait".equals(getNode().name)) return;
 			System.out.println("Instrumenting: "+getClassNode().name+"."+getNode().name+getNode().desc);
 		}
 		
@@ -94,75 +97,64 @@ public class MethodInstrumenter_OutOfScope extends MethodInstrumenter
 
 		// Insert entry instructions
 		{
-			// Set ThreadData var to null for verifier to work
-			s.ACONST_NULL();
-			s.ASTORE(getThreadDataVar());
-
-			// Store the monitoring mode for the behavior in a local
-			s.pushInt(getBehavior().getId()); 
-			s.INVOKESTATIC(BCIUtils.CLS_TRACEDMETHODS, "traceEnveloppe", "(I)Z");
+			// Store bootstrap field
+			s.GETSTATIC(BCIUtils.CLS_OBJECT, ClassInstrumenter.BOOTSTRAP_FLAG, "Z");
 			s.DUP();
-			s.ISTORE(getTraceEnabledVar());
+			s.ISTORE(itsBootstrapVar);
 			
-			// Check monitoring mode
 			s.IFfalse(lStart);
 			
-			// Monitoring enabled
-			{
-				// Store ThreadData object
-				s.INVOKESTATIC(BCIUtils.CLS_EVENTCOLLECTOR_AGENT, "_getThreadData", "()"+BCIUtils.DSC_THREADDATA);
-				s.DUP();
-				s.ASTORE(getThreadDataVar());
-				
-				// Send event
-				s.INVOKEVIRTUAL(
-						BCIUtils.CLS_THREADDATA, 
-						isStaticInitializer() ? "evOutOfScopeClinitEnter" : "evOutOfScopeBehaviorEnter", 
-						"()V");
-				
-				s.GOTO(lStart);
-			}
+			// Store ThreadData object
+			s.INVOKESTATIC(BCIUtils.CLS_EVENTCOLLECTOR_AGENT, "_getThreadData", "()"+BCIUtils.DSC_THREADDATA);
+			s.DUP();
+			s.ASTORE(getThreadDataVar());
+
+			// Send event
+			s.INVOKEVIRTUAL(
+					BCIUtils.CLS_THREADDATA, 
+					isStaticInitializer() ? "evOutOfScopeClinitEnter" : "evOutOfScopeBehaviorEnter", 
+					"()V");
+			
+			s.GOTO(lStart);
 		}
 		
 		// Insert exit instructions (every return statement is replaced by a GOTO to this block)
 		{
 			s.label(lExit);
-			
-			// Check monitoring mode
+			Type theReturnType = getReturnType();
 			Label lReturn = new Label();
-			s.ILOAD(getTraceEnabledVar());
-			s.IFfalse(lReturn);
 
-			// Monitoring active, send event
+			s.ILOAD(itsBootstrapVar);
+			s.IFfalse(lReturn);
+			
+			// Send event (the method returns a flag that indicates if the result must be sent)
 			s.ALOAD(getThreadDataVar());
-			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evOutOfScopeBehaviorExit_Normal", "()V");				
+			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evOutOfScopeBehaviorExit_Normal", "()Z");				
 
 			// Send return value if needed
-			Type theReturnType = getReturnType();
 			if (theReturnType.getSort() != Type.VOID) 
 			{
-				s.ALOAD(getThreadDataVar());
-				s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "isInScope", "()Z");
 				s.IFfalse(lReturn);
 
-				s.ALOAD(getThreadDataVar());
-				s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "sendOutOfScopeBehaviorResult", "()V");
 				s.ISTORE(theReturnType, itsResultVar); // We can't use DUP in case of long or double, so we just store the value
 				sendValue(s, itsResultVar, theReturnType);
 				s.ILOAD(theReturnType, itsResultVar);
 			}
+			else
+			{
+				s.POP();
+			}
 			
 			s.label(lReturn);
-			s.RETURN(Type.getReturnType(getNode().desc));
+			s.RETURN(theReturnType);
 		}
 		
 		// Insert finally instructions
 		{
 			s.label(lFinally);
-			
-			// Check monitoring mode
 			Label lThrow = new Label();
-			s.ILOAD(getTraceEnabledVar());
+			
+			s.ILOAD(itsBootstrapVar);
 			s.IFfalse(lThrow);
 			
 			s.ALOAD(getThreadDataVar());

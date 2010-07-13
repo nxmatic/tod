@@ -22,6 +22,14 @@ public class _IO
 	
 	public static native void outi(String aMessage, int... aValues);	
 	public static native void outb(String aMessage, boolean... aValues);
+	
+	public static void fatal(String aMessage)
+	{
+		err(aMessage);
+		exit();
+	}
+	
+	public static native void exit();
 
 	public static void printStackTrace(Throwable aThrowable)
 	{

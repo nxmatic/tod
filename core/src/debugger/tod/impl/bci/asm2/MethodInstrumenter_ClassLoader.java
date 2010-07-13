@@ -74,7 +74,8 @@ public class MethodInstrumenter_ClassLoader extends MethodInstrumenter
 			s.ASTORE(getThreadDataVar());
 
 			// Store the monitoring mode for the behavior in a local
-			s.INVOKESTATIC(BCIUtils.CLS_TRACEDMETHODS, "traceEnabled", "()Z");
+//			s.INVOKESTATIC(BCIUtils.CLS_TRACEDMETHODS, "traceEnabled", "()Z");
+			s.pushInt(1); // TODO: check how we implement dynamic scoping
 			s.DUP();
 			s.ISTORE(getTraceEnabledVar());
 			

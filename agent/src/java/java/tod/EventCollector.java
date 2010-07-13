@@ -183,9 +183,12 @@ public final class EventCollector
 	
 	private static boolean startsWith(char[] aChars, String aString)
 	{
-		int l = aString.length();
-		if (l > aChars.length) return false;
-		for(int i=0;i<l;i++) if (aChars[i] != aString.charAt(i)) return false;
+		int len = TODAccessor.getStringCount(aString);
+		int ofs = TODAccessor.getStringOffset(aString);
+		char[] buf = TODAccessor.getStringChars(aString);
+		
+		if (len > aChars.length) return false;
+		for(int i=0;i<len;i++) if (aChars[i] != buf[i+ofs]) return false;
 		return true;
 	}
 	

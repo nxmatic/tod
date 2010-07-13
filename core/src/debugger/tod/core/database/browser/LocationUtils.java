@@ -22,7 +22,6 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 */
 package tod.core.database.browser;
 
-import java.tod.util._StringBuilder;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -43,8 +42,6 @@ import tod.core.database.structure.SourceRange;
 import tod.core.database.structure.IBehaviorInfo.BytecodeRole;
 import tod.core.database.structure.IStructureDatabase.ProbeInfo;
 import tod.gui.IGUIManager;
-import tod2.agent.MonitoringMode;
-import zz.utils.Utils;
 
 /**
  * Utilities related to {@link IStructureDatabase}
@@ -310,50 +307,4 @@ public class LocationUtils
 				aBehavior.getSignature());
 	}
 	
-	public static String toMonitoringModeString(int aMode)
-	{
-		int theInstrumentation = aMode & MonitoringMode.MASK_INSTRUMENTATION;
-		int theCall = aMode & MonitoringMode.MASK_CALL;
-		
-		StringBuilder theBuilder = new StringBuilder();
-		
-		switch(theInstrumentation)
-		{
-		case MonitoringMode.INSTRUMENTATION_NONE: 
-			theBuilder.append("INSTRUMENTATION_NONE");
-			break;
-			
-		case MonitoringMode.INSTRUMENTATION_ENVELOPPE: 
-			theBuilder.append("INSTRUMENTATION_ENVELOPPE");
-			break;
-			
-		case MonitoringMode.INSTRUMENTATION_FULL: 
-			theBuilder.append("INSTRUMENTATION_FULL");
-			break;
-			
-		default: return "bad mode: "+theInstrumentation;
-		}
-		
-		theBuilder.append(' ');
-
-		switch(theCall)
-		{
-		case MonitoringMode.CALL_UNMONITORED: 
-			theBuilder.append("CALL_UNMONITORED");
-			break;
-			
-		case MonitoringMode.CALL_MONITORED: 
-			theBuilder.append("CALL_MONITORED");
-			break;
-			
-		case MonitoringMode.CALL_UNKNOWN: 
-			theBuilder.append("CALL_UNKNOWN");
-			break;
-			
-		default: return "bad mode: "+theCall;
-		}
-		
-		return theBuilder.toString();
-	}
-
 }

@@ -70,7 +70,7 @@ public class IOThread extends Thread
 	 */
 	private final _SyncRingBuffer<Packet> itsPendingPackets = new _SyncRingBuffer<Packet>(1000);
 	
-	private final _ArrayList<ThreadPacket>[] itsFreeThreadPackets;
+//	private final _ArrayList<ThreadPacket>[] itsFreeThreadPackets;
 	
 	/**
 	 * A set of {@link ThreadData} objects registered with this {@link IOThread}.
@@ -90,11 +90,6 @@ public class IOThread extends Thread
 	 *  Time at which last stale buffer check was performed
 	 */
 	private long itsCheckTime;
-	
-	/**
-	 * Last observed value of the Capture Enabled flag
-	 */
-	private boolean itsLastEnabled; 
 	
 	/**
 	 *  Number of buffers that were sent since last timestamp was taken (taking timestamps is costly)
@@ -118,8 +113,8 @@ public class IOThread extends Thread
 		itsShutdownHook = new MyShutdownHook();
 		Runtime.getRuntime().addShutdownHook(itsShutdownHook);
 		
-		itsFreeThreadPackets = new _ArrayList[ThreadPacket.RECYCLE_QUEUE_COUNT];
-		for(int i=0;i<itsFreeThreadPackets.length;i++) itsFreeThreadPackets[i] = new _ArrayList<ThreadPacket>();
+//		itsFreeThreadPackets = new _ArrayList[ThreadPacket.RECYCLE_QUEUE_COUNT];
+//		for(int i=0;i<itsFreeThreadPackets.length;i++) itsFreeThreadPackets[i] = new _ArrayList<ThreadPacket>();
 	}
 	
 	public void setChannel(_SocketChannel aChannel)
@@ -168,7 +163,6 @@ public class IOThread extends Thread
 		try
 		{
 			itsCheckTime = System.currentTimeMillis();
-			itsLastEnabled = ! AgentReady.CAPTURE_ENABLED; 
 			itsSentPackets = 0;
 			
 			while(!hasShutdownStarted())
@@ -226,20 +220,20 @@ public class IOThread extends Thread
 			itsPacketsSent++;
 		}
 		
-		synchronized (itsFreeThreadPackets)
-		{
-			itsFreeThreadPackets[aPacket.recycleQueue].add(aPacket);
-		}
+//		synchronized (itsFreeThreadPackets)
+//		{
+//			itsFreeThreadPackets[aPacket.recycleQueue].add(aPacket);
+//		}
 	}
 	
-	public ThreadPacket getFreeThreadPacket(int aRecycleQueue)
-	{
-		if (itsFreeThreadPackets[aRecycleQueue].isEmpty()) return null;
-		synchronized (itsFreeThreadPackets)
-		{
-			return itsFreeThreadPackets[aRecycleQueue].removeLast();
-		}
-	}
+//	public ThreadPacket getFreeThreadPacket(int aRecycleQueue)
+//	{
+//		if (itsFreeThreadPackets[aRecycleQueue].isEmpty()) return null;
+//		synchronized (itsFreeThreadPackets)
+//		{
+//			return itsFreeThreadPackets[aRecycleQueue].removeLast();
+//		}
+//	}
 	
 	private void sendStringPacket(StringPacket aPacket) throws _IOException
 	{
@@ -403,41 +397,41 @@ public class IOThread extends Thread
 	 */
 	public static final class ThreadPacket extends Packet
 	{
-		/**
-		 * Recycle queue for standard packets (all have the same length).
-		 */
-		public static final int RECYCLE_QUEUE_STANDARD = 0;
-		
-		/**
-		 * Recycle queue for other packets.
-		 */
-		public static final int RECYCLE_QUEUE_OTHER = 1;
-		public static final int RECYCLE_QUEUE_COUNT = 2;
+//		/**
+//		 * Recycle queue for standard packets (all have the same length).
+//		 */
+//		public static final int RECYCLE_QUEUE_STANDARD = 0;
+//		
+//		/**
+//		 * Recycle queue for other packets.
+//		 */
+//		public static final int RECYCLE_QUEUE_OTHER = 1;
+//		public static final int RECYCLE_QUEUE_COUNT = 2;
 		
 		public int threadId;
 		public byte[] data;
 		
-		/**
-		 * When the packet has been sent, it will be placed on this recycle queue.
-		 */
-		public int recycleQueue;
+//		/**
+//		 * When the packet has been sent, it will be placed on this recycle queue.
+//		 */
+//		public int recycleQueue;
 		
 		public int offset;
 		public int length;
 		
 		
-		public void set(int aThreadId, byte[] aData, int aRecycleQueue, int aOffset, int aLength)
+		public void set(int aThreadId, byte[] aData, /*int aRecycleQueue, */int aOffset, int aLength)
 		{
 			threadId = aThreadId;
 			data = aData;
-			recycleQueue = aRecycleQueue;
+//			recycleQueue = aRecycleQueue;
 			offset = aOffset;
 			length = aLength;
 		}
 
-		public void set(int aThreadId, byte[] aData, int aRecycleQueue)
+		public void set(int aThreadId, byte[] aData/*, int aRecycleQueue*/)
 		{
-			set(aThreadId, aData, aRecycleQueue, 0, aData.length);
+			set(aThreadId, aData, /*aRecycleQueue, */0, aData.length);
 		}
 
 		@Override

@@ -37,9 +37,9 @@ import java.tod.transport.ObjectEncoder;
 import java.util.HashMap;
 import java.util.Map;
 
+import tod.utils.ByteBuffer;
 import tod2.agent.ObjectValue;
 import tod2.agent.ObjectValue.FieldValue;
-import tod2.agent.io._ByteBuffer;
 
 /**
  * Decodes objects encoded by {@link ObjectEncoder}
@@ -66,18 +66,18 @@ public class ObjectDecoder
 		switch(theType)
 		{
 		case ObjectValue.TYPE_NULL: return null;
-		case ObjectValue.TYPE_STRING: return _ByteBuffer.getString(aStream);
-		case ObjectValue.TYPE_INT: return _ByteBuffer.getIntL(aStream); 
-		case ObjectValue.TYPE_LONG: return _ByteBuffer.getLongL(aStream);
+		case ObjectValue.TYPE_STRING: return ByteBuffer.getString(aStream);
+		case ObjectValue.TYPE_INT: return ByteBuffer.getIntL(aStream); 
+		case ObjectValue.TYPE_LONG: return ByteBuffer.getLongL(aStream);
 		case ObjectValue.TYPE_BYTE: return aStream.readByte();
-		case ObjectValue.TYPE_SHORT: return (short) _ByteBuffer.getCharL(aStream);
-		case ObjectValue.TYPE_CHAR: return _ByteBuffer.getCharL(aStream);
-		case ObjectValue.TYPE_FLOAT: return Float.intBitsToFloat(_ByteBuffer.getIntL(aStream));
-		case ObjectValue.TYPE_DOUBLE: return Double.longBitsToDouble(_ByteBuffer.getLongL(aStream));
+		case ObjectValue.TYPE_SHORT: return (short) ByteBuffer.getCharL(aStream);
+		case ObjectValue.TYPE_CHAR: return ByteBuffer.getCharL(aStream);
+		case ObjectValue.TYPE_FLOAT: return Float.intBitsToFloat(ByteBuffer.getIntL(aStream));
+		case ObjectValue.TYPE_DOUBLE: return Double.longBitsToDouble(ByteBuffer.getLongL(aStream));
 		case ObjectValue.TYPE_BOOLEAN: return aStream.readChar() != 0;
 		case ObjectValue.TYPE_VALUE: return readObjectValue(aStream, aMapping); 
 		case ObjectValue.TYPE_REF:
-			int theId = _ByteBuffer.getIntL(aStream);
+			int theId = ByteBuffer.getIntL(aStream);
 			Object theValue = aMapping.get(theId);
 			if (theValue == null) throw new RuntimeException("No mapping for "+theId);
 			return theValue;
@@ -88,18 +88,18 @@ public class ObjectDecoder
 	
 	private static ObjectValue readObjectValue(DataInputStream aStream, Map<Integer, ObjectValue> aMapping) throws IOException
 	{
-		String theClassName = _ByteBuffer.getString(aStream);
+		String theClassName = ByteBuffer.getString(aStream);
 		boolean theThrowable = aStream.readByte() != 0;
 		
 		ObjectValue theResult = new ObjectValue(theClassName, theThrowable);
 		aMapping.put(aMapping.size()+1, theResult);
 		
-		int theFieldCount = _ByteBuffer.getIntL(aStream);
+		int theFieldCount = ByteBuffer.getIntL(aStream);
 		
 		FieldValue[] theFields = new FieldValue[theFieldCount];
 		for(int i=0;i<theFieldCount;i++)
 		{
-			String theFieldName = _ByteBuffer.getString(aStream);
+			String theFieldName = ByteBuffer.getString(aStream);
 			Object theFieldValue = decode(aStream, aMapping);
 			
 			theFields[i] = new FieldValue(theFieldName, theFieldValue);

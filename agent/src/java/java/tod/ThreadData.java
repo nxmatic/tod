@@ -13,8 +13,6 @@ import java.tod.util.IntDeltaSender;
 import java.tod.util.LongDeltaSender;
 import java.tod.util._StringBuilder;
 
-import com.sun.org.apache.bcel.internal.generic.ATHROW;
-
 import tod2.access.TODAccessor;
 import tod2.agent.AgentDebugFlags;
 import tod2.agent.Command;
@@ -32,6 +30,13 @@ import tod2.agent.io._GrowingByteBuffer;
  */
 public final class ThreadData 
 {
+	/** 
+	 * Fake method to force the loading of this class
+	 */
+	public static void load()
+	{
+	}
+	
 	private boolean ECHO_FORREAL = true;
 	
 	/**
@@ -53,7 +58,7 @@ public final class ThreadData
 	 * The top of this stack indicates if the thread is executing in-scope or
 	 * out-of-scope code.
 	 */
-	private BitStack itsScopeStack = new BitStack();
+	private final BitStack itsScopeStack = new BitStack();
 	
 	/**
 	 * Size of the buffer store.
@@ -89,7 +94,6 @@ public final class ThreadData
 	private RegisteredRefObjectsStack itsRegisteredRefObjectsStack = new RegisteredRefObjectsStack();
 	
 	private int itsLastSentLTimestamp = 0;
-	private int itsLastTracedMethodsVersion = 0;
 
 	private int[] itsEvCount = new int[Message.MSG_COUNT];
 	private long[] itsEvData = new long[Message.MSG_COUNT];
@@ -131,7 +135,7 @@ public final class ThreadData
 		byte[] theData = new byte[BUFFER_SIZE]; 
 		
 		itsPacket = new ThreadPacket();
-		itsPacket.set(getId(), theData, ThreadPacket.RECYCLE_QUEUE_STANDARD);
+		itsPacket.set(getId(), theData/*, ThreadPacket.RECYCLE_QUEUE_STANDARD*/);
 		
 		itsBuffer = _ByteBuffer.wrap(theData);
 	}
@@ -184,6 +188,24 @@ public final class ThreadData
 		boolean thePop = itsScopeStack.pop();
 		if (AgentDebugFlags.EVENT_LOG) echoPopScope(thePop);
 		return thePop;
+	}
+	
+	/**
+	 * Pops a value the scope stack, checks that it is an out of scope, and peeks 
+	 * the next value
+	 */
+	private boolean popOutOfScopeAndPeekScope()
+	{
+		BitStack theStack = itsScopeStack;
+		if (theStack == null) 
+		{
+			_IO.fatal("[ThreadData.popOutOfScopeAndPeekScope]: null stack");
+		}
+		boolean thePop = theStack.pop();
+		if (thePop) _IO.fatal("[ThreadData.popOutOfScopeAndPeekScope]: Invalid state");
+		boolean thePeek = theStack.peek();
+		if (AgentDebugFlags.EVENT_LOG) echoPopScope(thePeek);
+		return thePeek;
 	}
 	
 	public void sendMessageType(_ByteBuffer aBuffer, byte aType) 
@@ -394,14 +416,14 @@ public final class ThreadData
 		
 		itsIOThread.pushPacket(thePacket);
 		
-		thePacket = itsIOThread.getFreeThreadPacket(ThreadPacket.RECYCLE_QUEUE_STANDARD);
+		/*thePacket = itsIOThread.getFreeThreadPacket(ThreadPacket.RECYCLE_QUEUE_STANDARD);
 		if (thePacket != null)
 		{
 			thePacket.threadId = getId();
 			itsBuffer.clear(thePacket.data);
 			itsPacket = thePacket;
 		}
-		else resetBuffer();
+		else*/ resetBuffer();
 	}
 	
 	/**
@@ -414,27 +436,6 @@ public final class ThreadData
 		{
 			sendSync(Timestamper.t);
 			itsLastSentLTimestamp = theLTimestamp;
-		}
-	}
-	
-	/**
-	 * Checks if the current version of the {@link TracedMethods} structure
-	 * is the same as the last observed; if not, send a message to inform the database.
-	 */
-	public void checkTracedMethodsVersion()
-	{
-		int theCurrentVersion = TracedMethods.version;
-		if (itsLastTracedMethodsVersion != theCurrentVersion)
-		{
-			itsLastTracedMethodsVersion = theCurrentVersion;
-			
-			msgStart(Message.TRACEDMETHODS_VERSION, 0);
-			if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.TRACEDMETHODS_VERSION, theCurrentVersion); 
-			sendMessageType(itsBuffer, Message.TRACEDMETHODS_VERSION);
-			itsBuffer.putInt(theCurrentVersion);
-			msgStop();
-			
-			commitBuffer();
 		}
 	}
 	
@@ -679,7 +680,6 @@ public final class ThreadData
 		if (enter()) return;
 		
 		sendRegisteredObjects();
-		checkTracedMethodsVersion();
 		commitBuffer();
 		
 		msgStart(Message.INSCOPE_BEHAVIOR_ENTER, 0);
@@ -698,7 +698,6 @@ public final class ThreadData
 		if (enter()) return;
 		
 		sendRegisteredObjects();
-		checkTracedMethodsVersion();
 		commitBuffer();
 		
 		msgStart(Message.INSCOPE_CLINIT_ENTER, 0);
@@ -736,7 +735,6 @@ public final class ThreadData
 		if (enter()) return;
 		
 		sendRegisteredObjects();
-		checkTracedMethodsVersion();
 		commitBuffer();
 		
 		msgStart(Message.CLASSLOADER_EXIT, 0);
@@ -746,7 +744,7 @@ public final class ThreadData
 		sendMessageType(itsBuffer, Message.CLASSLOADER_EXIT);
 		
 		msgStop();
-		if (popScope()) throw new TODError("Unexpected scope state");
+		if (popScope()) _IO.fatal("[ThreadData.evClassLoaderExit: Unexpected scope state");
 		exit();
 	}
 	
@@ -892,7 +890,7 @@ public final class ThreadData
 		if (AgentDebugFlags.EVENT_LOG) echoMessageType_NoIncCount(Message.INSCOPE_BEHAVIOR_EXIT_NORMAL, -1); 
 		msgStop();
 		
-		if (! popScope()) throw new TODError("Unexpected scope state");
+		if (! popScope()) _IO.fatal("[ThreadData.evInScopeBehaviorExit_Normal]: Unexpected scope state");
 		
 		exit();
 	}
@@ -909,7 +907,7 @@ public final class ThreadData
 		sendMessageType(itsBuffer, Message.INSCOPE_BEHAVIOR_EXIT_EXCEPTION);
 		msgStop();
 		
-		if (! popScope()) throw new TODError("Unexpected scope state");
+		if (! popScope()) _IO.fatal("[ThreadData.evInScopeBehaviorExit_Exception]: Unexpected scope state");
 		
 		exit();
 	}
@@ -921,16 +919,18 @@ public final class ThreadData
 	{
 		if (enter()) return;
 		
-		sendRegisteredObjects();
-		checkTracedMethodsVersion();
-		commitBuffer();
-		
-		msgStart(Message.OUTOFSCOPE_BEHAVIOR_ENTER, 0);
-		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.OUTOFSCOPE_BEHAVIOR_ENTER, -1); 
-		sendMessageType(itsBuffer, Message.OUTOFSCOPE_BEHAVIOR_ENTER);
-		msgStop();
-		
+		boolean theFromScope = isInScope();
 		pushOutOfScope();
+		if (theFromScope) 
+		{
+			sendRegisteredObjects();
+			commitBuffer();
+			
+			msgStart(Message.OUTOFSCOPE_BEHAVIOR_ENTER, 0);
+			if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.OUTOFSCOPE_BEHAVIOR_ENTER, -1); 
+			sendMessageType(itsBuffer, Message.OUTOFSCOPE_BEHAVIOR_ENTER);
+			msgStop();
+		}
 		
 		exit();
 	}
@@ -939,16 +939,18 @@ public final class ThreadData
 	{
 		if (enter()) return;
 		
-		sendRegisteredObjects();
-		checkTracedMethodsVersion();
-		commitBuffer();
-		
-		msgStart(Message.OUTOFSCOPE_CLINIT_ENTER, 0);
-		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.OUTOFSCOPE_CLINIT_ENTER, -1); 
-		sendMessageType(itsBuffer, Message.OUTOFSCOPE_CLINIT_ENTER);
-		msgStop();
-		
+		boolean theFromScope = isInScope();
 		pushOutOfScope();
+		if (theFromScope) 
+		{
+			sendRegisteredObjects();
+			commitBuffer();
+			
+			msgStart(Message.OUTOFSCOPE_CLINIT_ENTER, 0);
+			if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.OUTOFSCOPE_CLINIT_ENTER, -1); 
+			sendMessageType(itsBuffer, Message.OUTOFSCOPE_CLINIT_ENTER);
+			msgStop();
+		}
 		
 		exit();
 	}
@@ -956,36 +958,29 @@ public final class ThreadData
 	/**
 	 * Exiting normally from an out-of-scope non-void behavior (which has envelope only instrumentation).
 	 */
-	public void evOutOfScopeBehaviorExit_Normal()
+	public boolean evOutOfScopeBehaviorExit_Normal()
 	{
-		if (enter()) return;
+		if (enter()) return false;
 		
-		sendRegisteredObjects();
-		commitBuffer();
-		
-		msgStart(Message.OUTOFSCOPE_BEHAVIOR_EXIT_NORMAL, 0);
-		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.OUTOFSCOPE_BEHAVIOR_EXIT_NORMAL, -1); 
-		sendMessageType(itsBuffer, Message.OUTOFSCOPE_BEHAVIOR_EXIT_NORMAL);
-		msgStop();
-		
-		if (popScope()) throw new TODError("Unexpected scope state");
-		
-		exit();
-	}
-	
-	/**
-	 * Indicates that a behavior return value is going to be sent next.
-	 */
-	public void sendOutOfScopeBehaviorResult()
-	{
-		if (enter()) return;
-		
-		msgStart(Message.OUTOFSCOPE_BEHAVIOR_EXIT_RESULT, 1);
-		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.OUTOFSCOPE_BEHAVIOR_EXIT_RESULT, -1); 
-		sendMessageType(itsBuffer, Message.OUTOFSCOPE_BEHAVIOR_EXIT_RESULT);
-		msgStop();
-		
-		exit();
+		if (popOutOfScopeAndPeekScope()) 
+		{
+			// For some reason, calling sendRegisteredObjects here makes the VM crash at some point.
+//			sendRegisteredObjects();
+			commitBuffer();
+			
+			msgStart(Message.OUTOFSCOPE_BEHAVIOR_EXIT_NORMAL, 0);
+			if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.OUTOFSCOPE_BEHAVIOR_EXIT_NORMAL, -1); 
+			sendMessageType(itsBuffer, Message.OUTOFSCOPE_BEHAVIOR_EXIT_NORMAL);
+			msgStop();
+			
+			exit();
+			return true;
+		}
+		else
+		{
+			exit();
+			return false;
+		}
 	}
 	
 	/**
@@ -995,101 +990,21 @@ public final class ThreadData
 	{
 		if (enter()) return;
 		
-		sendRegisteredObjects();
-		commitBuffer();
-		
-		msgStart(Message.OUTOFSCOPE_BEHAVIOR_EXIT_EXCEPTION, 0);
-		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.OUTOFSCOPE_BEHAVIOR_EXIT_EXCEPTION, -1); 
-		sendMessageType(itsBuffer, Message.OUTOFSCOPE_BEHAVIOR_EXIT_EXCEPTION);
-		msgStop();
-		
-		if (popScope()) throw new TODError("Unexpected scope state");
-		
+		if (popOutOfScopeAndPeekScope()) 
+		{
+//			sendRegisteredObjects();
+			commitBuffer();
+			
+			msgStart(Message.OUTOFSCOPE_BEHAVIOR_EXIT_EXCEPTION, 0);
+			if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.OUTOFSCOPE_BEHAVIOR_EXIT_EXCEPTION, -1); 
+			sendMessageType(itsBuffer, Message.OUTOFSCOPE_BEHAVIOR_EXIT_EXCEPTION);
+			msgStop();
+		}
+
 		exit();
 	}
 	
 
-	/**
-	 * Before an unmonitored behavior call.
-	 */
-	public void evUnmonitoredBehaviorCall()
-	{
-		if (enter()) return;
-		
-		checkTracedMethodsVersion();
-
-		msgStart(Message.UNMONITORED_BEHAVIOR_CALL, 0);
-		if (AgentDebugFlags.EVENT_LOG) echoMessageType_NoIncCount(Message.UNMONITORED_BEHAVIOR_CALL, -1); 
-		msgStop();
-		pushOutOfScope();
-		
-		exit();
-	}
-	
-	/**
-	 * After an unmonitored behavior call.
-	 * The result value should be sent immediately after.
-	 */
-	public void evUnmonitoredBehaviorResultNonVoid()
-	{
-		if (enter()) return;
-		
-		sendRegisteredObjects();
-		commitBuffer();
-		
-		msgStart(Message.UNMONITORED_BEHAVIOR_CALL_RESULT, 1);
-		checkTimestamp();
-		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.UNMONITORED_BEHAVIOR_CALL_RESULT, -1); 
-		sendMessageType(itsBuffer, Message.UNMONITORED_BEHAVIOR_CALL_RESULT);
-		msgStop();
-		
-		if (popScope()) throw new TODError("Unexpected scope state");
-		
-		exit();
-	}
-	
-	/**
-	 * After an unmonitored behavior call.
-	 */
-	public void evUnmonitoredBehaviorResultVoid()
-	{
-		if (enter()) return;
-		
-		sendRegisteredObjects();
-		commitBuffer();
-		
-		msgStart(Message.UNMONITORED_BEHAVIOR_CALL_RESULT, 0);
-		checkTimestamp();
-		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.UNMONITORED_BEHAVIOR_CALL_RESULT, -1); 
-		sendMessageType(itsBuffer, Message.UNMONITORED_BEHAVIOR_CALL_RESULT);
-		msgStop();
-		
-		if (popScope()) throw new TODError("Unexpected scope state");
-		
-		exit();
-	}
-	
-	/**
-	 * An unmonitored behavior call threw an exception.
-	 */
-	public void evUnmonitoredBehaviorException()
-	{
-		if (enter()) return;
-		
-		sendRegisteredObjects();
-		commitBuffer();
-		
-		msgStart(Message.UNMONITORED_BEHAVIOR_CALL_EXCEPTION, 0);
-		checkTimestamp();
-		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.UNMONITORED_BEHAVIOR_CALL_EXCEPTION, -1); 
-		sendMessageType(itsBuffer, Message.UNMONITORED_BEHAVIOR_CALL_EXCEPTION);
-		msgStop();
-		
-		if (popScope()) throw new TODError("Unexpected scope state");
-		
-		exit();
-	}
-	
 	/**
 	 * Determines if the given object should be sent by value.
 	 */
@@ -1241,19 +1156,22 @@ public final class ThreadData
 
 	private void sendRegisteredObject(long aId, Object aObject) 
 	{
-		if (aObject.getClass() == String.class)
+//		_IO.out("s");
+//		if (aObject.getClass() == String.class)
+		if (aObject instanceof String)
 		{
 			// Special case for strings, for speed
 			itsIOThread.pushPacket(new StringPacket(aId, (String) aObject));
 			return;
 		}
 		
-		ThreadPacket thePacket = itsIOThread.getFreeThreadPacket(ThreadPacket.RECYCLE_QUEUE_OTHER);
-		if (thePacket == null) 
+		ThreadPacket thePacket;
+//		thePacket = itsIOThread.getFreeThreadPacket(1/*ThreadPacket.RECYCLE_QUEUE_OTHER*/);
+//		if (thePacket == null) 
 		{
 			thePacket = new ThreadPacket();
 			thePacket.data = new byte[128];
-			thePacket.recycleQueue = ThreadPacket.RECYCLE_QUEUE_OTHER;
+//			thePacket.recycleQueue = ThreadPacket.RECYCLE_QUEUE_OTHER;
 		}
 		
 		thePacket.threadId = getId();

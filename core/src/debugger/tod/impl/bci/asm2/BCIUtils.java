@@ -75,7 +75,6 @@ public class BCIUtils implements Opcodes
 	public static final String DSC_EVENTCOLLECTOR_AGENT = "L"+CLS_EVENTCOLLECTOR_AGENT+";";
 	public static final String CLS_AGENTREADY = "java/tod/AgentReady";
 	public static final String CLS_EXCEPTIONGENERATEDRECEIVER = "java/tod/ExceptionGeneratedReceiver";
-	public static final String CLS_TRACEDMETHODS = "java/tod/TracedMethods";
 	public static final String CLS_THREADDATA = "java/tod/ThreadData";
 	public static final String DSC_THREADDATA = "L"+CLS_THREADDATA+";";
 	public static final String CLS_OBJECT = getJvmClassName(Object.class);

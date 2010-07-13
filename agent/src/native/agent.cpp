@@ -83,8 +83,6 @@ int propVerbose = 2;
 StaticVoidMethod* ExceptionGeneratedReceiver_exceptionGenerated;
 int isInitializingExceptionMethods = 0;
 
-StaticVoidMethod* MethodGroupManager_classLoaded;
-StaticVoidMethod* MethodGroupManager_setup;
 StaticVoidMethod* TOD_enable;
 StaticVoidMethod* TOD_start;
 StaticLongMethod* ObjectIdentity_nextId;
@@ -190,57 +188,6 @@ struct ClassInfo
         this->infoLen = infoLen;
     }
 };
-
-void registerClassInfoNow(JNIEnv* jni, ClassInfo* classInfo)
-{
-	if (propVerbose>=2) printf("Trying: %d\n", classInfo->id);
-	
-	jbyteArray array = jni->NewByteArray(classInfo->infoLen);
-	jni->SetByteArrayRegion(array, 0, classInfo->infoLen, classInfo->info);
-	MethodGroupManager_classLoaded->invoke(jni, classInfo->id, array);
-	
-	if (propVerbose>=2) printf("Registered class info: %d\n", classInfo->id);
-
-// 	printf("Freeing...\n");
-// 	delete classInfo->bytecode;
-// 	delete classInfo->info;
-// 	delete classInfo;
-// 	printf("Freed.\n");
-}
-
-/**
-Registers the traced methods that were registered in tmpTracedMethods
-*/ 
-void registerBufferedClassInfo(JNIEnv* jni)
-{
-	if (propVerbose>=1) printf("Registering %d buffered class infos\n", classInfoBuffer.size());
-	std::vector<ClassInfo*>::iterator iter = classInfoBuffer.begin();
-	std::vector<ClassInfo*>::iterator end = classInfoBuffer.end();
-	
-	while (iter != end) 
-	{
-		ClassInfo* classInfo = *iter++;
-		if (propVerbose>=2) printf("Doing: %d\n", classInfo->id);
-		registerClassInfoNow(jni, classInfo);
-		if (propVerbose>=2) printf("Done: %d, remaining: %d\n", classInfo->id, classInfoBuffer.size());
-	}
-	
-	classInfoBuffer.clear();
-}
-
-void registerClassInfo(JNIEnv* jni, ClassInfo* classInfo)
-{
-	if (CAPTURE_STARTED)
-	{
-		if (propVerbose>=1) printf("Registering class info\n");
-		registerClassInfoNow(jni, classInfo);
-	}
-	else
-	{
-		if (propVerbose>=1) printf("Buffering class info, will register later\n");
-		classInfoBuffer.push_back(classInfo);
-	}
-}
 
 ClassInfo* checkCacheInfo(
 	const char* name, 
@@ -369,7 +316,6 @@ void agentClassFileLoadHook(
 			printf("[TOD] Starting capture (%s).\n", name);
 			fflush(stdout);
 
-			registerBufferedClassInfo(jni);
 			CAPTURE_STARTED = 1;
 			TOD_start->invoke(jni);
 		}
@@ -404,9 +350,6 @@ void agentClassFileLoadHook(
 		{
 			*new_class_data = (unsigned char*) info->bytecode;
 			*new_class_data_len = info->bytecodeLen;
-				
-			// Register traced methods
-			registerClassInfo(jni, info);
 		}
 	}
 	
@@ -501,13 +444,10 @@ void agentStart(JNIEnv* jni)
 	// Initialize the classes and method ids that will be used
 	// for registering traced methods
 	
-	MethodGroupManager_classLoaded = new StaticVoidMethod(jni, "java/tod/MethodGroupManager", "classLoaded", "(I[B)V");
-	MethodGroupManager_setup = new StaticVoidMethod(jni, "java/tod/MethodGroupManager", "setup", "()V");
-	TOD_enable = new StaticVoidMethod(jni, "java/tod/AgentReady", "nativeAgentLoaded", "()V");	
-	TOD_start = new StaticVoidMethod(jni, "java/tod/AgentReady", "start", "()V");	
+	TOD_enable = new StaticVoidMethod(jni, "java/tod/AgentReady", "nativeAgentLoaded", "()V");
+	TOD_start = new StaticVoidMethod(jni, "java/tod/AgentReady", "start", "()V");
 	ObjectIdentity_nextId = new StaticLongMethod(jni, "java/tod/ObjectIdentity", "nextId", "()J");
 
-	MethodGroupManager_setup->invoke(jni);
 	TOD_enable->invoke(jni);
 	
 	if (propVerbose>=1) printf("Agent start - done\n");
@@ -523,7 +463,7 @@ void agentInit(
 	char* aPropCachePath,
 	char* aPropClientName)
 {
-	printf("Loading TOD agent - v5.0.1\n");
+	printf("Loading TOD agent - v5.0.2\n");
 
 	if (aPropVerbose)
 	{

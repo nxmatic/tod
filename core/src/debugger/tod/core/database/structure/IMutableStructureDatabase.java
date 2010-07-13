@@ -22,7 +22,6 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 */
 package tod.core.database.structure;
 
-import java.tod.MethodGroupManager;
 import java.util.Map;
 
 import tod.core.database.structure.IBehaviorInfo.BytecodeRole;

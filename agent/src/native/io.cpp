@@ -230,6 +230,12 @@ JNIEXPORT jint JNICALL Java_java_tod_io__1IO_outb
 	jni->ReleaseBooleanArrayElements(v, elem, JNI_ABORT);
 }
 
+JNIEXPORT jint JNICALL Java_java_tod_io__1IO_exit
+  (JNIEnv* jni, jclass)
+{
+	exit(-2);
+}
+
 
 #ifdef __cplusplus
 }

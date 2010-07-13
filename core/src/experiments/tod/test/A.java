@@ -25,9 +25,25 @@ package tod.test;
 
 public class A
 {
+	private static void foo()
+	{
+		A a = new A(new B());
+		System.out.println(a);
+	}
+	
 	public A (A a)
 	{
 		System.out.println("hop");
 		int i = 987349827;
+	}
+	
+	public A(B b)
+	{
+		
+	}
+	
+	public static class B
+	{
+		
 	}
 }

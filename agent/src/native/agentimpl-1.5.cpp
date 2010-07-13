@@ -39,14 +39,32 @@ extern "C" {
 // Pointer to our JVMTI environment, to be able to use it in pure JNI calls
 jvmtiEnv *gJvmti;
 
-typedef jobject (JNICALL *cloneCall) (JNIEnv *env, jobject obj);
+typedef jobject (JNICALL *tCall__jobject) (JNIEnv*, jobject);
+typedef jclass (JNICALL *tCall__jclass) (JNIEnv*, jobject);
+typedef jint (JNICALL *tCall__jint) (JNIEnv*, jobject);
+typedef void (JNICALL *tCall__void) (JNIEnv*, jobject);
+typedef void (JNICALL *tCall_jlong_void) (JNIEnv*, jobject, jlong);
 
-jmethodID methodId_clone = 0;
-cloneCall originalMethod_clone = NULL;
+
+jmethodID methodId_Object_clone = 0;
+tCall__jobject originalMethod_Object_clone = NULL;
+
+jmethodID methodId_Object_getClass = 0;
+tCall__jclass originalMethod_Object_getClass = NULL;
+
+jmethodID methodId_Object_hashCode = 0;
+tCall__jint originalMethod_Object_hashCode = NULL;
+
+jmethodID methodId_Object_notify = 0;
+tCall__void originalMethod_Object_notify = NULL;
+
+jmethodID methodId_Object_notifyAll = 0;
+tCall__void originalMethod_Object_notifyAll = NULL;
+
+jmethodID methodId_Object_wait = 0;
+tCall_jlong_void originalMethod_Object_wait = NULL;
 
 jmethodID methodId_resetId = 0;
-
-jmethodID methodId_class_getName = 0;
 
 /* Every JVMTI interface returns an error code, which should be checked
  *   to avoid any cascading errors down the line.
@@ -158,30 +176,39 @@ void JNICALL cbVMStart(
 
 void initMethodIds(JNIEnv* jni)
 {
-	jclass class_Object;
-	class_Object = jni->FindClass("java/lang/Object");
-	methodId_clone = jni->GetMethodID(class_Object, "clone", "()Ljava/lang/Object;");
+	jclass class_Object = jni->FindClass("java/lang/Object");
+	
+	methodId_Object_clone = jni->GetMethodID(class_Object, "clone", "()Ljava/lang/Object;");
 	methodId_resetId = jni->GetMethodID(class_Object, "$tod$resetId", "()V");
-
-	jclass class_Class;
-	class_Class = jni->FindClass("java/lang/Class");
-	methodId_class_getName = jni->GetMethodID(class_Class, "getName", "()Ljava/lang/String;");
+	
+	methodId_Object_getClass = jni->GetMethodID(class_Object, "getClass", "()Ljava/lang/Class;");
+	methodId_Object_hashCode = jni->GetMethodID(class_Object, "hashCode", "()I");
+	methodId_Object_notify = jni->GetMethodID(class_Object, "notify", "()V");
+	methodId_Object_notifyAll = jni->GetMethodID(class_Object, "notifyAll", "()V");
+	methodId_Object_wait = jni->GetMethodID(class_Object, "wait", "(J)V");
 }
 
-JNIEXPORT jobject JNICALL cloneWrapper(JNIEnv *jni, jobject obj) 
+// void nativeEnvelopeEntry(JNIEnv *jni)
+// {
+// 	
+// }
+
+JNIEXPORT jobject JNICALL Object_clone_wrapper(JNIEnv *jni, jobject obj) 
 {
 	// Call original clone method
-	jobject clone = originalMethod_clone(jni, obj);
+	jobject clone = originalMethod_Object_clone(jni, obj);
 
 	// Determine if the object has a "real" class, as in certain cases
 	// calling the resetId method on array classes crashes the JVM
+	// Note that we don't care that resetId is not called on array classes
+	// as they don't store the id in a field
 	jclass cls = jni->GetObjectClass(obj);
 	jint status;
 	jvmtiError e = gJvmti->GetClassStatus(cls, &status);
 	if (e != JVMTI_ERROR_NONE)
 	{
 		jclass ex = jni->FindClass("java/lang/Error");
-		jni->ThrowNew(ex, "Bam");
+		jni->ThrowNew(ex, "Exception in Object_clone_wrapper (native)");
 		return 0;
 	}
 
@@ -190,6 +217,38 @@ JNIEXPORT jobject JNICALL cloneWrapper(JNIEnv *jni, jobject obj)
 		jni->CallObjectMethod(clone, methodId_resetId);
 		
 	return clone;
+}
+
+JNIEXPORT jclass JNICALL Object_getClass_wrapper(JNIEnv *jni, jobject obj) 
+{
+	// Call original method
+	jclass result = originalMethod_Object_getClass(jni, obj);
+	return result;
+}
+
+JNIEXPORT jint JNICALL Object_hashCode_wrapper(JNIEnv *jni, jobject obj) 
+{
+	// Call original method
+	jint result = originalMethod_Object_hashCode(jni, obj);
+	return result;
+}
+
+JNIEXPORT void JNICALL Object_notify_wrapper(JNIEnv *jni, jobject obj) 
+{
+	// Call original method
+	originalMethod_Object_notify(jni, obj);
+}
+
+JNIEXPORT void JNICALL Object_notifyAll_wrapper(JNIEnv *jni, jobject obj) 
+{
+	// Call original method
+	originalMethod_Object_notifyAll(jni, obj);
+}
+
+JNIEXPORT void JNICALL Object_wait_wrapper(JNIEnv *jni, jobject obj, jlong time) 
+{
+	// Call original method
+	originalMethod_Object_wait(jni, obj, time);
 }
 
 void JNICALL cbNativeMethodBind(
@@ -202,13 +261,40 @@ void JNICALL cbNativeMethodBind(
 {
 	if (jni == NULL) return;
 	
-	if (methodId_clone == NULL) initMethodIds(jni);
+	if (methodId_Object_clone == NULL) initMethodIds(jni);
 
-	if (method == methodId_clone)
+	if (method == methodId_Object_clone)
 	{
-		originalMethod_clone = (cloneCall) address;
-		*new_address_ptr = (void*) &cloneWrapper;
+		originalMethod_Object_clone = (tCall__jobject) address;
+		*new_address_ptr = (void*) &Object_clone_wrapper;
 	}
+	else if (method == methodId_Object_getClass)
+	{
+		originalMethod_Object_getClass = (tCall__jclass) address;
+		*new_address_ptr = (void*) &Object_getClass_wrapper;
+	} 
+	else if (method == methodId_Object_hashCode)
+	{
+		originalMethod_Object_hashCode = (tCall__jint) address;
+		*new_address_ptr = (void*) &Object_hashCode_wrapper;
+	} 
+	else if (method == methodId_Object_notify)
+	{
+		originalMethod_Object_notify = (tCall__void) address;
+		*new_address_ptr = (void*) &Object_notify_wrapper;
+	} 
+	else if (method == methodId_Object_notifyAll)
+	{
+		originalMethod_Object_notifyAll = (tCall__void) address;
+		*new_address_ptr = (void*) &Object_notifyAll_wrapper;
+	} 
+	else if (method == methodId_Object_wait)
+	{
+		originalMethod_Object_wait = (tCall_jlong_void) address;
+		*new_address_ptr = (void*) &Object_wait_wrapper;
+	} 
+
+	return;
 }
 
 /**
@@ -262,6 +348,7 @@ Agent_OnLoad(JavaVM *vm, char *options, void *reserved)
 	capabilities.can_generate_exception_events = 1;
 	capabilities.can_tag_objects = 1;
 	capabilities.can_generate_native_method_bind_events = 1;
+	capabilities.can_set_native_method_prefix = 1;
 	err = jvmti->AddCapabilities(&capabilities);
 	check_jvmti_error(jvmti, err, "AddCapabilities");
 
@@ -279,7 +366,10 @@ Agent_OnLoad(JavaVM *vm, char *options, void *reserved)
  	enable_event(jvmti, JVMTI_EVENT_CLASS_FILE_LOAD_HOOK);
 	enable_event(jvmti, JVMTI_EVENT_EXCEPTION);
 	enable_event(jvmti, JVMTI_EVENT_VM_START);
-	enable_event(jvmti, JVMTI_EVENT_NATIVE_METHOD_BIND);
+// 	enable_event(jvmti, JVMTI_EVENT_NATIVE_METHOD_BIND);
+	
+	// Native method prefix
+	jvmti->SetNativeMethodPrefix("$todwrap$");
 	
 	cfgIsJVM14 = false;
 
