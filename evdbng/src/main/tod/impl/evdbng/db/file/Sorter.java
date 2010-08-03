@@ -3,6 +3,8 @@ package tod.impl.evdbng.db.file;
 /**
  * A copy of Java's Arrays sorting algorithm, but allows to override the swap
  * method so that matched arrays (for instance) can be sorted efficiently.
+ * The mergeSort methods perform a stable sort, but do not sort in place 
+ * (although the API hides this).
  * 
  * @author gpothier
  * 
@@ -174,6 +176,50 @@ public abstract class Sorter
 		if ((s = d - c) > 1) sort1(x, n - s, s);
 	}
 
+	public void mergeSort(long[] x)
+	{
+        long[] aux = x.clone();
+        mergeSort(aux, x, 0, x.length, 0);
+	}
+	
+	private void mergeSort(long[] src, long[] dest, int low, int high, int off)
+	{
+		int length = high - low;
+
+		// Insertion sort on smallest arrays
+		if (length < 7)
+		{
+			for (int i = low; i < high; i++)
+				for (int j = i; j > low && dest[j - 1] > dest[j]; j--)
+					swap(dest, j, j - 1);
+			return;
+		}
+
+		// Recursively sort halves of dest into src
+		int destLow = low;
+		int destHigh = high;
+		low += off;
+		high += off;
+		int mid = (low + high) >>> 1;
+		mergeSort(dest, src, low, mid, -off);
+		mergeSort(dest, src, mid, high, -off);
+
+		// If list is already sorted, just copy from src to dest. This is an
+		// optimization that results in faster sorts for nearly ordered lists.
+		if (src[mid - 1] <= src[mid])
+		{
+			System.arraycopy(src, low, dest, destLow, length);
+			return;
+		}
+
+		// Merge sorted halves (now in src) into dest
+		for (int i = destLow, p = low, q = mid; i < destHigh; i++)
+		{
+			if (q >= high || p < mid && src[p] <= src[q]) dest[i] = src[p++];
+			else dest[i] = src[q++];
+		}
+	}
+	
 	/**
 	 * Swaps x[a] with x[b].
 	 */

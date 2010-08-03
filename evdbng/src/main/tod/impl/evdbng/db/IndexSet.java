@@ -31,7 +31,7 @@ import java.util.List;
 import tod.impl.database.AbstractFilteredBidiIterator;
 import tod.impl.database.IBidiIterator;
 import tod.impl.evdbng.DebuggerGridConfigNG;
-import tod.impl.evdbng.db.file.BTree;
+import tod.impl.evdbng.db.file.StaticBTree;
 import tod.impl.evdbng.db.file.Page;
 import tod.impl.evdbng.db.file.PagedFile;
 import tod.impl.evdbng.db.file.Tuple;
@@ -106,7 +106,7 @@ public abstract class IndexSet<T extends Tuple>
 		itsIndexes = new ArrayList<Entry<BTreeWrapper<T>>>();
 		
 		// Init discarded index page directory.
-		itsIndexesPerPage = PagedFile.PAGE_SIZE/BTree.getSerializedSize();
+		itsIndexesPerPage = PagedFile.PAGE_SIZE/StaticBTree.getSerializedSize();
 		itsIndexPages = new IntArray();
 		
 		Monitor.getInstance().register(this);
@@ -130,9 +130,9 @@ public abstract class IndexSet<T extends Tuple>
 		Monitor.getInstance().unregister(this);		
 	}
 
-	public abstract BTree<T> createIndex(int aIndex);
+	public abstract StaticBTree<T> createIndex(int aIndex);
 	
-	public abstract BTree<T> loadIndex(int aIndex, PageIOStream aStream);
+	public abstract StaticBTree<T> loadIndex(int aIndex, PageIOStream aStream);
 	
 	/**
 	 * Returns the file used by the indexes of this set.
@@ -145,7 +145,7 @@ public abstract class IndexSet<T extends Tuple>
 	/**
 	 * Retrieved the index corresponding to the specified... index.
 	 */
-	public BTree<T> getIndex(int aIndex)
+	public StaticBTree<T> getIndex(int aIndex)
 	{
 		Entry<BTreeWrapper<T>> theEntry = Utils.listGet(itsIndexes, aIndex);
 		BTreeWrapper<T> theIndex;
@@ -153,7 +153,7 @@ public abstract class IndexSet<T extends Tuple>
 		if (theEntry == null)
 		{
 			// The index never existed.
-			BTree<T> theTree = createIndex(aIndex);
+			StaticBTree<T> theTree = createIndex(aIndex);
 			theIndex = new BTreeWrapper<T>(theTree, this, aIndex);
 			theEntry = new Entry<BTreeWrapper<T>>(theIndex);
 			
@@ -166,7 +166,7 @@ public abstract class IndexSet<T extends Tuple>
 			// The index was written to the disk and discarded
 			PageIOStream theStream = getIndexPage(aIndex);
 			
-			BTree<T> theTree = loadIndex(aIndex, theStream);
+			StaticBTree<T> theTree = loadIndex(aIndex, theStream);
 			theIndex = new BTreeWrapper<T>(theTree, this, aIndex);
 			theEntry = new Entry<BTreeWrapper<T>>(theIndex);
 			
@@ -204,7 +204,7 @@ public abstract class IndexSet<T extends Tuple>
 		}
 		
 		PageIOStream theBitStruct = thePage.asIOStream();
-		theBitStruct.setPos((aIndex % itsIndexesPerPage) * BTree.getSerializedSize());
+		theBitStruct.setPos((aIndex % itsIndexesPerPage) * StaticBTree.getSerializedSize());
 		
 		return theBitStruct;
 	}
@@ -215,7 +215,7 @@ public abstract class IndexSet<T extends Tuple>
 		assert theEntry != null : itsName+": "+aIndex;
 		assert theEntry != DISCARDED_ENTRY : itsName+": "+aIndex;
 		assert theEntry.getValue() != null : itsName+": "+aIndex;
-		BTree<T> theIndex = theEntry.getValue().getTree();
+		StaticBTree<T> theIndex = theEntry.getValue().getTree();
 		
 		theIndex.writeTo(getIndexPage(aIndex));
 		Utils.listSet(itsIndexes, aIndex, DISCARDED_ENTRY);
@@ -316,7 +316,7 @@ public abstract class IndexSet<T extends Tuple>
 	
 	private static class BTreeWrapper<T extends Tuple>
 	{
-		private final BTree<T> itsTree;
+		private final StaticBTree<T> itsTree;
 		private final IndexSet<T> itsIndexSet;
 		
 		/**
@@ -327,7 +327,7 @@ public abstract class IndexSet<T extends Tuple>
 		private int itsUseCount = 0;
 		
 		public BTreeWrapper(
-				BTree<T> aTree, 
+				StaticBTree<T> aTree, 
 				IndexSet<T> aIndexSet, 
 				int aIndex)
 		{
@@ -346,7 +346,7 @@ public abstract class IndexSet<T extends Tuple>
 			return itsIndexSet;
 		}
 
-		public BTree<T> getTree()
+		public StaticBTree<T> getTree()
 		{
 			return itsTree;
 		}

@@ -24,7 +24,7 @@ package tod.impl.evdbng.db;
 
 import tod.impl.evdbng.DebuggerGridConfigNG;
 import tod.impl.evdbng.db.DBExecutor.DBTask;
-import tod.impl.evdbng.db.file.BTree;
+import tod.impl.evdbng.db.file.StaticBTree;
 import tod.impl.evdbng.db.file.PagedFile;
 import tod.impl.evdbng.db.file.SimpleTree;
 import tod.impl.evdbng.db.file.SimpleTuple;
@@ -43,13 +43,13 @@ public class SimpleIndexSet extends IndexSet<SimpleTuple>
 	}
 
 	@Override
-	public BTree<SimpleTuple> createIndex(int aIndex)
+	public StaticBTree<SimpleTuple> createIndex(int aIndex)
 	{
 		return new SimpleTree(getName()+"-"+aIndex, getFile());
 	}
 
 	@Override
-	public BTree<SimpleTuple> loadIndex(int aIndex, PageIOStream aStream)
+	public StaticBTree<SimpleTuple> loadIndex(int aIndex, PageIOStream aStream)
 	{
 		return new SimpleTree(getName()+"-"+aIndex, getFile(), aStream);
 	}

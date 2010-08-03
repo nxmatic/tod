@@ -34,7 +34,7 @@ import tod.impl.evdbng.db.file.Page.PageIOStream;
 import tod.impl.evdbng.db.file.TupleFinder.Match;
 import tod.impl.evdbng.db.file.TupleFinder.NoMatch;
 
-public abstract class BTree<T extends Tuple>
+public abstract class StaticBTree<T extends Tuple>
 {
 	/**
 	 * The name of this btree (the index it represents).
@@ -112,7 +112,7 @@ public abstract class BTree<T extends Tuple>
 	{
 		if (DebugFlags.DB_LOG_DIR != null)
 		{
-			synchronized(BTree.class)
+			synchronized(StaticBTree.class)
 			{
 				itsLogWriter.print(aName+": "+aLeafTupleCount+" - "+aKey);
 				if (aExtradata != null) itsLogWriter.print(" "+aExtradata);
@@ -122,7 +122,7 @@ public abstract class BTree<T extends Tuple>
 		}
 	}
 	
-	public BTree(String aName, PagedFile aFile)
+	public StaticBTree(String aName, PagedFile aFile)
 	{
 		itsName = aName;
 		itsFile = aFile;
@@ -138,7 +138,7 @@ public abstract class BTree<T extends Tuple>
 	/**
 	 * Reconstructs a previously-written tree from the given struct.
 	 */
-	public BTree(String aName, PagedFile aFile, PageIOStream aStream)
+	public StaticBTree(String aName, PagedFile aFile, PageIOStream aStream)
 	{
 		itsName = aName;
 		itsFile = aFile;
@@ -597,24 +597,22 @@ public abstract class BTree<T extends Tuple>
 	 */
 	private static class MyChainedPageIOStream<T extends Tuple> extends ChainedPageIOStream
 	{
-		private final BTree<T> itsTree;
+		private final StaticBTree<T> itsTree;
 		private final int itsLevel;
 		
-		public MyChainedPageIOStream(PagedFile aFile, BTree<T> aTree, int aLevel)
+		public MyChainedPageIOStream(PagedFile aFile, StaticBTree<T> aTree, int aLevel)
 		{
 			super(aFile);
 			itsTree = aTree;
 			itsLevel = aLevel;
 		}
 		
-		public MyChainedPageIOStream(PagedFile aFile, int aPageId, int aPosition, BTree<T> aTree, int aLevel)
+		public MyChainedPageIOStream(PagedFile aFile, int aPageId, int aPosition, StaticBTree<T> aTree, int aLevel)
 		{
 			super(aFile, aPageId, aPosition);
 			itsTree = aTree;
 			itsLevel = aLevel;
 		}
-
-
 
 		@Override
 		protected void newPageHook(int aOldPageId, int aNewPageId)

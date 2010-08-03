@@ -87,7 +87,7 @@ public class MethodInstrumenter_OutOfScope extends MethodInstrumenter
 //			if ("equals".equals(getNode().name)) return;
 //			if ("toString".equals(getNode().name)) return;
 			if ("finalize".equals(getNode().name)) return;
-			if ("wait".equals(getNode().name)) return;
+			if ("wait".equals(getNode().name)) return; // No problem, it's final
 			System.out.println("Instrumenting: "+theClassName+"."+getNode().name+getNode().desc);
 		}
 		

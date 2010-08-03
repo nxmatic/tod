@@ -31,7 +31,7 @@ import tod.impl.evdbng.DebuggerGridConfigNG;
 import tod.impl.evdbng.ObjectCodecNG;
 import tod.impl.evdbng.SplittedConditionHandler;
 import tod.impl.evdbng.db.IndexSet.IndexManager;
-import tod.impl.evdbng.db.file.BTree;
+import tod.impl.evdbng.db.file.StaticBTree;
 import tod.impl.evdbng.db.file.PagedFile;
 import tod.impl.evdbng.db.file.RoleTree;
 import tod.impl.evdbng.db.file.SequenceTree;
@@ -365,7 +365,7 @@ public class Indexes
 	}
 	
 	public <T extends Tuple> long[] fastCounts(
-			BTree<T> aIndex,
+			StaticBTree<T> aIndex,
 			long aT1, 
 			long aT2,
 			int aSlotsCount)

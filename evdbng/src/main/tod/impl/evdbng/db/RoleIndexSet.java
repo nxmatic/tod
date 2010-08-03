@@ -26,7 +26,7 @@ import tod.impl.database.AbstractFilteredBidiIterator;
 import tod.impl.database.IBidiIterator;
 import tod.impl.evdbng.DebuggerGridConfigNG;
 import tod.impl.evdbng.db.DBExecutor.DBTask;
-import tod.impl.evdbng.db.file.BTree;
+import tod.impl.evdbng.db.file.StaticBTree;
 import tod.impl.evdbng.db.file.PagedFile;
 import tod.impl.evdbng.db.file.RoleTree;
 import tod.impl.evdbng.db.file.RoleTuple;
@@ -76,13 +76,13 @@ public class RoleIndexSet extends IndexSet<RoleTuple>
 	}
 	
 	@Override
-	public BTree<RoleTuple> createIndex(int aIndex)
+	public StaticBTree<RoleTuple> createIndex(int aIndex)
 	{
 		return new RoleTree(getName()+"-"+aIndex, getFile());
 	}
 
 	@Override
-	public BTree<RoleTuple> loadIndex(int aIndex, PageIOStream aStream)
+	public StaticBTree<RoleTuple> loadIndex(int aIndex, PageIOStream aStream)
 	{
 		return new RoleTree(getName()+"-"+aIndex, getFile(), aStream);
 	}

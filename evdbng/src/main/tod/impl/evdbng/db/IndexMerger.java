@@ -25,7 +25,7 @@ package tod.impl.evdbng.db;
 import tod.impl.database.IBidiIterator;
 import tod.impl.dbgrid.merge.ConjunctionIterator;
 import tod.impl.dbgrid.merge.DisjunctionIterator;
-import tod.impl.evdbng.db.file.BTree;
+import tod.impl.evdbng.db.file.StaticBTree;
 import tod.impl.evdbng.db.file.Tuple;
 
 /**
@@ -59,13 +59,13 @@ public class IndexMerger
 	 * at the specified timestamp. 
 	 */
 	public static <T extends Tuple> IBidiIterator<T>[] getIterators(
-			BTree<T>[] aIndexes,
+			StaticBTree<T>[] aIndexes,
 			long aTimestamp)
 	{
 		IBidiIterator<T>[] theIterators = new IBidiIterator[aIndexes.length];
 		for (int i = 0; i < aIndexes.length; i++)
 		{
-			BTree<T> theIndex = aIndexes[i];
+			StaticBTree<T> theIndex = aIndexes[i];
 			theIterators[i] = theIndex.getTupleIterator(aTimestamp);
 		}
 		return theIterators;

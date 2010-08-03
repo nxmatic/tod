@@ -23,7 +23,7 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 package tod.impl.evdbng.db.file;
 
 /**
- * Tuple for internal nodes of the {@link BTree}
+ * Tuple for internal nodes of the {@link StaticBTree}
  * @author gpothier
  */
 public class InternalTuple extends Tuple

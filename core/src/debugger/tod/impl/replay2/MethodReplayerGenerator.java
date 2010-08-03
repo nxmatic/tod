@@ -988,6 +988,7 @@ public abstract class MethodReplayerGenerator
 						
 		};
 	}
+
 	
 	private static final String[] SUFFIX_FOR_SORT = new String[11];
 	private boolean itsStatic;

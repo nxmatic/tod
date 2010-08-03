@@ -26,10 +26,10 @@ import tod.core.DebugFlags;
 import tod.impl.evdbng.db.file.Page.PageIOStream;
 
 /**
- * A {@link BTree} of role tuples.
+ * A {@link StaticBTree} of role tuples.
  * @author gpothier
  */
-public class RoleTree extends BTree<RoleTuple>
+public class RoleTree extends StaticBTree<RoleTuple>
 {
 //	private AddTask itsCurrentTask = new AddTask();
 

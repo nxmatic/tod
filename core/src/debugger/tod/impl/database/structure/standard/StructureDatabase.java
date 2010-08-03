@@ -268,9 +268,14 @@ implements IShareableStructureDatabase
 		
 		itsFile.seek(theOffset); // Continue writing at the old location
 		
+		
+		System.out.println("Database loaded, registered elements:");
+		System.out.println(itsClasses.size()+" classes.");
+		System.out.println(itsBehaviors.size()+" behaviors.");
+		System.out.println(itsFields.size()+" fields.");
+		
 		if (DebugFlags.LOG_STRUCTURE)
 		{
-			System.out.println("Database loaded, registered elements:");
 			for (IClassInfo theClass : getClasses())
 			{
 				if (theClass != null) Utils.println("Class %d: %s", theClass.getId(), theClass.getName());

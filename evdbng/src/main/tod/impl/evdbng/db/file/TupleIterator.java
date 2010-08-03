@@ -41,10 +41,10 @@ import tod.impl.dbgrid.ITupleIterator;
 public class TupleIterator<T extends Tuple> extends AbstractBidiIterator<T>
 implements ITupleIterator<T>
 {
-	private final BTree<T> itsTree;
+	private final StaticBTree<T> itsTree;
 	
 	/**
-	 * The level of the iterated pages in the {@link BTree}.
+	 * The level of the iterated pages in the {@link StaticBTree}.
 	 * For now it seems we only iterate on leaves, so the level is 0.
 	 */
 	private int itsLevel = 0;
@@ -70,7 +70,7 @@ implements ITupleIterator<T>
 	/**
 	 * Creates an exhausted iterator.
 	 */
-	public TupleIterator(BTree<T> aTree)
+	public TupleIterator(StaticBTree<T> aTree)
 	{
 		super (true);
 		itsTree = aTree;
@@ -78,7 +78,7 @@ implements ITupleIterator<T>
 	}
 
 	public TupleIterator(
-			BTree<T> aTree, 
+			StaticBTree<T> aTree, 
 			TupleBuffer<T> aTupleBuffer,
 			int aPosition)
 	{

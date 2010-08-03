@@ -27,10 +27,10 @@ import tod.impl.dbgrid.db.ObjectsDatabase;
 import tod.impl.evdbng.db.file.Page.PageIOStream;
 
 /**
- * A {@link BTree} of object ref info for the {@link ObjectsDatabase}.
+ * A {@link StaticBTree} of object ref info for the {@link ObjectsDatabase}.
  * @author gpothier
  */
-public class ObjectRefTree extends BTree<ObjectRefTuple>
+public class ObjectRefTree extends StaticBTree<ObjectRefTuple>
 {
 	public ObjectRefTree(String aName, PagedFile aFile, PageIOStream aStream)
 	{

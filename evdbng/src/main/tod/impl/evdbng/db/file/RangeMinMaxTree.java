@@ -2,6 +2,7 @@ package tod.impl.evdbng.db.file;
 
 import static tod.impl.evdbng.db.file.PagedFile.PAGE_SIZE;
 import tod.impl.evdbng.db.file.Page.PageIOStream;
+import zz.utils.bit.BitUtils;
 
 
 /**
@@ -12,6 +13,16 @@ import tod.impl.evdbng.db.file.Page.PageIOStream;
  */
 public class RangeMinMaxTree
 {
+	/**
+	 * The integer MASKS[i] has the (32-i)th bit set and all other bits are 0.
+	 */
+	public static final int[] MASKS = new int[32];
+	
+	static
+	{
+		for(int i=31, j=1;i>=0;i--, j<<=1) MASKS[i] = j;
+	}
+
 	private final PagedFile itsFile;
 	private static final int BITS_PER_PAGE = PAGE_SIZE*8;
 	private static final int PACKETS_PER_PAGE = BITS_PER_PAGE/32;
@@ -32,15 +43,6 @@ public class RangeMinMaxTree
 	private static final int TUPLE_OFFSET_PTR = 6; 
 	
 	
-	/**
-	 * The integer MASKS[i] has the (32-i)th bit set and all other bits are 0.
-	 */
-	private static final int[] MASKS = new int[32];
-	
-	static
-	{
-		for(int i=31, j=1;i>=0;i--, j<<=1) MASKS[i] = j; 
-	}
 	
 	/**
 	 * The first page of each level of the tree. Index 0 corresponds to the leaves.

@@ -27,10 +27,10 @@ import tod.impl.dbgrid.db.ObjectsDatabase;
 import tod.impl.evdbng.db.file.Page.PageIOStream;
 
 /**
- * A {@link BTree} of object pointers for the {@link ObjectsDatabase}.
+ * A {@link StaticBTree} of object pointers for the {@link ObjectsDatabase}.
  * @author gpothier
  */
-public class ObjectPointerTree extends BTree<ObjectPointerTuple>
+public class ObjectPointerTree extends StaticBTree<ObjectPointerTuple>
 {
 
 	public ObjectPointerTree(String aName, PagedFile aFile, PageIOStream aStream)

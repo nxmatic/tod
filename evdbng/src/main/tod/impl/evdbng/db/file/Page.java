@@ -665,6 +665,12 @@ public abstract class Page
 			itsCurrentStream.writeBL(aByte, aLong);
 		}
 		
+		public void writeBytes(byte[] aBytes, int aOffset, int aLength)
+		{
+			checkSpace(aLength);
+			itsCurrentStream.writeBytes(aBytes, aOffset, aLength);
+		}
+		
 		public void writeInternalTupleData(int aPageId, long aTupleCount)
 		{
 			checkSpace(PageIOStream.internalTupleDataSize());

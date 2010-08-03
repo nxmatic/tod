@@ -26,10 +26,10 @@ import tod.core.DebugFlags;
 import tod.impl.evdbng.db.file.Page.PageIOStream;
 
 /**
- * A {@link BTree} of simple tuples (no extra data).
+ * A {@link StaticBTree} of simple tuples (no extra data).
  * @author gpothier
  */
-public class SimpleTree extends BTree<SimpleTuple>
+public class SimpleTree extends StaticBTree<SimpleTuple>
 {
 //	private AddTask itsCurrentTask = new AddTask();
 

@@ -233,7 +233,7 @@ public class TestBTree
 	}
 	
 	
-	private void testTupleForward(BTree aBTree, long aStartKey)
+	private void testTupleForward(StaticBTree aBTree, long aStartKey)
 	{
 		TupleIterator<SimpleTuple> theIterator = aBTree.getTupleIterator(aStartKey);
 		long theKey = aStartKey; 
@@ -245,7 +245,7 @@ public class TestBTree
 		
 	}
 	
-	private void testTupleBackward(BTree aBTree, long aStartKey)
+	private void testTupleBackward(StaticBTree aBTree, long aStartKey)
 	{
 		TupleIterator<SimpleTuple> theIterator = aBTree.getTupleIterator(aStartKey);
 		long theKey = aStartKey; 

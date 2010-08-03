@@ -62,6 +62,7 @@ import tod.core.database.structure.IMutableStructureDatabase;
 import tod.core.database.structure.IStructureDatabase;
 import tod.impl.bci.asm2.BCIUtils;
 import tod.impl.server.BufferStream;
+import zz.utils.ListMap;
 import zz.utils.Utils;
 
 public class ReplayerLoader extends ClassLoader
@@ -242,6 +243,74 @@ public class ReplayerLoader extends ClassLoader
 		String theName = aClassNode.name.replace('/', '.');
 		addClass(theName, theBytecode);
 	}
+	
+	/**
+	 * Creates the Dispatcher class that is used to dispatch method calls.
+	 */
+	private void createDispatcherClass()
+	{
+		ClassNode theClass = new ClassNode();
+		ListMap<MethodDescriptor, IBehaviorInfo> theMap = new ListMap<MethodDescriptor, IBehaviorInfo>();
+		
+		// Split behaviors into groups of the same signature
+		IBehaviorInfo[] theBehaviors = itsDatabase.getBehaviors();
+		for (IBehaviorInfo theBehavior : theBehaviors)
+		{
+			// TODO: check if in scope
+			MethodDescriptor theDescriptor = getDescriptor(theBehavior);
+			theMap.add(theDescriptor, theBehavior);
+		}
+
+		// Create one dispatch method per group
+		for(Map.Entry<MethodDescriptor, List<IBehaviorInfo>> theEntry : theMap.entrySet())
+		{
+			MethodNode theMethod  = createDispatcher(theEntry.getKey(), theEntry.getValue());
+			theClass.methods.add(theMethod);
+		}
+	}
+	
+	private MethodNode createDispatcher(MethodDescriptor aDescriptor, List<IBehaviorInfo> aBehaviors)
+	{
+		MethodNode theMethod = new MethodNode();
+		theMethod.name = "dispatch";
+		theMethod.desc = aDescriptor.getSignature()[1];
+		theMethod.exceptions = Collections.EMPTY_LIST;
+		theMethod.access = Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC;
+		theMethod.tryCatchBlocks = Collections.EMPTY_LIST;
+
+		SList s = new SList();
+		
+		int n = aBehaviors.size();
+		
+		Label[] theLabels = new Label[n];
+		int[] theKeys = new int[n];
+		for(int i=0;i<n;i++) theLabels[i] = new Label();
+		
+		Label theDefault = new Label();
+		
+		// Push args
+		s.ALOAD(0); // ThreadReplayer
+		s.ALOAD(0); // EventCollector
+		
+		
+		s.LOOKUPSWITCH(theDefault, theKeys, theLabels);
+		
+		for(int i=0;i<n;i++)
+		{
+			IBehaviorInfo theBehavior = aBehaviors.get(i);
+			theLabels[i] = new Label();
+			theKeys[i] = theBehavior.getId();
+			
+			s.label(theLabels[i]);
+		}
+		
+		
+		
+		
+		theMethod.instructions = s;
+		return theMethod;
+	}
+	
 	
 	/**
 	 * Create all methods with a body that throws {@link UnsupportedOperationException}.
@@ -482,6 +551,14 @@ public class ReplayerLoader extends ClassLoader
 		}
 	}
 	
+	private static MethodDescriptor getDescriptor(IBehaviorInfo aBehavior)
+	{
+		String theSignature = aBehavior.getSignature();
+		Type theReturnType = Type.getReturnType(theSignature);
+		Type[] theArgumentTypes = Type.getArgumentTypes(theSignature);
+		return new MethodDescriptor(aBehavior.isStatic(), theReturnType, theArgumentTypes);
+	}
+	
 	/**
 	 * Returns a set of all descriptors that are used by methods in the given database
 	 */
@@ -489,13 +566,7 @@ public class ReplayerLoader extends ClassLoader
 	{
 		Set<MethodDescriptor> theResult = new HashSet<MethodDescriptor>();
 		IBehaviorInfo[] theBehaviors = aDatabase.getBehaviors();
-		for (IBehaviorInfo theBehavior : theBehaviors)
-		{
-			String theSignature = theBehavior.getSignature();
-			Type theReturnType = Type.getReturnType(theSignature);
-			Type[] theArgumentTypes = Type.getArgumentTypes(theSignature);
-			theResult.add(new MethodDescriptor(theBehavior.isStatic(), theReturnType, theArgumentTypes));
-		}
+		for (IBehaviorInfo theBehavior : theBehaviors) theResult.add(getDescriptor(theBehavior));
 		
 		return theResult;
 	}

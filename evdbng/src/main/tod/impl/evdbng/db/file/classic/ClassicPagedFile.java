@@ -126,7 +126,7 @@ public class ClassicPagedFile extends PagedFile
 	{
 		try
 		{
-			itsLock.lock();
+			lock();
 
 			assert aPageId > 0 : aPageId;
 			
@@ -151,7 +151,7 @@ public class ClassicPagedFile extends PagedFile
 		}
 		finally
 		{
-			itsLock.unlock();
+			unlock();
 		}
 	}
 	
@@ -160,7 +160,7 @@ public class ClassicPagedFile extends PagedFile
 	{
 		try
 		{
-			itsLock.lock();
+			lock();
 
 			int thePageId;
 
@@ -172,7 +172,7 @@ public class ClassicPagedFile extends PagedFile
 		}
 		finally
 		{
-			itsLock.unlock();
+			unlock();
 		}
 	}
 	
@@ -218,7 +218,7 @@ public class ClassicPagedFile extends PagedFile
 	{
 		try
 		{
-			itsLock.lock();
+			lock();
 
 			int thePageId = aPage.getPageId();
 			
@@ -239,7 +239,7 @@ public class ClassicPagedFile extends PagedFile
 		}
 		finally
 		{
-			itsLock.unlock();
+			unlock();
 		}
 	}
 	
@@ -250,7 +250,7 @@ public class ClassicPagedFile extends PagedFile
 	{
 		try
 		{
-			itsLock.lock();
+			lock();
 
 			int thePhysPageId = itsPhysicalPage.get(aPage.getPageId());
 			updateScattering(thePhysPageId);
@@ -259,7 +259,7 @@ public class ClassicPagedFile extends PagedFile
 		}
 		finally
 		{
-			itsLock.unlock();
+			unlock();
 		}
 	}
 

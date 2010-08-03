@@ -36,6 +36,7 @@ import java.util.BitSet;
 import tod.BenchBase;
 import tod.BenchBase.BenchResults;
 
+import zz.utils.bit.BitUtils;
 import zz.utils.primitive.IntArray;
 
 public class BitStackBench
@@ -45,13 +46,14 @@ public class BitStackBench
 	
 	public static void main(String[] args)
 	{
+		bench(new DirectLookupInt());
 		bench(new DirectInt());
+		bench(new DirectLong());
 		bench(new FatByte());
 		bench(new ManualDynamicFatByte());
 		bench(new ManualDynamicInt());
 		bench(new DynamicInt());
 		bench(new BitSetBacked());
-		bench(new DirectLong());
 	}
 	
 	// Note that we duplicate the bench methods because using an abstract class and reusing the same
@@ -117,6 +119,29 @@ public class BitStackBench
 	}
 	
 	private static void bench(DirectInt aStack, int n)
+	{
+		for(int i=0;i<n;i++)
+		{
+			for(int j=0;j<M;j++) aStack.push((j & 1) == 0);
+			for(int j=0;j<M;j++) aStack.peek();
+			for(int j=0;j<M;j++) aStack.pop();
+		}
+	}
+	
+	private static void bench(final DirectLookupInt aStack)
+	{
+		bench(aStack, N);
+		BenchResults b = BenchBase.benchmark(new Runnable()
+		{
+			public void run()
+			{
+				bench(aStack, N);
+			}
+		});
+		System.out.println(aStack + ": " + b);
+	}
+	
+	private static void bench(DirectLookupInt aStack, int n)
 	{
 		for(int i=0;i<n;i++)
 		{
@@ -319,6 +344,49 @@ public class BitStackBench
 		public boolean peek()
 		{
 			return (itsValues[itsIndex] & itsMask) != 0;
+		}
+	}
+	
+	public static class DirectLookupInt 
+	{
+		private static final int[] IMASKS = new int[32];
+		
+		static
+		{
+			for(int i=31, j=1;i>=0;i--, j<<=1) IMASKS[i] = j;
+		}
+
+		
+		private int[] itsValues = new int[1024];
+		private int itsIndex = 0;
+		
+		public void push(boolean aValue)
+		{
+			int index = itsIndex++;
+			int mask = IMASKS[index & 31];
+			index >>= 5;
+			
+			if (aValue) itsValues[index] |= mask;
+			else itsValues[index] &= ~mask;
+			
+		}
+		
+		public boolean pop()
+		{
+			int index = --itsIndex;
+			int mask = IMASKS[index & 31];
+			index >>= 5;
+
+			return (itsValues[index] & mask) != 0;
+		}
+		
+		public boolean peek()
+		{
+			int index = itsIndex-1;
+			int mask = IMASKS[index & 31];
+			index >>= 5;
+			
+			return (itsValues[index] & mask) != 0;
 		}
 	}
 	

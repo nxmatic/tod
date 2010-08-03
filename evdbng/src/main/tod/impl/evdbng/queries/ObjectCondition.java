@@ -29,7 +29,7 @@ import tod.impl.evdbng.SplittedConditionHandler;
 import tod.impl.evdbng.db.IEventList;
 import tod.impl.evdbng.db.Indexes;
 import tod.impl.evdbng.db.RoleIndexSet;
-import tod.impl.evdbng.db.file.BTree;
+import tod.impl.evdbng.db.file.StaticBTree;
 import tod.impl.evdbng.db.file.RoleTuple;
 
 /**
@@ -58,7 +58,7 @@ public class ObjectCondition extends SimpleCondition<RoleTuple>
 	@Override
 	public IBidiIterator<RoleTuple> createTupleIterator(IEventList aEventList, Indexes aIndexes, long aEventId)
 	{
-		BTree<RoleTuple> theIndex = 
+		StaticBTree<RoleTuple> theIndex = 
 			aIndexes.getObjectIndex(itsPart, itsObjectId);
 		
 		IBidiIterator<RoleTuple> theTupleIterator = 

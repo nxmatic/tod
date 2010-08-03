@@ -37,7 +37,7 @@ import tod.impl.evdbng.db.file.TupleFinder.NoMatch;
  * We assume that the sequence starts at 0.
  * @author gpothier
  */
-public class SequenceTree extends BTree<SimpleTuple>
+public class SequenceTree extends StaticBTree<SimpleTuple>
 {
 	private AddTask itsCurrentTask = new AddTask();
 
