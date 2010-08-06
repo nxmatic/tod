@@ -34,6 +34,13 @@ import tod.impl.evdbng.db.file.Page.PageIOStream;
 import tod.impl.evdbng.db.file.TupleFinder.Match;
 import tod.impl.evdbng.db.file.TupleFinder.NoMatch;
 
+/**
+ * A B+Tree where keys can only be added in order. No key removal, no insertion,
+ * no rebalancing.
+ * @author gpothier
+ *
+ * @param <T>
+ */
 public abstract class StaticBTree<T extends Tuple>
 {
 	/**

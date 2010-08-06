@@ -87,7 +87,7 @@ public class DebuggerGridConfigNG
 	/**
 	 * Size of file pages in the database
 	 */
-	public static final int DB_PAGE_SIZE = 32;//4096;
+	public static final int DB_PAGE_SIZE = 4096;
 	
 	/**
 	 * Average event size.
@@ -128,9 +128,9 @@ public class DebuggerGridConfigNG
 	
 	private static String getDefaultPageBufferSize()
 	{
-//		int theSize = (int) (Runtime.getRuntime().maxMemory() / (1024*1024));
-		int theSize = (int) (VM.maxDirectMemory() / (1024*1024));
-		int theBufferSize = theSize * 10 / 10;
+		int theSize = (int) (Runtime.getRuntime().maxMemory() / (1024*1024));
+//		int theSize = (int) (VM.maxDirectMemory() / (1024*1024));
+		int theBufferSize = theSize * 6 / 10;
 		return theBufferSize + "m";
 	}
 	

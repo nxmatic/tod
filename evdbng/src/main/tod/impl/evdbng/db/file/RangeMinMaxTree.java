@@ -52,6 +52,7 @@ public class RangeMinMaxTree
 	private int itsCurrentPacket;
 	private int itsCurrentPacketMask = MASKS[0];
 	
+	private long itsSize = 0;
 	private int itsCurrentSum = 0;
 	
 	private int[] itsCurrentMin = new int[MAX_LEVELS];
@@ -73,6 +74,14 @@ public class RangeMinMaxTree
 	}
 	
 	/**
+	 * Returns the size, in bits, of this tree. Remember there are two bits per tree node.
+	 */
+	public long size()
+	{
+		return itsSize;
+	}
+	
+	/**
 	 * Writes an open parenthesis (start of a node)
 	 */
 	public void open()
@@ -84,6 +93,8 @@ public class RangeMinMaxTree
 		if (itsCurrentMax[0] < itsCurrentSum) itsCurrentMax[0] = itsCurrentSum;
 		
 		if (itsCurrentPacketMask == 0) writePacket();
+		
+		itsSize++;
 	}
 	
 	/**
@@ -97,15 +108,19 @@ public class RangeMinMaxTree
 		if (itsCurrentMin[0] > itsCurrentSum) itsCurrentMin[0] = itsCurrentSum;
 		
 		if (itsCurrentPacketMask == 0) writePacket();
+		
+		itsSize++;
 	}
 	
 	public boolean isLeaf(long i)
 	{
+		assert isOpen(i);
 		return isClose(i+1);
 	}
 	
 	public long parent(long i)
 	{
+		assert isOpen(i);
 		return enclose(i);
 	}
 	
@@ -117,6 +132,7 @@ public class RangeMinMaxTree
 	
 	public long nextSibling(long i)
 	{
+		assert isOpen(i);
 		long s = findclose(i)+1;
 		if (isClose(s)) return -1;
 		else return s;
@@ -124,12 +140,14 @@ public class RangeMinMaxTree
 	
 	public long prevSibling(long i)
 	{
+		assert isOpen(i);
 		if (isOpen(i-1)) return -1;
 		else return findopen(i-1);
 	}
 	
 	public long subtreeSize(long i)
 	{
+		assert isOpen(i);
 		return (findclose(i)-i+1)/2;
 	}
 	

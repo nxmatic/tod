@@ -1,11 +1,9 @@
 package tod.impl.evdbng.db.fieldwriteindex;
 
-import java.awt.print.PageFormat;
 import java.io.File;
 
 import tod.impl.evdbng.db.file.Page;
 import tod.impl.evdbng.db.file.PagedFile;
-import tod.impl.evdbng.db.file.Page.PageIOStream;
 
 public class OnDiskIndex
 {
@@ -18,34 +16,14 @@ public class OnDiskIndex
 	private PageStack itsEmptyPagesStack;
 	private PageStack[] itsSharedPagesStack = new PageStack[N_LOG2_OBJECTSPERPAGE]; 
 	
-	public OnDiskIndex(File aFile)
+	public OnDiskIndex(PagedFile aFile, Page aRootPage)
 	{
-		boolean theExisting = aFile.exists();
-		itsFile = PagedFile.create(aFile, false);
-		
-		if (theExisting) load();
-		else setup();
-		
+		itsFile = aFile;
+		itsDirectory = new Directory(aRootPage);
+
 		itsEmptyPagesStack = new PageStack(itsDirectory.getEmptyPagesStackSlot());
 		for(int i=0;i<N_LOG2_OBJECTSPERPAGE;i++)
 			itsSharedPagesStack[i] = new PageStack(itsDirectory.getIncompleteSharedPagesStackSlot(i));
-	}
-	
-	/**
-	 * Initial setup of the index
-	 */
-	private void setup()
-	{
-		Page theDirectoryPage = itsFile.create();
-		assert theDirectoryPage.getPageId() == 1;
-		
-		itsDirectory = new Directory(theDirectoryPage);
-	}
-	
-	private void load()
-	{
-		Page theDirectoryPage = itsFile.get(1);
-		itsDirectory = new Directory(theDirectoryPage);
 	}
 	
 	private class Directory
@@ -213,7 +191,13 @@ public class OnDiskIndex
 			int theCount = itsCountSlot.get();
 			if (theCount >= ITEMS_PER_PAGE)
 			{
-				Page theNextPage = itsNextPageSlot.getPage(true);
+				Page theNextPage = itsNextPageSlot.getPage(false);
+				if (theNextPage == null)
+				{
+					theNextPage = itsFile.create();
+					theNextPage.writeInt(POS_PREV_ID, itsCurrentPage.getPageId());
+					itsNextPageSlot.setPage(theNextPage);
+				}
 				setCurrentPage(theNextPage);
 				theCount = itsCountSlot.get();
 				assert theCount == 0;

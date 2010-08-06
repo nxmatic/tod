@@ -2,6 +2,7 @@
 <classpath>
 	<classpathentry kind="src" path="src/main"/>
 	<classpathentry kind="src" path="src/test"/>
+	<classpathentry kind="src" path="src/bench"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
 	<classpathentry kind="src" path="/TOD-core">
 		<attributes>
@@ -16,5 +17,6 @@
 	<classpathentry combineaccessrules="false" kind="src" path="/TOD-agent"/>
 	<classpathentry combineaccessrules="false" kind="src" path="/TOD-dbgrid"/>
 	<classpathentry kind="con" path="org.eclipse.ajdt.core.ASPECTJRT_CONTAINER"/>
+	<classpathentry kind="lib" path="/home/gpothier/apps/java/je-4.0.103/lib/je-4.0.103.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
