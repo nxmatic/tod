@@ -154,7 +154,7 @@ public class TODConfig extends PublicCloneable implements Serializable
 					"Tracing class filter for instrumentation. "
 							+ "Classes that do no pass this filter are not instrumented "
 							+ "but are registered in the structure database.",
-					ConfigUtils.readString("trace-filter", "[-java.** -javax.** -sun.** -com.sun.** -org.ietf.jgss.** -org.omg.** -org.w3c.** -org.xml.**]"));
+					ConfigUtils.readString("trace-filter", "[-java.** -javax.** -sun.** -com.sun.** +com.sun.tools.** -org.ietf.jgss.** -org.omg.** -org.w3c.** -org.xml.**]"));
 
 	public static final StringItem SCOPE_ID_FILTER =
 		new StringItem(

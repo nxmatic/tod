@@ -79,7 +79,7 @@ public class Disassembler
 			cr.accept(cn, 0);
 			
 			// Search the requested method
-			String theSig = aBehavior.getSignature();
+			String theSig = aBehavior.getDescriptor();
 			for (Iterator theIterator = cn.methods.iterator(); theIterator.hasNext();)
 			{
 				MethodNode theMethod = (MethodNode) theIterator.next();

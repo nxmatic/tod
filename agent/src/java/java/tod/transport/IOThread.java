@@ -185,6 +185,8 @@ public class IOThread extends Thread
 				
 				readCommands();
 			}
+			
+			TODAccessor.setBootstrapFlag(false); // Don't send any events after this thread ends.
 		}
 		catch (Exception e)
 		{

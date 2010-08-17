@@ -52,19 +52,6 @@ public class LocalsSnapshot
 	private int itsProbeId;
 	
 	/**
-	 * Number of stack slots from the previously snapshot stack that are still valid
-	 * for this snapshot's stack. 
-	 */
-	private int itsKeptStack;
-	
-	/**
-	 * Stack slots specific to this snapshot.
-	 */
-	private int[] itsResidualStack;
-	
-	private int itsTracedMethodsVersion;
-	
-	/**
 	 * As behavior ids are encoded with deltas, we need the current value 
 	 * at the time the snapshot was taken.
 	 */
@@ -94,20 +81,13 @@ public class LocalsSnapshot
 	public LocalsSnapshot(
 			long aPacketStartOffset,
 			int aPacketOffset,
-			int aBehaviorId,
 			int aProbeId,
-			int aKeptStack,
-			int[] aResidualStack,
-			int aTracedMethodsVersion,
 			int aBehIdCurrentValue,
 			long aObjIdCurrentValue)
 	{
 		itsPacketStartOffset = aPacketStartOffset;
 		itsPacketOffset = aPacketOffset;
 		itsProbeId = aProbeId;
-		itsKeptStack = aKeptStack;
-		itsResidualStack = aResidualStack;
-		itsTracedMethodsVersion = aTracedMethodsVersion;
 		itsBehIdCurrentValue = aBehIdCurrentValue;
 		itsObjIdCurrentValue = aObjIdCurrentValue;
 	}
@@ -120,13 +100,8 @@ public class LocalsSnapshot
 		itsPacketStartOffset = aBuffer.getLong();
 		itsPacketOffset = aBuffer.getInt();
 		itsProbeId = aBuffer.getInt();
-		itsKeptStack = aBuffer.getShort();
-		itsTracedMethodsVersion = aBuffer.getInt();
 		itsBehIdCurrentValue = aBuffer.getInt();
 		itsObjIdCurrentValue = aBuffer.getLong();
-		
-		itsResidualStack = new int[aBuffer.getShort()];
-		for(int i=0;i<itsResidualStack.length;i++) itsResidualStack[i] = aBuffer.getInt();
 		
 		itsIntValuesIndex = aBuffer.getShort();
 		itsIntValues = new int[itsIntValuesIndex];
@@ -157,13 +132,8 @@ public class LocalsSnapshot
 		aBuffer.putLong(itsPacketStartOffset);
 		aBuffer.putInt(itsPacketOffset);
 		aBuffer.putInt(itsProbeId);
-		aBuffer.putShort((short) itsKeptStack);
-		aBuffer.putInt(itsTracedMethodsVersion);
 		aBuffer.putInt(itsBehIdCurrentValue);
 		aBuffer.putLong(itsObjIdCurrentValue);
-		
-		aBuffer.putShort((short) itsResidualStack.length);
-		aBuffer.putInts(itsResidualStack);
 		
 		aBuffer.putShort((short) itsIntValues.length);
 		aBuffer.putInts(itsIntValues);
@@ -194,21 +164,6 @@ public class LocalsSnapshot
 	public int getProbeId()
 	{
 		return itsProbeId;
-	}
-	
-	public int[] getResidualStack()
-	{
-		return itsResidualStack;
-	}
-	
-	public int getKeptStack()
-	{
-		return itsKeptStack;
-	}
-	
-	public int getTracedMethodsVersion()
-	{
-		return itsTracedMethodsVersion;
 	}
 	
 	public int getBehIdCurrentValue()

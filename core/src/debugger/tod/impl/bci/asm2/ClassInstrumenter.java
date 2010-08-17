@@ -284,6 +284,7 @@ public class ClassInstrumenter
 				&& !BCIUtils.CLS_OBJECT.equals(getNode().name)
 				&& !BCIUtils.CLS_THREAD.equals(getNode().name)
 				&& !BCIUtils.CLS_THROWABLE.equals(getNode().name)
+//				&& !"java/security/AccessController".equals(getNode().name)
 				&& !"java/lang/ClassLoader$NativeLibrary".equals(getNode().name)) wrapNative(aNode);
 	}
 	
@@ -294,7 +295,7 @@ public class ClassInstrumenter
 	 */
 	private void wrapNative(MethodNode aNode)
 	{
-		System.out.println("Wrapping native: "+itsName+"."+aNode.name+aNode.desc);
+//		System.out.println("Wrapping native: "+itsName+"."+aNode.name+aNode.desc);
 		MethodNode theWrapper = createMethod(itsExtraMethods, aNode.name, aNode.desc, aNode.access & ~Opcodes.ACC_NATIVE);
 		
 		aNode.name = NATIVE_METHOD_PREFIX + aNode.name;
@@ -653,7 +654,7 @@ public class ClassInstrumenter
 	{
 		// Add field for ThreadData access
 		getNode().fields.add(new FieldNode(
-				Opcodes.ACC_PUBLIC | Opcodes.ACC_TRANSIENT | Opcodes.ACC_VOLATILE, 
+				Opcodes.ACC_PUBLIC | Opcodes.ACC_TRANSIENT, 
 				THREAD_THREADDATAFIELD, 
 				BCIUtils.DSC_THREADDATA, 
 				null, 

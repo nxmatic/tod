@@ -61,15 +61,6 @@ public class ThreadReplayer_FirstPass extends ThreadReplayer
 	}
 
 	@Override
-	protected ReplayerGenerator createReplayerGenerator(
-			ReplayerLoader aLoader,
-			TODConfig aConfig,
-			IMutableStructureDatabase aDatabase)
-	{
-		return new ReplayerGenerator_FirstPass(aLoader, aConfig, aDatabase);
-	}
-
-	@Override
 	public byte getNextMessage()
 	{
 		itsMessagesSinceLastSnapshot++;
@@ -86,11 +77,7 @@ public class ThreadReplayer_FirstPass extends ThreadReplayer
 		return new LocalsSnapshot(
 				getStream().getPacketStartOffset(), 
 				getStream().position(), 
-				getStack().peek(),
 				aProbeId,
-				0, // TODO: compress stacks
-				getStack().toArray(),
-				getTracedMethodsVersion(),
 				getBehIdReceiver().getCurrentValue(),
 				getObjIdReceiver().getCurrentValue());
 	}
@@ -123,10 +110,7 @@ public class ThreadReplayer_FirstPass extends ThreadReplayer
 	@Override
 	public void replay()
 	{
-		UnmonitoredReplayerFrame theRootFrame = createUnmonitoredFrame(null, null, null);
-		theRootFrame.setRootFrame(true);
-		theRootFrame.invoke_OOS();		
-		System.out.println("ThreadReplayer.replay()");
+		dispatch_main();
 	}
 	
 	@Override

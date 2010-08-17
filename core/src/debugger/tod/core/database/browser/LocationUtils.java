@@ -304,7 +304,7 @@ public class LocationUtils
 				"%s.%s%s",
 				aBehavior.getDeclaringType().getName(),
 				aBehavior.getName(),
-				aBehavior.getSignature());
+				aBehavior.getDescriptor());
 	}
 	
 }

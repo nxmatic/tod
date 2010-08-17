@@ -55,7 +55,6 @@ import tod.core.database.structure.IMutableBehaviorInfo;
 import tod.core.database.structure.IMutableClassInfo;
 import tod.impl.bci.asm2.MethodInfo.BCIFrame;
 import tod.impl.bci.asm2.MethodInfo.NewInvokeLink;
-import tod.impl.replay2.SList;
 
 /**
  * Instruments in-scope methods.
@@ -586,7 +585,7 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 	private void processGetArray(InsnNode aNode)
 	{
 		SyntaxInsnList s = new SyntaxInsnList();
-		Type theType = BCIUtils.getType(BCIUtils.getSort(aNode.getOpcode()));
+		Type theType = BCIUtils.getType(BCIUtils.getSort(aNode.getOpcode()), BCIUtils.TYPE_OBJECT);
 
 		s.ALOAD(getThreadDataVar()); 
 		s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evArrayRead", "()V"); 

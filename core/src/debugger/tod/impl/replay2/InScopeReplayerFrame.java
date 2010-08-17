@@ -99,10 +99,9 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 		return m;
 	}
 	
-	@Override
-	protected byte peekNextMessage()
+	public static byte peekNextMessage(ThreadReplayer aReplayer)
 	{
-		byte m = super.peekNextMessage();
+		byte m = ReplayerFrame.peekNextMessage(aReplayer);
 //		if (m == Message.EXCEPTION)  
 //		{
 //			super.getNextMessage(); // Consume the message
@@ -118,162 +117,162 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 		theChild.invoke_OOS();
 	}
 	
-	protected int expectAndSendIntFieldRead(ObjectId aTarget, int aFieldId)
+	public static int expectAndSendIntFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldId)
 	{
 		int theValue;
 		
-		byte m = getNextMessageConsumingClassloading();
-		if (m == Message.FIELD_READ) theValue = readInt();
+		byte m = getNextMessageConsumingClassloading(aReplayer);
+		if (m == Message.FIELD_READ) theValue = aReplayer.readInt();
 		else throw new UnexpectedMessageException(m);
 		
-		getCollector().fieldRead(aTarget, aFieldId);
-		getCollector().value(theValue);
+		aReplayer.getCollector().fieldRead(aTarget, aFieldId);
+		aReplayer.getCollector().value(theValue);
 		
 		return theValue;
 	}
 	
-	protected int expectAndSendIntFieldRead(ObjectId aTarget, int aFieldId, int aCachedValue)
+	public static int expectAndSendIntFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldId, int aCachedValue)
 	{
 		int theValue;
 		
-		byte m = getNextMessageConsumingClassloading();
+		byte m = getNextMessageConsumingClassloading(aReplayer);
 		switch(m)
 		{
-		case Message.FIELD_READ: theValue =  readInt(); break;
+		case Message.FIELD_READ: theValue =  aReplayer.readInt(); break;
 		case Message.FIELD_READ_SAME: theValue = aCachedValue; break;
 		default: throw new UnexpectedMessageException(m);
 		}
 		
-		getCollector().fieldRead(aTarget, aFieldId);
-		getCollector().value(theValue);
+		aReplayer.getCollector().fieldRead(aTarget, aFieldId);
+		aReplayer.getCollector().value(theValue);
 		
 		return theValue;
 	}
 	
-	protected long expectAndSendLongFieldRead(ObjectId aTarget, int aFieldId)
+	public static long expectAndSendLongFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldId)
 	{
 		long theValue;
 		
-		byte m = getNextMessageConsumingClassloading();
-		if (m == Message.FIELD_READ) theValue = readLong();
+		byte m = getNextMessageConsumingClassloading(aReplayer);
+		if (m == Message.FIELD_READ) theValue = aReplayer.readLong();
 		else throw new UnexpectedMessageException(m);
 		
-		getCollector().fieldRead(aTarget, aFieldId);
-		getCollector().value(theValue);
+		aReplayer.getCollector().fieldRead(aTarget, aFieldId);
+		aReplayer.getCollector().value(theValue);
 		
 		return theValue;
 	}
 	
-	protected long expectAndSendLongFieldRead(ObjectId aTarget, int aFieldId, long aCachedValue)
+	public static long expectAndSendLongFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldId, long aCachedValue)
 	{
 		long theValue;
 		
-		byte m = getNextMessageConsumingClassloading();
+		byte m = getNextMessageConsumingClassloading(aReplayer);
 		switch(m)
 		{
-		case Message.FIELD_READ: theValue =  readLong(); break;
+		case Message.FIELD_READ: theValue =  aReplayer.readLong(); break;
 		case Message.FIELD_READ_SAME: theValue = aCachedValue; break;
 		default: throw new UnexpectedMessageException(m);
 		}
 		
-		getCollector().fieldRead(aTarget, aFieldId);
-		getCollector().value(theValue);
+		aReplayer.getCollector().fieldRead(aTarget, aFieldId);
+		aReplayer.getCollector().value(theValue);
 		
 		return theValue;
 	}
 	
-	protected float expectAndSendFloatFieldRead(ObjectId aTarget, int aFieldId)
+	public static float expectAndSendFloatFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldId)
 	{
 		float theValue;
 		
-		byte m = getNextMessageConsumingClassloading();
-		if (m == Message.FIELD_READ) theValue = readFloat();
+		byte m = getNextMessageConsumingClassloading(aReplayer);
+		if (m == Message.FIELD_READ) theValue = aReplayer.readFloat();
 		else throw new UnexpectedMessageException(m);
 		
-		getCollector().fieldRead(aTarget, aFieldId);
-		getCollector().value(theValue);
+		aReplayer.getCollector().fieldRead(aTarget, aFieldId);
+		aReplayer.getCollector().value(theValue);
 		
 		return theValue;
 	}
 	
-	protected float expectAndSendFloatFieldRead(ObjectId aTarget, int aFieldId, float aCachedValue)
+	public static float expectAndSendFloatFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldId, float aCachedValue)
 	{
 		float theValue;
 		
-		byte m = getNextMessageConsumingClassloading();
+		byte m = getNextMessageConsumingClassloading(aReplayer);
 		switch(m)
 		{
-		case Message.FIELD_READ: theValue =  readFloat(); break;
+		case Message.FIELD_READ: theValue = aReplayer.readFloat(); break;
 		case Message.FIELD_READ_SAME: theValue = aCachedValue; break;
 		default: throw new UnexpectedMessageException(m);
 		}
 		
-		getCollector().fieldRead(aTarget, aFieldId);
-		getCollector().value(theValue);
+		aReplayer.getCollector().fieldRead(aTarget, aFieldId);
+		aReplayer.getCollector().value(theValue);
 		
 		return theValue;
 	}
 	
-	protected double expectAndSendDoubleFieldRead(ObjectId aTarget, int aFieldId)
+	public static double expectAndSendDoubleFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldId)
 	{
 		double theValue;
 		
-		byte m = getNextMessageConsumingClassloading();
-		if (m == Message.FIELD_READ) theValue = readDouble();
+		byte m = getNextMessageConsumingClassloading(aReplayer);
+		if (m == Message.FIELD_READ) theValue = aReplayer.readDouble();
 		else throw new UnexpectedMessageException(m);
 		
-		getCollector().fieldRead(aTarget, aFieldId);
-		getCollector().value(theValue);
+		aReplayer.getCollector().fieldRead(aTarget, aFieldId);
+		aReplayer.getCollector().value(theValue);
 		
 		return theValue;
 	}
 	
-	protected double expectAndSendDoubleFieldRead(ObjectId aTarget, int aFieldId, double aCachedValue)
+	public static double expectAndSendDoubleFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldId, double aCachedValue)
 	{
 		double theValue;
 		
-		byte m = getNextMessageConsumingClassloading();
+		byte m = getNextMessageConsumingClassloading(aReplayer);
 		switch(m)
 		{
-		case Message.FIELD_READ: theValue =  readDouble(); break;
+		case Message.FIELD_READ: theValue = aReplayer.readDouble(); break;
 		case Message.FIELD_READ_SAME: theValue = aCachedValue; break;
 		default: throw new UnexpectedMessageException(m);
 		}
 		
-		getCollector().fieldRead(aTarget, aFieldId);
-		getCollector().value(theValue);
+		aReplayer.getCollector().fieldRead(aTarget, aFieldId);
+		aReplayer.getCollector().value(theValue);
 		
 		return theValue;
 	}
 	
-	protected ObjectId expectAndSendRefFieldRead(ObjectId aTarget, int aFieldId)
+	public static ObjectId expectAndSendRefFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldId)
 	{
 		ObjectId theValue;
 		
-		byte m = getNextMessageConsumingClassloading();
-		if (m == Message.FIELD_READ) theValue = readRef();
+		byte m = getNextMessageConsumingClassloading(aReplayer);
+		if (m == Message.FIELD_READ) theValue = aReplayer.readRef();
 		else throw new UnexpectedMessageException(m);
 		
-		getCollector().fieldRead(aTarget, aFieldId);
-		getCollector().value(theValue);
+		aReplayer.getCollector().fieldRead(aTarget, aFieldId);
+		aReplayer.getCollector().value(theValue);
 		
 		return theValue;
 	}
 	
-	protected ObjectId expectAndSendRefFieldRead(ObjectId aTarget, int aFieldId, ObjectId aCachedValue)
+	public static ObjectId expectAndSendRefFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldId, ObjectId aCachedValue)
 	{
 		ObjectId theValue;
 		
-		byte m = getNextMessageConsumingClassloading();
+		byte m = getNextMessageConsumingClassloading(aReplayer);
 		switch(m)
 		{
-		case Message.FIELD_READ: theValue =  readRef(); break;
+		case Message.FIELD_READ: theValue = aReplayer.readRef(); break;
 		case Message.FIELD_READ_SAME: theValue = aCachedValue; break;
 		default: throw new UnexpectedMessageException(m);
 		}
 		
-		getCollector().fieldRead(aTarget, aFieldId);
-		getCollector().value(theValue);
+		aReplayer.getCollector().fieldRead(aTarget, aFieldId);
+		aReplayer.getCollector().value(theValue);
 		
 		return theValue;
 	}
@@ -281,30 +280,30 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 
 	
 	
-	protected void expectException()
+	public static void expectException(ThreadReplayer aReplayer)
 	{
-		byte m = getNextMessage();
+		byte m = aReplayer.getNextMessage();
 		throw new UnexpectedMessageException(m); // should never get executed: getNextMessage should throw an exception
 	}
 	
-	protected ObjectId expectConstant()
+	public static ObjectId expectConstant(ThreadReplayer aReplayer)
 	{
-		byte m = getNextMessageConsumingClassloading();
-		if (m == Message.CONSTANT) return readRef();
+		byte m = getNextMessageConsumingClassloading(aReplayer);
+		if (m == Message.CONSTANT) return aReplayer.readRef();
 		else throw new UnexpectedMessageException(m);
 	}
 	
-	protected int expectInstanceofOutcome()
+	public static int expectInstanceofOutcome(ThreadReplayer aReplayer)
 	{
-		byte m = getNextMessageConsumingClassloading();
-		if (m == Message.INSTANCEOF_OUTCOME) return readByte();
+		byte m = getNextMessageConsumingClassloading(aReplayer);
+		if (m == Message.INSTANCEOF_OUTCOME) return aReplayer.readByte();
 		else throw new UnexpectedMessageException(m);
 	}
 	
-	protected ObjectId expectNewArray()
+	public static ObjectId expectNewArray(ThreadReplayer aReplayer)
 	{
-		byte m = getNextMessageConsumingClassloading();
-		if (m == Message.NEW_ARRAY) return readRef();
+		byte m = getNextMessageConsumingClassloading(aReplayer);
+		if (m == Message.NEW_ARRAY) return aReplayer.readRef();
 		else throw new UnexpectedMessageException(m);
 	}
 	
@@ -314,27 +313,27 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 	 * Note: can't read the value here as the type is not static
 	 * (otherwise we would need a switch, not efficient).
 	 */
-	protected void expectArrayRead()
+	public static void expectArrayRead(ThreadReplayer aReplayer)
 	{
 //		byte m = getNextMessage();
-		byte m = getNextMessageConsumingClassloading();
+		byte m = getNextMessageConsumingClassloading(aReplayer);
 		if (m == Message.ARRAY_READ) return;
 		else throw new UnexpectedMessageException(m);
 	}
 	
-	protected int expectArrayLength()
+	public static int expectArrayLength(ThreadReplayer aReplayer)
 	{
-		byte m = getNextMessage();
-		if (m == Message.ARRAY_LENGTH) return readInt();
+		byte m = aReplayer.getNextMessage();
+		if (m == Message.ARRAY_LENGTH) return aReplayer.readInt();
 		else throw new UnexpectedMessageException(m);
 	}
 	
 	/**
 	 * Returns normally if the next message is not an exception
 	 */
-	protected void checkCast()
+	public static void checkCast(ThreadReplayer aReplayer)
 	{
-		if (isExceptionNext()) expectException();
+		if (aReplayer.isExceptionNext()) expectException(aReplayer);
 	}
 	
 	/**
@@ -342,29 +341,29 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 	 * and returns the next (non classloading-related) message.
 	 * @return
 	 */
-	protected byte getNextMessageConsumingClassloading()
+	public static byte getNextMessageConsumingClassloading(ThreadReplayer aReplayer)
 	{
-		skipClassloading();
-		return getNextMessage();
+		skipClassloading(aReplayer);
+		return aReplayer.getNextMessage();
 	}
 	
 
-	private byte peekNextMessageConsumingClassloading()
+	private static byte peekNextMessageConsumingClassloading(ThreadReplayer aReplayer)
 	{
 		while(true)
 		{
-			byte theMessage = peekNextMessage();
+			byte theMessage = aReplayer.peekNextMessage();
 			switch(theMessage)
 			{
 			case Message.CLASSLOADER_ENTER:
-				getNextMessage();
+				aReplayer.getNextMessage();
 				invokeClassloader();
 				break;
 				
 			case Message.INSCOPE_CLINIT_ENTER:
 			{
-				getNextMessage();
-				int theBehaviorId = readInt();
+				aReplayer.getNextMessage();
+				int theBehaviorId = aReplayer.readInt();
 				InScopeReplayerFrame theReplayer = getReplayer().createInScopeFrame(this, theBehaviorId, "bid: "+theBehaviorId);
 				theReplayer.invokeVoid_S();
 				break;
@@ -372,7 +371,7 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 				
 			case Message.OUTOFSCOPE_CLINIT_ENTER:
 			{
-				getNextMessage();
+				aReplayer.getNextMessage();
 				EnveloppeReplayerFrame theReplayer = getReplayer().createEnveloppeFrame(this, Type.VOID_TYPE, null);
 				theReplayer.invokeVoid_S();
 				break;
@@ -384,14 +383,14 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 		}
 	}
 	
-	private void skipClassloading()
+	private static void skipClassloading(ThreadReplayer aReplayer)
 	{
-		peekNextMessageConsumingClassloading();
+		peekNextMessageConsumingClassloading(aReplayer);
 	}
 	
 	protected ReplayerFrame invoke(int aBehaviorId)
 	{
-		byte theMessage = peekNextMessageConsumingClassloading();
+		byte theMessage = peekNextMessageConsumingClassloading(aReplayer);
 		
 		int theMode = getReplayer().getBehaviorMonitoringMode(aBehaviorId);
 		int theCallMode = theMode & MonitoringMode.MASK_CALL;
@@ -447,24 +446,24 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 		return getReplayer().createUnmonitoredFrame(this, getReplayer().getBehaviorReturnType(aBehaviorId), "bid: "+aBehaviorId);
 	}
 	
-	protected TmpObjectId nextTmpId()
+	public static TmpObjectId nextTmpId(ThreadReplayer aReplayer)
 	{
-		return new TmpObjectId(getReplayer().getTmpIdManager().nextId());
+		return new TmpObjectId(aReplayer.getTmpIdManager().nextId());
 	}
 	
-	protected TmpObjectId nextTmpId_skipClassloading()
+	public static TmpObjectId nextTmpId_skipClassloading(ThreadReplayer aReplayer)
 	{
 		skipClassloading();
-		return nextTmpId();
+		return nextTmpId(aReplayer);
 	}
 	
-	protected void waitObjectInitialized(TmpObjectId aId)
+	public static void waitObjectInitialized(ThreadReplayer aReplayer, TmpObjectId aId)
 	{
-		byte theMessage = getNextMessage();
+		byte theMessage = aReplayer.getNextMessage();
 		if (theMessage != Message.OBJECT_INITIALIZED) throw new UnexpectedMessageException(theMessage);
 		
-		ObjectId theActualRef = readRef();
-		getReplayer().getTmpIdManager().associate(aId.getId(), theActualRef.getId());
+		ObjectId theActualRef = aReplayer.readRef();
+		aReplayer.getTmpIdManager().associate(aId.getId(), theActualRef.getId());
 		
 		if (ThreadReplayer.ECHO && ThreadReplayer.ECHO_FORREAL)
 		{
@@ -474,13 +473,13 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 		aId.setId(theActualRef.getId());
 	}
 	
-	protected void waitConstructorTarget(ObjectId aId)
+	public static void waitConstructorTarget(ThreadReplayer aReplayer, ObjectId aId)
 	{
-		byte theMessage = getNextMessage();
+		byte theMessage = aReplayer.getNextMessage();
 		if (theMessage != Message.CONSTRUCTOR_TARGET) throw new UnexpectedMessageException(theMessage);
 		
-		ObjectId theActualRef = readRef();
-		getReplayer().getTmpIdManager().associate(aId.getId(), theActualRef.getId());
+		ObjectId theActualRef = aReplayer.readRef();
+		aReplayer.getTmpIdManager().associate(aId.getId(), theActualRef.getId());
 
 		if (ThreadReplayer.ECHO && ThreadReplayer.ECHO_FORREAL)
 		{
@@ -493,20 +492,21 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 	/**
 	 * Checks that the next message is {@link Message#BEHAVIOR_ENTER_ARGS}. 
 	 */
-	protected void waitArgs()
+	public static void waitArgs(ThreadReplayer aReplayer)
 	{
-		byte theMessage = getNextMessage();
+		byte theMessage = aReplayer.getNextMessage();
 		if (theMessage != Message.BEHAVIOR_ENTER_ARGS) throw new UnexpectedMessageException(theMessage);
 	}
 	
-	protected static boolean cmpId(ObjectId id1, ObjectId id2)
+	public static boolean cmpId(ObjectId id1, ObjectId id2)
 	{
 		if (id1 == null && id2 == null) return true;
 		if (id1 == null || id2 == null) return false;
 		return id1.getId() == id2.getId();
 	}
 	
-	public LocalsSnapshot createSnapshot(
+	public static LocalsSnapshot createSnapshot(
+			ThreadReplayer aReplayer,
 			int aProbeId,
 			int aIntValuesCount, 
 			int aLongValuesCount, 
@@ -514,38 +514,38 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 			int aDoubleValuesCount, 
 			int aRefValuesCount)
 	{
-		LocalsSnapshot theSnapshot = getReplayer().createSnapshot(aProbeId);
+		LocalsSnapshot theSnapshot = aReplayer.createSnapshot(aProbeId);
 		theSnapshot.alloc(aIntValuesCount, aLongValuesCount, aFloatValuesCount, aDoubleValuesCount, aRefValuesCount);
 		return theSnapshot;
 	}
 	
-	public void registerSnapshot(LocalsSnapshot aSnapshot)
+	public static void registerSnapshot(ThreadReplayer aReplayer, LocalsSnapshot aSnapshot)
 	{
-		getReplayer().registerSnapshot(aSnapshot);
+		aReplayer.registerSnapshot(aSnapshot);
 	}
 	
 	/**
 	 * Shortcut for registering a snapshot when there are no locals.
 	 */
-	public void registerEmptySnapshot(int aProbeId)
+	public static void registerEmptySnapshot(ThreadReplayer aReplayer, int aProbeId)
 	{
-		LocalsSnapshot theSnapshot = getReplayer().createSnapshot(aProbeId);
-		getCollector().localsSnapshot(theSnapshot);
+		LocalsSnapshot theSnapshot = aReplayer.createSnapshot(aProbeId);
+		aReplayer.getCollector().localsSnapshot(theSnapshot);
 	}
 	
-	public int getSnapshotSeq()
+	public static int getSnapshotSeq(ThreadReplayer aReplayer)
 	{
-		return getReplayer().getSnapshotSeq();
+		return aReplayer.getSnapshotSeq();
 	}
 	
-	public LocalsSnapshot getSnapshotForResume()
+	public static LocalsSnapshot getSnapshotForResume(ThreadReplayer aReplayer)
 	{
-		return getReplayer().getSnapshotForResume();
+		return aReplayer.getSnapshotForResume();
 	}
 	
-	public int getStartProbe()
+	public static int getStartProbe(ThreadReplayer aReplayer)
 	{
-		return getReplayer().getStartProbe();
+		return aReplayer.getStartProbe();
 	}
 
 	/**

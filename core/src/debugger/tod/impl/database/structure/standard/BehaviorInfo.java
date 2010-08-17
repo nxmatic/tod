@@ -190,7 +190,7 @@ public class BehaviorInfo extends MemberInfo implements IMutableBehaviorInfo
 		return itsArgumentTypes;
 	}
 	
-	public String getSignature()
+	public String getDescriptor()
 	{
 //		return itsSignature;
 		StringBuilder theBuilder = new StringBuilder("(");

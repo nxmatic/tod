@@ -53,11 +53,6 @@ import zz.utils.primitive.IntStack;
 
 public abstract class ThreadReplayer
 {
-	private static final int FRAMETYPE_UNMONITORED = -1;
-	private static final int FRAMETYPE_ENVELOPPE = -2;
-	private static final int FRAMETYPE_CLASSLOADERWRAPPER = -3;
-	private static final int FRAMETYPE_INITIAL = -4;
-	
 	public static final boolean ECHO = false;
 	public static boolean ECHO_FORREAL = true;
 
@@ -66,7 +61,6 @@ public abstract class ThreadReplayer
 	private final IMutableStructureDatabase itsDatabase;
 	
 	private int itsMessageCount = 0;
-	private IntStack itsStack = new IntStack();
 
 	private BufferStream itsStream;
 	private final TmpIdManager itsTmpIdManager;
@@ -78,10 +72,10 @@ public abstract class ThreadReplayer
 	 * The mode is updated whenever we receive a {@link Message#TRACEDMETHODS_VERSION} message.
 	 */
 	private final ByteArray itsMonitoringModes = new ByteArray();
-	private int itsCurrentTracedMethodsVersion = 0;
 	
 	private final List<Type> itsBehaviorReturnTypes = new ArrayList<Type>();
 
+	private byte itsLastMessage;
 	private ExceptionInfo itsLastException;
 	
 	private final EventCollector itsCollector;
@@ -105,22 +99,9 @@ public abstract class ThreadReplayer
 		itsStream = aBuffer;
 	}
 	
-	protected abstract ReplayerGenerator createReplayerGenerator(ReplayerLoader aLoader, TODConfig aConfig, IMutableStructureDatabase aDatabase);
-	
-	protected ReplayerGenerator getGenerator()
-	{
-		if (itsLoader.getGenerator() == null) itsLoader.setGenerator(createReplayerGenerator(itsLoader, itsConfig, itsDatabase));
-		return (ReplayerGenerator) itsLoader.getGenerator();
-	}
-
-	protected BufferStream getStream()
+	public BufferStream getStream()
 	{
 		return itsStream;
-	}
-	
-	public IntStack getStack()
-	{
-		return itsStack;
 	}
 	
 	public IStructureDatabase getDatabase()
@@ -181,6 +162,15 @@ public abstract class ThreadReplayer
 		return itsStream.peek();
 	}
 	
+	/**
+	 * Whether the next message will be an exception.
+	 * This method only peeks the next message.
+	 */
+	public boolean isExceptionNext()
+	{
+		return peekNextMessage() == Message.EXCEPTION;
+	}
+	
 	private void processStatelessMessages()
 	{
 		while(true)
@@ -189,11 +179,6 @@ public abstract class ThreadReplayer
 			
 			switch(theMessage)
 			{
-			case Message.TRACEDMETHODS_VERSION:
-				nextMessage();
-				processTracedMethodsVersion(itsStream.getInt());
-				break;
-				
 			case Message.REGISTER_REFOBJECT:
 				nextMessage();
 				processRegisterRefObject(itsObjIdReceiver.receiveFull(itsStream), itsStream);
@@ -239,33 +224,6 @@ public abstract class ThreadReplayer
 		}
 	}
 	
-	private void processTracedMethodsVersion(int aVersion)
-	{
-		if (ThreadReplayer.ECHO && ThreadReplayer.ECHO_FORREAL)
-			System.out.println("Traced methods version: "+aVersion);
-
-		setTracedMethodsVersion(aVersion);
-	}
-	
-	protected void setTracedMethodsVersion(int aVersion)
-	{
-		assert aVersion >= itsCurrentTracedMethodsVersion;
-		for(int i=itsCurrentTracedMethodsVersion;i<aVersion;i++)
-		{
-			ModeChange theChange = ModeChangesList.get(i);
-			itsMonitoringModes.set(theChange.behaviorId, theChange.mode);
-			if (ThreadReplayer.ECHO && ThreadReplayer.ECHO_FORREAL) 
-				Utils.println("Mode changed (%d): %d -> %d (%s)", itsThreadId, theChange.behaviorId, theChange.mode, LocationUtils.toMonitoringModeString(theChange.mode));
-		}
-		
-		itsCurrentTracedMethodsVersion = aVersion;
-	}
-	
-	public int getTracedMethodsVersion()
-	{
-		return itsCurrentTracedMethodsVersion;
-	}
-	
 	/**
 	 * Returns the current monitoring mode for the given method
 	 * @return One of the constants in {@link MonitoringMode}.
@@ -281,7 +239,7 @@ public abstract class ThreadReplayer
 		if (theType == null)
 		{
 			IBehaviorInfo theBehavior = getDatabase().getBehavior(aBehaviorId, true);
-			String theSignature = theBehavior.getSignature();
+			String theSignature = theBehavior.getDescriptor();
 			theType = Type.getReturnType(theSignature);
 //			theType = MethodReplayerGenerator.getActualType(theType);
 			Utils.listSet(itsBehaviorReturnTypes, aBehaviorId, theType);
@@ -356,7 +314,6 @@ public abstract class ThreadReplayer
 	{
 		InScopeReplayerFrame theFrame = getGenerator().createInScopeFrame(aBehaviorId);
 		theFrame.setup(this, itsStream, aDebugInfo, isInScope(aParent), null);
-		itsStack.push(aBehaviorId);
 		return theFrame;
 	}
 	
@@ -364,7 +321,6 @@ public abstract class ThreadReplayer
 	{
 		EnveloppeReplayerFrame theFrame = getGenerator().createEnveloppeFrame();
 		theFrame.setup(this, itsStream, aDebugInfo, isInScope(aParent), aReturnType);
-		itsStack.push(FRAMETYPE_ENVELOPPE);
 		return theFrame;
 	}
 	
@@ -372,7 +328,6 @@ public abstract class ThreadReplayer
 	{
 		UnmonitoredReplayerFrame theFrame = getGenerator().createUnmonitoredFrame();
 		theFrame.setup(this, itsStream, aDebugInfo, isInScope(aParent), aReturnType);
-		itsStack.push(FRAMETYPE_UNMONITORED);
 		return theFrame;
 	}
 	
@@ -380,18 +335,7 @@ public abstract class ThreadReplayer
 	{
 		ClassloaderWrapperReplayerFrame theFrame = getGenerator().createClassloaderWrapperFrame();
 		theFrame.setup(this, itsStream, aDebugInfo, isInScope(aParent), null);
-		itsStack.push(FRAMETYPE_CLASSLOADERWRAPPER);
 		return theFrame;
-	}
-	
-	protected void pushInitialFrame()
-	{
-		itsStack.push(FRAMETYPE_INITIAL);
-	}
-	
-	public void popped()
-	{
-		itsStack.pop();
 	}
 	
 	public IntDeltaReceiver getBehIdReceiver()
@@ -452,10 +396,185 @@ public abstract class ThreadReplayer
 		return itsLastException;
 	}
 	
+	public int readInt()
+	{
+		return getStream().getInt();
+	}
+	
+	public boolean readBoolean()
+	{
+		return getStream().get() != 0;
+	}
+	
+	public byte readByte()
+	{
+		return getStream().get();
+	}
+	
+	public char readChar()
+	{
+		return getStream().getChar();
+	}
+	
+	public short readShort()
+	{
+		return getStream().getShort();
+	}
+	
+	public float readFloat()
+	{
+		return getStream().getFloat();
+	}
+	
+	public long readLong()
+	{
+		return getStream().getLong();
+	}
+	
+	public double readDouble()
+	{
+		return getStream().getDouble();
+	}
+	
 	public ExceptionInfo getLastException()
 	{
 		return itsLastException;
 	}
+	
+	/**
+	 * Starts the replay of the thread.
+	 */
+	public void dispatch_main()
+	{
+		// Not using while(true), otherwise we crash when the stream ends.
+		while(hasMoreMessages())
+		{
+			byte m = getNextMessage();
+			
+			boolean theContinue = dispatch(m);
+			if (! theContinue) break;
+		}
+	}
+	
+	/**
+	 * Common loop for out-of-scope methods.
+	 * Returns normally if the replayed methods returns normally, otherwise throws an exception.
+	 */
+	public void dispatch_OOS_loop()
+	{
+		while(true)
+		{
+			byte m = getNextMessage();
+			
+			boolean theContinue = dispatch(m);
+			if (! theContinue) break;
+		}
+	}
+	
+	private boolean dispatch(byte aMessage)
+	{
+		switch(aMessage)
+		{
+		case Message.EXCEPTION:
+			processException();
+			break;
+		
+		case Message.INSCOPE_BEHAVIOR_ENTER: 
+			evInScopeBehaviorEnter(getBehIdReceiver().receiveFull(getStream())); 
+			break;
+			
+		case Message.INSCOPE_BEHAVIOR_ENTER_DELTA: 
+			evInScopeBehaviorEnter(getBehIdReceiver().receiveDelta(getStream())); 
+			break;
+			
+		case Message.OUTOFSCOPE_BEHAVIOR_ENTER: evOutOfScopeBehaviorEnter(); break;
+		case Message.INSCOPE_CLINIT_ENTER: evInScopeClinitEnter(getStream().getInt()); break;
+		case Message.OUTOFSCOPE_CLINIT_ENTER: evOutOfScopeClinitEnter(); break;
+		case Message.CLASSLOADER_ENTER: evClassloaderEnter(); break;
+
+		case Message.HANDLER_REACHED:
+			if (itsLastMessage != Message.EXCEPTION) throw new IllegalStateException();
+			throw new HandlerReachedException(itsLastException.exception, getStream().getInt());
+			
+		case Message.INSCOPE_BEHAVIOR_EXIT_EXCEPTION: throw new BehaviorExitException(); 
+		
+		default: throw new RuntimeException("Command not handled: "+Message._NAMES[aMessage]);
+		}
+	
+		itsLastMessage = aMessage;
+		
+		return true;
+
+	}
+
+	public void dispatch_OOS_V()
+	{
+		dispatch_OOS_loop();
+	}
+	
+	public int dispatch_OOS_I()
+	{
+		dispatch_OOS_loop();
+		return getStream().getInt();
+	}
+	
+	public boolean dispatch_OOS_Z()
+	{
+		dispatch_OOS_loop();
+		return getStream().get() != 0;
+	}
+	
+	public byte dispatch_OOS_B()
+	{
+		dispatch_OOS_loop();
+		return getStream().get();
+	}
+	
+	public short dispatch_OOS_S()
+	{
+		dispatch_OOS_loop();
+		return getStream().getShort();
+	}
+	
+	public char dispatch_OOS_C()
+	{
+		dispatch_OOS_loop();
+		return getStream().getChar();
+	}
+	
+	public long dispatch_OOS_J()
+	{
+		dispatch_OOS_loop();
+		return getStream().getLong();
+	}
+	
+	public float dispatch_OOS_F()
+	{
+		dispatch_OOS_loop();
+		return getStream().getFloat();
+	}
+	
+	public double dispatch_OOS_D()
+	{
+		dispatch_OOS_loop();
+		return getStream().getDouble();
+	}
+	
+	public ObjectId dispatch_OOS_R()
+	{
+		dispatch_OOS_loop();
+		return readRef();
+	}
+	
+	public ObjectId processException()
+	{
+		ExceptionInfo theInfo = readExceptionInfo();
+		// TODO: register exception
+		return theInfo.exception;
+	}
+
+
+
 	
 	public static class ExceptionInfo
 	{

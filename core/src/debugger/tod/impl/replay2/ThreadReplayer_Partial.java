@@ -55,15 +55,6 @@ public class ThreadReplayer_Partial extends ThreadReplayer
 	}
 
 	@Override
-	protected ReplayerGenerator createReplayerGenerator(
-			ReplayerLoader aLoader,
-			TODConfig aConfig,
-			IMutableStructureDatabase aDatabase)
-	{
-		return new ReplayerGenerator_Partial(aLoader, aConfig, aDatabase, itsSnapshot);
-	}
-
-	@Override
 	public void registerSnapshot(LocalsSnapshot aSnapshot)
 	{
 		throw new UnsupportedOperationException();
@@ -99,7 +90,6 @@ public class ThreadReplayer_Partial extends ThreadReplayer
 	@Override
 	public void replay()
 	{
-		setTracedMethodsVersion(itsSnapshot.getTracedMethodsVersion());
 		getBehIdReceiver().setCurrentValue(itsSnapshot.getBehIdCurrentValue());
 		getObjIdReceiver().setCurrentValue(itsSnapshot.getObjIdCurrentValue());
 		
@@ -115,7 +105,6 @@ public class ThreadReplayer_Partial extends ThreadReplayer
 		ReplayerGenerator_Partial theGenerator = (ReplayerGenerator_Partial) getGenerator();
 		InScopeReplayerFrame theFrame = theGenerator.createInitialFrame(aBehaviorId);
 		theFrame.setup(this, getStream(), "initial", false, null);
-		pushInitialFrame();
 		return theFrame;
 	}
 	

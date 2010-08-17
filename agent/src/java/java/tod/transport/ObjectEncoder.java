@@ -5,6 +5,7 @@ package java.tod.transport;
 
 
 import java.tod.util._IdentityHashMap;
+import java.tod.util._StringBuilder;
 
 import tod2.access.TODAccessor;
 import tod2.agent.ObjectValue;
@@ -106,7 +107,16 @@ public class ObjectEncoder
 				aBuffer.putInt(theId.intValue());
 			}
 		}
-		else throw new RuntimeException("Not handled: "+aObject);
+		else 
+		{
+			_StringBuilder b = new _StringBuilder();
+			b.append("Not handled: ");
+			b.append(aObject);
+			b.append(" (");
+			b.append(aObject.getClass());
+			b.append(")");
+			throw new RuntimeException(b.toString());
+		}
 	}
 
 	private static void writeString(String v, _ByteBuffer aBuffer)

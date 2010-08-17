@@ -62,7 +62,7 @@ import tod.impl.replay2.EventCollector;
 import tod.impl.replay2.HandlerReachedException;
 import tod.impl.replay2.InScopeReplayerFrame;
 import tod.impl.replay2.LocalsSnapshot;
-import tod.impl.replay2.ReplayerFrame;
+import tod.impl.replay2.ThreadReplayer;
 import tod.impl.replay2.TmpObjectId;
 import tod.impl.replay2.UnmonitoredBehaviorCallException;
 import zz.utils.Utils;
@@ -70,6 +70,8 @@ import zz.utils.Utils;
 public class BCIUtils implements Opcodes
 {
     public static final Type TYPE_OBJECTID = Type.getType(ObjectId.class);
+    public static final Type TYPE_OBJECT = Type.getType(Object.class);
+    public static final Type TYPE_THREADREPLAYER = Type.getType(ThreadReplayer.class);
 
 	public static final String CLS_EVENTCOLLECTOR_AGENT = "java/tod/EventCollector";
 	public static final String DSC_EVENTCOLLECTOR_AGENT = "L"+CLS_EVENTCOLLECTOR_AGENT+";";
@@ -93,20 +95,20 @@ public class BCIUtils implements Opcodes
 	public static final String CLS_THREAD = getJvmClassName(Thread.class);
 	public static final String CLS_LOCALSSNAPSHOT = getJvmClassName(LocalsSnapshot.class);
 	public static final String DSC_LOCALSSNAPSHOT = "L"+CLS_LOCALSSNAPSHOT+";";
-	public static final String CLS_REPLAYERFRAME = BCIUtils.getJvmClassName(ReplayerFrame.class);
-	public static final String DSC_REPLAYERFRAME = "L"+CLS_REPLAYERFRAME+";";
-	public static final String CLS_INSCOPEREPLAYERFRAME = BCIUtils.getJvmClassName(InScopeReplayerFrame.class);
 	public static final String CLS_HANDLERREACHED = BCIUtils.getJvmClassName(HandlerReachedException.class);
 	public static final String CLS_BEHAVIOREXITEXCEPTION = BCIUtils.getJvmClassName(BehaviorExitException.class);
 	public static final String CLS_UNMONITOREDCALLEXCEPTION = BCIUtils.getJvmClassName(UnmonitoredBehaviorCallException.class);
+	public static final String CLS_INSCOPEREPLAYERFRAME = BCIUtils.getJvmClassName(InScopeReplayerFrame.class);
 	public static final String CLS_EVENTCOLLECTOR_REPLAY = BCIUtils.getJvmClassName(EventCollector.class);
 	public static final String DSC_EVENTCOLLECTOR_REPLAY = "L"+CLS_EVENTCOLLECTOR_REPLAY+";";
+	public static final String CLS_THREADREPLAYER = BCIUtils.getJvmClassName(ThreadReplayer.class);
+	public static final String DSC_THREADREPLAYER = "L"+CLS_THREADREPLAYER+";";
 
 	private static final Type[] TYPE_FOR_SORT = new Type[11];
 	static
 	{
-		TYPE_FOR_SORT[Type.OBJECT] = Type.getType(Object.class);
-		TYPE_FOR_SORT[Type.ARRAY] = Type.getType(Object.class);
+		TYPE_FOR_SORT[Type.OBJECT] = null;
+		TYPE_FOR_SORT[Type.ARRAY] = null;
 		TYPE_FOR_SORT[Type.BOOLEAN] = Type.BOOLEAN_TYPE;
 		TYPE_FOR_SORT[Type.BYTE] = Type.BYTE_TYPE;
 		TYPE_FOR_SORT[Type.CHAR] = Type.CHAR_TYPE;
@@ -346,9 +348,10 @@ public class BCIUtils implements Opcodes
 		}
 	}
 
-	public static Type getType(int aSort)
+	public static Type getType(int aSort, Type aReferenceType)
 	{
-		return TYPE_FOR_SORT[aSort];
+		Type theType = TYPE_FOR_SORT[aSort];
+		return theType != null ? theType : aReferenceType;
 	}
 
 	/**
@@ -720,9 +723,22 @@ public class BCIUtils implements Opcodes
 		return theBuilder.toString();
 	}
 
+	/**
+	 * Returns a one-character descriptor for the given type, folding all the types
+	 * that are represented as an int in bytecode into int.
+	 */
 	public static char getSigForType(Type aType)
 	{
-		switch(aType.getSort())
+		return getSigForSort(aType.getSort());
+	}
+	
+	/**
+	 * Returns a one-character descriptor for the given type, folding all the types
+	 * that are represented as an int in bytecode into int.
+	 */
+	public static char getSigForSort(int aSort)
+	{
+		switch(aSort)
 		{
 		case Type.ARRAY:
 		case Type.OBJECT:
@@ -745,10 +761,49 @@ public class BCIUtils implements Opcodes
 			return 'J';
 	
 		default:
-			throw new RuntimeException("Not handled: "+aType);	
+			throw new RuntimeException("Not handled: "+aSort);	
 		}
 	}
 
+	/**
+	 * Returns a one-character descriptor for the given type. These are the classical
+	 * JVM descriptor characters, with just L for reference types.
+	 */
+	public static char getCompleteSigForType(Type aType)
+	{
+		return getCompleteSigForSort(aType.getSort());
+	}
+	
+	/**
+	 * Returns a one-character descriptor for the given type. These are the classical
+	 * JVM descriptor characters, with just L for reference types.
+	 */
+	public static char getCompleteSigForSort(int aSort)
+	{
+		switch(aSort)
+		{
+		case Type.ARRAY:
+		case Type.OBJECT: return 'L';
+		
+		case Type.BOOLEAN: return 'Z';
+		case Type.BYTE: return 'B';
+		case Type.CHAR: return 'C';
+		case Type.INT: return 'I';
+		case Type.SHORT: return 'S';
+		case Type.DOUBLE: return 'D';
+		case Type.FLOAT: return 'F';
+		case Type.LONG: return 'J';
+		
+		default:
+			throw new RuntimeException("Not handled: "+aSort);	
+		}
+	}
+	
+	public static Type getReplayDispatchType(Type aType)
+	{
+		return getType(aType.getSort(), TYPE_OBJECTID);
+	}
+	
 	/**
 	 * Returns the actual type to use for the given type (all refs are folded into ObjectId)
 	 */

@@ -59,7 +59,7 @@ public interface IBehaviorInfo extends IMemberInfo
 	/**
 	 * Returns the JVM signature of this behavior.
 	 */
-	public String getSignature();
+	public String getDescriptor();
 
 	/**
 	 * Returns the type of the return value of this behavior. 

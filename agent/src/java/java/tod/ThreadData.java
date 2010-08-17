@@ -1011,7 +1011,7 @@ public final class ThreadData
 	private boolean shouldSendByValue(Object aObject)
 	{
 		return (aObject instanceof String) || (aObject instanceof Throwable) 
-			|| (aObject instanceof Number) || (aObject instanceof Boolean);
+			/*|| (aObject instanceof Number) || (aObject instanceof Boolean)*/;
 	}
 
 	/**

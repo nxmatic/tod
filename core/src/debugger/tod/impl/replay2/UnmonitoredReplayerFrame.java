@@ -63,23 +63,12 @@ public class UnmonitoredReplayerFrame extends ReplayerFrame
 	
 	protected void replay()
 	{
-		try
+		while(! itsRootFrame || hasMoreMessages())
 		{
-			while(! itsRootFrame || hasMoreMessages())
-			{
-				byte m = getNextMessage();
-				
-				boolean theContinue = replay(m);
-				if (! theContinue) break;
-			}
-		}
-		catch (ReplayerException e)
-		{
-			throw e;
-		}
-		finally
-		{
-			popped();
+			byte m = getNextMessage();
+			
+			boolean theContinue = replay(m);
+			if (! theContinue) break;
 		}
 	}
 	
