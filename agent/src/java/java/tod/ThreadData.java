@@ -675,9 +675,9 @@ public final class ThreadData
 		exit();
 	}
 	
-	public void evInScopeBehaviorEnter(int aBehaviorId)
+	public boolean evInScopeBehaviorEnter(int aBehaviorId)
 	{
-		if (enter()) return;
+		if (enter()) return true;
 		
 		sendRegisteredObjects();
 		commitBuffer();
@@ -689,13 +689,18 @@ public final class ThreadData
 		itsBehIdSender.send(itsBuffer, aBehaviorId, Message.INSCOPE_BEHAVIOR_ENTER_DELTA, Message.INSCOPE_BEHAVIOR_ENTER);
 
 		msgStop();
+		
+		boolean theFromScope = isInScope();
+
 		pushInScope();
 		exit();
+		
+		return theFromScope;
 	}
 
-	public void evInScopeClinitEnter(int aBehaviorId)
+	public boolean evInScopeClinitEnter(int aBehaviorId)
 	{
-		if (enter()) return;
+		if (enter()) return true;
 		
 		sendRegisteredObjects();
 		commitBuffer();
@@ -708,8 +713,13 @@ public final class ThreadData
 		itsBuffer.putInt(aBehaviorId);
 		
 		msgStop();
+
+		boolean theFromScope = isInScope();
+
 		pushInScope();
 		exit();
+		
+		return theFromScope;
 	}
 	
 	public void evClassLoaderEnter()

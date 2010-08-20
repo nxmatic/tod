@@ -62,7 +62,7 @@ public class ReplayerWrapper
 		try
 		{
 			itsLoader = aLoader;
-			itsReplayer = itsLoader.createReplayer(aSnapshot, aThreadId, aConfig, aDatabase, aCollector, aTmpIdManager, aBuffer);
+			itsReplayer = itsLoader.createReplayer(aSnapshot, aThreadId, aCollector, aTmpIdManager, aBuffer);
 			itsReplayMethod = itsReplayer.getClass().getMethod("replay");
 		}
 		catch (Exception e)
@@ -95,11 +95,13 @@ public class ReplayerWrapper
 		catch (RuntimeException e)
 		{
 			System.err.println("Runtime exception catched by ReplayerWrapper: "+e.getClass()+": "+e.getMessage());
+			e.printStackTrace();
 			throw e;
 		}
 		catch (Throwable e)
 		{
 			System.err.println("Exception catched by ReplayerWrapper: "+e.getClass()+": "+e.getMessage());
+			e.printStackTrace();
 			throw new RuntimeException(e);
 		}
 	}

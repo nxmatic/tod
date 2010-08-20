@@ -45,17 +45,12 @@ import zz.utils.tree.SimpleTreeNode;
  */
 public class ReplayerVerifier extends SimpleVerifier
 {
-	private static final Type TYPE_CONCRETEREPLAYERFRAME = Type.getType("L$$CONCRETE_REPLAYER;");
-	private static final Type TYPE_FACTORY = Type.getType("L$$FACTORY;");
 	private static final SimpleTreeBuilder<Type> b = new SimpleTreeBuilder<Type>();
 	private static final SimpleTreeNode<Type> ROOT = b.getTree().getRoot();
 	
 	static
 	{
 		b.root(Type.getType(Object.class), 
-				b.node(Type.getType(ReplayerFrame.class), 
-						b.node(Type.getType(InScopeReplayerFrame.class), 
-								b.leaf(TYPE_CONCRETEREPLAYERFRAME))),
 				b.node(Type.getType(Throwable.class), 
 						b.node(Type.getType(Exception.class),
 								b.node(Type.getType(RuntimeException.class), 
@@ -65,27 +60,14 @@ public class ReplayerVerifier extends SimpleVerifier
 				b.node(Type.getType(ObjectId.class),
 						b.leaf(Type.getType(TmpObjectId.class))),
 				b.leaf(Type.getType(String.class)),
+				b.leaf(Type.getType(ThreadReplayer.class)),
+				b.leaf(Type.getType(InScopeReplayerFrame.class)),
 				b.leaf(Type.getType(EventCollector.class)),
 				b.leaf(Type.getType(LocalsSnapshot.class)));
 	}
 	
-	
-	
-	private boolean isConcreteFrame(Type aType)
-	{
-	    return ReplayerGenerator.isConcreteFrameType(aType);
-	}
-	
-	private boolean isFactory(Type aType)
-	{
-		String theName = aType.getClassName();
-		return theName.startsWith("$tod$replayer2$") && theName.endsWith("_Factory");
-	}
-	
 	private Type getCanonicalType(Type t)
 	{
-		if (isConcreteFrame(t)) return TYPE_CONCRETEREPLAYERFRAME;
-		if (isFactory(t)) return TYPE_FACTORY;
 		return t;
 	}
 	

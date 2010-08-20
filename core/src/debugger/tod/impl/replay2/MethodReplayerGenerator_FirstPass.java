@@ -31,7 +31,7 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.replay2;
 
-import static tod.impl.bci.asm2.BCIUtils.CLS_INSCOPEREPLAYERFRAME;
+import static tod.impl.bci.asm2.BCIUtils.*;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -43,6 +43,7 @@ import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.MethodNode;
 
 import tod.core.config.TODConfig;
+import tod.core.database.structure.IBehaviorInfo;
 import tod.core.database.structure.IMutableStructureDatabase;
 import tod.impl.bci.asm2.BCIUtils;
 import tod.impl.bci.asm2.MethodInfo.BCIFrame;
@@ -57,12 +58,11 @@ public class MethodReplayerGenerator_FirstPass extends MethodReplayerGenerator
 	public MethodReplayerGenerator_FirstPass(
 			TODConfig aConfig,
 			IMutableStructureDatabase aDatabase,
-			ReplayerGenerator aGenerator,
-			int aBehaviorId,
+			IBehaviorInfo aBehavior,
 			ClassNode aClassNode,
 			MethodNode aMethodNode)
 	{
-		super(aConfig, aDatabase, aGenerator, aBehaviorId, aClassNode, aMethodNode);
+		super(aConfig, aDatabase, aBehavior, aClassNode, aMethodNode);
 	}
 	
 	@Override
@@ -84,8 +84,8 @@ public class MethodReplayerGenerator_FirstPass extends MethodReplayerGenerator
 	{
 		SList s = new SList();
 
-		s.ALOAD(0);
-		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "getSnapshotSeq", "()I");
+		s.ALOAD(getThreadReplayerSlot());
+		s.INVOKEVIRTUAL(CLS_THREADREPLAYER, "getSnapshotSeq", "()I");
 		s.ISTORE(itsSnapshotSeqVar);
 		
 		aInsns.insert(s);
@@ -126,7 +126,7 @@ public class MethodReplayerGenerator_FirstPass extends MethodReplayerGenerator
 
 		String theDesc = Type.getMethodDescriptor(Type.INT_TYPE, theArgTypes.toArray(new Type[theArgTypes.size()]));
 
-		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, ReplayerGenerator.SNAPSHOT_METHOD_NAME, theDesc);
+		s.INVOKEVIRTUAL(CLS_THREADREPLAYER, MethodReplayerGenerator.SNAPSHOT_METHOD_NAME, theDesc);
 		s.ISTORE(itsSnapshotSeqVar);
 		
 		if (aSaveStack) genLoadStack(s, theStackTypes);

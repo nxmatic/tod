@@ -98,7 +98,7 @@ public abstract class DBSideIOThread
 		itsDatabase = aDatabase;
 		itsIn = aIn;
 		itsSnapshot = aSnapshot;
-		itsLoader = new ReplayerLoader(getClass().getClassLoader(), aDatabase);
+		itsLoader = new ReplayerLoader(getClass().getClassLoader(), itsConfig, itsDatabase, itsSnapshot == null);
 	}
 
 	public void setInitialSkip(int aInitialSkip)

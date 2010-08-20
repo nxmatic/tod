@@ -58,6 +58,8 @@ import org.objectweb.asm.tree.MethodNode;
 
 import tod.core.config.TODConfig;
 import tod.core.database.structure.IBehaviorInfo;
+import tod.core.database.structure.IClassInfo;
+import tod.core.database.structure.IMutableBehaviorInfo;
 import tod.core.database.structure.IMutableStructureDatabase;
 import tod.core.database.structure.IStructureDatabase;
 import tod.impl.bci.asm2.BCIUtils;
@@ -65,46 +67,64 @@ import tod.impl.replay2.MethodReplayerGenerator.MethodSignature;
 import tod.impl.server.BufferStream;
 import zz.utils.ListMap;
 import zz.utils.Utils;
+import zz.utils.bit.BitUtils;
 
 public class ReplayerLoader extends ClassLoader
 {
+	private static final int OOSDISPATCH_BITS = 8; 
+	private static final int OOSDISPATCH_MASK = BitUtils.pow2i(OOSDISPATCH_BITS)-1;
+	
 	private final ClassLoader itsParent;
-	private final IStructureDatabase itsDatabase;
+	private TODConfig itsConfig;
+	private final IMutableStructureDatabase itsDatabase;
 	private final Map<String, byte[]> itsClassesMap = new HashMap<String, byte[]>();
 	
-	private Constructor its1stPassReplayerCtor;
-	private Constructor itsPartialReplayerCtor;
+	private boolean itsFirstPass;
+	private Constructor itsReplayerCtor;
 	
 	private Object itsGenerator;
+	
+	private Map<IClassInfo, ClassNode> itsClassNodeCache = new HashMap<IClassInfo, ClassNode>();
 
-	public ReplayerLoader(ClassLoader aParent, IStructureDatabase aDatabase)
+	public ReplayerLoader(
+			ClassLoader aParent, 
+			TODConfig aConfig,
+			IMutableStructureDatabase aDatabase, 
+			boolean aFirstPass)
 	{
 		itsParent = aParent;
+		itsConfig = aConfig;
 		itsDatabase = aDatabase;
+		itsFirstPass = aFirstPass;
 		modifyBaseClasses(aDatabase);
 		
 		try
 		{
-			Class the1stPassClass = loadClass("tod.impl.replay2.ThreadReplayer_FirstPass");
-			its1stPassReplayerCtor = the1stPassClass.getConstructor(
-					ReplayerLoader.class, 
-					int.class,
-					TODConfig.class, 
-					IMutableStructureDatabase.class, 
-					EventCollector.class,
-					TmpIdManager.class, 
-					BufferStream.class);
-			
-			Class thePartialClass = loadClass("tod.impl.replay2.ThreadReplayer_Partial");
-			itsPartialReplayerCtor = thePartialClass.getConstructor(
-					ReplayerLoader.class, 
-					int.class,
-					TODConfig.class, 
-					IMutableStructureDatabase.class, 
-					EventCollector.class,
-					TmpIdManager.class, 
-					BufferStream.class,
-					LocalsSnapshot.class);
+			if (itsFirstPass)
+			{
+				Class the1stPassClass = loadClass("tod.impl.replay2.ThreadReplayer_FirstPass");
+				itsReplayerCtor = the1stPassClass.getConstructor(
+						ReplayerLoader.class, 
+						int.class,
+						TODConfig.class, 
+						IMutableStructureDatabase.class, 
+						EventCollector.class,
+						TmpIdManager.class, 
+						BufferStream.class);
+			}
+			else
+			{
+				Class thePartialClass = loadClass("tod.impl.replay2.ThreadReplayer_Partial");
+				itsReplayerCtor = thePartialClass.getConstructor(
+						ReplayerLoader.class, 
+						int.class,
+						TODConfig.class, 
+						IMutableStructureDatabase.class, 
+						EventCollector.class,
+						TmpIdManager.class, 
+						BufferStream.class,
+						LocalsSnapshot.class);
+			}
 		}
 		catch (Exception e)
 		{
@@ -115,21 +135,21 @@ public class ReplayerLoader extends ClassLoader
 	public Object createReplayer(
 			LocalsSnapshot aSnapshot,
 			int aThreadId,
-			TODConfig aConfig,
-			IMutableStructureDatabase aDatabase,
 			EventCollector aCollector,
 			TmpIdManager aTmpIdManager,
 			BufferStream aBuffer)
 	{
 		try
 		{
-			if (aSnapshot == null)
+			if (itsFirstPass)
 			{
-				return its1stPassReplayerCtor.newInstance(this, aThreadId, aConfig, aDatabase, aCollector, aTmpIdManager, aBuffer);
+				assert aSnapshot == null;
+				return itsReplayerCtor.newInstance(this, aThreadId, itsConfig, itsDatabase, aCollector, aTmpIdManager, aBuffer);
 			}
 			else
 			{
-				return itsPartialReplayerCtor.newInstance(this, aThreadId, aConfig, aDatabase, aCollector, aTmpIdManager, aBuffer, aSnapshot);
+				assert aSnapshot != null;
+				return itsReplayerCtor.newInstance(this, aThreadId, itsConfig, itsDatabase, aCollector, aTmpIdManager, aBuffer, aSnapshot);
 			}
 		}
 		catch (Exception e)
@@ -163,9 +183,63 @@ public class ReplayerLoader extends ClassLoader
 			&& ! aName.equals(EventCollector.class.getName());
 	}
 	
-	private byte[] createReplayerClass(int aBehaviorId)
+	private ClassNode getClassNode(IClassInfo aClass)
 	{
+		ClassNode theClassNode = itsClassNodeCache.get(aClass);
+		if (theClassNode == null)
+		{
+			byte[] theClassBytecode = aClass.getBytecode().original;
+			theClassNode = new ClassNode();
+			ClassReader theReader = new ClassReader(theClassBytecode);
+			theReader.accept(theClassNode, 0);
+			
+			itsClassNodeCache.put(aClass, theClassNode);
+		}
+		return theClassNode;
+	}
+	
+	private MethodNode findMethodNode(ClassNode aClassNode, IBehaviorInfo aBehavior)
+	{
+		return findMethodNode(aClassNode, aBehavior.getName(), aBehavior.getDescriptor());
+	}
+	
+	private MethodNode findMethodNode(ClassNode aClassNode, String aName, String aDescriptor)
+	{
+		for (MethodNode theMethodNode : (List<MethodNode>) aClassNode.methods)
+		{
+			if (theMethodNode.name.equals(aName)
+					&& theMethodNode.desc.equals(aDescriptor)) return theMethodNode;
+		}
+		return null;
+	}
+	
+	private byte[] createFirstPassReplayerClass(int aBehaviorId)
+	{
+		IBehaviorInfo theBehavior = itsDatabase.getBehavior(aBehaviorId, true);
+		ClassNode theClassNode = getClassNode(theBehavior.getDeclaringType());
+		MethodNode theMethodNode = findMethodNode(theClassNode, theBehavior);
 		
+		return new MethodReplayerGenerator_FirstPass(
+				itsConfig, 
+				itsDatabase, 
+				itsDatabase.getBehavior(aBehaviorId, true), 
+				theClassNode, 
+				theMethodNode).generate();
+	}
+	
+	private byte[] createPartialReplayerClass(int aBehaviorId, int aSnapshotProbeId)
+	{
+		IBehaviorInfo theBehavior = itsDatabase.getBehavior(aBehaviorId, true);
+		ClassNode theClassNode = getClassNode(theBehavior.getDeclaringType());
+		MethodNode theMethodNode = findMethodNode(theClassNode, theBehavior);
+		
+		return new MethodReplayerGenerator_Partial(
+				itsConfig, 
+				itsDatabase, 
+				itsDatabase.getBehavior(aBehaviorId, true), 
+				theClassNode, 
+				theMethodNode,
+				aSnapshotProbeId > 0 ? itsDatabase.getSnapshotProbeInfo(aSnapshotProbeId) : null).generate();
 	}
 	
 	@Override
@@ -174,8 +248,29 @@ public class ReplayerLoader extends ClassLoader
 		byte[] theBytecode;
 		if (aName.startsWith(MethodReplayerGenerator.REPLAY_CLASS_PREFIX))
 		{
-			int id = Integer.parseInt(aName.substring(MethodReplayerGenerator.REPLAY_CLASS_PREFIX.length()));
-			theBytecode = createReplayerClass(id);
+			String theName = aName.substring(MethodReplayerGenerator.REPLAY_CLASS_PREFIX.length());
+			if (itsFirstPass)
+			{
+				int id = Integer.parseInt(theName);
+				theBytecode = createFirstPassReplayerClass(id);
+			}
+			else
+			{
+				String[] theParts = theName.split("_");
+				if (theParts.length == 1)
+				{
+					// Non-startup replayer
+					int theBehaviorId = Integer.parseInt(theParts[0]);
+					theBytecode = createPartialReplayerClass(theBehaviorId, 0);
+				}
+				else
+				{
+					// Startup replayer
+					int theBehaviorId = Integer.parseInt(theParts[0]);
+					int theSnapshotProbeId = Integer.parseInt(theParts[1]);
+					theBytecode = createPartialReplayerClass(theBehaviorId, theSnapshotProbeId);
+				}
+			}
 		}
 		else
 		{
@@ -234,13 +329,11 @@ public class ReplayerLoader extends ClassLoader
 		modifyThreadReplayer(theUsedDescriptors);
 	}
 	
-	private MethodNode createNode(MethodDescriptor aDescriptor)
+	private MethodNode createMethodNode(MethodSignature aSignature)
 	{
-		MethodSignature theSignature = aDescriptor.getDispatchSignature();
-		
 		MethodNode theMethodNode = new MethodNode();
-		theMethodNode.name = theSignature.name;
-		theMethodNode.desc = theSignature.descriptor;
+		theMethodNode.name = aSignature.name;
+		theMethodNode.desc = aSignature.descriptor;
 		theMethodNode.exceptions = Collections.EMPTY_LIST;
 		theMethodNode.access = Opcodes.ACC_PUBLIC;
 		theMethodNode.tryCatchBlocks = Collections.EMPTY_LIST;
@@ -280,8 +373,24 @@ public class ReplayerLoader extends ClassLoader
 	private void modifyThreadReplayer(Set<MethodDescriptor> aUsedDescriptors)
 	{
 		ClassNode theClassNode = getSourceClassNode(BCIUtils.getJvmClassName(ThreadReplayer.class));
-		ListMap<MethodDescriptor, IBehaviorInfo> theMap = new ListMap<MethodDescriptor, IBehaviorInfo>();
 		
+		ListMap<MethodDescriptor,IBehaviorInfo> theSignatureGroups = getDescriptorGroups();
+		createInScopeDispatchMethods(theClassNode, theSignatureGroups);
+		createOutOfScopeDispatchMethods(theClassNode, theSignatureGroups);
+		
+		// Create snapshot methods
+		for (String theSignature : itsDatabase.getRegisteredSnapshotSignatures())
+		{
+			modifyThreadReplayer_addSnapshotMethod(theClassNode, theSignature);
+		}
+		
+		addClass(theClassNode);
+	}
+	
+	private ListMap<MethodDescriptor, IBehaviorInfo> getDescriptorGroups()
+	{
+		ListMap<MethodDescriptor, IBehaviorInfo> theMap = new ListMap<MethodDescriptor, IBehaviorInfo>();
+
 		// Split behaviors into groups of the same signature
 		IBehaviorInfo[] theBehaviors = itsDatabase.getBehaviors();
 		for (IBehaviorInfo theBehavior : theBehaviors)
@@ -291,96 +400,320 @@ public class ReplayerLoader extends ClassLoader
 			theMap.add(theDescriptor, theBehavior);
 		}
 
-		// Create one dispatch method per group
-		for(Map.Entry<MethodDescriptor, List<IBehaviorInfo>> theEntry : theMap.entrySet())
-		{
-			MethodNode theMethod  = createDispatcher(theEntry.getKey(), theEntry.getValue());
-			theClassNode.methods.add(theMethod);
-		}
-		
-		// Create snapshot methods
-		for (String theSignature : itsDatabase.getRegisteredSnapshotSignatures())
-		{
-			modifyThreadReplayer_addSnapshotMethod(theClassNode, theSignature);
-		}
-
+		return theMap;
 	}
 	
-	private MethodNode createDispatcher(MethodDescriptor aDescriptor, List<IBehaviorInfo> aBehaviors)
+	/**
+	 * In-scope dispatch methods receive their arguments from the caller.
+	 * There is one dispatch methods per distinct signature.
+	 */
+	private void createInScopeDispatchMethods(ClassNode aClassNode, ListMap<MethodDescriptor, IBehaviorInfo> aSignatureGroups)
+	{
+		// Create one dispatch method per group
+		for(Map.Entry<MethodDescriptor, List<IBehaviorInfo>> theEntry : aSignatureGroups.entrySet())
+		{
+			MethodNode theMethod = createInScopeDispatcher(theEntry.getKey(), theEntry.getValue());
+			BCIUtils.checkMethod(aClassNode, theMethod, new ReplayerVerifier(), false);
+			aClassNode.methods.add(theMethod);
+		}
+	}
+	
+	private MethodNode createInScopeDispatcher(MethodDescriptor aDescriptor, List<IBehaviorInfo> aBehaviors)
 	{
 		MethodSignature theDispatchSignature = aDescriptor.getDispatchSignature();
+		byte[] theArgSorts = aDescriptor.getArgSorts();
+		Type theReturnType = getType(aDescriptor.getReturnSort(), TYPE_OBJECTID);
 		
-		MethodNode theMethod = new MethodNode();
-		theMethod.name = theDispatchSignature.name;
-		theMethod.desc = theDispatchSignature.descriptor;
-		theMethod.exceptions = Collections.EMPTY_LIST;
+		MethodNode theMethod = createMethodNode(theDispatchSignature);
 		theMethod.access = Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC;
-		theMethod.tryCatchBlocks = Collections.EMPTY_LIST;
 
-		SList s = new SList();
-		
+		SList sw = new SList();
+
 		int n = aBehaviors.size();
 		
-		Label[] theLabels = new Label[n];
-		int[] theKeys = new int[n];
-		for(int i=0;i<n;i++) theLabels[i] = new Label();
+		Label[] theLabels = new Label[n+1]; // +1 because we need the out-of-scope case
+		int[] theKeys = new int[n+1];
+		for(int i=0;i<n+1;i++) theLabels[i] = new Label();
+		Label lDefault = new Label();
+
+		// Push args
+		int theSlot = 0; 
+		if (! aDescriptor.isStatic()) sw.ALOAD(theSlot++);
+		for(int theSort : theArgSorts)
+		{
+			Type theType = getType(theSort, TYPE_OBJECTID);
+			sw.ILOAD(theType, theSlot);
+			theSlot += theType.getSize();
+		}
+		int theThreadReplayerSlot = theSlot++; // Not strictly needed, but just in case we add another argument
+		sw.ALOAD(theThreadReplayerSlot); // Push the ThreadReplayer
 		
+		SList cases = new SList();
+		{
+			// Prepare cases
+			for(int i=0;i<n;i++)
+			{
+				IBehaviorInfo theBehavior = aBehaviors.get(i);
+				theLabels[i+1] = new Label();
+				theKeys[i+1] = theBehavior.getId();
+				
+				cases.label(theLabels[i+1]);
+				MethodSignature theReplaySignature = MethodReplayerGenerator.getReplayMethodSignature(theBehavior);
+				cases.INVOKESTATIC(
+						MethodReplayerGenerator.REPLAY_CLASS_PREFIX + theBehavior.getId(), 
+						theReplaySignature.name, 
+						theReplaySignature.descriptor);
+				
+				cases.IRETURN(theReturnType);
+			}
+			
+			// Add case for out of scope
+			theLabels[0] = new Label();
+			theKeys[0] = -1;
+			cases.label(theLabels[0]);
+	
+			// Pop all args
+			cases.POP(); // ThreadReplayer
+			
+			for(int i = theArgSorts.length-1;i>=0;i--)
+			{
+				int theSort = theArgSorts[i];
+				Type theType = getType(theSort, TYPE_OBJECTID);
+				cases.POP(theType);
+			}
+			if (! aDescriptor.isStatic()) cases.POP();
+	
+			cases.ALOAD(theThreadReplayerSlot);
+			cases.INVOKEVIRTUAL(
+					CLS_THREADREPLAYER,
+					"dispatch_OOS_"+getCompleteSigForSort(theReturnType.getSort()), 
+					"()"+theReturnType.getDescriptor());
+			
+			cases.IRETURN(theReturnType);
+			
+			// Add default
+			cases.label(lDefault);
+			cases.createRTEx("Bad method id");
+			cases.ATHROW();
+		}		
+
+		
+		// Create switch
+		sw.ALOAD(theThreadReplayerSlot);
+		sw.INVOKEVIRTUAL(CLS_THREADREPLAYER, "getDispatchTarget", "()I");
+		sw.LOOKUPSWITCH(lDefault, theKeys, theLabels);
+		sw.add(cases);
+		
+		theMethod.instructions = sw;
+		theMethod.maxLocals = theSlot;
+		theMethod.maxStack = theSlot+2;
+		return theMethod;
+	}
+
+	/**
+	 * Out-of-scope dispatch methods read their arguments from the stream.
+	 * They actually dispatch TO in-scope methods, but FROM OOS code.
+	 */
+	private void createOutOfScopeDispatchMethods(ClassNode aClassNode, ListMap<MethodDescriptor, IBehaviorInfo> aSignatureGroups)
+	{
+		// Create one dispatch method per group
+		for(Map.Entry<MethodDescriptor, List<IBehaviorInfo>> theEntry : aSignatureGroups.entrySet())
+		{
+			MethodNode theMethod = createOutOfScopeDispatcher(theEntry.getKey(), theEntry.getValue());
+			BCIUtils.checkMethod(aClassNode, theMethod, new ReplayerVerifier(), false);
+			aClassNode.methods.add(theMethod);
+		}
+
+		IBehaviorInfo[] theBehaviors = itsDatabase.getBehaviors();
+		int theLastId = theBehaviors[theBehaviors.length-1].getId();
+		createHierarchicalOutOfScopeDispatcher(aClassNode, theLastId);
+	}
+	
+	private void createHierarchicalOutOfScopeDispatcher(ClassNode aClassNode, int aLastId)
+	{
+		MethodNode theMethod = findMethodNode(aClassNode, "dispatch_inscope", "(I"+DSC_THREADREPLAYER+")V");
+		
+		SList s = new SList();
+		
+		int theCases = aLastId >>> OOSDISPATCH_BITS;
+		Label[] theLabels = new Label[theCases];
+		for(int i=0;i<theCases;i++) theLabels[i] = new Label();
 		Label lDefault = new Label();
 		
 		// Push args
-		s.ALOAD(0); // ThreadReplayer (this)
+		s.ILOAD(0);
+		s.ALOAD(1);
 		
-		int theSlot = 2; // Slot 1 is behavior id
-		if (! aDescriptor.isStatic()) s.ALOAD(theSlot++);
-		for(int theSort : aDescriptor.getArgSorts())
+		// Switch
+		s.ILOAD(0);
+		s.pushInt(OOSDISPATCH_BITS);
+		s.IUSHR();
+		s.TABLESWITCH(0, theCases-1, lDefault, theLabels);
+		
+		for(int i=0;i<theCases;i++)
 		{
-			Type theType = getType(theSort, TYPE_OBJECTID);
-			s.ILOAD(theType, theSlot);
-			theSlot += theType.getSize();
-		}
-		
-		// Create switch
-		s.ILOAD(1); // Behavior id
-		s.LOOKUPSWITCH(lDefault, theKeys, theLabels);
-		
-		for(int i=0;i<n;i++)
-		{
-			IBehaviorInfo theBehavior = aBehaviors.get(i);
-			theLabels[i] = new Label();
-			theKeys[i] = theBehavior.getId();
-			
 			s.label(theLabels[i]);
-			String theDescriptor = theBehavior.getDescriptor();
-			Type theReturnType = Type.getReturnType(theDescriptor);
-			MethodSignature theReplaySignature = 
-				MethodReplayerGenerator.getReplayMethodSignature(theBehavior);
-			s.INVOKESTATIC(MethodReplayerGenerator.REPLAY_CLASS_PREFIX + theBehavior.getId(), theReplaySignature.name, theReplaySignature.descriptor);
 			
-			s.IRETURN(theReturnType);
+			s.INVOKESTATIC(CLS_THREADREPLAYER, "dispatch_OOS_"+i, "(I"+DSC_THREADREPLAYER+")V");
+			s.RETURN();
+			
+			aClassNode.methods.add(createLevel2OutOfScopeDispatcher(aClassNode, i));
 		}
 		
+		// Add default
 		s.label(lDefault);
-		s.ILOAD(1);
+		s.ILOAD(0);
+		s.createRTExArg("Bad method id");
+		s.ATHROW();
+		
+		theMethod.instructions = s;
+		theMethod.maxLocals = 2;
+		theMethod.maxStack = 4;
+		
+		BCIUtils.checkMethod(aClassNode, theMethod, new ReplayerVerifier(), false);
+	}
+
+	private MethodNode createLevel2OutOfScopeDispatcher(ClassNode aClassNode, int aHighOrderId)
+	{
+		MethodNode theMethod = createMethodNode(new MethodSignature("dispatch_OOS_"+aHighOrderId, "(I"+DSC_THREADREPLAYER+")V"));
+		theMethod.access = Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC;
+		
+		SList s = new SList();
+		
+		int theCases = BitUtils.pow2i(OOSDISPATCH_BITS);
+		Label[] theLabels = new Label[theCases];
+		for(int i=0;i<theCases;i++) theLabels[i] = new Label();
+		Label lDefault = new Label();
+		
+		// Push args
+		s.ILOAD(0);
+		s.ALOAD(1);
+		
+		// Switch
+		s.ILOAD(0);
+		s.pushInt(OOSDISPATCH_MASK);
+		s.IAND();
+		s.TABLESWITCH(0, theCases-1, lDefault, theLabels);
+		
+		for(int i=0;i<theCases;i++)
+		{
+			s.label(theLabels[i]);
+			
+			int theId = aHighOrderId*theCases + i;
+			if (theId > 0)
+			{
+				IMutableBehaviorInfo theBehavior = itsDatabase.getBehavior(theId, true);
+				MethodDescriptor theDescriptor = getDescriptor(theBehavior);
+				MethodSignature theSignature = theDescriptor.getOOSDispatchSignature();
+				
+				s.INVOKESTATIC(CLS_THREADREPLAYER, theSignature.name, theSignature.descriptor);
+			}
+
+			s.RETURN();
+		}
+		
+		// Add default
+		s.label(lDefault);
+		s.ILOAD(0);
 		s.createRTExArg("Bad method id");
 		s.ATHROW();
 		
 		theMethod.instructions = s;
 		return theMethod;
 	}
+	
+	/**
+	 * Creates an out-of-scope dispatcher for a given method signature.
+	 * Reads the arguments from the stream.
+	 */
+	private MethodNode createOutOfScopeDispatcher(MethodDescriptor aDescriptor, List<IBehaviorInfo> aBehaviors)
+	{
+		MethodSignature theDispatchSignature = aDescriptor.getOOSDispatchSignature();
+		byte[] theArgSorts = aDescriptor.getArgSorts();
+		Type theReturnType = getType(aDescriptor.getReturnSort(), TYPE_OBJECTID);
+		
+		MethodNode theMethod = createMethodNode(theDispatchSignature);
+		theMethod.access = Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC;
+
+		SList sw = new SList();
+		
+		int n = aBehaviors.size();
+		
+		Label[] theLabels = new Label[n]; 
+		int[] theKeys = new int[n];
+		for(int i=0;i<n;i++) theLabels[i] = new Label();
+		
+		Label lDefault = new Label();
+		
+		// Push args
+		int theSlot = 0;
+		if (! aDescriptor.isStatic())
+		{
+			sw.invokeRead(TYPE_OBJECTID, 1);
+			theSlot++;
+		}
+		for(int theSort : theArgSorts)
+		{
+			Type theType = getType(theSort, TYPE_OBJECTID);
+			sw.invokeRead(theType, 1);
+			theSlot += theType.getSize();
+		}
+		sw.ALOAD(1); // Push the ThreadReplayer
+
+		SList cases = new SList();
+		{
+			for(int i=0;i<n;i++)
+			{
+				IBehaviorInfo theBehavior = aBehaviors.get(i);
+				theLabels[i] = new Label();
+				theKeys[i] = theBehavior.getId();
+				
+				cases.label(theLabels[i]);
+				MethodSignature theReplaySignature = MethodReplayerGenerator.getReplayMethodSignature(theBehavior);
+				cases.INVOKESTATIC(
+						MethodReplayerGenerator.REPLAY_CLASS_PREFIX + theBehavior.getId(), 
+						theReplaySignature.name, 
+						theReplaySignature.descriptor);
+				
+				cases.POP(theReturnType);
+				cases.RETURN();
+			}
+			
+			// Add default
+			cases.label(lDefault);
+			cases.ILOAD(0);
+			cases.createRTExArg("Bad method id");
+			cases.ATHROW();
+
+		}
+		// Create switch
+		sw.ILOAD(0); // Push behavior id
+		sw.LOOKUPSWITCH(lDefault, theKeys, theLabels);
+		sw.add(cases);
+		
+		theMethod.instructions = sw;
+		theMethod.maxLocals = 2;
+		theMethod.maxStack = theSlot+3;
+		
+		return theMethod;
+	}
+
 
 	private void modifyThreadReplayer_addSnapshotMethod(ClassNode aClassNode, String aSnapshotSig)
 	{
 		Type[] theSignature = new Type[aSnapshotSig.length()];
 		for(int i=0;i<theSignature.length;i++) theSignature[i] = BCIUtils.getTypeForSig(aSnapshotSig.charAt(i));
 		MethodNode theMethod = createSnapshotMethod(aClassNode, theSignature);
+		BCIUtils.checkMethod(aClassNode, theMethod, new ReplayerVerifier(), false);
 		aClassNode.methods.add(theMethod);
 	}
 	
 	private MethodNode createSnapshotMethod(ClassNode aClassNode, Type[] aSnapshotSignature)
 	{
 		MethodNode theMethodNode = new MethodNode();
-		theMethodNode.name = ReplayerGenerator.SNAPSHOT_METHOD_NAME;
+		theMethodNode.name = MethodReplayerGenerator.SNAPSHOT_METHOD_NAME;
 		theMethodNode.maxLocals = 3;
+		theMethodNode.maxStack = 9;
 
 		LocalsMapInfo theLocalsMapInfo = new LocalsMapInfo();
 		List<Type> theArgTypes = new ArrayList<Type>();
@@ -405,7 +738,7 @@ public class ReplayerLoader extends ClassLoader
 		SList s = new SList();
 		
 		s.ALOAD(0);
-		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "getSnapshotSeq", "()I");
+		s.INVOKEVIRTUAL(CLS_THREADREPLAYER, "getSnapshotSeq", "()I");
 		s.DUP();
 		s.ISTORE(vSnapshotSeq);
 		s.ILOAD(1); // Passed seq
@@ -419,7 +752,7 @@ public class ReplayerLoader extends ClassLoader
 		s.pushInt(theLocalsMapInfo.floatValuesCount);
 		s.pushInt(theLocalsMapInfo.doubleValuesCount);
 		s.pushInt(theLocalsMapInfo.refValuesCount);
-		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "createSnapshot", "(IIIIII)"+DSC_LOCALSSNAPSHOT);
+		s.INVOKEVIRTUAL(CLS_THREADREPLAYER, "createSnapshot", "(IIIIII)"+DSC_LOCALSSNAPSHOT);
 		s.ASTORE(vSnapshot);
 		
 		int theSlot = 3;
@@ -433,7 +766,7 @@ public class ReplayerLoader extends ClassLoader
 		
 		s.ALOAD(0);
 		s.ALOAD(vSnapshot);
-		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "registerSnapshot", "("+DSC_LOCALSSNAPSHOT+")V");
+		s.INVOKEVIRTUAL(CLS_THREADREPLAYER, "registerSnapshot", "("+DSC_LOCALSSNAPSHOT+")V");
 		
 		s.label(lNoSnapshot);
 		s.ILOAD(vSnapshotSeq);
@@ -561,6 +894,7 @@ public class ReplayerLoader extends ClassLoader
 		private final byte[] itsArgSorts;
 		private final byte itsReturnSort;
 		private MethodSignature itsSignature;
+		private MethodSignature itsOOSSignature;
 		
 		public MethodDescriptor(IBehaviorInfo aBehavior, Type aReturnType, Type... aArgTypes)
 		{
@@ -590,6 +924,7 @@ public class ReplayerLoader extends ClassLoader
 		{
 //			int theSort = BCIUtils.getActualReplayType(aType).getSort();
 			int theSort = aType.getSort();
+			if (theSort == Type.ARRAY) theSort = Type.OBJECT;
 			assert theSort <= Byte.MAX_VALUE;
 			return (byte) theSort;
 		}
@@ -600,12 +935,20 @@ public class ReplayerLoader extends ClassLoader
 		public MethodSignature getDispatchSignature()
 		{
 			if (itsSignature == null)
-			{
 				itsSignature = MethodReplayerGenerator.getDispatchMethodSignature(itsBehavior);
-			}
 			return itsSignature;
 		}
 
+		/**
+		 * Returns the signature for the out-of-scope dispatcher method corresponding to this descriptor.
+		 */
+		public MethodSignature getOOSDispatchSignature()
+		{
+			if (itsOOSSignature == null)
+				itsOOSSignature = MethodReplayerGenerator.getOOSDispatchMethodSignature(itsBehavior);
+			return itsOOSSignature;
+		}
+		
 		@Override
 		public int hashCode()
 		{

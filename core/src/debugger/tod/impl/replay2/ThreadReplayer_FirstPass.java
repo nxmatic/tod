@@ -110,7 +110,7 @@ public class ThreadReplayer_FirstPass extends ThreadReplayer
 	@Override
 	public void replay()
 	{
-		dispatch_main();
+		replay_main();
 	}
 	
 	@Override

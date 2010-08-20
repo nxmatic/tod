@@ -325,6 +325,7 @@ public class SyntaxInsnList extends InsnList
 	{
 		switch(type.getSize())
 		{
+		case 0: break;
 		case 1: POP(); break;
 		case 2: POP2(); break;
 		default: throw new RuntimeException("Bad size");

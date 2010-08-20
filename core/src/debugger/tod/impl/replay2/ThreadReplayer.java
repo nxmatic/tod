@@ -37,23 +37,23 @@ import java.util.List;
 import org.objectweb.asm.Type;
 
 import tod.core.config.TODConfig;
-import tod.core.database.browser.LocationUtils;
 import tod.core.database.structure.IBehaviorInfo;
 import tod.core.database.structure.IMutableStructureDatabase;
 import tod.core.database.structure.IStructureDatabase;
 import tod.core.database.structure.ObjectId;
 import tod.impl.server.BufferStream;
-import tod.impl.server.ModeChangesList;
-import tod.impl.server.ModeChangesList.ModeChange;
 import tod2.agent.Message;
 import tod2.agent.ValueType;
 import zz.utils.Utils;
 import zz.utils.primitive.ByteArray;
-import zz.utils.primitive.IntStack;
 
 public abstract class ThreadReplayer
 {
-	public static final boolean ECHO = false;
+	static
+	{
+		System.out.println("ThreadReplayer loaded by: "+ThreadReplayer.class.getClassLoader());
+	}
+	public static final boolean ECHO = true;
 	public static boolean ECHO_FORREAL = true;
 
 	private final int itsThreadId;
@@ -75,7 +75,6 @@ public abstract class ThreadReplayer
 	
 	private final List<Type> itsBehaviorReturnTypes = new ArrayList<Type>();
 
-	private byte itsLastMessage;
 	private ExceptionInfo itsLastException;
 	
 	private final EventCollector itsCollector;
@@ -145,13 +144,8 @@ public abstract class ThreadReplayer
 		byte theMessage = itsStream.get();
 		if (ECHO) 
 		{
-			if (!ECHO_FORREAL && itsMessageCount > 1713000000) ECHO_FORREAL = true;
 			if (theMessage != Message.REGISTER_OBJECT) itsMessageCount++;
 			if (ECHO_FORREAL) echo("Message (%d): [#%d @%d] %s", itsThreadId, itsMessageCount, itsStream.position(), Message._NAMES[theMessage]);
-			if (itsMessageCount == 15360423)
-			{
-				System.out.println("ThreadReplayer.nextMessage()");
-			}
 		}
 		return theMessage;
 	}
@@ -161,6 +155,41 @@ public abstract class ThreadReplayer
 		processStatelessMessages();
 		return itsStream.peek();
 	}
+	
+	public byte peekNextMessageConsumingClassloading()
+	{
+		while(true)
+		{
+			byte theMessage = peekNextMessage();
+			switch(theMessage)
+			{
+			case Message.CLASSLOADER_ENTER:
+				getNextMessage();
+				replay_ClassLoader_loop();
+				break;
+				
+			case Message.INSCOPE_CLINIT_ENTER:
+			{
+				getNextMessage();
+				int theBehaviorId = readInt();
+				dispatch_inscope(theBehaviorId, this);
+				break;
+			}
+				
+			case Message.OUTOFSCOPE_CLINIT_ENTER:
+			{
+				getNextMessage();
+				replay_OOS_loop();
+				break;
+			}
+			
+			default: 
+				return theMessage;
+			}
+		}
+	}
+	
+
 	
 	/**
 	 * Whether the next message will be an exception.
@@ -305,39 +334,6 @@ public abstract class ThreadReplayer
 		itsCollector.sync(theTimestamp);
 	}
 	
-	private static boolean isInScope(ReplayerFrame aFrame)
-	{
-		return aFrame != null ? aFrame.isInScope() : false;
-	}
-	
-	public InScopeReplayerFrame createInScopeFrame(ReplayerFrame aParent, int aBehaviorId, String aDebugInfo)
-	{
-		InScopeReplayerFrame theFrame = getGenerator().createInScopeFrame(aBehaviorId);
-		theFrame.setup(this, itsStream, aDebugInfo, isInScope(aParent), null);
-		return theFrame;
-	}
-	
-	public EnveloppeReplayerFrame createEnveloppeFrame(ReplayerFrame aParent, Type aReturnType, String aDebugInfo)
-	{
-		EnveloppeReplayerFrame theFrame = getGenerator().createEnveloppeFrame();
-		theFrame.setup(this, itsStream, aDebugInfo, isInScope(aParent), aReturnType);
-		return theFrame;
-	}
-	
-	public UnmonitoredReplayerFrame createUnmonitoredFrame(ReplayerFrame aParent, Type aReturnType, String aDebugInfo)
-	{
-		UnmonitoredReplayerFrame theFrame = getGenerator().createUnmonitoredFrame();
-		theFrame.setup(this, itsStream, aDebugInfo, isInScope(aParent), aReturnType);
-		return theFrame;
-	}
-	
-	public ClassloaderWrapperReplayerFrame createClassloaderFrame(ReplayerFrame aParent, String aDebugInfo)
-	{
-		ClassloaderWrapperReplayerFrame theFrame = getGenerator().createClassloaderWrapperFrame();
-		theFrame.setup(this, itsStream, aDebugInfo, isInScope(aParent), null);
-		return theFrame;
-	}
-	
 	public IntDeltaReceiver getBehIdReceiver()
 	{
 		return itsBehIdReceiver;
@@ -444,14 +440,14 @@ public abstract class ThreadReplayer
 	/**
 	 * Starts the replay of the thread.
 	 */
-	public void dispatch_main()
+	public void replay_main()
 	{
 		// Not using while(true), otherwise we crash when the stream ends.
 		while(hasMoreMessages())
 		{
 			byte m = getNextMessage();
 			
-			boolean theContinue = dispatch(m);
+			boolean theContinue = replay_OOS(m);
 			if (! theContinue) break;
 		}
 	}
@@ -460,18 +456,18 @@ public abstract class ThreadReplayer
 	 * Common loop for out-of-scope methods.
 	 * Returns normally if the replayed methods returns normally, otherwise throws an exception.
 	 */
-	public void dispatch_OOS_loop()
+	public void replay_OOS_loop()
 	{
 		while(true)
 		{
 			byte m = getNextMessage();
 			
-			boolean theContinue = dispatch(m);
+			boolean theContinue = replay_OOS(m);
 			if (! theContinue) break;
 		}
 	}
 	
-	private boolean dispatch(byte aMessage)
+	private boolean replay_OOS(byte aMessage)
 	{
 		switch(aMessage)
 		{
@@ -480,89 +476,140 @@ public abstract class ThreadReplayer
 			break;
 		
 		case Message.INSCOPE_BEHAVIOR_ENTER: 
-			evInScopeBehaviorEnter(getBehIdReceiver().receiveFull(getStream())); 
+			dispatch_inscope(getBehIdReceiver().receiveFull(getStream()), this); 
 			break;
 			
 		case Message.INSCOPE_BEHAVIOR_ENTER_DELTA: 
-			evInScopeBehaviorEnter(getBehIdReceiver().receiveDelta(getStream())); 
+			dispatch_inscope(getBehIdReceiver().receiveDelta(getStream()), this); 
 			break;
 			
-		case Message.OUTOFSCOPE_BEHAVIOR_ENTER: evOutOfScopeBehaviorEnter(); break;
-		case Message.INSCOPE_CLINIT_ENTER: evInScopeClinitEnter(getStream().getInt()); break;
-		case Message.OUTOFSCOPE_CLINIT_ENTER: evOutOfScopeClinitEnter(); break;
-		case Message.CLASSLOADER_ENTER: evClassloaderEnter(); break;
-
-		case Message.HANDLER_REACHED:
-			if (itsLastMessage != Message.EXCEPTION) throw new IllegalStateException();
-			throw new HandlerReachedException(itsLastException.exception, getStream().getInt());
-			
-		case Message.INSCOPE_BEHAVIOR_EXIT_EXCEPTION: throw new BehaviorExitException(); 
+		case Message.INSCOPE_CLINIT_ENTER: 
+			dispatch_inscope(getStream().getInt(), this); 
+			break;
 		
+//		case Message.OUTOFSCOPE_BEHAVIOR_ENTER: dispatch_OOS_loop(); break;
+//		case Message.OUTOFSCOPE_CLINIT_ENTER: dispatch_OOS_loop(); break;
+		case Message.CLASSLOADER_ENTER: replay_ClassLoader_loop(); break;
+		
+		case Message.OUTOFSCOPE_BEHAVIOR_EXIT_EXCEPTION:
+		case Message.OUTOFSCOPE_BEHAVIOR_EXIT_NORMAL:
+			return false;
+
 		default: throw new RuntimeException("Command not handled: "+Message._NAMES[aMessage]);
 		}
 	
-		itsLastMessage = aMessage;
-		
 		return true;
+	}
+	
+	/**
+	 * Loop for classloader code.
+	 * Returns normally if the replayed methods returns normally, otherwise throws an exception.
+	 */
+	public void replay_ClassLoader_loop()
+	{
+		while(true)
+		{
+			byte m = getNextMessage();
+			
+			boolean theContinue = replay_ClassLoader(m);
+			if (! theContinue) break;
+		}
+	}
+	
+	private boolean replay_ClassLoader(byte aMessage)
+	{
+		switch(aMessage)
+		{
+		case Message.EXCEPTION:
+			processException();
+			break;
+		
+		case Message.INSCOPE_BEHAVIOR_ENTER: 
+			dispatch_inscope(getBehIdReceiver().receiveFull(getStream()), this); 
+			break;
+			
+		case Message.INSCOPE_BEHAVIOR_ENTER_DELTA: 
+			dispatch_inscope(getBehIdReceiver().receiveDelta(getStream()), this); 
+			break;
+			
+		case Message.INSCOPE_CLINIT_ENTER: 
+			dispatch_inscope(getStream().getInt(), this); 
+			break;
+		
+		case Message.OUTOFSCOPE_BEHAVIOR_ENTER: replay_OOS_loop(); break;
+		case Message.OUTOFSCOPE_CLINIT_ENTER: replay_OOS_loop(); break;
+		case Message.CLASSLOADER_ENTER: replay_ClassLoader_loop(); break;
+		
+		case Message.CLASSLOADER_EXIT:
+			return false;
 
+		default: throw new RuntimeException("Command not handled: "+Message._NAMES[aMessage]);
+		}
+	
+		return true;
+	}
+	
+	public static void dispatch_inscope(int aBehaviorId, ThreadReplayer aReplayer)
+	{
+		throw new Error("This code is supposed to be replaced by the ReplayerLoader.");
 	}
 
 	public void dispatch_OOS_V()
 	{
-		dispatch_OOS_loop();
+		replay_OOS_loop();
 	}
 	
 	public int dispatch_OOS_I()
 	{
-		dispatch_OOS_loop();
+		replay_OOS_loop();
 		return getStream().getInt();
 	}
 	
 	public boolean dispatch_OOS_Z()
 	{
-		dispatch_OOS_loop();
+		replay_OOS_loop();
 		return getStream().get() != 0;
 	}
 	
 	public byte dispatch_OOS_B()
 	{
-		dispatch_OOS_loop();
+		replay_OOS_loop();
 		return getStream().get();
 	}
 	
 	public short dispatch_OOS_S()
 	{
-		dispatch_OOS_loop();
+		replay_OOS_loop();
 		return getStream().getShort();
 	}
 	
 	public char dispatch_OOS_C()
 	{
-		dispatch_OOS_loop();
+		replay_OOS_loop();
 		return getStream().getChar();
 	}
 	
 	public long dispatch_OOS_J()
 	{
-		dispatch_OOS_loop();
+		replay_OOS_loop();
 		return getStream().getLong();
 	}
 	
 	public float dispatch_OOS_F()
 	{
-		dispatch_OOS_loop();
+		replay_OOS_loop();
 		return getStream().getFloat();
 	}
 	
 	public double dispatch_OOS_D()
 	{
-		dispatch_OOS_loop();
+		replay_OOS_loop();
 		return getStream().getDouble();
 	}
 	
-	public ObjectId dispatch_OOS_R()
+	public ObjectId dispatch_OOS_L()
 	{
-		dispatch_OOS_loop();
+		replay_OOS_loop();
 		return readRef();
 	}
 	
@@ -573,8 +620,56 @@ public abstract class ThreadReplayer
 		return theInfo.exception;
 	}
 
+	public static Exception createRtEx(int aArg, String aMessage)
+	{
+		return new RuntimeException(aMessage+": "+aArg);
+	}
+	
+	public static Exception createRtEx(String aMessage)
+	{
+		return new RuntimeException(aMessage);
+	}
+	
+	public static Exception createUnsupportedEx()
+	{
+		return new UnsupportedOperationException();
+	}
 
+	public static Exception createUnsupportedEx(String aMessage)
+	{
+		return new UnsupportedOperationException(aMessage);
+	}
+	
+	/**
+	 * Expects a behavior enter message (skipping classloading).
+	 * Returns the behavior id if the message is for an in scope behavior,
+	 * -1 otherwise.
+	 */
+	public int getDispatchTarget()
+	{
+		byte theMessage = peekNextMessageConsumingClassloading();
 
+		switch(theMessage)
+		{
+		case Message.INSCOPE_BEHAVIOR_ENTER: 
+			return getBehIdReceiver().receiveFull(getStream()); 
+			
+		case Message.INSCOPE_BEHAVIOR_ENTER_DELTA: 
+			return getBehIdReceiver().receiveDelta(getStream()); 
+			
+		case Message.INSCOPE_CLINIT_ENTER: 
+			return getStream().getInt(); 
+		
+		case Message.OUTOFSCOPE_BEHAVIOR_ENTER:
+			return -1;
+			
+		case Message.OUTOFSCOPE_CLINIT_ENTER:
+			return -1;
+			
+		default:
+			throw new RuntimeException("Unexpected message: "+Message._NAMES[theMessage]);
+		}
+	}
 	
 	public static class ExceptionInfo
 	{

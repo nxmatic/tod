@@ -95,18 +95,18 @@ public class ThreadReplayer_Partial extends ThreadReplayer
 		
 		SnapshotProbeInfo theSnapshotProbeInfo = getDatabase().getSnapshotProbeInfo(itsSnapshot.getProbeId());
 		int theBehaviorId = theSnapshotProbeInfo.behaviorId;
-		InScopeReplayerFrame theFrame = createInitialFrame(theBehaviorId);
-		theFrame.invoke_PartialReplay();
+//		InScopeReplayerFrame theFrame = createInitialFrame(theBehaviorId);
+//		theFrame.invoke_PartialReplay();
 		getStream().skipAll(); // Finishes 
 	}
 	
-	private InScopeReplayerFrame createInitialFrame(int aBehaviorId)
-	{
-		ReplayerGenerator_Partial theGenerator = (ReplayerGenerator_Partial) getGenerator();
-		InScopeReplayerFrame theFrame = theGenerator.createInitialFrame(aBehaviorId);
-		theFrame.setup(this, getStream(), "initial", false, null);
-		return theFrame;
-	}
+//	private InScopeReplayerFrame createInitialFrame(int aBehaviorId)
+//	{
+//		ReplayerGenerator_Partial theGenerator = (ReplayerGenerator_Partial) getGenerator();
+//		InScopeReplayerFrame theFrame = theGenerator.createInitialFrame(aBehaviorId);
+//		theFrame.setup(this, getStream(), "initial", false, null);
+//		return theFrame;
+//	}
 	
 
 }

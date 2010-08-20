@@ -50,7 +50,7 @@ public class SList extends SyntaxInsnList
 	public void createRTEx(String aMessage)
 	{
 		LDC(aMessage);
-		INVOKESTATIC(CLS_REPLAYERFRAME, "createRtEx", "(Ljava/lang/String;)Ljava/lang/Exception;");
+		INVOKESTATIC(CLS_THREADREPLAYER, "createRtEx", "(Ljava/lang/String;)Ljava/lang/Exception;");
 	}
 
 	/**
@@ -59,7 +59,7 @@ public class SList extends SyntaxInsnList
 	public void createUnsupportedEx(String aMessage)
 	{
 		LDC(aMessage);
-		INVOKESTATIC(CLS_REPLAYERFRAME, "createUnsupportedEx", "(Ljava/lang/String;)Ljava/lang/Exception;");
+		INVOKESTATIC(CLS_THREADREPLAYER, "createUnsupportedEx", "(Ljava/lang/String;)Ljava/lang/Exception;");
 	}
 	
 	/**
@@ -69,77 +69,77 @@ public class SList extends SyntaxInsnList
 	public void createRTExArg(String aMessage)
 	{
 		LDC(aMessage);
-		INVOKESTATIC(CLS_REPLAYERFRAME, "createRtEx", "(ILjava/lang/String;)Ljava/lang/Exception;");
+		INVOKESTATIC(CLS_THREADREPLAYER, "createRtEx", "(ILjava/lang/String;)Ljava/lang/Exception;");
 	}
 	
-	public void invokeReadRef()
+	public void invokeReadRef(int aThreadReplayerSlot)
 	{
-		ALOAD(0);
-		INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "readRef", "()"+DSC_OBJECTID);
+		ALOAD(aThreadReplayerSlot);
+		INVOKEVIRTUAL(CLS_THREADREPLAYER, "readRef", "()"+DSC_OBJECTID);
 	}
 	
-	public void invokeReadInt()
+	public void invokeReadInt(int aThreadReplayerSlot)
 	{
-		ALOAD(0);
-		INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "readInt", "()I");
+		ALOAD(aThreadReplayerSlot);
+		INVOKEVIRTUAL(CLS_THREADREPLAYER, "readInt", "()I");
 	}
 	
-	public void invokeReadBoolean()
+	public void invokeReadBoolean(int aThreadReplayerSlot)
 	{
-		ALOAD(0);
-		INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "readBoolean", "()Z");
+		ALOAD(aThreadReplayerSlot);
+		INVOKEVIRTUAL(CLS_THREADREPLAYER, "readBoolean", "()Z");
 	}
 	
-	public void invokeReadByte()
+	public void invokeReadByte(int aThreadReplayerSlot)
 	{
-		ALOAD(0);
-		INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "readByte", "()B");
+		ALOAD(aThreadReplayerSlot);
+		INVOKEVIRTUAL(CLS_THREADREPLAYER, "readByte", "()B");
 	}
 	
-	public void invokeReadChar()
+	public void invokeReadChar(int aThreadReplayerSlot)
 	{
-		ALOAD(0);
-		INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "readChar", "()C");
+		ALOAD(aThreadReplayerSlot);
+		INVOKEVIRTUAL(CLS_THREADREPLAYER, "readChar", "()C");
 	}
 	
-	public void invokeReadShort()
+	public void invokeReadShort(int aThreadReplayerSlot)
 	{
-		ALOAD(0);
-		INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "readShort", "()S");
+		ALOAD(aThreadReplayerSlot);
+		INVOKEVIRTUAL(CLS_THREADREPLAYER, "readShort", "()S");
 	}
 	
-	public void invokeReadFloat()
+	public void invokeReadFloat(int aThreadReplayerSlot)
 	{
-		ALOAD(0);
-		INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "readFloat", "()F");
+		ALOAD(aThreadReplayerSlot);
+		INVOKEVIRTUAL(CLS_THREADREPLAYER, "readFloat", "()F");
 	}
 	
-	public void invokeReadLong()
+	public void invokeReadLong(int aThreadReplayerSlot)
 	{
-		ALOAD(0);
-		INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "readLong", "()J");
+		ALOAD(aThreadReplayerSlot);
+		INVOKEVIRTUAL(CLS_THREADREPLAYER, "readLong", "()J");
 	}
 	
-	public void invokeReadDouble()
+	public void invokeReadDouble(int aThreadReplayerSlot)
 	{
-		ALOAD(0);
-		INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "readDouble", "()D");
+		ALOAD(aThreadReplayerSlot);
+		INVOKEVIRTUAL(CLS_THREADREPLAYER, "readDouble", "()D");
 	}
 	
-	public void invokeRead(Type aType)
+	public void invokeRead(Type aType, int aThreadReplayerSlot)
 	{
 		switch(aType.getSort())
 		{
 		case Type.ARRAY:
-		case Type.OBJECT: invokeReadRef(); break;
-		case Type.INT: invokeReadInt(); break;
-		case Type.BOOLEAN: invokeReadBoolean(); break;
-		case Type.BYTE: invokeReadByte(); break;
-		case Type.CHAR: invokeReadChar(); break;
-		case Type.SHORT: invokeReadShort(); break;
-		case Type.FLOAT: invokeReadFloat(); break;
-		case Type.LONG: invokeReadLong(); break;
-		case Type.DOUBLE: invokeReadDouble(); break;
+		case Type.OBJECT: invokeReadRef(aThreadReplayerSlot); break;
+		case Type.INT: invokeReadInt(aThreadReplayerSlot); break;
+		case Type.BOOLEAN: invokeReadBoolean(aThreadReplayerSlot); break;
+		case Type.BYTE: invokeReadByte(aThreadReplayerSlot); break;
+		case Type.CHAR: invokeReadChar(aThreadReplayerSlot); break;
+		case Type.SHORT: invokeReadShort(aThreadReplayerSlot); break;
+		case Type.FLOAT: invokeReadFloat(aThreadReplayerSlot); break;
+		case Type.LONG: invokeReadLong(aThreadReplayerSlot); break;
+		case Type.DOUBLE: invokeReadDouble(aThreadReplayerSlot); break;
 		default: throw new RuntimeException("Not handled: "+aType);
 		}
 	}

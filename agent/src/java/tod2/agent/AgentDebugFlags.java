@@ -45,7 +45,7 @@ public class AgentDebugFlags
 	/**
 	 * If true, {@link ThreadData} prints all the events it receives
 	 */
-	public static final boolean EVENT_LOG = false;
+	public static final boolean EVENT_LOG = true;
 	
 	/**
 	 * Stream to which the {@link EventInterpreter} sends debug info.

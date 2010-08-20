@@ -426,7 +426,7 @@ public class BCIUtils implements Opcodes
 					aClassNode.name,
 					aNode.name,
 					aNode.desc,
-					getBytecodeRanks(aNode, e.nodes),
+					e.nodes != null ? getBytecodeRanks(aNode, e.nodes) : "?",
 					e.getMessage());
 		}
 		catch (Exception e)
@@ -448,7 +448,6 @@ public class BCIUtils implements Opcodes
 		{
 			Frame theFrame = aFrames[i];
 			AbstractInsnNode theInsn = aNode.instructions.get(i);
-			
 			
 			switch(theInsn.getType())
 			{
@@ -793,6 +792,7 @@ public class BCIUtils implements Opcodes
 		case Type.DOUBLE: return 'D';
 		case Type.FLOAT: return 'F';
 		case Type.LONG: return 'J';
+		case Type.VOID: return 'V';
 		
 		default:
 			throw new RuntimeException("Not handled: "+aSort);	

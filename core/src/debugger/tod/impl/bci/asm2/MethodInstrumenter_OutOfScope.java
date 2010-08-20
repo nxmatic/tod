@@ -75,12 +75,28 @@ public class MethodInstrumenter_OutOfScope extends MethodInstrumenter
 		// Constructors are not overridable so if a constructor is out of scope it is never monitored.
 		// Same for statics and privates
 		// NOT for finals (they can override something) nor clinit (called automatically)
-		if ((isConstructor() || isStatic() || isPrivate()) && ! isStaticInitializer()) return;
+//		if ((isConstructor() || isStatic() || isPrivate()) && ! isStaticInitializer()) return;
+	
+		// Yes, but we need enveloppe instrumentation anyway...
+		// Just leaving privates, because scope is at the class granularity.
+		if ((isPrivate()) && ! isStaticInitializer()) return;
 		
 		// Temp optimizations (ObjectIdentity uses a WeakHashMap which uses refs)
 		String theClassName = getClassNode().name;
 		
 		if (StructureDatabase.isSkipped(theClassName)) return;
+		
+		if (theClassName.startsWith("java/lang/"))
+		{
+			if ("<init>".equals(getNode().name)) return;	
+			if (isStatic()) return;
+		}
+		
+		if (theClassName.startsWith("java/util/Arrays"))
+		{
+//			if ("<init>".equals(getNode().name)) return;	
+			if (isStatic()) return;
+		}
 		
 		if (BCIUtils.CLS_OBJECT.equals(theClassName)) 
 		{

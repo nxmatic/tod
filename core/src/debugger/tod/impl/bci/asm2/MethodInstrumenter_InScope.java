@@ -130,26 +130,21 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 			
 		// Insert entry instructions
 		{
-			// Set ThreadData var to null for verifier to work
-			s.INVOKESTATIC(BCIUtils.CLS_EVENTCOLLECTOR_AGENT, "_getThreadData", "()"+BCIUtils.DSC_THREADDATA); // ThD
-			s.ASTORE(getThreadDataVar());
-			
 			if (DebugFlags.USE_FIELD_CACHE) s.add(itsMethodInfo.getFieldCacheInitInstructions());
 			
-			// Store inScope 
-			s.ALOAD(getThreadDataVar());
+			s.INVOKESTATIC(BCIUtils.CLS_EVENTCOLLECTOR_AGENT, "_getThreadData", "()"+BCIUtils.DSC_THREADDATA); // ThD
 			s.DUP();
+			s.ASTORE(getThreadDataVar());
 			
 			// Send event
 			s.pushInt(getBehavior().getId()); // ThD, BId 
 			s.INVOKEVIRTUAL(
 					BCIUtils.CLS_THREADDATA, 
 					isStaticInitializer() ? "evInScopeClinitEnter" : "evInScopeBehaviorEnter", 
-					"(I)V");
+					"(I)Z");
 			
 			//Check if we must send args
 			Label lAfterSendArgs = new Label();
-			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "isInScope", "()Z"); // ThD, inScope
 			s.IFtrue(lAfterSendArgs);
 			sendEnterArgs(s);
 			s.label(lAfterSendArgs);

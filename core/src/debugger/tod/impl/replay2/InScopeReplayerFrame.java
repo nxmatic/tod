@@ -35,86 +35,38 @@ import org.objectweb.asm.Type;
 
 import tod.core.database.browser.LocationUtils;
 import tod.core.database.structure.ObjectId;
+import tod.impl.replay2.ThreadReplayer.ExceptionInfo;
 import tod2.agent.Message;
 import zz.utils.Utils;
 
-public abstract class InScopeReplayerFrame extends ReplayerFrame
+public class InScopeReplayerFrame 
 {
-	private int itsId;
-	private String itsName;
-	private int itsAccess;
-	
-	private Type[] itsArgTypes;
-	private Type itsReturnType;	
-	
-	protected InScopeReplayerFrame()
+	private static void processException(ThreadReplayer aReplayer)
 	{
-	}
-	
-	@Override
-	public boolean isInScope()
-	{
-		return true;
-	}
-	
-	public void setSignature(int aId, String aName, int aAccess, Type[] aArgTypes, Type aReturnType)
-	{
-		if (ThreadReplayer.ECHO && ThreadReplayer.ECHO_FORREAL) System.out.println("InScopeReplayerFrame.InScopeReplayerFrame(): "+aName);
-		itsId = aId;
-		itsName = aName;
-		itsAccess = aAccess;
-		itsArgTypes = aArgTypes;
-		itsReturnType = aReturnType;
-	}
-	
-	private void processException()
-	{
-		ObjectId theException = readException();
-		byte m = super.getNextMessage();
+		ExceptionInfo theExceptionInfo = aReplayer.readExceptionInfo();
+		ObjectId theException = theExceptionInfo.exception;
+		byte m = aReplayer.getNextMessage();
 		switch(m)
 		{
 		case Message.HANDLER_REACHED: 
-			throw new HandlerReachedException(theException, readInt());
+			throw new HandlerReachedException(theException, aReplayer.readInt());
 			
 		case Message.INSCOPE_BEHAVIOR_EXIT_EXCEPTION:
-		case Message.OUTOFSCOPE_BEHAVIOR_EXIT_EXCEPTION: // Because when we process exceptions we are already in the outer frame
 			throw new BehaviorExitException();
-			
-		case Message.UNMONITORED_BEHAVIOR_CALL_EXCEPTION:
-			throw new UnmonitoredBehaviorCallException();
 			
 		default: throw new UnexpectedMessageException(m);
 		}
 	}
 	
-	@Override
-	protected byte getNextMessage()
+	public static byte getNextMessage(ThreadReplayer aReplayer)
 	{
-		byte m = super.getNextMessage();
+		byte m = aReplayer.getNextMessage();
 		if (m == Message.EXCEPTION) 
 		{
-			processException();
+			processException(aReplayer);
 			throw new RuntimeException("processException should always throw an exception");
 		}
 		return m;
-	}
-	
-	public static byte peekNextMessage(ThreadReplayer aReplayer)
-	{
-		byte m = ReplayerFrame.peekNextMessage(aReplayer);
-//		if (m == Message.EXCEPTION)  
-//		{
-//			super.getNextMessage(); // Consume the message
-//			processException();
-//			throw new RuntimeException("processException should always throw an exception");
-//		}
-		return m;
-	}
-	
-	protected void invokeClassloader()
-	{
-		ClassloaderWrapperReplayerFrame theChild = getReplayer().createClassloaderFrame(this, null);
-		theChild.invoke_OOS();
 	}
 	
 	public static int expectAndSendIntFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldId)
@@ -277,12 +229,9 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 		return theValue;
 	}
 	
-
-	
-	
 	public static void expectException(ThreadReplayer aReplayer)
 	{
-		byte m = aReplayer.getNextMessage();
+		byte m = getNextMessage(aReplayer);
 		throw new UnexpectedMessageException(m); // should never get executed: getNextMessage should throw an exception
 	}
 	
@@ -348,103 +297,11 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 	}
 	
 
-	private static byte peekNextMessageConsumingClassloading(ThreadReplayer aReplayer)
-	{
-		while(true)
-		{
-			byte theMessage = aReplayer.peekNextMessage();
-			switch(theMessage)
-			{
-			case Message.CLASSLOADER_ENTER:
-				aReplayer.getNextMessage();
-				invokeClassloader();
-				break;
-				
-			case Message.INSCOPE_CLINIT_ENTER:
-			{
-				aReplayer.getNextMessage();
-				int theBehaviorId = aReplayer.readInt();
-				InScopeReplayerFrame theReplayer = getReplayer().createInScopeFrame(this, theBehaviorId, "bid: "+theBehaviorId);
-				theReplayer.invokeVoid_S();
-				break;
-			}
-				
-			case Message.OUTOFSCOPE_CLINIT_ENTER:
-			{
-				aReplayer.getNextMessage();
-				EnveloppeReplayerFrame theReplayer = getReplayer().createEnveloppeFrame(this, Type.VOID_TYPE, null);
-				theReplayer.invokeVoid_S();
-				break;
-			}
-			
-			default: 
-				return theMessage;
-			}
-		}
-	}
-	
 	private static void skipClassloading(ThreadReplayer aReplayer)
 	{
-		peekNextMessageConsumingClassloading(aReplayer);
+		aReplayer.peekNextMessageConsumingClassloading();
 	}
 	
-	protected ReplayerFrame invoke(int aBehaviorId)
-	{
-		byte theMessage = peekNextMessageConsumingClassloading(aReplayer);
-		
-		int theMode = getReplayer().getBehaviorMonitoringMode(aBehaviorId);
-		int theCallMode = theMode & MonitoringMode.MASK_CALL;
-		
-		if (ThreadReplayer.ECHO && ThreadReplayer.ECHO_FORREAL) Utils.println(
-				"InScopeReplayerFrame.invoke(): [%s] (%d) %s", 
-				LocationUtils.toMonitoringModeString(theMode), 
-				aBehaviorId,
-				getReplayer().getDatabase().getBehavior(aBehaviorId, true));
-		
-		switch(theCallMode)
-		{
-		case MonitoringMode.CALL_MONITORED:
-			return invokeMonitored(theMessage, aBehaviorId);
-			
-		case MonitoringMode.CALL_UNKNOWN:
-		case MonitoringMode.CALL_UNMONITORED:
-			return invokeUnmonitored(theMessage, aBehaviorId);
-			
-		default:
-			throw new RuntimeException("Not handled: "+theMode);
-		}
-	}
-	
-	private ReplayerFrame invokeMonitored(byte aMessage, int aBehaviorId)
-	{
-		switch(aMessage)
-		{
-			case Message.INSCOPE_BEHAVIOR_ENTER:
-			{
-				getNextMessage();
-				int theBehaviorId = getReplayer().getBehIdReceiver().receiveFull(getStream());
-				return getReplayer().createInScopeFrame(this, theBehaviorId, "bid: "+theBehaviorId);
-			}
-				
-			case Message.INSCOPE_BEHAVIOR_ENTER_DELTA:
-			{
-				getNextMessage();
-				int theBehaviorId = getReplayer().getBehIdReceiver().receiveDelta(getStream());
-				return getReplayer().createInScopeFrame(this, theBehaviorId, "bid: "+theBehaviorId);
-			}
-
-			case Message.OUTOFSCOPE_BEHAVIOR_ENTER:
-				getNextMessage();
-				return getReplayer().createEnveloppeFrame(this, getReplayer().getBehaviorReturnType(aBehaviorId), "bid: "+aBehaviorId);
-				
-			default: throw new UnexpectedMessageException(aMessage, "bid: "+aBehaviorId);
-		}
-	}
-	
-	private ReplayerFrame invokeUnmonitored(byte aMessage, int aBehaviorId)
-	{
-		return getReplayer().createUnmonitoredFrame(this, getReplayer().getBehaviorReturnType(aBehaviorId), "bid: "+aBehaviorId);
-	}
 	
 	public static TmpObjectId nextTmpId(ThreadReplayer aReplayer)
 	{
@@ -453,7 +310,7 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 	
 	public static TmpObjectId nextTmpId_skipClassloading(ThreadReplayer aReplayer)
 	{
-		skipClassloading();
+		skipClassloading(aReplayer);
 		return nextTmpId(aReplayer);
 	}
 	
@@ -546,51 +403,5 @@ public abstract class InScopeReplayerFrame extends ReplayerFrame
 	public static int getStartProbe(ThreadReplayer aReplayer)
 	{
 		return aReplayer.getStartProbe();
-	}
-
-	/**
-	 * A factory that creates a particular (generated) subclass of {@link InScopeReplayerFrame}.
-	 * @author gpothier
-	 */
-	public static abstract class Factory
-	{
-		private int itsBehaviorId;
-		private String itsName;
-		private int itsAccess;
-		private Type[] itsArgTypes;
-		private Type itsReturnType;
-
-		public void setSignature(int aId, String aName, int aAccess, String aDescriptor)
-		{
-			itsBehaviorId = aId;
-			itsName = aName;
-			itsAccess = aAccess;
-			itsArgTypes = Type.getArgumentTypes(aDescriptor);
-			itsReturnType = Type.getReturnType(aDescriptor);
-		}
-
-		public int getBehaviorId()
-		{
-			return itsBehaviorId;
-		}
-		
-		public Type[] getArgTypes()
-		{
-			return itsArgTypes;
-		}
-		
-		public Type getReturnType()
-		{
-			return itsReturnType;
-		}
-		
-		public InScopeReplayerFrame create()
-		{
-			InScopeReplayerFrame theFrame = create0();
-			theFrame.setSignature(itsBehaviorId, itsName, itsAccess, itsArgTypes, itsReturnType);
-			return theFrame;
-		}
-		
-		protected abstract InScopeReplayerFrame create0();
 	}
 }

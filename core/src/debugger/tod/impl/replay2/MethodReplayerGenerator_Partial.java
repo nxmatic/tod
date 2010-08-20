@@ -41,6 +41,7 @@ import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.MethodNode;
 
 import tod.core.config.TODConfig;
+import tod.core.database.structure.IBehaviorInfo;
 import tod.core.database.structure.IMutableStructureDatabase;
 import tod.core.database.structure.IStructureDatabase.SnapshotProbeInfo;
 import tod.impl.bci.asm2.MethodInfo.BCIFrame;
@@ -48,7 +49,6 @@ import tod.impl.bci.asm2.MethodInfo.BCIFrame;
 public class MethodReplayerGenerator_Partial extends MethodReplayerGenerator
 {
 	private int itsSnapshotVar;
-	private final LocalsSnapshot itsSnapshot;
 	private final SnapshotProbeInfo itsSnapshotProbeInfo;
 	
 	private int itsProbeIndex = 0;
@@ -58,15 +58,13 @@ public class MethodReplayerGenerator_Partial extends MethodReplayerGenerator
 	public MethodReplayerGenerator_Partial(
 			TODConfig aConfig,
 			IMutableStructureDatabase aDatabase,
-			ReplayerGenerator aGenerator,
-			int aBehaviorId,
+			IBehaviorInfo aBehavior,
 			ClassNode aClassNode,
 			MethodNode aMethodNode,
-			LocalsSnapshot aSnapshot)
+			SnapshotProbeInfo aSnapshotProbeInfo)
 	{
-		super(aConfig, aDatabase, aGenerator, aBehaviorId, aClassNode, aMethodNode);
-		itsSnapshot = aSnapshot;
-		itsSnapshotProbeInfo = itsSnapshot != null ? getDatabase().getSnapshotProbeInfo(itsSnapshot.getProbeId()) : null;
+		super(aConfig, aDatabase, aBehavior, aClassNode, aMethodNode);
+		itsSnapshotProbeInfo = aSnapshotProbeInfo;
 	}
 
 	@Override
@@ -108,7 +106,7 @@ public class MethodReplayerGenerator_Partial extends MethodReplayerGenerator
 		s = new SList();
 		
 		s.ALOAD(0);
-		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "getSnapshotForResume", "()"+DSC_LOCALSSNAPSHOT);
+		s.INVOKEVIRTUAL(CLS_THREADREPLAYER, "getSnapshotForResume", "()"+DSC_LOCALSSNAPSHOT);
 		s.ASTORE(itsSnapshotVar);
 		
 		if (aSaveStack)
