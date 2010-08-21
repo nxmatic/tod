@@ -329,7 +329,7 @@ public class ClassInstrumenter
 //		IMutableBehaviorInfo theBehavior = itsClassInfo.getNewBehavior(theWrapper.name, theWrapper.desc, theWrapper.access);
 //		new MethodInstrumenter_OutOfScope(this, aNode, theBehavior).proceed();
 	}
-
+	
 	/**
 	 * Replaces the body of {@link TODAccessor#getId(Object)} so that
 	 * it calls the generated Object.$tod$getId method

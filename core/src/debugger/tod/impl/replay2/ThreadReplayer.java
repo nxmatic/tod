@@ -648,6 +648,7 @@ public abstract class ThreadReplayer
 	public int getDispatchTarget()
 	{
 		byte theMessage = peekNextMessageConsumingClassloading();
+		getNextMessage();
 
 		switch(theMessage)
 		{

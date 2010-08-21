@@ -101,6 +101,134 @@ public class InScopeReplayerFrame
 		return theValue;
 	}
 	
+	public static byte expectAndSendByteFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldId)
+	{
+		byte theValue;
+		
+		byte m = getNextMessageConsumingClassloading(aReplayer);
+		if (m == Message.FIELD_READ) theValue = aReplayer.readByte();
+		else throw new UnexpectedMessageException(m);
+		
+		aReplayer.getCollector().fieldRead(aTarget, aFieldId);
+		aReplayer.getCollector().value(theValue);
+		
+		return theValue;
+	}
+	
+	public static byte expectAndSendIntFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldId, byte aCachedValue)
+	{
+		byte theValue;
+		
+		byte m = getNextMessageConsumingClassloading(aReplayer);
+		switch(m)
+		{
+		case Message.FIELD_READ: theValue =  aReplayer.readByte(); break;
+		case Message.FIELD_READ_SAME: theValue = aCachedValue; break;
+		default: throw new UnexpectedMessageException(m);
+		}
+		
+		aReplayer.getCollector().fieldRead(aTarget, aFieldId);
+		aReplayer.getCollector().value(theValue);
+		
+		return theValue;
+	}
+	
+	public static boolean expectAndSendBooleanFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldId)
+	{
+		boolean theValue;
+		
+		byte m = getNextMessageConsumingClassloading(aReplayer);
+		if (m == Message.FIELD_READ) theValue = aReplayer.readBoolean();
+		else throw new UnexpectedMessageException(m);
+		
+		aReplayer.getCollector().fieldRead(aTarget, aFieldId);
+		aReplayer.getCollector().value(theValue ? 1 : 0);
+		
+		return theValue;
+	}
+	
+	public static boolean expectAndSendBooleanFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldId, boolean aCachedValue)
+	{
+		boolean theValue;
+		
+		byte m = getNextMessageConsumingClassloading(aReplayer);
+		switch(m)
+		{
+		case Message.FIELD_READ: theValue =  aReplayer.readBoolean(); break;
+		case Message.FIELD_READ_SAME: theValue = aCachedValue; break;
+		default: throw new UnexpectedMessageException(m);
+		}
+		
+		aReplayer.getCollector().fieldRead(aTarget, aFieldId);
+		aReplayer.getCollector().value(theValue ? 1 : 0);
+		
+		return theValue;
+	}
+	
+	public static char expectAndSendCharFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldId)
+	{
+		char theValue;
+		
+		byte m = getNextMessageConsumingClassloading(aReplayer);
+		if (m == Message.FIELD_READ) theValue = aReplayer.readChar();
+		else throw new UnexpectedMessageException(m);
+		
+		aReplayer.getCollector().fieldRead(aTarget, aFieldId);
+		aReplayer.getCollector().value(theValue);
+		
+		return theValue;
+	}
+	
+	public static char expectAndSendCharFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldId, char aCachedValue)
+	{
+		char theValue;
+		
+		byte m = getNextMessageConsumingClassloading(aReplayer);
+		switch(m)
+		{
+		case Message.FIELD_READ: theValue =  aReplayer.readChar(); break;
+		case Message.FIELD_READ_SAME: theValue = aCachedValue; break;
+		default: throw new UnexpectedMessageException(m);
+		}
+		
+		aReplayer.getCollector().fieldRead(aTarget, aFieldId);
+		aReplayer.getCollector().value(theValue);
+		
+		return theValue;
+	}
+	
+	public static short expectAndSendShortFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldId)
+	{
+		short theValue;
+		
+		byte m = getNextMessageConsumingClassloading(aReplayer);
+		if (m == Message.FIELD_READ) theValue = aReplayer.readShort();
+		else throw new UnexpectedMessageException(m);
+		
+		aReplayer.getCollector().fieldRead(aTarget, aFieldId);
+		aReplayer.getCollector().value(theValue);
+		
+		return theValue;
+	}
+	
+	public static short expectAndSendShortFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldId, short aCachedValue)
+	{
+		short theValue;
+		
+		byte m = getNextMessageConsumingClassloading(aReplayer);
+		switch(m)
+		{
+		case Message.FIELD_READ: theValue =  aReplayer.readShort(); break;
+		case Message.FIELD_READ_SAME: theValue = aCachedValue; break;
+		default: throw new UnexpectedMessageException(m);
+		}
+		
+		aReplayer.getCollector().fieldRead(aTarget, aFieldId);
+		aReplayer.getCollector().value(theValue);
+		
+		return theValue;
+	}
+	
 	public static long expectAndSendLongFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldId)
 	{
 		long theValue;

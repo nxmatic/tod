@@ -31,6 +31,8 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.bci.asm2;
 
+import static tod.impl.bci.asm2.BCIUtils.CLS_THREADREPLAYER;
+
 import java.util.HashSet;
 import java.util.ListIterator;
 import java.util.Set;
@@ -55,6 +57,8 @@ import tod.core.database.structure.IMutableBehaviorInfo;
 import tod.core.database.structure.IMutableClassInfo;
 import tod.impl.bci.asm2.MethodInfo.BCIFrame;
 import tod.impl.bci.asm2.MethodInfo.NewInvokeLink;
+import tod.impl.replay2.SList;
+import tod.impl.replay2.MethodReplayerGenerator.MethodSignature;
 
 /**
  * Instruments in-scope methods.
@@ -112,9 +116,8 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		Label lActive = new Label();
 		
 		// Create activation checking code
-//		s.pushInt(getBehavior().getId()); 
-//		s.INVOKESTATIC(BCIUtils.CLS_TRACEDMETHODS, "traceFull", "(I)Z");
-		s.pushInt(1); // TODO: See how we do the dynamic scoping
+		// TODO: See how we do the dynamic scoping
+		s.GETSTATIC(BCIUtils.CLS_OBJECT, ClassInstrumenter.BOOTSTRAP_FLAG, "Z");
 		s.IFtrue(lActive);
 
 		{
@@ -124,7 +127,6 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 			getNode().tryCatchBlocks.addAll(theClone.tryCatchBlocks);
 			getNode().localVariables.addAll(theClone.localVariables);
 		}
-
 
 		s.label(lActive);
 			
@@ -203,9 +205,9 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 
 		if (theArgCount > 0)
 		{
-			s.ALOAD(getThreadDataVar());
-			s.pushInt(theArgCount); 
-			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "sendBehaviorEnterArgs", "(I)V");
+//			s.ALOAD(getThreadDataVar());
+//			s.pushInt(theArgCount); 
+//			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "sendBehaviorEnterArgs", "(I)V");
 
 			int theArgIndex = 0;
 			if (theSendThis) sendValue_Ref(s, theArgIndex++);
@@ -371,77 +373,98 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		
 		SyntaxInsnList s = new SyntaxInsnList();
 		
-		// For constructor calls scope is resolved statically
-		if (BCIUtils.isConstructorCall(aNode)) processInvoke_Constructor(s, aNode);
-		else processInvoke_Method(s, aNode);
+		boolean theStatic = aNode.getOpcode() == Opcodes.INVOKESTATIC;
+		boolean theTouchy = MethodInstrumenter_OutOfScope.isTouchy(aNode.owner, aNode.name, theStatic);
+		
+		Label lBeginTry = new Label();
+		Label lEndTry = new Label();
+		Label lHandler = new Label();
+		Label lAfter = new Label();
+
+		// Touchy methods have no enveloppe instrumentation, so we have to add it here.
+		if (theTouchy)
+		{
+			// Send event
+			s.ALOAD(getThreadDataVar());
+			s.INVOKEVIRTUAL(
+					BCIUtils.CLS_THREADDATA, 
+					"<clinit>".equals(aNode.name) ? "evOutOfScopeClinitEnter" : "evOutOfScopeBehaviorEnter", 
+					"()V");
+
+			s.label(lBeginTry);
+		}
+
+		// Insert method call
+		MethodInsnNode theClone = (MethodInsnNode) aNode.clone(null);
+		s.add(theClone);				
+
+		if (theTouchy)
+		{
+			s.label(lEndTry);
+			s.ALOAD(getThreadDataVar());
+			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evOutOfScopeBehaviorExit_Normal", "()Z");		
+			
+			Type theReturnType = Type.getReturnType(aNode.desc);
+			
+			// Send return value if needed
+			if (theReturnType.getSort() != Type.VOID) 
+			{
+				s.IFfalse(lAfter);
+
+				s.ISTORE(theReturnType, itsTmpValueVar); // We can't use DUP in case of long or double, so we just store the value
+				sendValue(s, itsTmpValueVar, theReturnType);
+				s.ILOAD(theReturnType, itsTmpValueVar);
+			}
+			else
+			{
+				s.POP();
+			}
+
+			s.GOTO(lAfter);
+			
+			// Handler
+			s.label(lHandler);
+			s.ALOAD(getThreadDataVar());
+			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evOutOfScopeBehaviorExit_Exception", "()V");
+			s.ATHROW();
+
+			getNode().visitTryCatchBlock(lBeginTry, lEndTry, lHandler, null);
+		}
+		
+		s.label(lAfter);
+		
+		if (BCIUtils.isConstructorCall(aNode)) 
+		{
+			// Check if called method is monitored
+			if (! isCalleeInScope(aNode))
+			{
+				boolean theChaining = itsMethodInfo.isChainingInvocation(aNode);
+				if (theChaining)
+				{
+					s.ALOAD(getThreadDataVar());
+					s.ALOAD(0);
+					s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "sendConstructorTarget", "("+BCIUtils.DSC_OBJECT+")V");				
+				}
+				else
+				{
+					// Save target
+					NewInvokeLink theNewInvokeLink = itsMethodInfo.getNewInvokeLink(aNode);
+					SyntaxInsnList s2 = new SyntaxInsnList();
+					s2.DUP();
+					s2.ASTORE(itsTmpTargetVars[theNewInvokeLink.getNestingLevel()]);
+					insertAfter(theNewInvokeLink.getNewInsn(), s2);
+
+					// Do send
+					s.ALOAD(getThreadDataVar());
+					s.ALOAD(itsTmpTargetVars[theNewInvokeLink.getNestingLevel()]);
+					s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evObjectInitialized", "("+BCIUtils.DSC_OBJECT+")V");
+				}
+			}
+		}
 		
 		replace(aNode, s);
 	}
 
-	/** Copied from MethodNode */
-	private LabelNode getLabelNode(final Label l)
-	{
-		if (!(l.info instanceof LabelNode))
-		{
-			l.info = new LabelNode(l);
-		}
-		return (LabelNode) l.info;
-	}
-	
-	/** Copied from MethodNode */
-	private void visitTryCatchBlock(
-			MethodNode node,
-			final Label start,
-			final Label end,
-			final Label handler,
-			final String type)
-	{
-		node.tryCatchBlocks.add(0, new TryCatchBlockNode(
-				getLabelNode(start),
-				getLabelNode(end),
-				getLabelNode(handler),
-				type));
-	}
-	
-	private void processInvoke_Method(SyntaxInsnList s, MethodInsnNode aNode)
-	{
-		MethodInsnNode theClone = (MethodInsnNode) aNode.clone(null);
-		s.add(theClone);				
-	}
-
-	private void processInvoke_Constructor(SyntaxInsnList s, MethodInsnNode aNode)
-	{
-		MethodInsnNode theClone = (MethodInsnNode) aNode.clone(null);
-
-		s.add(theClone);				
-		
-		// Check if called method is monitored
-		if (! isCalleeInScope(aNode))
-		{
-			boolean theChaining = itsMethodInfo.isChainingInvocation(aNode);
-			if (theChaining)
-			{
-				s.ALOAD(getThreadDataVar());
-				s.ALOAD(0);
-				s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "sendConstructorTarget", "("+BCIUtils.DSC_OBJECT+")V");				
-			}
-			else
-			{
-				// Save target
-				NewInvokeLink theNewInvokeLink = itsMethodInfo.getNewInvokeLink(aNode);
-				SyntaxInsnList s2 = new SyntaxInsnList();
-				s2.DUP();
-				s2.ASTORE(itsTmpTargetVars[theNewInvokeLink.getNestingLevel()]);
-				insertAfter(theNewInvokeLink.getNewInsn(), s2);
-
-				// Do send
-				s.ALOAD(getThreadDataVar());
-				s.ALOAD(itsTmpTargetVars[theNewInvokeLink.getNestingLevel()]);
-				s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evObjectInitialized", "("+BCIUtils.DSC_OBJECT+")V");
-			}
-		}
-	}
-	
 	private void processNewArray(AbstractInsnNode aNode)
 	{
 		SyntaxInsnList s = new SyntaxInsnList();

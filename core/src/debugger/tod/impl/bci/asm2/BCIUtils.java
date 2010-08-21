@@ -805,7 +805,7 @@ public class BCIUtils implements Opcodes
 	}
 	
 	/**
-	 * Returns the actual type to use for the given type (all refs are folded into ObjectId)
+	 * Returns the actual type to use for the given type (all refs are folded into ObjectId, and scalars to int).
 	 */
 	public static Type getActualReplayType(Type aType)
 	{

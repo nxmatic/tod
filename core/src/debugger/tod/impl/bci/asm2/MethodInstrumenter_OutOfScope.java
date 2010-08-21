@@ -66,6 +66,35 @@ public class MethodInstrumenter_OutOfScope extends MethodInstrumenter
 		getNode().maxStack += 3; // This is the max we add to the stack
 	}
 
+	public static boolean isTouchy(String aClassName, String aMethodName, boolean aStatic)
+	{
+		if (BCIUtils.CLS_OBJECT.equals(aClassName)) 
+		{
+//			if ("equals".equals(getNode().name)) return;
+//			if ("toString".equals(getNode().name)) return;
+			if ("finalize".equals(aMethodName)) return true;
+			if ("wait".equals(aMethodName)) return true; // No problem, it's final
+		}
+
+		if (aClassName.startsWith("Xjava/") 
+				|| aClassName.startsWith("java/lang/Math")
+				|| aClassName.startsWith("java/lang/Object")
+				|| aClassName.startsWith("java/lang/String$1")
+				|| aClassName.startsWith("java/lang/String")
+				)
+		{
+			if ("<init>".equals(aMethodName)) return true;	
+			if (aStatic) return true;
+		}
+		
+		if (aClassName.startsWith("java/util/Arrays"))
+		{
+			if (aStatic) return true;
+		}
+
+		return false;
+	}
+	
 	@Override
 	public void proceed()
 	{
@@ -85,28 +114,7 @@ public class MethodInstrumenter_OutOfScope extends MethodInstrumenter
 		String theClassName = getClassNode().name;
 		
 		if (StructureDatabase.isSkipped(theClassName)) return;
-		
-		if (theClassName.startsWith("java/lang/"))
-		{
-			if ("<init>".equals(getNode().name)) return;	
-			if (isStatic()) return;
-		}
-		
-		if (theClassName.startsWith("java/util/Arrays"))
-		{
-//			if ("<init>".equals(getNode().name)) return;	
-			if (isStatic()) return;
-		}
-		
-		if (BCIUtils.CLS_OBJECT.equals(theClassName)) 
-		{
-//			if ("equals".equals(getNode().name)) return;
-//			if ("toString".equals(getNode().name)) return;
-			if ("finalize".equals(getNode().name)) return;
-			if ("wait".equals(getNode().name)) return; // No problem, it's final
-			System.out.println("Instrumenting: "+theClassName+"."+getNode().name+getNode().desc);
-		}
-
+		if (isTouchy(theClassName, getNode().name, isStatic())) return;
 		if (theClassName.contains("tod")) System.out.println("TOD?: "+theClassName);
 		
 		// For some reason, we need to do this to avoid a JVM crash

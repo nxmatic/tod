@@ -38,6 +38,7 @@ public final class ThreadData
 	}
 	
 	private boolean ECHO_FORREAL = true;
+	private boolean ECHO_SCOPE_FORREAL = false;
 	
 	/**
 	 * Internal thread id.
@@ -293,7 +294,7 @@ public final class ThreadData
 	
 	public void echoPushScope(boolean aInScope)
 	{
-		if (!ECHO_FORREAL) return;
+		if (!ECHO_SCOPE_FORREAL) return;
 		_StringBuilder theBuilder = new _StringBuilder();
 		theBuilder.append(getId());
 		theBuilder.append(" >>>");
@@ -303,7 +304,7 @@ public final class ThreadData
 
 	public void echoPopScope(boolean aInScope)
 	{
-		if (!ECHO_FORREAL) return;
+		if (!ECHO_SCOPE_FORREAL) return;
 		_StringBuilder theBuilder = new _StringBuilder();
 		theBuilder.append(getId());
 		theBuilder.append(" <<<");
