@@ -107,7 +107,7 @@ public class MethodInstrumenter_ClassLoader extends MethodInstrumenter
 
 			// Monitoring active, send event
 			s.ALOAD(getThreadDataVar());
-			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evClassLoaderExit", "()V");				
+			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evClassLoaderExit_Normal", "()V");				
 
 			s.label(lReturn);
 			s.RETURN(Type.getReturnType(getNode().desc));
@@ -123,7 +123,7 @@ public class MethodInstrumenter_ClassLoader extends MethodInstrumenter
 			s.IFfalse(lThrow);
 			
 			s.ALOAD(getThreadDataVar());
-			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evClassLoaderExit", "()V");
+			s.INVOKEVIRTUAL(BCIUtils.CLS_THREADDATA, "evClassLoaderExit_Exception", "()V");
 
 			s.label(lThrow);
 			s.ATHROW();

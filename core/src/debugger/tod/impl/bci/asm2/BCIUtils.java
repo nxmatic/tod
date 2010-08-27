@@ -88,6 +88,7 @@ public class BCIUtils implements Opcodes
 	public static final String CLS_CLASS = getJvmClassName(Class.class);
 	public static final String DSC_CLASS = "L"+CLS_CLASS+";";
 	public static final String CLS_CLASSLOADER = getJvmClassName(ClassLoader.class);
+	public static final String DSC_CLASSLOADER = "L"+CLS_CLASSLOADER+";";
 	public static final String CLS_OBJECTID = getJvmClassName(ObjectId.class);
 	public static final String DSC_OBJECTID = "L"+CLS_OBJECTID+";";
 	public static final String CLS_TMPOBJECTID = getJvmClassName(TmpObjectId.class);
@@ -468,7 +469,7 @@ public class BCIUtils implements Opcodes
 				StringWriter theWriter = new StringWriter();
 				theTraceVisitor.print(new PrintWriter(theWriter));
 				String theTraced = theWriter.toString().replace("\n", "");
-				System.out.println(bcIndex+" "+theFrame+" | "+theTraced);
+				System.out.println(bcIndex+"\t"+frameString(theFrame)+" |\t"+theTraced);
 				bcIndex++;
 				break;
 				
@@ -478,6 +479,18 @@ public class BCIUtils implements Opcodes
 				break;
 			}
 		}
+	}
+	
+	private static String frameString(Frame aFrame)
+	{
+		if (aFrame == null) return "null";
+		String s = aFrame.toString();
+		s = s.replace("Ltod/core/database/structure/ObjectId;", "O");
+		s = s.replace("Ltod/impl/replay2/ThreadReplayer;", "R");
+		s = s.replace("Ltod/impl/replay2/TmpObjectId;", "T");
+		s = s.replace("Lnull;", "L");
+		s = s.replace("Ltod/impl/replay2/HandlerReachedException;", "h");
+		return s;
 	}
 
 	public static int getBytecodeRank(MethodNode aNode, AbstractInsnNode aInstruction)

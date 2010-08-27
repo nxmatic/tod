@@ -31,9 +31,6 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.replay2;
 
-import org.objectweb.asm.Type;
-
-import tod.core.database.browser.LocationUtils;
 import tod.core.database.structure.ObjectId;
 import tod.impl.replay2.ThreadReplayer.ExceptionInfo;
 import tod2.agent.Message;
@@ -41,34 +38,6 @@ import zz.utils.Utils;
 
 public class InScopeReplayerFrame 
 {
-	private static void processException(ThreadReplayer aReplayer)
-	{
-		ExceptionInfo theExceptionInfo = aReplayer.readExceptionInfo();
-		ObjectId theException = theExceptionInfo.exception;
-		byte m = aReplayer.getNextMessage();
-		switch(m)
-		{
-		case Message.HANDLER_REACHED: 
-			throw new HandlerReachedException(theException, aReplayer.readInt());
-			
-		case Message.INSCOPE_BEHAVIOR_EXIT_EXCEPTION:
-			throw new BehaviorExitException();
-			
-		default: throw new UnexpectedMessageException(m);
-		}
-	}
-	
-	public static byte getNextMessage(ThreadReplayer aReplayer)
-	{
-		byte m = aReplayer.getNextMessage();
-		if (m == Message.EXCEPTION) 
-		{
-			processException(aReplayer);
-			throw new RuntimeException("processException should always throw an exception");
-		}
-		return m;
-	}
-	
 	public static int expectAndSendIntFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldId)
 	{
 		int theValue;
@@ -359,8 +328,63 @@ public class InScopeReplayerFrame
 	
 	public static void expectException(ThreadReplayer aReplayer)
 	{
-		byte m = getNextMessage(aReplayer);
-		throw new UnexpectedMessageException(m); // should never get executed: getNextMessage should throw an exception
+		byte m = aReplayer.getNextMessage();
+		if (m == Message.EXCEPTION) 
+		{
+			ExceptionInfo theExceptionInfo = aReplayer.readExceptionInfo();
+			ObjectId theException = theExceptionInfo.exception;
+			m = aReplayer.getNextMessage();
+			switch(m)
+			{
+			case Message.HANDLER_REACHED: 
+				throw new HandlerReachedException(theException, aReplayer.readInt());
+				
+			case Message.OUTOFSCOPE_BEHAVIOR_EXIT_EXCEPTION:
+			case Message.INSCOPE_BEHAVIOR_EXIT_EXCEPTION:
+				throw new BehaviorExitException();
+				
+			default: throw new UnexpectedMessageException(m);
+			}
+		}
+		throw new UnexpectedMessageException(m); 
+	}
+	
+	public static void expectException_ClassLoader(ThreadReplayer aReplayer)
+	{
+		byte m = aReplayer.getNextMessage();
+		if (m == Message.EXCEPTION) 
+		{
+			ExceptionInfo theExceptionInfo = aReplayer.readExceptionInfo();
+			ObjectId theException = theExceptionInfo.exception;
+			m = aReplayer.getNextMessage();
+			switch(m)
+			{
+			case Message.CLASSLOADER_EXIT_EXCEPTION:
+				throw new BehaviorExitException();
+				
+			default: throw new UnexpectedMessageException(m);
+			}
+		}
+		throw new UnexpectedMessageException(m); 
+	}
+	
+	public static void expectException_OOS(ThreadReplayer aReplayer)
+	{
+		byte m = aReplayer.getNextMessage();
+		if (m == Message.EXCEPTION) 
+		{
+			ExceptionInfo theExceptionInfo = aReplayer.readExceptionInfo();
+			ObjectId theException = theExceptionInfo.exception;
+			m = aReplayer.getNextMessage();
+			switch(m)
+			{
+			case Message.OUTOFSCOPE_BEHAVIOR_EXIT_EXCEPTION:
+				throw new BehaviorExitException();
+				
+			default: throw new UnexpectedMessageException(m);
+			}
+		}
+		throw new UnexpectedMessageException(m); 
 	}
 	
 	public static ObjectId expectConstant(ThreadReplayer aReplayer)

@@ -37,6 +37,7 @@ These functions are called by the actual agent implementations.
 extern int cfgHostBits;
 extern int cfgHostId;
 extern bool cfgIsJVM14;
+extern int propVerbose;
 
 void agentClassFileLoadHook(
 	JNIEnv* jni, const char* name, 

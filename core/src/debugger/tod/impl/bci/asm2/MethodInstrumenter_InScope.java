@@ -31,7 +31,7 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.bci.asm2;
 
-import static tod.impl.bci.asm2.BCIUtils.CLS_THREADREPLAYER;
+import static tod.impl.bci.asm2.BCIUtils.*;
 
 import java.util.HashSet;
 import java.util.ListIterator;
@@ -44,7 +44,6 @@ import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.FieldInsnNode;
 import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.InsnNode;
-import org.objectweb.asm.tree.LabelNode;
 import org.objectweb.asm.tree.LdcInsnNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
@@ -53,12 +52,11 @@ import org.objectweb.asm.tree.TypeInsnNode;
 
 import tod.Util;
 import tod.core.DebugFlags;
+import tod.core.database.structure.IBehaviorInfo;
+import tod.core.database.structure.IClassInfo;
 import tod.core.database.structure.IMutableBehaviorInfo;
-import tod.core.database.structure.IMutableClassInfo;
 import tod.impl.bci.asm2.MethodInfo.BCIFrame;
 import tod.impl.bci.asm2.MethodInfo.NewInvokeLink;
-import tod.impl.replay2.SList;
-import tod.impl.replay2.MethodReplayerGenerator.MethodSignature;
 
 /**
  * Instruments in-scope methods.
@@ -355,14 +353,27 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 	/**
 	 * Returns the id of the behavior invoked by the given node.
 	 */
-	private int getBehaviorId(MethodInsnNode aNode)
+	private IBehaviorInfo getCalledBehavior(MethodInsnNode aNode)
 	{
-		IMutableClassInfo theClass = getDatabase().getNewClass(Util.jvmToScreen(aNode.owner));
-		IMutableBehaviorInfo theBehavior = theClass.getNewBehavior(
-				aNode.name, 
-				aNode.desc, 
-				aNode.getOpcode() == Opcodes.INVOKESTATIC ? Opcodes.ACC_STATIC : 0);
-		return theBehavior.getId();
+		IClassInfo theClass = getDatabase().getClass(Util.jvmToScreen(aNode.owner), false);
+		if (theClass == null) return null;
+		else return theClass.getBehavior(aNode.name, aNode.desc);
+	}
+	
+	private boolean isClassLoader(IClassInfo aClass)
+	{
+		while(aClass != null)
+		{
+			if (CLS_CLASSLOADER.equals(aClass.getName())) return true;
+			aClass = aClass.getSupertype();
+		}
+		return false;
+	}
+	
+	private boolean isClassLoader(String aClassName)
+	{
+		IClassInfo theClass = getDatabase().getClass(Util.jvmToScreen(aClassName), false);
+		return isClassLoader(theClass);
 	}
 	
 	private void processInvoke(MethodInsnNode aNode)
@@ -386,17 +397,31 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		{
 			// Send event
 			s.ALOAD(getThreadDataVar());
+			s.pushInt(getCalledBehavior(aNode).getId());
 			s.INVOKEVIRTUAL(
 					BCIUtils.CLS_THREADDATA, 
 					"<clinit>".equals(aNode.name) ? "evOutOfScopeClinitEnter" : "evOutOfScopeBehaviorEnter", 
-					"()V");
+					"(I)V");
 
 			s.label(lBeginTry);
 		}
 
 		// Insert method call
-		MethodInsnNode theClone = (MethodInsnNode) aNode.clone(null);
-		s.add(theClone);				
+		if (aNode.name.equals("loadClass")
+				&& isClassLoader(aNode.owner)
+				&& aNode.desc.equals("("+DSC_STRING+")"+DSC_CLASS))
+		{
+			s.ALOAD(getThreadDataVar());
+			s.INVOKESTATIC(
+					CLS_THREADDATA, 
+					"HACK_ClassLoader_loadClass", 
+					"("+DSC_CLASSLOADER+DSC_STRING+DSC_THREADDATA+")"+DSC_CLASS);
+		}
+		else
+		{
+			MethodInsnNode theClone = (MethodInsnNode) aNode.clone(null);
+			s.add(theClone);				
+		}
 
 		if (theTouchy)
 		{
@@ -655,4 +680,20 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		
 		insertAfter(aNode, s);
 	}
+
+//	private static abstract class WrapperDef
+//	{
+//		public abstract boolean accept(MethodInsnNode aNode);
+//	}
+//	
+//	/**
+//	 * A wrapper def for a single method
+//	 * @author gpothier
+//	 */
+//	private static class SimpleWrapperDef
+//	{
+//		private final String itsClassName;
+//		private final String itsMethodName;
+//		private final String itsDesc;
+//	}
 }

@@ -38,7 +38,6 @@ import org.objectweb.asm.Type;
 
 import tod.core.config.TODConfig;
 import tod.core.database.structure.IBehaviorInfo;
-import tod.core.database.structure.IMutableStructureDatabase;
 import tod.core.database.structure.IStructureDatabase;
 import tod.core.database.structure.ObjectId;
 import tod.impl.server.BufferStream;
@@ -54,11 +53,11 @@ public abstract class ThreadReplayer
 		System.out.println("ThreadReplayer loaded by: "+ThreadReplayer.class.getClassLoader());
 	}
 	public static final boolean ECHO = true;
-	public static boolean ECHO_FORREAL = true;
+	public static boolean ECHO_FORREAL = false;
 
 	private final int itsThreadId;
 	private final TODConfig itsConfig;
-	private final IMutableStructureDatabase itsDatabase;
+	private final IStructureDatabase itsDatabase;
 	
 	private int itsMessageCount = 0;
 
@@ -84,7 +83,7 @@ public abstract class ThreadReplayer
 			ReplayerLoader aLoader,
 			int aThreadId,
 			TODConfig aConfig, 
-			IMutableStructureDatabase aDatabase, 
+			IStructureDatabase aDatabase, 
 			EventCollector aCollector,
 			TmpIdManager aTmpIdManager,
 			BufferStream aBuffer)
@@ -146,6 +145,11 @@ public abstract class ThreadReplayer
 		{
 			if (theMessage != Message.REGISTER_OBJECT) itsMessageCount++;
 			if (ECHO_FORREAL) echo("Message (%d): [#%d @%d] %s", itsThreadId, itsMessageCount, itsStream.position(), Message._NAMES[theMessage]);
+			if (itsMessageCount == 180000000)
+			{
+				ECHO_FORREAL = true;
+				System.out.println("ThreadReplayer.nextMessage()");
+			}
 		}
 		return theMessage;
 	}
@@ -458,12 +462,20 @@ public abstract class ThreadReplayer
 	 */
 	public void replay_OOS_loop()
 	{
-		while(true)
+		try
 		{
-			byte m = getNextMessage();
-			
-			boolean theContinue = replay_OOS(m);
-			if (! theContinue) break;
+			while(true)
+			{
+				byte m = getNextMessage();
+				
+				boolean theContinue = replay_OOS(m);
+				if (! theContinue) break;
+			}
+		}
+		catch (BehaviorExitException e)
+		{
+			InScopeReplayerFrame.expectException(this);
+			throw new RuntimeException("This line should never be executed.");
 		}
 	}
 	
@@ -491,10 +503,12 @@ public abstract class ThreadReplayer
 //		case Message.OUTOFSCOPE_CLINIT_ENTER: dispatch_OOS_loop(); break;
 		case Message.CLASSLOADER_ENTER: replay_ClassLoader_loop(); break;
 		
-		case Message.OUTOFSCOPE_BEHAVIOR_EXIT_EXCEPTION:
 		case Message.OUTOFSCOPE_BEHAVIOR_EXIT_NORMAL:
 			return false;
 
+		case Message.OUTOFSCOPE_BEHAVIOR_EXIT_EXCEPTION:
+			throw new BehaviorExitException();
+			
 		default: throw new RuntimeException("Command not handled: "+Message._NAMES[aMessage]);
 		}
 	
@@ -507,13 +521,22 @@ public abstract class ThreadReplayer
 	 */
 	public void replay_ClassLoader_loop()
 	{
-		while(true)
+		try
 		{
-			byte m = getNextMessage();
-			
-			boolean theContinue = replay_ClassLoader(m);
-			if (! theContinue) break;
+			while(true)
+			{
+				byte m = getNextMessage();
+				
+				boolean theContinue = replay_ClassLoader(m);
+				if (! theContinue) break;
+			}
 		}
+		catch (BehaviorExitException e)
+		{
+			InScopeReplayerFrame.expectException_ClassLoader(this);
+			throw new RuntimeException("This line should never be executed.");
+		}
+
 	}
 	
 	private boolean replay_ClassLoader(byte aMessage)
@@ -540,9 +563,10 @@ public abstract class ThreadReplayer
 		case Message.OUTOFSCOPE_CLINIT_ENTER: replay_OOS_loop(); break;
 		case Message.CLASSLOADER_ENTER: replay_ClassLoader_loop(); break;
 		
-		case Message.CLASSLOADER_EXIT:
+		case Message.CLASSLOADER_EXIT_NORMAL:
+		case Message.CLASSLOADER_EXIT_EXCEPTION:
 			return false;
-
+			
 		default: throw new RuntimeException("Command not handled: "+Message._NAMES[aMessage]);
 		}
 	
@@ -556,61 +580,141 @@ public abstract class ThreadReplayer
 
 	public void dispatch_OOS_V()
 	{
-		replay_OOS_loop();
+		try
+		{
+			replay_OOS_loop();
+		}
+		catch (BehaviorExitException e)
+		{
+			InScopeReplayerFrame.expectException(this);
+			throw new RuntimeException("This line should never be executed.");
+		}
 	}
 	
 	public int dispatch_OOS_I()
 	{
-		replay_OOS_loop();
-		return getStream().getInt();
+		try
+		{
+			replay_OOS_loop();
+			return getStream().getInt();
+		}
+		catch (BehaviorExitException e)
+		{
+			InScopeReplayerFrame.expectException(this);
+			throw new RuntimeException("This line should never be executed.");
+		}
 	}
 	
 	public boolean dispatch_OOS_Z()
 	{
-		replay_OOS_loop();
-		return getStream().get() != 0;
+		try
+		{
+			replay_OOS_loop();
+			return getStream().get() != 0;
+		}
+		catch (BehaviorExitException e)
+		{
+			InScopeReplayerFrame.expectException(this);
+			throw new RuntimeException("This line should never be executed.");
+		}
 	}
 	
 	public byte dispatch_OOS_B()
 	{
-		replay_OOS_loop();
-		return getStream().get();
+		try
+		{
+			replay_OOS_loop();
+			return getStream().get();
+		}
+		catch (BehaviorExitException e)
+		{
+			InScopeReplayerFrame.expectException(this);
+			throw new RuntimeException("This line should never be executed.");
+		}
 	}
 	
 	public short dispatch_OOS_S()
 	{
-		replay_OOS_loop();
-		return getStream().getShort();
+		try
+		{
+			replay_OOS_loop();
+			return getStream().getShort();
+		}
+		catch (BehaviorExitException e)
+		{
+			InScopeReplayerFrame.expectException(this);
+			throw new RuntimeException("This line should never be executed.");
+		}
 	}
 	
 	public char dispatch_OOS_C()
 	{
-		replay_OOS_loop();
-		return getStream().getChar();
+		try
+		{
+			replay_OOS_loop();
+			return getStream().getChar();
+		}
+		catch (BehaviorExitException e)
+		{
+			InScopeReplayerFrame.expectException(this);
+			throw new RuntimeException("This line should never be executed.");
+		}
 	}
 	
 	public long dispatch_OOS_J()
 	{
-		replay_OOS_loop();
-		return getStream().getLong();
+		try
+		{
+			replay_OOS_loop();
+			return getStream().getLong();
+		}
+		catch (BehaviorExitException e)
+		{
+			InScopeReplayerFrame.expectException(this);
+			throw new RuntimeException("This line should never be executed.");
+		}
 	}
 	
 	public float dispatch_OOS_F()
 	{
-		replay_OOS_loop();
-		return getStream().getFloat();
+		try
+		{
+			replay_OOS_loop();
+			return getStream().getFloat();
+		}
+		catch (BehaviorExitException e)
+		{
+			InScopeReplayerFrame.expectException(this);
+			throw new RuntimeException("This line should never be executed.");
+		}
 	}
 	
 	public double dispatch_OOS_D()
 	{
-		replay_OOS_loop();
-		return getStream().getDouble();
+		try
+		{
+			replay_OOS_loop();
+			return getStream().getDouble();
+		}
+		catch (BehaviorExitException e)
+		{
+			InScopeReplayerFrame.expectException(this);
+			throw new RuntimeException("This line should never be executed.");
+		}
 	}
 	
 	public ObjectId dispatch_OOS_L()
 	{
-		replay_OOS_loop();
-		return readRef();
+		try
+		{
+			replay_OOS_loop();
+			return readRef();
+		}
+		catch (BehaviorExitException e)
+		{
+			InScopeReplayerFrame.expectException(this);
+			throw new RuntimeException("This line should never be executed.");
+		}
 	}
 	
 	public ObjectId processException()

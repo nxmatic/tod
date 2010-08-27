@@ -103,7 +103,7 @@ public class MethodReplayerGenerator_FirstPass extends MethodReplayerGenerator
 		
 		if (aSaveStack) genSaveStack(s, theStackTypes);
 
-		s.ALOAD(0);
+		s.ALOAD(getThreadReplayerSlot());
 		s.ILOAD(itsSnapshotSeqVar);
 		int theProbeId = getDatabase().getNewSnapshotProbe(getBehaviorId(), ++itsProbeIndex, theLocalsSig).id;
 		s.pushInt(theProbeId);
@@ -115,13 +115,17 @@ public class MethodReplayerGenerator_FirstPass extends MethodReplayerGenerator
 			if (theType == null) continue;
 
 			theArgTypes.add(BCIUtils.getActualReplayType(theType));
-			s.ILOAD(theType, i+1);
+			s.ILOAD(theType, transformSlot(i));
 		}
 
 		if (aSaveStack) 
 		{
 			genReverseLoadStack(s, theStackTypes);
-			for(Type theType : theStackTypes) theArgTypes.add(theType);
+			for(int i=theStackTypes.length-1;i>=0;i--)
+			{
+				Type theType = theStackTypes[i];
+				theArgTypes.add(theType);
+			}
 		}
 
 		String theDesc = Type.getMethodDescriptor(Type.INT_TYPE, theArgTypes.toArray(new Type[theArgTypes.size()]));

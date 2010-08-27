@@ -70,14 +70,14 @@ public class MethodInstrumenter_OutOfScope extends MethodInstrumenter
 	{
 		if (BCIUtils.CLS_OBJECT.equals(aClassName)) 
 		{
-//			if ("equals".equals(getNode().name)) return;
-//			if ("toString".equals(getNode().name)) return;
 			if ("finalize".equals(aMethodName)) return true;
-			if ("wait".equals(aMethodName)) return true; // No problem, it's final
+			if ("wait".equals(aMethodName)) return true; 
+			if ("notify".equals(aMethodName)) return true; 
+			if ("notifyAll".equals(aMethodName)) return true; 
+			if ("getClass".equals(aMethodName)) return true; 
 		}
 
-		if (aClassName.startsWith("Xjava/") 
-				|| aClassName.startsWith("java/lang/Math")
+		if (aClassName.startsWith("java/lang/Math")
 				|| aClassName.startsWith("java/lang/Object")
 				|| aClassName.startsWith("java/lang/String$1")
 				|| aClassName.startsWith("java/lang/String")
@@ -90,6 +90,20 @@ public class MethodInstrumenter_OutOfScope extends MethodInstrumenter
 		if (aClassName.startsWith("java/util/Arrays"))
 		{
 			if (aStatic) return true;
+		}
+		
+		if ("java/lang/System".equals(aClassName))
+		{
+			if ("nanoTime".equals(aMethodName)) return true;
+			if ("currentTimeMillis".equals(aMethodName)) return true;
+			if ("arraycopy".equals(aMethodName)) return true;
+			if ("identityHashCode".equals(aMethodName)) return true;
+		}
+
+		if (BCIUtils.CLS_THREAD.equals(aClassName))
+		{
+			if ("currentThread".equals(aMethodName)) return true;
+			if ("sleep".equals(aMethodName)) return true;
 		}
 
 		return false;
@@ -146,10 +160,11 @@ public class MethodInstrumenter_OutOfScope extends MethodInstrumenter
 			}
 			
 			// Send event
+			s.pushInt(getBehavior().getId());
 			s.INVOKEVIRTUAL(
 					BCIUtils.CLS_THREADDATA, 
 					isStaticInitializer() ? "evOutOfScopeClinitEnter" : "evOutOfScopeBehaviorEnter", 
-					"()V");
+					"(I)V");
 			
 			s.GOTO(lStart);
 		}

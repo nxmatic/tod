@@ -51,6 +51,7 @@ import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldInsnNode;
+import org.objectweb.asm.tree.IincInsnNode;
 import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.InsnNode;
 import org.objectweb.asm.tree.JumpInsnNode;
@@ -62,6 +63,7 @@ import org.objectweb.asm.tree.MethodNode;
 import org.objectweb.asm.tree.MultiANewArrayInsnNode;
 import org.objectweb.asm.tree.TryCatchBlockNode;
 import org.objectweb.asm.tree.TypeInsnNode;
+import org.objectweb.asm.tree.VarInsnNode;
 
 import tod.Util;
 import tod.core.DebugFlags;
@@ -96,7 +98,7 @@ public abstract class MethodReplayerGenerator
 	
 	private Label lCodeStart;
 	private Label lCodeEnd;
-	private Label lExitException = new Label();
+//	private Label lExitException = new Label();
 	private List itsOriginalTryCatchNodes;
 
 	private Type[] itsArgTypes;
@@ -237,15 +239,17 @@ public abstract class MethodReplayerGenerator
 		itsMethodNode.instructions.insert(nStart);
 		
 		// If the original method is non-static, the generated method takes the original "this" as a parameter.
-		// If original is static, the generated method takes no parameter, but is no longer static
-		itsMethodNode.maxLocals++; 
+		if (! itsStatic) itsMethodNode.maxLocals++;
+		itsMethodNode.maxLocals++; // For the ThreadReplayer arg.
 
 		int theSlotsCount = itsMethodInfo.setupLocalCacheSlots(itsMethodNode.maxLocals);
 		itsMethodNode.maxLocals += theSlotsCount;
 		
-		itsSaveArgsSlots = nextFreeVar(computeMaxSaveArgsSpace(itsMethodNode.instructions));
+		int theSaveArgsSpace = computeMaxSaveArgsSpace(itsMethodNode.instructions);
+		itsSaveArgsSlots = nextFreeVar(theSaveArgsSpace);
 
 		allocVars();
+		itsMethodNode.maxStack = itsMethodNode.maxLocals+4;
 		
 		itsTmpTargetVars = new int[itsMethodInfo.getMaxNewInvokeNesting()+1];
 //		for (int i=0;i<itsTmpTargetVars.length;i++) itsTmpTargetVars[i] = nextFreeVar(1);
@@ -275,14 +279,12 @@ public abstract class MethodReplayerGenerator
 		itsMethodNode.access = Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC;
 		itsMethodNode.exceptions = Collections.EMPTY_LIST;
 		
-		itsMethodNode.maxStack += 8;
-		
-		// Update debug info (local vars are shift by 1)
+		// Update debug info (local vars are shifted by 1)
 		for(Iterator<LocalVariableNode> theIterator = itsMethodNode.localVariables.iterator();theIterator.hasNext();)
 		{
 			LocalVariableNode theNode = theIterator.next();
-			theNode.index++;
-			if ("this".equals(theNode.name)) theNode.name = "$ref$";
+			theNode.index = transformSlot(theNode.index);
+			if ("this".equals(theNode.name)) theNode.name = "$this$";
 		}
 		itsMethodNode.localVariables.add(new LocalVariableNode("this", "L"+itsClassNode.name+";", null, nStart, nEnd, 0));
 		
@@ -537,14 +539,14 @@ public abstract class MethodReplayerGenerator
 			itsMethodNode.visitTryCatchBlock(theFirstNode.start.getLabel(), theFirstNode.end.getLabel(), lDispatcher, CLS_HANDLERREACHED);
 		}
 		
-		s.label(lExitException);
-		s.POP();
-		s.ALOAD(itsThreadReplayerSlot);
-		s.INVOKESTATIC(CLS_INSCOPEREPLAYERFRAME, "expectException", "("+DSC_THREADREPLAYER+")V");
-		s.pushDefaultValue(itsReturnType);
-		s.RETURN(itsReturnType);
-
-		itsMethodNode.visitTryCatchBlock(lCodeStart, lCodeEnd, lExitException, CLS_BEHAVIOREXITEXCEPTION);
+//		s.label(lExitException);
+//		s.POP();
+//		s.ALOAD(itsThreadReplayerSlot);
+//		s.INVOKESTATIC(CLS_INSCOPEREPLAYERFRAME, "expectException", "("+DSC_THREADREPLAYER+")V");
+//		s.pushDefaultValue(itsReturnType);
+//		s.RETURN(itsReturnType);
+//
+//		itsMethodNode.visitTryCatchBlock(lCodeStart, lCodeEnd, lExitException, CLS_BEHAVIOREXITEXCEPTION);
 
 		aInsns.add(s);
 	}
@@ -580,9 +582,9 @@ public abstract class MethodReplayerGenerator
 	/**
 	 * Generates the bytecode that pushes the current collector on the stack.
 	 */
-	private static void pushCollector(SList s)
+	private void pushCollector(SList s)
 	{
-		s.ALOAD(0);
+		s.ALOAD(itsThreadReplayerSlot);
 		s.INVOKEVIRTUAL(CLS_THREADREPLAYER, "getCollector", "()"+DSC_EVENTCOLLECTOR_REPLAY);
 	}
 
@@ -667,6 +669,26 @@ public abstract class MethodReplayerGenerator
 				processPutArray(aInsns, (InsnNode) theNode);
 				break;
 				
+			case Opcodes.ILOAD:
+			case Opcodes.LLOAD:
+			case Opcodes.FLOAD:
+			case Opcodes.DLOAD:
+			case Opcodes.ALOAD:
+				processGetVar(aInsns, (VarInsnNode) theNode);
+				break;
+				
+			case Opcodes.ISTORE:
+			case Opcodes.LSTORE:
+			case Opcodes.FSTORE:
+			case Opcodes.DSTORE:
+			case Opcodes.ASTORE:
+				processPutVar(aInsns, (VarInsnNode) theNode);
+				break;
+				
+			case Opcodes.IINC:
+				processIinc(aInsns, (IincInsnNode) theNode);
+				break;
+				
 			case Opcodes.LDC:
 				processLdc(aInsns, (LdcInsnNode) theNode);
 				break;
@@ -698,6 +720,10 @@ public abstract class MethodReplayerGenerator
 				
 			case Opcodes.CHECKCAST:
 				processCheckCast(aInsns, (TypeInsnNode) theNode);
+				break;
+				
+			case Opcodes.RET:
+				processRet(aInsns, (VarInsnNode) theNode);
 				break;
 			}
 		}
@@ -732,15 +758,20 @@ public abstract class MethodReplayerGenerator
 		return itsThreadReplayerSlot;
 	}
 	
+	private boolean isCalleeInScope(MethodInsnNode aNode)
+	{
+		return getDatabase().isInScope(aNode.owner);
+	}
+
 	private void processInvoke(InsnList aInsns, MethodInsnNode aNode)
 	{
-		Type[] theArgTypes = Type.getArgumentTypes(aNode.desc);
-		
 		boolean theStatic = aNode.getOpcode() == Opcodes.INVOKESTATIC;
 		boolean theChainingInvocation = itsMethodInfo.isChainingInvocation(aNode);
 		
+		boolean theConstructor = "<init>".equals(aNode.name);
+		
 		boolean theExpectObjectInitialized = 
-			"<init>".equals(aNode.name) 
+			theConstructor 
 			&& ! theChainingInvocation
 			&& ! getDatabase().isInScope(aNode.owner);
 		
@@ -749,20 +780,12 @@ public abstract class MethodReplayerGenerator
 		// Add ThreadReplayer arg
 		s.ALOAD(itsThreadReplayerSlot);
 
-		IBehaviorInfo theTargetBehavior = getTargetBehavior(aNode);
+		MethodSignature theSignature = getDispatchMethodSignature(aNode.desc, theStatic, theConstructor);
+		s.INVOKESTATIC(CLS_THREADREPLAYER, theSignature.name, theSignature.descriptor);
+		insertSnapshotProbe(s, aNode, true);
 		
-		if (theTargetBehavior == null)
+		if (! isCalleeInScope(aNode))
 		{
-			// The method was never instrumented, thus never executed
-			s.createRTEx("The method was never executed: "+aNode.owner+" "+aNode.name+" "+aNode.desc);
-			s.ATHROW();
-		}
-		else
-		{
-			MethodSignature theSignature = getDispatchMethodSignature(theTargetBehavior);
-			s.INVOKESTATIC(CLS_THREADREPLAYER, theSignature.name, theSignature.descriptor);
-			insertSnapshotProbe(s, aNode, true);
-			
 			if (theExpectObjectInitialized)
 			{
 				// Save target at the NEW site
@@ -780,7 +803,7 @@ public abstract class MethodReplayerGenerator
 				TypeInsnNode theNewInsn = theNewInvokeLink.getNewInsn();
 				AbstractInsnNode theReplacementInsn = itsNewReplacementInsnsMap.get(theNewInsn);
 				aInsns.insert(theReplacementInsn, s2);
-
+	
 				// Do wait
 				s.ALOAD(itsThreadReplayerSlot);
 				s.ALOAD(theVar);
@@ -794,7 +817,6 @@ public abstract class MethodReplayerGenerator
 			}
 		}
 		
-
 		aInsns.insert(aNode, s);
 		aInsns.remove(aNode);
 	}
@@ -875,19 +897,18 @@ public abstract class MethodReplayerGenerator
 //						theArgTypes.toArray(new Type[theArgTypes.size()])));
 //	}
 
-	public static MethodSignature getDispatchMethodSignature(IBehaviorInfo aBehavior)
+	public static MethodSignature getDispatchMethodSignature(String aDescriptor, boolean aStatic, boolean aConstructor)
 	{
-		String theDescriptor = aBehavior.getDescriptor();
-		Type[] theArgumentTypes = Type.getArgumentTypes(theDescriptor);
-		Type theReturnType = Type.getReturnType(theDescriptor);
+		Type[] theArgumentTypes = Type.getArgumentTypes(aDescriptor);
+		Type theReturnType = Type.getReturnType(aDescriptor);
 		
 		List<Type> theArgTypes = new ArrayList<Type>();
-		if (! aBehavior.isStatic()) theArgTypes.add(TYPE_OBJECTID); // First arg is the target
+		if (! aStatic) theArgTypes.add(TYPE_OBJECTID); // First arg is the target
 		for (Type theType : theArgumentTypes) theArgTypes.add(getReplayDispatchType(theType));
 		theArgTypes.add(TYPE_THREADREPLAYER); 
 		
 		return new MethodSignature(
-				"dispatch_"+getCompleteSigForType(theReturnType)+(aBehavior.isStatic() ? "_S" : ""),
+				"dispatch_"+getCompleteSigForType(theReturnType)+(aStatic ? "_S" : "")+(aConstructor ? "_c" : ""),
 				Type.getMethodDescriptor(
 						getReplayDispatchType(theReturnType), 
 						theArgTypes.toArray(new Type[theArgTypes.size()])));
@@ -903,7 +924,9 @@ public abstract class MethodReplayerGenerator
 		for(int i=0;i<sig.length;i++) sig[i] = getCompleteSigForType(theArgTypes[i]);
 		
 		return new MethodSignature(
-				"dispatch_"+new String(sig)+"_"+getCompleteSigForType(theReturnType)+(aBehavior.isStatic() ? "_S" : "")+"_OOS",
+				"dispatch_"+new String(sig)+"_"+getCompleteSigForType(theReturnType)
+					+(aBehavior.isStatic() ? "_S" : "")+(aBehavior.isConstructor() ? "_c" : "")
+					+"_OOS",
 				"(I"+DSC_THREADREPLAYER+")V");
 	}
 	
@@ -1116,6 +1139,43 @@ public abstract class MethodReplayerGenerator
 		aInsns.remove(aNode);
 	}
 	
+	protected int transformSlot(int aSlot)
+	{
+		return aSlot < itsThreadReplayerSlot ? aSlot : aSlot+1;
+	}
+	
+	private void processGetVar(InsnList aInsns, VarInsnNode aNode)
+	{
+//		Type theType = getTypeOrId(BCIUtils.getSort(aNode.getOpcode()));
+//		SList s = new SList();
+//		s.ILOAD(theType, aNode.var+1);
+//		
+//		aInsns.insert(aNode, s);
+//		aInsns.remove(aNode);
+		aNode.var = transformSlot(aNode.var);
+	}
+
+	private void processPutVar(InsnList aInsns, VarInsnNode aNode)
+	{
+//		Type theType = getTypeOrId(BCIUtils.getSort(aNode.getOpcode()));
+//		SList s = new SList();
+//		s.ISTORE(theType, aNode.var+1);
+//		
+//		aInsns.insert(aNode, s);
+//		aInsns.remove(aNode);
+		aNode.var = transformSlot(aNode.var);
+	}
+	
+	private void processIinc(InsnList aInsns, IincInsnNode aNode)
+	{
+//		SList s = new SList();
+//		s.IINC(aNode.var+1, aNode.incr);
+//		
+//		aInsns.insert(aNode, s);
+//		aInsns.remove(aNode);
+		aNode.var = transformSlot(aNode.var);
+	}
+
 	/**
 	 * We need to check if an exception is going to be thrown.
 	 */
@@ -1159,8 +1219,8 @@ public abstract class MethodReplayerGenerator
 			s.POP(theType);
 			s.POP(theType);
 			
-			s.ALOAD(0);
-			s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "expectException", "()V");
+			s.ALOAD(itsThreadReplayerSlot);
+			s.INVOKESTATIC(CLS_INSCOPEREPLAYERFRAME, "expectException", "("+DSC_THREADREPLAYER+")V");
 			s.pushDefaultValue(itsReturnType);
 			s.RETURN(itsReturnType);
 		}
@@ -1174,8 +1234,8 @@ public abstract class MethodReplayerGenerator
 		BCIFrame theFrame = itsMethodInfo.getFrame(aNode);
 		
 		SList s = new SList();
-		s.ALOAD(0);
-		s.INVOKEVIRTUAL(CLS_INSCOPEREPLAYERFRAME, "checkCast", "()V");
+		s.ALOAD(itsThreadReplayerSlot);
+		s.INVOKESTATIC(CLS_INSCOPEREPLAYERFRAME, "checkCast", "("+DSC_THREADREPLAYER+")V");
 
 		aInsns.insert(aNode, s);
 		aInsns.remove(aNode);
@@ -1191,6 +1251,11 @@ public abstract class MethodReplayerGenerator
 		aInsns.remove(aNode);
 	}
 
+	private void processRet(InsnList aInsns, VarInsnNode aNode)
+	{
+		aNode.var = transformSlot(aNode.var);
+	}
+	
 	protected abstract void addSnapshotSetup(InsnList aInsns);
 	protected abstract void insertSnapshotProbe(SList s, AbstractInsnNode aReferenceNode, boolean aSaveStack);
 	

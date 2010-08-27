@@ -29,6 +29,7 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 
 #include "agentimpl.h"
 #include "agent.h"
+#include "jniutils.h"
 
 #include "utils.h"
 
@@ -49,22 +50,17 @@ typedef void (JNICALL *tCall_jlong_void) (JNIEnv*, jobject, jlong);
 jmethodID methodId_Object_clone = 0;
 tCall__jobject originalMethod_Object_clone = NULL;
 
-jmethodID methodId_Object_getClass = 0;
-tCall__jclass originalMethod_Object_getClass = NULL;
-
 jmethodID methodId_Object_hashCode = 0;
 tCall__jint originalMethod_Object_hashCode = NULL;
 
-jmethodID methodId_Object_notify = 0;
-tCall__void originalMethod_Object_notify = NULL;
-
-jmethodID methodId_Object_notifyAll = 0;
-tCall__void originalMethod_Object_notifyAll = NULL;
-
-jmethodID methodId_Object_wait = 0;
-tCall_jlong_void originalMethod_Object_wait = NULL;
-
 jmethodID methodId_resetId = 0;
+
+StaticVoidMethod* ThreadData_evOOSEnter = NULL;
+StaticVoidMethod* ThreadData_evOOSExit_Normal = NULL;
+StaticVoidMethod* ThreadData_evOOSExit_Exception = NULL;
+StaticVoidMethod* ThreadData_sendResult_Ref = NULL;
+StaticVoidMethod* ThreadData_sendResult_Int = NULL;
+
 
 /* Every JVMTI interface returns an error code, which should be checked
  *   to avoid any cascading errors down the line.
@@ -172,6 +168,15 @@ void JNICALL cbVMStart(
 	JNIEnv* jni)
 {
 	agentStart(jni);
+
+	printf("Resolving ThreadData methods... ");
+	StaticVoidMethod* TOD_enable = new StaticVoidMethod(jni, "java/tod/AgentReady", "nativeAgentLoaded", "()V");
+	ThreadData_evOOSEnter = new StaticVoidMethod(jni, "java/tod/AgentReady", "evOOSEnter", "()V");
+	ThreadData_evOOSExit_Normal = new StaticVoidMethod(jni, "java/tod/AgentReady", "evOOSExit_Normal", "()V");
+	ThreadData_evOOSExit_Exception = new StaticVoidMethod(jni, "java/tod/AgentReady", "evOOSExit_Exception", "()V");
+	ThreadData_sendResult_Ref = new StaticVoidMethod(jni, "java/tod/AgentReady", "sendResult_Ref", "(Ljava/lang/Object;)V");
+	ThreadData_sendResult_Int = new StaticVoidMethod(jni, "java/tod/AgentReady", "sendResult_Int", "(I)V");
+	printf("Done\n");
 }
 
 void initMethodIds(JNIEnv* jni)
@@ -181,22 +186,48 @@ void initMethodIds(JNIEnv* jni)
 	methodId_Object_clone = jni->GetMethodID(class_Object, "clone", "()Ljava/lang/Object;");
 	methodId_resetId = jni->GetMethodID(class_Object, "$tod$resetId", "()V");
 	
-	methodId_Object_getClass = jni->GetMethodID(class_Object, "getClass", "()Ljava/lang/Class;");
 	methodId_Object_hashCode = jni->GetMethodID(class_Object, "hashCode", "()I");
-	methodId_Object_notify = jni->GetMethodID(class_Object, "notify", "()V");
-	methodId_Object_notifyAll = jni->GetMethodID(class_Object, "notifyAll", "()V");
-	methodId_Object_wait = jni->GetMethodID(class_Object, "wait", "(J)V");
 }
 
-// void nativeEnvelopeEntry(JNIEnv *jni)
-// {
-// 	
-// }
+void nativeEnvelopeBegin(JNIEnv *jni)
+{
+	if (propVerbose >= 1) printf("nativeEnvelopeBegin\n");
+	if (ThreadData_evOOSEnter) ThreadData_evOOSEnter->invoke(jni);
+}
+
+// Returns true if normal exit, false if exception
+bool nativeEnvelopeEnd(JNIEnv *jni)
+{
+	if (ThreadData_evOOSEnter)
+	{
+		jthrowable exception = jni->ExceptionOccurred();
+		if (exception)
+		{
+			if (propVerbose >= 1) printf("nativeEnvelopeEnd - exception\n");
+			jni->ExceptionClear();
+			ThreadData_evOOSExit_Exception->invoke(jni);
+			jni->Throw(exception);
+			return false;
+		}
+		else
+		{
+			if (propVerbose >= 1) printf("nativeEnvelopeEnd - exit\n");
+			ThreadData_evOOSExit_Normal->invoke(jni);
+			return true;
+		}
+	}
+	else return false;
+}
 
 JNIEXPORT jobject JNICALL Object_clone_wrapper(JNIEnv *jni, jobject obj) 
 {
+	nativeEnvelopeBegin(jni);
+
 	// Call original clone method
 	jobject clone = originalMethod_Object_clone(jni, obj);
+
+	if (nativeEnvelopeEnd(jni))
+		ThreadData_sendResult_Ref->invoke(jni, clone);
 
 	// Determine if the object has a "real" class, as in certain cases
 	// calling the resetId method on array classes crashes the JVM
@@ -219,36 +250,17 @@ JNIEXPORT jobject JNICALL Object_clone_wrapper(JNIEnv *jni, jobject obj)
 	return clone;
 }
 
-JNIEXPORT jclass JNICALL Object_getClass_wrapper(JNIEnv *jni, jobject obj) 
-{
-	// Call original method
-	jclass result = originalMethod_Object_getClass(jni, obj);
-	return result;
-}
-
 JNIEXPORT jint JNICALL Object_hashCode_wrapper(JNIEnv *jni, jobject obj) 
 {
+	nativeEnvelopeBegin(jni);
+	
 	// Call original method
 	jint result = originalMethod_Object_hashCode(jni, obj);
+	
+	if (nativeEnvelopeEnd(jni))
+		ThreadData_sendResult_Int->invoke(jni, result);
+	
 	return result;
-}
-
-JNIEXPORT void JNICALL Object_notify_wrapper(JNIEnv *jni, jobject obj) 
-{
-	// Call original method
-	originalMethod_Object_notify(jni, obj);
-}
-
-JNIEXPORT void JNICALL Object_notifyAll_wrapper(JNIEnv *jni, jobject obj) 
-{
-	// Call original method
-	originalMethod_Object_notifyAll(jni, obj);
-}
-
-JNIEXPORT void JNICALL Object_wait_wrapper(JNIEnv *jni, jobject obj, jlong time) 
-{
-	// Call original method
-	originalMethod_Object_wait(jni, obj, time);
 }
 
 void JNICALL cbNativeMethodBind(
@@ -268,30 +280,10 @@ void JNICALL cbNativeMethodBind(
 		originalMethod_Object_clone = (tCall__jobject) address;
 		*new_address_ptr = (void*) &Object_clone_wrapper;
 	}
-	else if (method == methodId_Object_getClass)
-	{
-		originalMethod_Object_getClass = (tCall__jclass) address;
-		*new_address_ptr = (void*) &Object_getClass_wrapper;
-	} 
 	else if (method == methodId_Object_hashCode)
 	{
 		originalMethod_Object_hashCode = (tCall__jint) address;
 		*new_address_ptr = (void*) &Object_hashCode_wrapper;
-	} 
-	else if (method == methodId_Object_notify)
-	{
-		originalMethod_Object_notify = (tCall__void) address;
-		*new_address_ptr = (void*) &Object_notify_wrapper;
-	} 
-	else if (method == methodId_Object_notifyAll)
-	{
-		originalMethod_Object_notifyAll = (tCall__void) address;
-		*new_address_ptr = (void*) &Object_notifyAll_wrapper;
-	} 
-	else if (method == methodId_Object_wait)
-	{
-		originalMethod_Object_wait = (tCall_jlong_void) address;
-		*new_address_ptr = (void*) &Object_wait_wrapper;
 	} 
 
 	return;
@@ -366,7 +358,7 @@ Agent_OnLoad(JavaVM *vm, char *options, void *reserved)
  	enable_event(jvmti, JVMTI_EVENT_CLASS_FILE_LOAD_HOOK);
 	enable_event(jvmti, JVMTI_EVENT_EXCEPTION);
 	enable_event(jvmti, JVMTI_EVENT_VM_START);
-// 	enable_event(jvmti, JVMTI_EVENT_NATIVE_METHOD_BIND);
+	enable_event(jvmti, JVMTI_EVENT_NATIVE_METHOD_BIND);
 	
 	// Native method prefix
 	jvmti->SetNativeMethodPrefix("$todwrap$");

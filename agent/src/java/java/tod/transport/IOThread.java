@@ -76,7 +76,8 @@ public class IOThread extends Thread
 	 * A set of {@link ThreadData} objects registered with this {@link IOThread}.
 	 * They are periodically requested to write all pending data.
 	 */
-	private final _ArrayList<WeakReference<ThreadData>> itsThreadDatas = new _ArrayList<WeakReference<ThreadData>>();
+//	private final _ArrayList<WeakReference<ThreadData>> itsThreadDatas = new _ArrayList<WeakReference<ThreadData>>();
+	private final _ArrayList<ThreadData> itsThreadDatas = new _ArrayList<ThreadData>();
 	
 	
 	private final MyShutdownHook itsShutdownHook;
@@ -141,7 +142,8 @@ public class IOThread extends Thread
 	
 	public void registerThreadData(ThreadData aThreadData)
 	{
-		itsThreadDatas.add(new WeakReference<ThreadData>(aThreadData));
+//		itsThreadDatas.add(new WeakReference<ThreadData>(aThreadData));
+		itsThreadDatas.add(aThreadData);
 	}
 	
 	public boolean hasShutdownStarted()
@@ -495,8 +497,10 @@ public class IOThread extends Thread
 			_IO.out("[TOD] Shutting down...");
 			for(int i=0;i<itsThreadDatas.size();i++)
 			{
-				WeakReference<ThreadData> theRef = itsThreadDatas.get(i); 
-				ThreadData theThreadData = theRef.get();
+//				WeakReference<ThreadData> theRef = itsThreadDatas.get(i); 
+//				ThreadData theThreadData = theRef.get();
+				ThreadData theThreadData = itsThreadDatas.get(i);
+				
 				if (theThreadData == null) continue;
 				
 				theThreadData.flushBuffer(); // TODO: see how to properly synchronize this.

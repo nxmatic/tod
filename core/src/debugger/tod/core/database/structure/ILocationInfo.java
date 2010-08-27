@@ -37,6 +37,9 @@ public interface ILocationInfo
 	 */
 	public int getId();
 
+	/**
+	 * Returns the JVM name of the class (ie. packages separated by / and not .)
+	 */
 	public String getName();
 	
 	/**

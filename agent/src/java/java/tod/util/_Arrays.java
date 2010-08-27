@@ -25,7 +25,6 @@
 
 package java.tod.util;
 
-import java.lang.reflect.*;
 import java.tod.io._IO;
 
 /**

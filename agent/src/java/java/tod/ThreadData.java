@@ -37,7 +37,7 @@ public final class ThreadData
 	{
 	}
 	
-	private boolean ECHO_FORREAL = true;
+	private boolean ECHO_FORREAL = false;
 	private boolean ECHO_SCOPE_FORREAL = false;
 	
 	/**
@@ -230,7 +230,7 @@ public final class ThreadData
 		
 		if (! ECHO_FORREAL)
 		{
-			if (getId() == 1 && itsMessageCount > 13000000) ECHO_FORREAL = true;
+			if (itsMessageCount > 180000000) ECHO_FORREAL = true;
 			return;
 		}
 		
@@ -445,10 +445,10 @@ public final class ThreadData
 	 */
 	private void sendSync(long aTimestamp)
 	{
-		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.SYNC, aTimestamp); 
-		sendMessageType(itsBuffer, Message.SYNC);
-		itsBuffer.putLong(aTimestamp);
-		commitBuffer();
+//		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.SYNC, aTimestamp); 
+//		sendMessageType(itsBuffer, Message.SYNC);
+//		itsBuffer.putLong(aTimestamp);
+//		commitBuffer();
 	}
 	
 	/**
@@ -605,9 +605,9 @@ public final class ThreadData
 		if (enter()) return;
 		
 		// Exception messages can be larger than other messages so check we have enough room
-		int theMsgLen = aMethodName.length()*2 
-				+ aMethodSignature.length()*2
-				+ aMethodDeclaringClassSignature.length()*2
+		int theMsgLen = TODAccessor.getStringCount(aMethodName)*2 
+				+ TODAccessor.getStringCount(aMethodSignature)*2
+				+ TODAccessor.getStringCount(aMethodDeclaringClassSignature)*2
 				+ 256;
 		
 		if (itsBuffer.remaining() <= theMsgLen) flushBuffer();
@@ -741,21 +741,39 @@ public final class ThreadData
 		exit();
 	}
 	
-	public void evClassLoaderExit()
+	public void evClassLoaderExit_Normal()
 	{
 		if (enter()) return;
 		
 		sendRegisteredObjects();
 		commitBuffer();
 		
-		msgStart(Message.CLASSLOADER_EXIT, 0);
+		msgStart(Message.CLASSLOADER_EXIT_NORMAL, 0);
 		
 		checkTimestamp();
-		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.CLASSLOADER_EXIT, -1);
-		sendMessageType(itsBuffer, Message.CLASSLOADER_EXIT);
+		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.CLASSLOADER_EXIT_NORMAL, -1);
+		sendMessageType(itsBuffer, Message.CLASSLOADER_EXIT_NORMAL);
 		
 		msgStop();
-		if (popScope()) _IO.fatal("[ThreadData.evClassLoaderExit: Unexpected scope state");
+		if (popScope()) _IO.fatal("[ThreadData.evClassLoaderExit_Normal: Unexpected scope state");
+		exit();
+	}
+	
+	public void evClassLoaderExit_Exception()
+	{
+		if (enter()) return;
+		
+		sendRegisteredObjects();
+		commitBuffer();
+		
+		msgStart(Message.CLASSLOADER_EXIT_EXCEPTION, 0);
+		
+		checkTimestamp();
+		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.CLASSLOADER_EXIT_EXCEPTION, -1);
+		sendMessageType(itsBuffer, Message.CLASSLOADER_EXIT_EXCEPTION);
+		
+		msgStop();
+		if (popScope()) _IO.fatal("[ThreadData.evClassLoaderExit_Exception: Unexpected scope state");
 		exit();
 	}
 	
@@ -926,7 +944,7 @@ public final class ThreadData
 	/**
 	 * Entering into an out-of-scope behavior (which has envelope only instrumentation).
 	 */
-	public void evOutOfScopeBehaviorEnter()
+	public void evOutOfScopeBehaviorEnter(int aBehaviorId)
 	{
 		if (enter()) return;
 		
@@ -938,7 +956,7 @@ public final class ThreadData
 			commitBuffer();
 			
 			msgStart(Message.OUTOFSCOPE_BEHAVIOR_ENTER, 0);
-			if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.OUTOFSCOPE_BEHAVIOR_ENTER, -1); 
+			if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.OUTOFSCOPE_BEHAVIOR_ENTER, aBehaviorId); 
 			sendMessageType(itsBuffer, Message.OUTOFSCOPE_BEHAVIOR_ENTER);
 			msgStop();
 		}
@@ -946,7 +964,7 @@ public final class ThreadData
 		exit();
 	}
 	
-	public void evOutOfScopeClinitEnter()
+	public void evOutOfScopeClinitEnter(int aBehaviorId)
 	{
 		if (enter()) return;
 		
@@ -958,7 +976,7 @@ public final class ThreadData
 			commitBuffer();
 			
 			msgStart(Message.OUTOFSCOPE_CLINIT_ENTER, 0);
-			if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.OUTOFSCOPE_CLINIT_ENTER, -1); 
+			if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.OUTOFSCOPE_CLINIT_ENTER, aBehaviorId); 
 			sendMessageType(itsBuffer, Message.OUTOFSCOPE_CLINIT_ENTER);
 			msgStop();
 		}
@@ -993,6 +1011,8 @@ public final class ThreadData
 			return false;
 		}
 	}
+	
+
 	
 	/**
 	 * Exiting with an exception from an out-of-scope behavior (which has enveloppe only instrumentation).
@@ -1096,7 +1116,11 @@ public final class ThreadData
 	
 	private void sendValue(_ByteBuffer aBuffer, Object aValue) 
 	{
-		if (aValue == null) sendValueType(aBuffer, ValueType.NULL);
+		if (aValue == null) 
+		{
+			sendValueType(aBuffer, ValueType.NULL);
+			if (AgentDebugFlags.EVENT_LOG) echoValue("null", 0);
+		}
 		else if (shouldSendByValue(aValue)) sendObjectByValue(aBuffer, aValue);
 		else sendObjectByRef(aBuffer, aValue);
 	}
@@ -1119,6 +1143,8 @@ public final class ThreadData
 			itsRegisteredObjectsStack.push(theObjectId, aObject);
 		}
 
+		if (AgentDebugFlags.EVENT_LOG) echoValue("val", theObjectId);
+		
 		// Send object id
 		itsObjIdSender.send(aBuffer, theObjectId, ValueType.OBJECT_ID_DELTA, ValueType.OBJECT_ID);
 	}
@@ -1134,14 +1160,14 @@ public final class ThreadData
 		long theObjectId = getObjectId(aObject);
 		assert theObjectId != 0;
 		
-		if (AgentDebugFlags.EVENT_LOG) echoValue("ref", theObjectId);
-		
 		if (theObjectId < 0)
 		{
 			// First time this object appears, register its type
 			theObjectId = -theObjectId;
 			itsRegisteredRefObjectsStack.push(aObject, theObjectId);
 		}
+
+		if (AgentDebugFlags.EVENT_LOG) echoValue("ref", theObjectId);
 
 		itsObjIdSender.send(aBuffer, theObjectId, ValueType.OBJECT_ID_DELTA, ValueType.OBJECT_ID);
 	}
@@ -1329,7 +1355,40 @@ public final class ThreadData
 	{
 		itsProcessingExceptions = aProcessingExceptions;
 	}
-
+	
+	/**
+	 * The {@link ClassLoader#loadClass(String)} method is sometimes called automatically
+	 * by the VM, so we register it as a classloader method. But it is possible to call it
+	 * directly, so we need to be able to differentiate. In-scope code calls to it are replaced
+	 * by calls to this method.
+	 */
+	public static Class HACK_ClassLoader_loadClass(ClassLoader aLoader, String aName, ThreadData aThreadData) throws ClassNotFoundException
+	{
+		aThreadData.evOutOfScopeBehaviorEnter(-1);
+		Class theResult = null;
+		try
+		{
+			theResult = aLoader.loadClass(aName);
+		}
+		catch (ClassNotFoundException e)
+		{
+			aThreadData.evOutOfScopeBehaviorExit_Exception();
+			throw e;
+		}
+		catch (RuntimeException e)
+		{
+			aThreadData.evOutOfScopeBehaviorExit_Exception();
+			throw e;
+		}
+		catch(Throwable e)
+		{
+			_IO.fatal("Unexpected exception in HACK_ClassLoader_loadClass.");
+		}
+		aThreadData.evOutOfScopeBehaviorExit_Normal();
+		aThreadData.sendValue_Ref(theResult);
+		return theResult;
+	}
+	
 	/**
 	 * A stack of objects pending to be sent.
 	 * 

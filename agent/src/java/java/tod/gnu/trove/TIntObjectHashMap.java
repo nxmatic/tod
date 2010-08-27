@@ -344,39 +344,6 @@ public class TIntObjectHashMap<V> extends TIntHash {
     }
 
     /**
-     * Return the values of the map; the runtime type of the returned array is that of
-     * the specified array.
-    *
-    * @param a the array into which the elements of this collection are to be
-    *        stored, if it is big enough; otherwise, a new array of the same
-    *        runtime type is allocated for this purpose.
-    * @return an array containing the elements of this collection
-    *
-    * @throws ArrayStoreException the runtime type of the specified array is
-    *         not a supertype of the runtime type of every element in this
-    *         collection.
-    * @throws NullPointerException if the specified array is <tt>null</tt>.
-    *
-    * @see #getValues()
-    */
-    public <T> T[] getValues( T[] a ) {
-		if (a.length < _size) {
-			a = (T[])java.lang.reflect.Array.newInstance(a.getClass().getComponentType(),
-    			_size);
-        }
-
-        V[] v = _values;
-        byte[] states = _states;
-
-        for (int i = v.length, j = 0; i-- > 0;) {
-            if (states[i] == FULL) {
-                a[j++] = (T) v[i];
-            }
-        }
-		return a;
-    }
-
-    /**
      * returns the keys of the map.
      *
      * @return a <code>Set</code> value

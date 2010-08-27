@@ -733,7 +733,7 @@ implements IShareableStructureDatabase
 	
 	public static boolean isSkipped(String aClassName)
 	{
-		if (aClassName.startsWith("java/lang/ref/")) return true;
+//		if (aClassName.startsWith("java/lang/ref/")) return true;
 		return false;
 	}
 

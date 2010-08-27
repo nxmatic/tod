@@ -60,7 +60,7 @@ void check_jvmpi_error(jint errnum, const char *str)
 {
 	if (errnum != JVMPI_SUCCESS) 
 	{
-		char *errmsg = NULL;
+		const char *errmsg = NULL;
 		switch(errnum)
 		{
 			ERRCASE(JVMPI_FAIL)
@@ -79,7 +79,7 @@ void check_jvmdi_error(jint errnum, const char *str)
 {
 	if (errnum != JVMDI_ERROR_NONE) 
 	{
-		char *errmsg = NULL;
+		const char *errmsg = NULL;
 		switch(errnum)
 		{
 			ERRCASE(JVMDI_ERROR_OUT_OF_MEMORY)
@@ -216,18 +216,18 @@ void cbClassLoadHook(JVMPI_Event* event)
 		event->u.class_load_hook.malloc_f);
 }
 
-jclass loadClass(JNIEnv* jni, char* aName)
+jclass loadClass(JNIEnv* jni, const char* aName)
 {
 	jclass cls = jni->FindClass(aName);
 	if (cls == NULL) printf("Could not load %s!\n", aName);
 	return cls;
 }
 
-void registerNative(JNIEnv* jni, jclass aClass, char* aName, char* aSig, void* aPtr)
+void registerNative(JNIEnv* jni, jclass aClass, const char* aName, const char* aSig, void* aPtr)
 {
 	JNINativeMethod m;
-	m.name = aName;
-	m.signature = aSig;
+	m.name = (char*) aName;
+	m.signature = (char*) aSig;
 	m.fnPtr = aPtr;
 	int res = jni->RegisterNatives(aClass, &m, 1);
 	

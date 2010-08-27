@@ -88,4 +88,33 @@ public class AgentReady
 		
 		STARTED = true;
 	}
+	
+	
+	// The methods below are used by the native agent for native wrapping
+	public static void evOOSEnter()
+	{
+		EventCollector._getThreadData().evOutOfScopeBehaviorEnter(-1);
+	}
+
+	public static void evOOSExit_Normal()
+	{
+		EventCollector._getThreadData().evOutOfScopeBehaviorExit_Normal();
+	}
+	
+	public static void evOOSExit_Exception()
+	{
+		EventCollector._getThreadData().evOutOfScopeBehaviorExit_Exception();
+	}
+	
+	public static void sendResult_Ref(Object aValue)
+	{
+		ThreadData theThreadData = EventCollector._getThreadData();
+		if (theThreadData.isInScope()) theThreadData.sendValue_Ref(aValue);
+	}
+	
+	public static void sendResult_Int(int aValue)
+	{
+		ThreadData theThreadData = EventCollector._getThreadData();
+		if (theThreadData.isInScope()) theThreadData.sendValue_Int(aValue);
+	}
 }

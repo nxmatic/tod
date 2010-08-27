@@ -79,6 +79,8 @@ public class ClassInstrumenter
 	
 	private static final String CLSID_FIELD = "$tod$clsId";
 	private static final String CLSID_GETTER = "$tod$getClsId";
+
+	private static final String INTRINSIC_PREFIX = "$tintr$";
 	
 	private static final String STRING_GETCHARS = "$tod$getChars";
 	private static final String STRING_GETOFFSET = "$tod$getOffset";
@@ -266,7 +268,9 @@ public class ClassInstrumenter
 		itsBehaviors.add(theBehavior);
 		
 		if (BCIUtils.CLS_CLASSLOADER.equals(getNode().name) 
-				&& ("loadClassInternal".equals(aNode.name) || "checkPackageAccess".equals(aNode.name))) 
+				&& ("loadClassInternal".equals(aNode.name) 
+						|| "checkPackageAccess".equals(aNode.name)
+						|| ("loadClass".equals(aNode.name) && "(Ljava/lang/String;)Ljava/lang/Class;".equals(aNode.desc)))) 
 		{
 			new MethodInstrumenter_ClassLoader(this, aNode, theBehavior).proceed();
 		}
@@ -276,26 +280,46 @@ public class ClassInstrumenter
 		}
 		else 
 		{
-			new MethodInstrumenter_OutOfScope(this, aNode, theBehavior).proceed();
+			if (isInstrinsic(itsName, aNode.name, BCIUtils.isStatic(aNode.access))) wrapIntrinsic(aNode);
+			else new MethodInstrumenter_OutOfScope(this, aNode, theBehavior).proceed();
 		}
 
 		if (BCIUtils.isNative(aNode.access)
 				&& !BCIUtils.isPrivate(aNode.access)
 				&& !BCIUtils.CLS_OBJECT.equals(getNode().name)
-				&& !BCIUtils.CLS_THREAD.equals(getNode().name)
 				&& !BCIUtils.CLS_THROWABLE.equals(getNode().name)
-//				&& !"java/security/AccessController".equals(getNode().name)
+				&& !MethodInstrumenter_OutOfScope.isTouchy(getNode().name, aNode.name, BCIUtils.isStatic(aNode.access))
 				&& !"java/lang/ClassLoader$NativeLibrary".equals(getNode().name)) wrapNative(aNode);
 	}
 	
-	
+	/**
+	 * Indicates if (we think that) the given method is an intrinsic one,
+	 * ie. the compiler knows its semantics and can optimize it out (along with our instrumentation)
+	 */
+	public static boolean isInstrinsic(String aClassName, String aMethodName, boolean aStatic)
+	{
+		if (BCIUtils.CLS_STRING.equals(aClassName))
+		{
+			if ("length".equals(aMethodName)) return true;
+			if ("compareTo".equals(aMethodName)) return true;
+			if ("compareToIgnoreCase".equals(aMethodName)) return true;
+			if ("charAt".equals(aMethodName)) return true;
+		}
+
+		// For the overrides of Object
+		if ("equals".equals(aMethodName)) return true;
+		if ("hashCode".equals(aMethodName)) return true;
+		
+		return false;
+	}
+
 	/**
 	 * Wraps a native method (based on JVMTI's SetNativeMethodPrefix)
 	 * @param aNode
 	 */
 	private void wrapNative(MethodNode aNode)
 	{
-//		System.out.println("Wrapping native: "+itsName+"."+aNode.name+aNode.desc);
+		System.out.println("Wrapping native: "+itsName+"."+aNode.name+aNode.desc);
 		MethodNode theWrapper = createMethod(itsExtraMethods, aNode.name, aNode.desc, aNode.access & ~Opcodes.ACC_NATIVE);
 		
 		aNode.name = NATIVE_METHOD_PREFIX + aNode.name;
@@ -326,8 +350,46 @@ public class ClassInstrumenter
 		theWrapper.instructions = s;
 		
 		// Insert enveloppe instrumentation
-//		IMutableBehaviorInfo theBehavior = itsClassInfo.getNewBehavior(theWrapper.name, theWrapper.desc, theWrapper.access);
-//		new MethodInstrumenter_OutOfScope(this, aNode, theBehavior).proceed();
+		IMutableBehaviorInfo theBehavior = itsClassInfo.getNewBehavior(theWrapper.name, theWrapper.desc, theWrapper.access);
+		new MethodInstrumenter_OutOfScope(this, theWrapper, theBehavior).proceed();
+	}
+	
+	/**
+	 * Creates a wrapper for an intrinsic method.
+	 * In-scope code must call the wrapper instead of the original
+	 */
+	private void wrapIntrinsic(MethodNode aNode)
+	{
+		System.out.println("Wrapping intrinsic: "+itsName+"."+aNode.name+aNode.desc);
+		MethodNode theWrapper = createMethod(itsExtraMethods, INTRINSIC_PREFIX+aNode.name, aNode.desc, aNode.access);
+		
+		boolean theStatic = BCIUtils.isStatic(aNode.access);
+		
+		SyntaxInsnList s = new SyntaxInsnList();
+		
+		// Call original native method
+		Type[] theTypes = Type.getArgumentTypes(aNode.desc);
+		int theIndex = 0;
+		if (! theStatic) s.ALOAD(theIndex++);
+		for (int i = 0; i < theTypes.length; i++)
+		{
+			Type theType = theTypes[i];
+			s.ILOAD(theType, theIndex);
+			theIndex += theType.getSize();
+		}
+		
+		if (theStatic) s.INVOKESTATIC(itsNode.name, aNode.name, aNode.desc);
+		else s.INVOKESPECIAL(itsNode.name, aNode.name, aNode.desc);
+		
+		s.IRETURN(Type.getReturnType(aNode.desc));
+		
+		theWrapper.maxLocals = theIndex;
+		theWrapper.maxStack = theIndex + 2; // +2 to account for the return value, not optimal but easy...
+		theWrapper.instructions = s;
+		
+		// Insert enveloppe instrumentation
+		IMutableBehaviorInfo theBehavior = itsClassInfo.getNewBehavior(theWrapper.name, theWrapper.desc, theWrapper.access);
+		new MethodInstrumenter_OutOfScope(this, theWrapper, theBehavior).proceed();
 	}
 	
 	/**
@@ -678,8 +740,8 @@ public class ClassInstrumenter
 		theNode.access = aAccess;
 		theNode.name = aName;
 		theNode.desc = aDesc;
-		theNode.tryCatchBlocks = Collections.EMPTY_LIST;
-		theNode.exceptions = Collections.EMPTY_LIST;
+		theNode.tryCatchBlocks = new ArrayList();
+		theNode.exceptions = new ArrayList();
 		
 		return theNode;
 	}

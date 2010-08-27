@@ -128,10 +128,10 @@ public final class _StringBuilder
 	 * @param	  seq   the sequence to copy.
 	 * @throws	NullPointerException if <code>seq</code> is <code>null</code>
 	 */
-	public _StringBuilder(CharSequence seq) {
-		this(seq.length() + 16);
-		append(seq);
-	}
+//	public _StringBuilder(CharSequence seq) {
+//		this(seq.length() + 16);
+//		append(seq);
+//	}
 
 	/**
 	 * Returns the length (character count).
@@ -333,39 +333,39 @@ public final class _StringBuilder
 	/**
 	 * @throws IndexOutOfBoundsException {@inheritDoc}
 	 */
-	public _StringBuilder append(CharSequence s) {
-		if (s == null)
-			s = "null";
-		if (s instanceof String)
-			return this.append((String)s);
-//		if (s instanceof StringBuffer)
-//			return this.append((StringBuffer)s);
-		if (s instanceof StringBuilder)
-			return this.append((StringBuilder)s);
-		return this.append(s, 0, s.length());
-	}
+//	public _StringBuilder append(CharSequence s) {
+//		if (s == null)
+//			s = "null";
+//		if (s instanceof String)
+//			return this.append((String)s);
+////		if (s instanceof StringBuffer)
+////			return this.append((StringBuffer)s);
+//		if (s instanceof StringBuilder)
+//			return this.append((StringBuilder)s);
+//		return this.append(s, 0, s.length());
+//	}
 
 	/**
 	 * @throws	 IndexOutOfBoundsException {@inheritDoc}
 	 */
-	public _StringBuilder append(CharSequence s, int start, int end) {
-		if (s == null)
-			s = "null";
-		if ((start < 0) || (end < 0) || (start > end) || (end > s.length()))
-			throw new IndexOutOfBoundsException(
-				"start " + start + ", end " + end + ", s.length() "
-				+ s.length());
-		int len = end - start;
-		if (len == 0)
-			return this;
-		int newCount = count + len;
-		if (newCount > value.length)
-			expandCapacity(newCount);
-		for (int i=start; i<end; i++)
-			value[count++] = s.charAt(i);
-		count = newCount;
-		return this;
-	}
+//	public _StringBuilder append(CharSequence s, int start, int end) {
+//		if (s == null)
+//			s = "null";
+//		if ((start < 0) || (end < 0) || (start > end) || (end > s.length()))
+//			throw new IndexOutOfBoundsException(
+//				"start " + start + ", end " + end + ", s.length() "
+//				+ s.length());
+//		int len = end - start;
+//		if (len == 0)
+//			return this;
+//		int newCount = count + len;
+//		if (newCount > value.length)
+//			expandCapacity(newCount);
+//		for (int i=start; i<end; i++)
+//			value[count++] = s.charAt(i);
+//		count = newCount;
+//		return this;
+//	}
 
 	public _StringBuilder append(char str[]) {
 		int newCount = count + str.length;

@@ -72,7 +72,8 @@ import zz.utils.bit.BitUtils;
 public class ReplayerLoader extends ClassLoader
 {
 	private static final int OOSDISPATCH_BITS = 8; 
-	private static final int OOSDISPATCH_MASK = BitUtils.pow2i(OOSDISPATCH_BITS)-1;
+	private static final int OOSDISPATCH_N = BitUtils.pow2i(OOSDISPATCH_BITS);
+	private static final int OOSDISPATCH_MASK = OOSDISPATCH_N-1;
 	
 	private final ClassLoader itsParent;
 	private TODConfig itsConfig;
@@ -336,7 +337,7 @@ public class ReplayerLoader extends ClassLoader
 		theMethodNode.desc = aSignature.descriptor;
 		theMethodNode.exceptions = Collections.EMPTY_LIST;
 		theMethodNode.access = Opcodes.ACC_PUBLIC;
-		theMethodNode.tryCatchBlocks = Collections.EMPTY_LIST;
+		theMethodNode.tryCatchBlocks = new ArrayList();
 
 		return theMethodNode;
 	}
@@ -418,6 +419,10 @@ public class ReplayerLoader extends ClassLoader
 		}
 	}
 	
+	/**
+	 * The in-scope dispatcher is called by in-scope code.
+	 * It can dispatch to either in- or out-of-scope methods.
+	 */
 	private MethodNode createInScopeDispatcher(MethodDescriptor aDescriptor, List<IBehaviorInfo> aBehaviors)
 	{
 		MethodSignature theDispatchSignature = aDescriptor.getDispatchSignature();
@@ -427,6 +432,10 @@ public class ReplayerLoader extends ClassLoader
 		MethodNode theMethod = createMethodNode(theDispatchSignature);
 		theMethod.access = Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC;
 
+		Label lBegin = new Label();
+		Label lEnd = new Label();
+		Label lHandler = new Label();
+		
 		SList sw = new SList();
 
 		int n = aBehaviors.size();
@@ -435,6 +444,8 @@ public class ReplayerLoader extends ClassLoader
 		int[] theKeys = new int[n+1];
 		for(int i=0;i<n+1;i++) theLabels[i] = new Label();
 		Label lDefault = new Label();
+		
+		sw.label(lBegin);
 
 		// Push args
 		int theSlot = 0; 
@@ -445,8 +456,9 @@ public class ReplayerLoader extends ClassLoader
 			sw.ILOAD(theType, theSlot);
 			theSlot += theType.getSize();
 		}
-		int theThreadReplayerSlot = theSlot++; // Not strictly needed, but just in case we add another argument
+		int theThreadReplayerSlot = theSlot++; 
 		sw.ALOAD(theThreadReplayerSlot); // Push the ThreadReplayer
+		int theBehaviorIdSlot = theSlot++;
 		
 		SList cases = new SList();
 		{
@@ -493,7 +505,8 @@ public class ReplayerLoader extends ClassLoader
 			
 			// Add default
 			cases.label(lDefault);
-			cases.createRTEx("Bad method id");
+			cases.ILOAD(theBehaviorIdSlot);
+			cases.createRTExArg("Bad method id");
 			cases.ATHROW();
 		}		
 
@@ -501,12 +514,27 @@ public class ReplayerLoader extends ClassLoader
 		// Create switch
 		sw.ALOAD(theThreadReplayerSlot);
 		sw.INVOKEVIRTUAL(CLS_THREADREPLAYER, "getDispatchTarget", "()I");
+		sw.DUP();
+		sw.ISTORE(theBehaviorIdSlot);
 		sw.LOOKUPSWITCH(lDefault, theKeys, theLabels);
 		sw.add(cases);
+		
+		sw.label(lEnd);
+
+		// Catch BehaviorExitException
+		sw.label(lHandler);
+		sw.POP();
+		sw.ALOAD(theThreadReplayerSlot);
+		sw.INVOKESTATIC(CLS_INSCOPEREPLAYERFRAME, "expectException", "("+DSC_THREADREPLAYER+")V");
+		sw.createRTEx("Shouldn't be reached");
+		sw.ATHROW();
+		
+		theMethod.visitTryCatchBlock(lBegin, lEnd, lHandler, CLS_BEHAVIOREXITEXCEPTION);
 		
 		theMethod.instructions = sw;
 		theMethod.maxLocals = theSlot;
 		theMethod.maxStack = theSlot+2;
+		
 		return theMethod;
 	}
 
@@ -535,7 +563,7 @@ public class ReplayerLoader extends ClassLoader
 		
 		SList s = new SList();
 		
-		int theCases = aLastId >>> OOSDISPATCH_BITS;
+		int theCases = (aLastId + OOSDISPATCH_N-1) >>> OOSDISPATCH_BITS;
 		Label[] theLabels = new Label[theCases];
 		for(int i=0;i<theCases;i++) theLabels[i] = new Label();
 		Label lDefault = new Label();
@@ -557,7 +585,10 @@ public class ReplayerLoader extends ClassLoader
 			s.INVOKESTATIC(CLS_THREADREPLAYER, "dispatch_OOS_"+i, "(I"+DSC_THREADREPLAYER+")V");
 			s.RETURN();
 			
-			aClassNode.methods.add(createLevel2OutOfScopeDispatcher(aClassNode, i));
+			aClassNode.methods.add(createLevel2OutOfScopeDispatcher(
+					aClassNode, 
+					i,
+					Math.min(OOSDISPATCH_N, aLastId-(i*OOSDISPATCH_N))));
 		}
 		
 		// Add default
@@ -573,14 +604,14 @@ public class ReplayerLoader extends ClassLoader
 		BCIUtils.checkMethod(aClassNode, theMethod, new ReplayerVerifier(), false);
 	}
 
-	private MethodNode createLevel2OutOfScopeDispatcher(ClassNode aClassNode, int aHighOrderId)
+	private MethodNode createLevel2OutOfScopeDispatcher(ClassNode aClassNode, int aHighOrderId, int aSubcases)
 	{
 		MethodNode theMethod = createMethodNode(new MethodSignature("dispatch_OOS_"+aHighOrderId, "(I"+DSC_THREADREPLAYER+")V"));
 		theMethod.access = Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC;
 		
 		SList s = new SList();
 		
-		int theCases = BitUtils.pow2i(OOSDISPATCH_BITS);
+		int theCases = aSubcases;
 		Label[] theLabels = new Label[theCases];
 		for(int i=0;i<theCases;i++) theLabels[i] = new Label();
 		Label lDefault = new Label();
@@ -599,7 +630,7 @@ public class ReplayerLoader extends ClassLoader
 		{
 			s.label(theLabels[i]);
 			
-			int theId = aHighOrderId*theCases + i;
+			int theId = aHighOrderId*OOSDISPATCH_N + i;
 			if (theId > 0)
 			{
 				IMutableBehaviorInfo theBehavior = itsDatabase.getBehavior(theId, true);
@@ -625,6 +656,7 @@ public class ReplayerLoader extends ClassLoader
 	/**
 	 * Creates an out-of-scope dispatcher for a given method signature.
 	 * Reads the arguments from the stream.
+	 * The arguments of the method are (behaviod id, ThreadReplayer)
 	 */
 	private MethodNode createOutOfScopeDispatcher(MethodDescriptor aDescriptor, List<IBehaviorInfo> aBehaviors)
 	{
@@ -649,7 +681,15 @@ public class ReplayerLoader extends ClassLoader
 		int theSlot = 0;
 		if (! aDescriptor.isStatic())
 		{
-			sw.invokeRead(TYPE_OBJECTID, 1);
+			if (! aDescriptor.isConstructor())
+			{
+				sw.invokeRead(TYPE_OBJECTID, 1);
+			}
+			else
+			{
+				sw.ALOAD(1);
+				sw.INVOKESTATIC(CLS_INSCOPEREPLAYERFRAME, "nextTmpId", "("+DSC_THREADREPLAYER+")"+BCIUtils.DSC_TMPOBJECTID);
+			}
 			theSlot++;
 		}
 		for(int theSort : theArgSorts)
@@ -910,6 +950,11 @@ public class ReplayerLoader extends ClassLoader
 			return itsBehavior.isStatic();
 		}
 		
+		public boolean isConstructor()
+		{
+			return itsBehavior.isConstructor();
+		}
+		
 		public byte getReturnSort()
 		{
 			return itsReturnSort;
@@ -935,7 +980,10 @@ public class ReplayerLoader extends ClassLoader
 		public MethodSignature getDispatchSignature()
 		{
 			if (itsSignature == null)
-				itsSignature = MethodReplayerGenerator.getDispatchMethodSignature(itsBehavior);
+				itsSignature = MethodReplayerGenerator.getDispatchMethodSignature(
+						itsBehavior.getDescriptor(), 
+						itsBehavior.isStatic(),
+						itsBehavior.isConstructor());
 			return itsSignature;
 		}
 
@@ -957,6 +1005,7 @@ public class ReplayerLoader extends ClassLoader
 			result = prime * result + Arrays.hashCode(itsArgSorts);
 			result = prime * result + itsReturnSort;
 			result = prime * result + (isStatic() ? 1231 : 1237);
+			result = prime * result + (isConstructor() ? 1231 : 1237);
 			return result;
 		}
 
@@ -970,6 +1019,7 @@ public class ReplayerLoader extends ClassLoader
 			if (!Arrays.equals(itsArgSorts, other.itsArgSorts)) return false;
 			if (itsReturnSort != other.itsReturnSort) return false;
 			if (isStatic() != other.isStatic()) return false;
+			if (isConstructor() != other.isConstructor()) return false;
 			return true;
 		}
 
