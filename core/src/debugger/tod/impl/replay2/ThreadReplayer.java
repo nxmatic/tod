@@ -145,7 +145,7 @@ public abstract class ThreadReplayer
 		{
 			if (theMessage != Message.REGISTER_OBJECT) itsMessageCount++;
 			if (ECHO_FORREAL) echo("Message (%d): [#%d @%d] %s", itsThreadId, itsMessageCount, itsStream.position(), Message._NAMES[theMessage]);
-			if (itsMessageCount == 180000000)
+			if (itsMessageCount == -1)
 			{
 				ECHO_FORREAL = true;
 				System.out.println("ThreadReplayer.nextMessage()");

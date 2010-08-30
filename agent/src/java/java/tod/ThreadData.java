@@ -230,7 +230,7 @@ public final class ThreadData
 		
 		if (! ECHO_FORREAL)
 		{
-			if (itsMessageCount > 180000000) ECHO_FORREAL = true;
+			if (itsMessageCount > 265000000) ECHO_FORREAL = true;
 			return;
 		}
 		
@@ -1354,39 +1354,6 @@ public final class ThreadData
 	public void setProcessingExceptions(boolean aProcessingExceptions)
 	{
 		itsProcessingExceptions = aProcessingExceptions;
-	}
-	
-	/**
-	 * The {@link ClassLoader#loadClass(String)} method is sometimes called automatically
-	 * by the VM, so we register it as a classloader method. But it is possible to call it
-	 * directly, so we need to be able to differentiate. In-scope code calls to it are replaced
-	 * by calls to this method.
-	 */
-	public static Class HACK_ClassLoader_loadClass(ClassLoader aLoader, String aName, ThreadData aThreadData) throws ClassNotFoundException
-	{
-		aThreadData.evOutOfScopeBehaviorEnter(-1);
-		Class theResult = null;
-		try
-		{
-			theResult = aLoader.loadClass(aName);
-		}
-		catch (ClassNotFoundException e)
-		{
-			aThreadData.evOutOfScopeBehaviorExit_Exception();
-			throw e;
-		}
-		catch (RuntimeException e)
-		{
-			aThreadData.evOutOfScopeBehaviorExit_Exception();
-			throw e;
-		}
-		catch(Throwable e)
-		{
-			_IO.fatal("Unexpected exception in HACK_ClassLoader_loadClass.");
-		}
-		aThreadData.evOutOfScopeBehaviorExit_Normal();
-		aThreadData.sendValue_Ref(theResult);
-		return theResult;
 	}
 	
 	/**

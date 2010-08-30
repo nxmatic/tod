@@ -82,4 +82,11 @@ public class TODAccessor
 	{
 		throw new Error("This code is supposed to be replaced by the instrumenter.");
 	}
+	
+//	public static Object Object_clone(Object aTarget)
+//	{
+//		throw new Error("This code is supposed to be replaced by the instrumenter.");
+//	}
+	
+	
 }

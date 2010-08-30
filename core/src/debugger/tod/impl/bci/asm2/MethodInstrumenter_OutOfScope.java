@@ -106,6 +106,14 @@ public class MethodInstrumenter_OutOfScope extends MethodInstrumenter
 			if ("sleep".equals(aMethodName)) return true;
 		}
 
+		// Not actually touchy, but intrinsic (we need to have it here because of super calls)
+		if (BCIUtils.CLS_OBJECT.equals(aClassName)) 
+		{
+			if ("equals".equals(aMethodName)) return true;
+			if ("hashCode".equals(aMethodName)) return true; 
+			if ("clone".equals(aMethodName)) return true; 
+		}
+
 		return false;
 	}
 	

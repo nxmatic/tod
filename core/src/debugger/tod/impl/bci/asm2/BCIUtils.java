@@ -65,6 +65,7 @@ import tod.impl.replay2.LocalsSnapshot;
 import tod.impl.replay2.ThreadReplayer;
 import tod.impl.replay2.TmpObjectId;
 import tod.impl.replay2.UnmonitoredBehaviorCallException;
+import tod2.access.Intrinsics;
 import zz.utils.Utils;
 
 public class BCIUtils implements Opcodes
@@ -79,6 +80,7 @@ public class BCIUtils implements Opcodes
 	public static final String CLS_EXCEPTIONGENERATEDRECEIVER = "java/tod/ExceptionGeneratedReceiver";
 	public static final String CLS_THREADDATA = "java/tod/ThreadData";
 	public static final String DSC_THREADDATA = "L"+CLS_THREADDATA+";";
+	public static final String CLS_INTRINSICS = getJvmClassName(Intrinsics.class);
 	public static final String CLS_OBJECT = getJvmClassName(Object.class);
 	public static final String DSC_OBJECT = "L"+CLS_OBJECT+";";
 	public static final String CLS_THROWABLE = getJvmClassName(Throwable.class);

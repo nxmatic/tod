@@ -144,7 +144,7 @@ public class TODConfig extends PublicCloneable implements Serializable
 							+ "Classes that do no pass this filter are not touched by any kind "
 							+ "of instrumentation and are not registered in the trace database. "
 							+ "There should not be any reason to modify it.",
-					ConfigUtils.readString("scope-globalFilter", "[-tod.agent.**]"));
+					ConfigUtils.readString("scope-globalFilter", "[-tod.agent.** -tod2.access.Intrinsics]"));
 
 	public static final StringItem SCOPE_TRACE_FILTER =
 			new StringItem(

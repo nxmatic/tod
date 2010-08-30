@@ -32,7 +32,6 @@ Inc. MD5 Message-Digest Algorithm".
 package tod.impl.bci.asm2;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 import org.objectweb.asm.ClassReader;
@@ -80,11 +79,11 @@ public class ClassInstrumenter
 	private static final String CLSID_FIELD = "$tod$clsId";
 	private static final String CLSID_GETTER = "$tod$getClsId";
 
-	private static final String INTRINSIC_PREFIX = "$tintr$";
-	
 	private static final String STRING_GETCHARS = "$tod$getChars";
 	private static final String STRING_GETOFFSET = "$tod$getOffset";
 	private static final String STRING_GETCOUNT = "$tod$getCount";
+	
+	private static final String OBJECT_CLONE = "$tod$clone";
 	
 	private static final String THREAD_THREADDATAFIELD = "$tod$threadData";
 	private static final String THREAD_GETID = "$tod$getId";
@@ -167,6 +166,7 @@ public class ClassInstrumenter
 			addGetIdMethod_Root();
 			addResetIdMethod_Root();
 			addBootstrapField();
+//			addObjectRawAccess();
 		}
 		else if (BCIUtils.CLS_CLASS.equals(getNode().name)) addGetClsIdMethod();
 		else if (BCIUtils.CLS_STRING.equals(getNode().name)) addStringRawAccess();
@@ -280,8 +280,12 @@ public class ClassInstrumenter
 		}
 		else 
 		{
-			if (isInstrinsic(itsName, aNode.name, BCIUtils.isStatic(aNode.access))) wrapIntrinsic(aNode);
-			else new MethodInstrumenter_OutOfScope(this, aNode, theBehavior).proceed();
+			new MethodInstrumenter_OutOfScope(this, aNode, theBehavior).proceed();
+		}
+		
+		if (! BCIUtils.isNative(aNode.access))
+		{
+			new MethodInstrumenter_PostprocessClone(this, aNode, theBehavior).proceed();
 		}
 
 		if (BCIUtils.isNative(aNode.access)
@@ -293,27 +297,6 @@ public class ClassInstrumenter
 	}
 	
 	/**
-	 * Indicates if (we think that) the given method is an intrinsic one,
-	 * ie. the compiler knows its semantics and can optimize it out (along with our instrumentation)
-	 */
-	public static boolean isInstrinsic(String aClassName, String aMethodName, boolean aStatic)
-	{
-		if (BCIUtils.CLS_STRING.equals(aClassName))
-		{
-			if ("length".equals(aMethodName)) return true;
-			if ("compareTo".equals(aMethodName)) return true;
-			if ("compareToIgnoreCase".equals(aMethodName)) return true;
-			if ("charAt".equals(aMethodName)) return true;
-		}
-
-		// For the overrides of Object
-		if ("equals".equals(aMethodName)) return true;
-		if ("hashCode".equals(aMethodName)) return true;
-		
-		return false;
-	}
-
-	/**
 	 * Wraps a native method (based on JVMTI's SetNativeMethodPrefix)
 	 * @param aNode
 	 */
@@ -324,44 +307,6 @@ public class ClassInstrumenter
 		
 		aNode.name = NATIVE_METHOD_PREFIX + aNode.name;
 		aNode.access = (aNode.access & ~(Opcodes.ACC_PUBLIC | Opcodes.ACC_PROTECTED)) | Opcodes.ACC_PRIVATE;
-		
-		boolean theStatic = BCIUtils.isStatic(aNode.access);
-		
-		SyntaxInsnList s = new SyntaxInsnList();
-		
-		// Call original native method
-		Type[] theTypes = Type.getArgumentTypes(aNode.desc);
-		int theIndex = 0;
-		if (! theStatic) s.ALOAD(theIndex++);
-		for (int i = 0; i < theTypes.length; i++)
-		{
-			Type theType = theTypes[i];
-			s.ILOAD(theType, theIndex);
-			theIndex += theType.getSize();
-		}
-		
-		if (theStatic) s.INVOKESTATIC(itsNode.name, aNode.name, aNode.desc);
-		else s.INVOKESPECIAL(itsNode.name, aNode.name, aNode.desc);
-		
-		s.IRETURN(Type.getReturnType(aNode.desc));
-		
-		theWrapper.maxLocals = theIndex;
-		theWrapper.maxStack = theIndex + 2; // +2 to account for the return value, not optimal but easy...
-		theWrapper.instructions = s;
-		
-		// Insert enveloppe instrumentation
-		IMutableBehaviorInfo theBehavior = itsClassInfo.getNewBehavior(theWrapper.name, theWrapper.desc, theWrapper.access);
-		new MethodInstrumenter_OutOfScope(this, theWrapper, theBehavior).proceed();
-	}
-	
-	/**
-	 * Creates a wrapper for an intrinsic method.
-	 * In-scope code must call the wrapper instead of the original
-	 */
-	private void wrapIntrinsic(MethodNode aNode)
-	{
-		System.out.println("Wrapping intrinsic: "+itsName+"."+aNode.name+aNode.desc);
-		MethodNode theWrapper = createMethod(itsExtraMethods, INTRINSIC_PREFIX+aNode.name, aNode.desc, aNode.access);
 		
 		boolean theStatic = BCIUtils.isStatic(aNode.access);
 		
@@ -422,6 +367,8 @@ public class ClassInstrumenter
 				makeSetBootstrapFlag(theNode);
 			else if ("getBootstrapFlag".equals(theNode.name))
 				makeGetBootstrapFlag(theNode);
+			else if ("Object_clone".equals(theNode.name))
+				makeAccessor(theNode, BCIUtils.CLS_OBJECT, OBJECT_CLONE, BCIUtils.DSC_OBJECT);
 		}
 	}
 	
@@ -695,6 +642,14 @@ public class ClassInstrumenter
 		createGetter(BCIUtils.CLS_STRING, STRING_GETCOUNT, "count", "I");
 	}
 	
+//	/**
+//	 * Adds the raw access methods to java.lang.Object
+//	 */
+//	private void addObjectRawAccess()
+//	{
+//		createCaller(BCIUtils.CLS_OBJECT, OBJECT_CLONE, "clone", "()"+BCIUtils.DSC_OBJECT);
+//	}
+//	
 	private void createGetter(String aOwner, String aGetterName, String aFieldName, String aValueDesc)
 	{
 		Type theType = Type.getType(aValueDesc);
@@ -710,6 +665,31 @@ public class ClassInstrumenter
 		s.IRETURN(theType);
 		
 		theGetter.instructions = s;
+	}
+	
+	private void createCaller(String aOwner, String aCallerName, String aMethodName, String aDesc)
+	{
+		Type[] theArgumentTypes = Type.getArgumentTypes(aDesc);
+		Type theReturnType = Type.getReturnType(aDesc);
+		
+		MethodNode theCaller = createMethod(aCallerName, aDesc, Opcodes.ACC_PUBLIC);
+		theCaller.maxStack = Type.getArgumentsAndReturnSizes(aDesc);
+		theCaller.maxLocals = Type.getArgumentsAndReturnSizes(aDesc);
+		
+		SyntaxInsnList s = new SyntaxInsnList();
+		
+		int theSlot = 0;
+		s.ALOAD(theSlot++);
+		for (Type theType : theArgumentTypes)
+		{
+			s.ILOAD(theType, theSlot);
+			theSlot += theType.getSize();
+		}
+		
+		s.INVOKEVIRTUAL(aOwner, aMethodName, aDesc);
+		s.IRETURN(theReturnType);
+		
+		theCaller.instructions = s;
 	}
 	
 	private void addThreadAccess()

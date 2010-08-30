@@ -55,6 +55,7 @@ import tod.core.DebugFlags;
 import tod.core.database.structure.IBehaviorInfo;
 import tod.core.database.structure.IClassInfo;
 import tod.core.database.structure.IMutableBehaviorInfo;
+import tod.core.database.structure.IStructureDatabase;
 import tod.impl.bci.asm2.MethodInfo.BCIFrame;
 import tod.impl.bci.asm2.MethodInfo.NewInvokeLink;
 
@@ -77,6 +78,17 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 	private MethodInfo itsMethodInfo;
 	
 	private Label lExit = new Label();
+	
+	private WrapperDef[] itsWrapperDefs = {
+			new ClassLoader_loadClass_WrapperDef(),
+			new SimpleWrapperDef("Object_equals", "("+DSC_OBJECT+DSC_OBJECT+")Z", null, "equals", "("+DSC_OBJECT+")Z"),
+			new SimpleWrapperDef("Object_hashCode", "("+DSC_OBJECT+")I", null, "hashCode", "()I"),
+			new SimpleWrapperDef("Object_clone", "("+DSC_OBJECT+")"+DSC_OBJECT, null, "clone", "()"+DSC_OBJECT),
+			new SimpleWrapperDef("String_length", "("+DSC_STRING+")I", CLS_STRING, "length", "()I"),
+			new SimpleWrapperDef("String_charAt", "("+DSC_STRING+"I)C", CLS_STRING, "charAt", "(I)C"),
+			new SimpleWrapperDef("String_compareTo", "("+DSC_STRING+DSC_STRING+")I", CLS_STRING, "compareTo", "("+DSC_STRING+")I"),
+			new SimpleWrapperDef("String_compareToIgnoreCase", "("+DSC_STRING+DSC_STRING+")I", CLS_STRING, "compareToIgnoreCase", "("+DSC_STRING+")I"),
+	};
 	
 	public MethodInstrumenter_InScope(ClassInstrumenter aClassInstrumenter, MethodNode aNode, IMutableBehaviorInfo aBehavior)
 	{
@@ -360,20 +372,11 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		else return theClass.getBehavior(aNode.name, aNode.desc);
 	}
 	
-	private boolean isClassLoader(IClassInfo aClass)
+	private WrapperDef getWrapperFor(MethodInsnNode aNode)
 	{
-		while(aClass != null)
-		{
-			if (CLS_CLASSLOADER.equals(aClass.getName())) return true;
-			aClass = aClass.getSupertype();
-		}
-		return false;
-	}
-	
-	private boolean isClassLoader(String aClassName)
-	{
-		IClassInfo theClass = getDatabase().getClass(Util.jvmToScreen(aClassName), false);
-		return isClassLoader(theClass);
+		if (aNode.getOpcode() == Opcodes.INVOKESPECIAL) return null; // That would be a super call, don't reroute it.
+		for (WrapperDef theDef : itsWrapperDefs) if (theDef.accept(getDatabase(), aNode)) return theDef;
+		return null;
 	}
 	
 	private void processInvoke(MethodInsnNode aNode)
@@ -407,15 +410,10 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		}
 
 		// Insert method call
-		if (aNode.name.equals("loadClass")
-				&& isClassLoader(aNode.owner)
-				&& aNode.desc.equals("("+DSC_STRING+")"+DSC_CLASS))
+		WrapperDef theWrapperDef = getWrapperFor(aNode);
+		if (theWrapperDef != null)
 		{
-			s.ALOAD(getThreadDataVar());
-			s.INVOKESTATIC(
-					CLS_THREADDATA, 
-					"HACK_ClassLoader_loadClass", 
-					"("+DSC_CLASSLOADER+DSC_STRING+DSC_THREADDATA+")"+DSC_CLASS);
+			s.INVOKESTATIC(CLS_INTRINSICS, theWrapperDef.getWrapperName(), theWrapperDef.getWrapperDesc());
 		}
 		else
 		{
@@ -681,19 +679,94 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		insertAfter(aNode, s);
 	}
 
-//	private static abstract class WrapperDef
-//	{
-//		public abstract boolean accept(MethodInsnNode aNode);
-//	}
-//	
-//	/**
-//	 * A wrapper def for a single method
-//	 * @author gpothier
-//	 */
-//	private static class SimpleWrapperDef
-//	{
-//		private final String itsClassName;
-//		private final String itsMethodName;
-//		private final String itsDesc;
-//	}
+	private static abstract class WrapperDef
+	{
+		private final String itsWrapperName;
+		private final String itsWrapperDesc;
+		
+		public WrapperDef(String aWrapperName, String aWrapperDesc)
+		{
+			itsWrapperName = aWrapperName;
+			itsWrapperDesc = aWrapperDesc;
+		}
+		
+		public String getWrapperName()
+		{
+			return itsWrapperName;
+		}
+		
+		public String getWrapperDesc()
+		{
+			return itsWrapperDesc;
+		}
+		
+		public abstract boolean accept(IStructureDatabase aDatabase, MethodInsnNode aNode);
+	}
+	
+	/**
+	 * A wrapper def for a single method
+	 * @author gpothier
+	 */
+	private static class SimpleWrapperDef extends WrapperDef
+	{
+		private final String itsClassName;
+		private final String itsMethodName;
+		private final String itsDesc;
+		
+		public SimpleWrapperDef(
+				String aWrapperName,
+				String aWrapperDesc,
+				String aClassName,
+				String aMethodName,
+				String aDesc)
+		{
+			super(aWrapperName, aWrapperDesc);
+			itsClassName = aClassName;
+			itsMethodName = aMethodName;
+			itsDesc = aDesc;
+		}
+
+		@Override
+		public boolean accept(IStructureDatabase aDatabase, MethodInsnNode aNode)
+		{
+			if (itsClassName != null && ! itsClassName.equals(aNode.owner)) return false;
+			if (itsMethodName != null && ! itsMethodName.equals(aNode.name)) return false;
+			if (itsDesc != null && ! itsDesc.equals(aNode.desc)) return false;
+			return true;
+		}
+	}
+	
+	private static class ClassLoader_loadClass_WrapperDef extends WrapperDef
+	{
+		public ClassLoader_loadClass_WrapperDef()
+		{
+			super("ClassLoader_loadClass", "("+DSC_CLASSLOADER+DSC_STRING+")"+DSC_CLASS);
+		}
+
+		@Override
+		public boolean accept(IStructureDatabase aDatabase, MethodInsnNode aNode)
+		{
+			return aNode.name.equals("loadClass")
+				&& isClassLoader(aDatabase, aNode.owner)
+				&& aNode.desc.equals("("+DSC_STRING+")"+DSC_CLASS);
+		}
+		
+		private static boolean isClassLoader(IClassInfo aClass)
+		{
+			while(aClass != null)
+			{
+				if (CLS_CLASSLOADER.equals(aClass.getName())) return true;
+				aClass = aClass.getSupertype();
+			}
+			return false;
+		}
+		
+		private static boolean isClassLoader(IStructureDatabase aDatabase, String aClassName)
+		{
+			IClassInfo theClass = aDatabase.getClass(Util.jvmToScreen(aClassName), false);
+			return isClassLoader(theClass);
+		}
+		
+
+	}
 }

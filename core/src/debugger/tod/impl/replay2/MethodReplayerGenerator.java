@@ -700,12 +700,8 @@ public abstract class MethodReplayerGenerator
 				
 			case Opcodes.IDIV:
 			case Opcodes.LDIV:
-			case Opcodes.FDIV:
-			case Opcodes.DDIV:
 			case Opcodes.IREM:
 			case Opcodes.LREM:
-			case Opcodes.FREM:
-			case Opcodes.DREM:
 				processDiv(aInsns, (InsnNode) theNode);
 				break;
 				
@@ -1197,16 +1193,6 @@ public abstract class MethodReplayerGenerator
 		case Type.LONG:
 			s.pushLong(0);
 			s.LCMP();
-			break;
-		
-		case Type.DOUBLE:
-			s.pushDouble(0.0);
-			s.DCMPG();
-			break;
-			
-		case Type.FLOAT:
-			s.pushFloat(0f);
-			s.FCMPG();
 			break;
 		
 		default: throw new RuntimeException("Unexpected type: "+theType);
