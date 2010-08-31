@@ -514,46 +514,4 @@ public class InScopeReplayerFrame
 		return id1.getId() == id2.getId();
 	}
 	
-	public static LocalsSnapshot createSnapshot(
-			ThreadReplayer aReplayer,
-			int aProbeId,
-			int aIntValuesCount, 
-			int aLongValuesCount, 
-			int aFloatValuesCount, 
-			int aDoubleValuesCount, 
-			int aRefValuesCount)
-	{
-		LocalsSnapshot theSnapshot = aReplayer.createSnapshot(aProbeId);
-		theSnapshot.alloc(aIntValuesCount, aLongValuesCount, aFloatValuesCount, aDoubleValuesCount, aRefValuesCount);
-		return theSnapshot;
-	}
-	
-	public static void registerSnapshot(ThreadReplayer aReplayer, LocalsSnapshot aSnapshot)
-	{
-		aReplayer.registerSnapshot(aSnapshot);
-	}
-	
-	/**
-	 * Shortcut for registering a snapshot when there are no locals.
-	 */
-	public static void registerEmptySnapshot(ThreadReplayer aReplayer, int aProbeId)
-	{
-		LocalsSnapshot theSnapshot = aReplayer.createSnapshot(aProbeId);
-		aReplayer.getCollector().localsSnapshot(theSnapshot);
-	}
-	
-	public static int getSnapshotSeq(ThreadReplayer aReplayer)
-	{
-		return aReplayer.getSnapshotSeq();
-	}
-	
-	public static LocalsSnapshot getSnapshotForResume(ThreadReplayer aReplayer)
-	{
-		return aReplayer.getSnapshotForResume();
-	}
-	
-	public static int getStartProbe(ThreadReplayer aReplayer)
-	{
-		return aReplayer.getStartProbe();
-	}
 }

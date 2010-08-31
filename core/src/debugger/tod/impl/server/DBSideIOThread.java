@@ -272,8 +272,8 @@ public abstract class DBSideIOThread
 				@Override
 				protected EventCollector createCollector(int aThreadId)
 				{
-//					EventCollector theCollector = new ObjectAccessDistributionEventCollector(aThreadId);
-					EventCollector theCollector = new CounterEventCollector();
+					EventCollector theCollector = new ObjectAccessDistributionEventCollector(aThreadId);
+//					EventCollector theCollector = new CounterEventCollector();
 					theCollectors.put(aThreadId, theCollector);
 					return theCollector;
 				}

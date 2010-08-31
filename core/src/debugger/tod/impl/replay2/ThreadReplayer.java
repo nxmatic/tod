@@ -126,6 +126,20 @@ public abstract class ThreadReplayer
 	public abstract LocalsSnapshot getSnapshotForResume();
 	public abstract void registerSnapshot(LocalsSnapshot aSnapshot);
 	public abstract int getStartProbe();
+	
+	public LocalsSnapshot createSnapshot(
+			int aProbeId,
+			int aIntValuesCount, 
+			int aLongValuesCount, 
+			int aFloatValuesCount, 
+			int aDoubleValuesCount, 
+			int aRefValuesCount)
+	{
+		LocalsSnapshot theSnapshot = createSnapshot(aProbeId);
+		theSnapshot.alloc(aIntValuesCount, aLongValuesCount, aFloatValuesCount, aDoubleValuesCount, aRefValuesCount);
+		return theSnapshot;
+	}
+
 
 	public byte getNextMessage()
 	{

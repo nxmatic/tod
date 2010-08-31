@@ -42,8 +42,6 @@ import zz.utils.Utils;
 
 public class ObjectAccessDistributionEventCollector extends CounterEventCollector
 {
-	private static final int N = 2048;
-
 	private final int itsThreadId;
 	private TLongHashSet itsObjectsSet = new TLongHashSet();
 	

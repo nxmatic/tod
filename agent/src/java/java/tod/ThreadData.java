@@ -445,10 +445,10 @@ public final class ThreadData
 	 */
 	private void sendSync(long aTimestamp)
 	{
-//		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.SYNC, aTimestamp); 
-//		sendMessageType(itsBuffer, Message.SYNC);
-//		itsBuffer.putLong(aTimestamp);
-//		commitBuffer();
+		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.SYNC, aTimestamp); 
+		sendMessageType(itsBuffer, Message.SYNC);
+		itsBuffer.putLong(aTimestamp);
+		commitBuffer();
 	}
 	
 	/**
