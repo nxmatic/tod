@@ -416,7 +416,7 @@ public class BufferManager
 				while (theRemaining > 0)
 				{
 					int theRead = aPage.getFile().getChannel().read(thePageData, thePagePos);
-					assert theRead >= 0 : "theRead: "+theRead+", thePagePos: "+thePagePos+", aPageId: "+aPhysPageId;
+					assert theRead >= 0 : "theRead: "+theRead+", thePagePos: "+thePagePos+", aPhysPageId: "+aPhysPageId;
 					theRemaining -= theRead;
 					thePagePos += theRead;
 				}

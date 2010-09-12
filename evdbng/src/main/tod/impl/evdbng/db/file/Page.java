@@ -71,6 +71,14 @@ public abstract class Page
 	public abstract void writeSSSI(int aPosition, short aShort1, short aShort2, short aShort3, int aInt);
 	public abstract void writeInternalTupleData(int aPosition, int aPageId, long aTupleCount);
 	
+	/**
+	 * Internal move of a portion of this page.
+	 * Moves aLength bytes starting at aPosition, offsetting them my aOffset.
+	 */
+	public abstract void move(int aPosition, int aLength, int aOffset);
+	
+	public abstract void copy(int aSrcPos, Page aDest, int aDstPos, int aLength);
+	
 	public PageIOStream asIOStream()
 	{
 		return new PageIOStream(this);
@@ -675,6 +683,78 @@ public abstract class Page
 		{
 			checkSpace(PageIOStream.internalTupleDataSize());
 			itsCurrentStream.writeInternalTupleData(aPageId, aTupleCount);
+		}
+	}
+
+	public static class IntSlot
+	{
+		private Page itsPage;
+		private int itsOffset;
+		
+		public IntSlot()
+		{
+		}
+		
+		public IntSlot(Page aPage, int aOffset)
+		{
+			setup(aPage, aOffset);
+		}
+		
+		public void setup(Page aPage, int aOffset)
+		{
+			itsPage = aPage;
+			itsOffset = aOffset;
+		}
+		
+		public int get()
+		{
+			return itsPage.readInt(itsOffset);
+		}
+		
+		public void set(int aValue)
+		{
+			itsPage.writeInt(itsOffset, aValue);
+		}
+	}
+	
+	public static class PidSlot
+	{
+		private Page itsPage;
+		private int itsOffset;
+		
+		public PidSlot()
+		{
+		}
+		
+		public PidSlot(Page aPage, int aOffset)
+		{
+			setup(aPage, aOffset);
+		}
+		
+		public void setup(Page aPage, int aOffset)
+		{
+			itsPage = aPage;
+			itsOffset = aOffset;
+		}
+		
+		public Page getPage(boolean aCreateIfNull)
+		{
+			Page page;
+			int pid = itsPage.readInt(itsOffset);
+			if (pid == 0)
+			{
+				if (! aCreateIfNull) return null;
+				page = itsPage.getFile().create();
+				pid = page.getPageId();
+				itsPage.writeInt(itsOffset, pid);
+			}
+			else page = itsPage.getFile().get(pid);
+			return page;
+		}
+		
+		public void setPage(Page aPage)
+		{
+			itsPage.writeInt(itsOffset, aPage.getPageId());
 		}
 	}
 

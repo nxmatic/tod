@@ -29,7 +29,7 @@ import tod.impl.evdbng.db.file.Page.PageIOStream;
  * Stores the decoded tuples of a {@link Page}.
  * @author gpothier
  */
-public abstract class TupleBuffer<T extends Tuple>
+public abstract class TupleBuffer<T extends Tuple> extends Sorter
 {
 	/**
 	 * tuple count of the previous page
@@ -53,6 +53,12 @@ public abstract class TupleBuffer<T extends Tuple>
 	{
 		itsKeyBuffer[itsPosition] = aKey;
 		read0(itsPosition, aStream);
+		itsPosition++;
+	}
+	
+	public void write(PageIOStream aStream)
+	{
+		write0(itsPosition, aStream);
 		itsPosition++;
 	}
 	
@@ -83,6 +89,7 @@ public abstract class TupleBuffer<T extends Tuple>
 	 * Reads a tuple data into internal buffers.
 	 */
 	public abstract void read0(int aPosition, PageIOStream aStream);
+	public abstract void write0(int aPosition, PageIOStream aStream);
 	
 	public int getPreviousPageId()
 	{
@@ -107,7 +114,26 @@ public abstract class TupleBuffer<T extends Tuple>
 	{
 		itsTupleCount = aTupleCount;
 	}
+	
+	public int getPosition()
+	{
+		return itsPosition;
+	}
+	
+	public void setPosition(int aPosition)
+	{
+		itsPosition = aPosition;
+	}
 
+	public void sort()
+	{
+		sort(itsKeyBuffer);
+	}
+	
+	public void mergesort()
+	{
+		mergeSort(itsKeyBuffer);
+	}
 
 	/**
 	 * Tuple data reader for simple tuples
@@ -124,11 +150,21 @@ public abstract class TupleBuffer<T extends Tuple>
 		public void read0(int aPosition, PageIOStream aStream)
 		{
 		}
+		
+		@Override
+		public void write0(int aPosition, PageIOStream aStream)
+		{
+		}
 
 		@Override
 		public SimpleTuple getTuple(int aPosition)
 		{
 			return new SimpleTuple(getKey(aPosition));
+		}
+
+		@Override
+		protected void swap(int a, int b)
+		{
 		}
 	}
 	
@@ -153,41 +189,24 @@ public abstract class TupleBuffer<T extends Tuple>
 		}
 
 		@Override
+		public void write0(int aPosition, PageIOStream aStream)
+		{
+			aStream.writeRole(itsBuffer[aPosition]);
+		}
+
+		@Override
 		public RoleTuple getTuple(int aPosition)
 		{
 			return new RoleTuple(getKey(aPosition), itsBuffer[aPosition]);
 		}
+
+		@Override
+		protected void swap(int a, int b)
+		{
+			swap(itsBuffer, a, b);
+		}
 	}
 	
-	public static class InternalTupleBuffer extends TupleBuffer<InternalTuple>
-	{
-		private int[] itsPageIdBuffer;
-		private long[] itsTupleCountBuffer;
-		
-		public InternalTupleBuffer(int aSize, int aPreviousPageId, int aNextPageId)
-		{
-			super(aSize, aPreviousPageId, aNextPageId);
-			itsPageIdBuffer = new int[aSize];
-			itsTupleCountBuffer = new long[aSize];
-		}
-
-		@Override
-		public void read0(int aPosition, PageIOStream aStream)
-		{
-			itsPageIdBuffer[aPosition] = aStream.readPagePointer();
-			itsTupleCountBuffer[aPosition] = aStream.readTupleCount();
-		}
-
-		@Override
-		public InternalTuple getTuple(int aPosition)
-		{
-			return new InternalTuple(
-					getKey(aPosition), 
-					itsPageIdBuffer[aPosition], 
-					itsTupleCountBuffer[aPosition]);
-		}
-	}
-
 	public static class ObjectPointerTupleBuffer extends TupleBuffer<ObjectPointerTuple>
 	{
 		private int[] itsPageIdBuffer;
@@ -208,12 +227,26 @@ public abstract class TupleBuffer<T extends Tuple>
 		}
 		
 		@Override
+		public void write0(int aPosition, PageIOStream aStream)
+		{
+			aStream.writePagePointer(itsPageIdBuffer[aPosition]);
+			aStream.writePageOffset(itsOffsetBuffer[aPosition]);
+		}
+
+		@Override
 		public ObjectPointerTuple getTuple(int aPosition)
 		{
 			return new ObjectPointerTuple(
 					getKey(aPosition), 
 					itsPageIdBuffer[aPosition], 
 					itsOffsetBuffer[aPosition]);
+		}
+
+		@Override
+		protected void swap(int a, int b)
+		{
+			swap(itsPageIdBuffer, a, b);
+			swap(itsOffsetBuffer, a, b);
 		}
 	}
 	
@@ -234,11 +267,23 @@ public abstract class TupleBuffer<T extends Tuple>
 		}
 		
 		@Override
+		public void write0(int aPosition, PageIOStream aStream)
+		{
+			aStream.writeLong(itsClassIdBuffer[aPosition]);
+		}
+
+		@Override
 		public ObjectRefTuple getTuple(int aPosition)
 		{
 			return new ObjectRefTuple(
 					getKey(aPosition), 
 					itsClassIdBuffer[aPosition]);
+		}
+
+		@Override
+		protected void swap(int a, int b)
+		{
+			swap(itsClassIdBuffer, a, b);
 		}
 	}
 	

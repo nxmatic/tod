@@ -839,6 +839,68 @@ public class ClassicPagedFile extends PagedFile
 
 		
 		@Override
+		public void move(int aPosition, int aLength, int aOffset)
+		{
+			try
+			{
+				lock();
+
+				assert aPosition+aLength+aOffset <= PAGE_SIZE;
+				assert aPosition+aOffset >= 0;
+				
+				int theBufferId = getValidBufferId();
+				ByteBuffer theBuffer = getBuffer();
+				if (aOffset > 0)
+				{
+					int theStart = itsStartPos + aPosition + aLength;
+					int theEnd = theStart - aLength;
+					for (int i=theStart-1;i>=theEnd;i--) theBuffer.put(i+aOffset, theBuffer.get(i));
+				}
+				else
+				{
+					int theStart = itsStartPos + aPosition;
+					int theEnd = theStart + aLength;
+					for (int i=theStart;i<theEnd;i++) theBuffer.put(i+aOffset, theBuffer.get(i));
+				}
+				
+				modified(theBufferId);
+			}
+			finally
+			{
+				unlock();
+			}
+		}
+
+		@Override
+		public void copy(int aSrcPos, Page aDest, int aDstPos, int aLength)
+		{
+			try
+			{
+				lock();
+				
+				FilePage theDest = (FilePage) aDest;
+
+				assert aSrcPos+aLength <= PAGE_SIZE;
+				assert aDstPos+aLength <= PAGE_SIZE;
+				
+				int theSrcBufferId = getValidBufferId();
+				int theDstBufferId = theDest.getValidBufferId();
+				ByteBuffer theBuffer = getBuffer();
+
+				int theSrc = itsStartPos + aSrcPos;
+				int theDst = theDest.itsStartPos + aDstPos;
+				for (int i=0;i<aLength;i++) theBuffer.put(theDst++, theBuffer.get(theSrc++));
+				
+				modified(theSrcBufferId);
+				modified(theDstBufferId);
+			}
+			finally
+			{
+				unlock();
+			}
+		}
+
+		@Override
 		public String toString()
 		{
 			return "Page (pid: "+getPageId()+", bid: "+itsBufferId+")" + super.toString();

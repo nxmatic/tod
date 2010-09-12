@@ -3,11 +3,10 @@ package tod.impl.evdbng.db.file;
 /**
  * A copy of Java's Arrays sorting algorithm, but allows to override the swap
  * method so that matched arrays (for instance) can be sorted efficiently.
- * The mergeSort methods perform a stable sort, but do not sort in place 
+ * The {@link #mergeSort()} methods perform a stable sort, but do not sort in place 
  * (although the API hides this).
  * 
  * @author gpothier
- * 
  */
 public abstract class Sorter
 {
@@ -91,7 +90,7 @@ public abstract class Sorter
 		swap(a, b);
 	}
 
-	protected void swap(long x[], int a, int b)
+	protected static void swap(long x[], int a, int b)
 	{
 		long t = x[a];
 		x[a] = x[b];
@@ -229,7 +228,7 @@ public abstract class Sorter
 		swap(a, b);
 	}
 
-	protected void swap(int x[], int a, int b)
+	protected static void swap(int x[], int a, int b)
 	{
 		int t = x[a];
 		x[a] = x[b];
@@ -253,6 +252,20 @@ public abstract class Sorter
 		return (x[a] < x[b] ? (x[b] < x[c] ? b : x[a] < x[c] ? c : a) : (x[b] > x[c] ? b : x[a] > x[c] ? c : a));
 	}
 
+	protected static void swap(byte x[], int a, int b)
+	{
+		byte t = x[a];
+		x[a] = x[b];
+		x[b] = t;
+	}
+
+	protected static void swap(short x[], int a, int b)
+	{
+		short t = x[a];
+		x[a] = x[b];
+		x[b] = t;
+	}
+	
 	/**
 	 * Swaps the items at positions a and b.
 	 */

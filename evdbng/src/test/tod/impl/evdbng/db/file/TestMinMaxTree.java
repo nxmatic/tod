@@ -437,5 +437,17 @@ public class TestMinMaxTree
 			aPosition += 2;
 			itsBuffer.putInt(aPosition, aInt);
 		}
+
+		@Override
+		public void move(int aPosition, int aLength, int aOffset)
+		{
+			throw new NotImplementedException();
+		}
+
+		@Override
+		public void copy(int aSrcPos, Page aDest, int aDstPos, int aLength)
+		{
+			throw new NotImplementedException();
+		}
 	}
 }

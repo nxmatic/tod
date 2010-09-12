@@ -4,20 +4,15 @@ import java.io.File;
 
 import tod.BenchBase;
 import tod.BenchBase.BenchResults;
-import tod.core.DebugFlags;
-import tod.impl.evdbng.db.file.ObjectRefTuple;
+import tod.impl.evdbng.db.file.InsertableBTree;
+import tod.impl.evdbng.db.file.Page;
+import tod.impl.evdbng.db.file.Page.PageIOStream;
+import tod.impl.evdbng.db.file.Page.PidSlot;
 import tod.impl.evdbng.db.file.PagedFile;
 import tod.impl.evdbng.db.file.StaticBTree;
 import tod.impl.evdbng.db.file.Tuple;
 import tod.impl.evdbng.db.file.TupleBuffer;
 import tod.impl.evdbng.db.file.TupleBufferFactory;
-import tod.impl.evdbng.db.file.Page.PageIOStream;
-import tod.impl.evdbng.db.file.TupleBuffer.ObjectRefTupleBuffer;
-import tod.test.Benchmark;
-
-import zz.utils.bit.BitUtils;
-
-import btree.Benchmarks;
 
 import com.sleepycat.bind.tuple.TupleBinding;
 import com.sleepycat.bind.tuple.TupleInput;
@@ -25,7 +20,6 @@ import com.sleepycat.bind.tuple.TupleOutput;
 import com.sleepycat.je.Database;
 import com.sleepycat.je.DatabaseConfig;
 import com.sleepycat.je.DatabaseEntry;
-import com.sleepycat.je.DatabaseException;
 import com.sleepycat.je.Environment;
 import com.sleepycat.je.EnvironmentConfig;
 
@@ -37,7 +31,8 @@ public class BDBvsBTree
 	
 	public static void main(String[] args)
 	{
-		mine();
+		mine_static();
+		mine_insertable();
 		bdb();
 	}
 	
@@ -136,10 +131,10 @@ public class BDBvsBTree
 		}
 	}
 	
-	private static void mine()
+	private static void mine_static()
 	{
 		final PagedFile file = PagedFile.create(new File("/home/gpothier/tmp/btreebench/mine"), true);
-		final IntBTree btree = new IntBTree("test", file);
+		final IntStaticBTree btree = new IntStaticBTree("test", file);
 		
 		BenchResults b = BenchBase.benchmark(new Runnable()
 		{
@@ -168,8 +163,45 @@ public class BDBvsBTree
 			}
 		});
 		
-		System.out.println("Mine: "+b);
+		System.out.println("Mine (static): "+b);
 
+	}
+	
+	private static void mine_insertable()
+	{
+		final PagedFile file = PagedFile.create(new File("/home/gpothier/tmp/btreebench/mine"), true);
+		Page theDirectory = file.create();
+		final IntInsertableBTree btree = new IntInsertableBTree("test", file, new PidSlot(theDirectory, 0));
+		
+		BenchResults b = BenchBase.benchmark(new Runnable()
+		{
+			public void run()
+			{
+				int ki = 0;
+				int vi = 0;
+				long key = 0;
+				for(int i=0;i<N;i++)
+				{
+					btree.add(key, VALUES[vi]);
+					
+					key += KEY_INC[ki];
+					
+					ki++;
+					if (ki >= KEY_INC.length) ki = 0;
+					
+					vi++;
+					if (vi >= VALUES.length) vi = 0;
+					
+					if ((i & 0xffff) == 0) System.out.println(i);
+				}
+				
+				System.out.println("sync");
+				file.flush();
+			}
+		});
+		
+		System.out.println("Mine (insertable): "+b);
+		
 	}
 	
 	private static class IntTuple extends Tuple
@@ -201,6 +233,12 @@ public class BDBvsBTree
 		{
 			return PageIOStream.intSize();
 		}
+
+		@Override
+		public IntTuple readTuple(long aKey, PageIOStream aStream)
+		{
+			return new IntTuple(aKey, aStream.readInt());
+		}
 	};
 	
 	private static class IntTupleBuffer extends TupleBuffer<IntTuple>
@@ -220,17 +258,29 @@ public class BDBvsBTree
 		}
 		
 		@Override
+		public void write0(int aPosition, PageIOStream aStream)
+		{
+			aStream.writeInt(itsDataBuffer[aPosition]);
+		}
+		
+		@Override
 		public IntTuple getTuple(int aPosition)
 		{
 			return new IntTuple(
 					getKey(aPosition), 
 					itsDataBuffer[aPosition]);
 		}
+		
+		@Override
+		protected void swap(int a, int b)
+		{
+			swap(itsDataBuffer, a, b);
+		}
 	}
 	
-	private static class IntBTree extends StaticBTree<IntTuple>
+	private static class IntStaticBTree extends StaticBTree<IntTuple>
 	{
-		public IntBTree(String aName, PagedFile aFile)
+		public IntStaticBTree(String aName, PagedFile aFile)
 		{
 			super(aName, aFile);
 		}
@@ -247,6 +297,28 @@ public class BDBvsBTree
 			theStream.writeInt(aData);
 		}
 	}
+	
+	private static class IntInsertableBTree extends InsertableBTree<IntTuple>
+	{
+		public IntInsertableBTree(String aName, PagedFile aFile, PidSlot aRootSlot)
+		{
+			super(aName, aFile, aRootSlot);
+		}
+		
+		@Override
+		protected TupleBufferFactory<IntTuple> getTupleBufferFactory()
+		{
+			return INT_TUPLEFACTORY;
+		}
+		
+		public void add(long aKey, int aData)
+		{
+			PageIOStream theStream = insertLeafKey(aKey);
+			theStream.writeInt(aData);
+		}
+	}
+	
+	
 
 
 }

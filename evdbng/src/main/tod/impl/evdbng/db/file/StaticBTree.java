@@ -357,10 +357,7 @@ public abstract class StaticBTree<T extends Tuple>
 		else
 		{
 			// Internal tuples record the page pointer and the number of tuples below (for counts)
-			theBuffer = TupleBufferFactory.INTERNAL.create(
-					PagedFile.PAGE_SIZE, 
-					thePreviousPagePointer, 
-					theNextPagePointer);
+			theBuffer = INTERNAL.create(PagedFile.PAGE_SIZE, thePreviousPagePointer, theNextPagePointer);
 		}
 
 		while(true)
@@ -627,5 +624,96 @@ public abstract class StaticBTree<T extends Tuple>
 			itsTree.newPageHook(itsLevel, aOldPageId, aNewPageId);
 		}
 	}
-	
+
+	/**
+	 * Tuple for internal nodes of the {@link StaticBTree}
+	 * @author gpothier
+	 */
+	private static class InternalTuple extends Tuple
+	{
+		private final int itsPageId;
+		private final long itsTupleCount;
+		
+		public InternalTuple(long aKey, int aPageId, long aTupleCount)
+		{
+			super(aKey);
+			assert aPageId != 0;
+			itsPageId = aPageId;
+			itsTupleCount = aTupleCount;
+		}
+
+		public int getPageId()
+		{
+			return itsPageId;
+		}
+
+		public long getTupleCount()
+		{
+			return itsTupleCount;
+		}
+	}
+
+	private static class InternalTupleBuffer extends TupleBuffer<InternalTuple>
+	{
+		private int[] itsPageIdBuffer;
+		private long[] itsTupleCountBuffer;
+		
+		public InternalTupleBuffer(int aSize, int aPreviousPageId, int aNextPageId)
+		{
+			super(aSize, aPreviousPageId, aNextPageId);
+			itsPageIdBuffer = new int[aSize];
+			itsTupleCountBuffer = new long[aSize];
+		}
+
+		@Override
+		public void read0(int aPosition, PageIOStream aStream)
+		{
+			itsPageIdBuffer[aPosition] = aStream.readPagePointer();
+			itsTupleCountBuffer[aPosition] = aStream.readTupleCount();
+		}
+
+		@Override
+		public void write0(int aPosition, PageIOStream aStream)
+		{
+			aStream.writePagePointer(itsPageIdBuffer[aPosition]);
+			aStream.writeTupleCount(itsTupleCountBuffer[aPosition]);
+		}
+
+		@Override
+		public InternalTuple getTuple(int aPosition)
+		{
+			return new InternalTuple(
+					getKey(aPosition), 
+					itsPageIdBuffer[aPosition], 
+					itsTupleCountBuffer[aPosition]);
+		}
+
+		@Override
+		protected void swap(int a, int b)
+		{
+			swap(itsPageIdBuffer, a, b);
+			swap(itsTupleCountBuffer, a, b);
+		}
+	}
+
+	private static final TupleBufferFactory<InternalTuple> INTERNAL = new TupleBufferFactory<InternalTuple>()
+	{
+		@Override
+		public InternalTupleBuffer create(int aSize, int aPreviousPageId, int aNextPageId)
+		{
+			return new InternalTupleBuffer(aSize, aPreviousPageId, aNextPageId);
+		}
+		
+		@Override
+		public int getDataSize()
+		{
+			return PageIOStream.internalTupleDataSize();
+		}
+
+		@Override
+		public InternalTuple readTuple(long aKey, PageIOStream aStream)
+		{
+			return new InternalTuple(aKey, aStream.readPagePointer(), aStream.readTupleCount());
+		}
+	};
 }

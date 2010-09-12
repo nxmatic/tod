@@ -23,7 +23,6 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 package tod.impl.evdbng.db.file;
 
 import tod.impl.evdbng.db.file.Page.PageIOStream;
-import tod.impl.evdbng.db.file.TupleBuffer.InternalTupleBuffer;
 import tod.impl.evdbng.db.file.TupleBuffer.ObjectPointerTupleBuffer;
 import tod.impl.evdbng.db.file.TupleBuffer.ObjectRefTupleBuffer;
 import tod.impl.evdbng.db.file.TupleBuffer.RoleTupleBuffer;
@@ -48,6 +47,13 @@ public abstract class TupleBufferFactory<T extends Tuple>
 		{
 			return 0;
 		}
+
+		@Override
+		public SimpleTuple readTuple(long aKey, PageIOStream aStream)
+		{
+			return new SimpleTuple(aKey);
+		}
+		
 	};
 	
 	public static final TupleBufferFactory<RoleTuple> ROLE = new TupleBufferFactory<RoleTuple>()
@@ -63,20 +69,11 @@ public abstract class TupleBufferFactory<T extends Tuple>
 		{
 			return PageIOStream.roleSize();
 		}
-	};
-	
-	public static final TupleBufferFactory<InternalTuple> INTERNAL = new TupleBufferFactory<InternalTuple>()
-	{
+
 		@Override
-		public InternalTupleBuffer create(int aSize, int aPreviousPageId, int aNextPageId)
+		public RoleTuple readTuple(long aKey, PageIOStream aStream)
 		{
-			return new InternalTupleBuffer(aSize, aPreviousPageId, aNextPageId);
-		}
-		
-		@Override
-		public int getDataSize()
-		{
-			return PageIOStream.internalTupleDataSize();
+			return new RoleTuple(aKey, (byte) aStream.readRole());
 		}
 	};
 	
@@ -93,6 +90,14 @@ public abstract class TupleBufferFactory<T extends Tuple>
 		{
 			return PageIOStream.pagePointerSize()+PageIOStream.pageOffsetSize();
 		}
+
+		@Override
+		public ObjectPointerTuple readTuple(long aKey, PageIOStream aStream)
+		{
+			return new ObjectPointerTuple(aKey,
+					aStream.readPagePointer(),
+					aStream.readPageOffset());
+		}
 	};
 	
 	public static final TupleBufferFactory<ObjectRefTuple> OBJECT_REF = new TupleBufferFactory<ObjectRefTuple>()
@@ -108,6 +113,13 @@ public abstract class TupleBufferFactory<T extends Tuple>
 		{
 			return PageIOStream.longSize();
 		}
+
+		@Override
+		public ObjectRefTuple readTuple(long aKey, PageIOStream aStream)
+		{
+			return new ObjectRefTuple(aKey, aStream.readLong());
+		}
+		
 	};
 	
 	/**
@@ -120,5 +132,5 @@ public abstract class TupleBufferFactory<T extends Tuple>
 	 */
 	public abstract int getDataSize();
 	
-
+	public abstract T readTuple(long aKey, PageIOStream aStream);
 }

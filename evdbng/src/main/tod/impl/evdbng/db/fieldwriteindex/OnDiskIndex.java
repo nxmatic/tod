@@ -3,6 +3,8 @@ package tod.impl.evdbng.db.fieldwriteindex;
 import java.io.File;
 
 import tod.impl.evdbng.db.file.Page;
+import tod.impl.evdbng.db.file.Page.IntSlot;
+import tod.impl.evdbng.db.file.Page.PidSlot;
 import tod.impl.evdbng.db.file.PagedFile;
 
 public class OnDiskIndex
@@ -73,77 +75,6 @@ public class OnDiskIndex
 		}
 	}
 	
-	private class PidSlot
-	{
-		private Page itsPage;
-		private int itsOffset;
-		
-		public PidSlot()
-		{
-		}
-		
-		public PidSlot(Page aPage, int aOffset)
-		{
-			setup(aPage, aOffset);
-		}
-		
-		public void setup(Page aPage, int aOffset)
-		{
-			itsPage = aPage;
-			itsOffset = aOffset;
-		}
-		
-		public Page getPage(boolean aCreateIfNull)
-		{
-			Page page;
-			int pid = itsPage.readInt(itsOffset);
-			if (pid == 0)
-			{
-				if (! aCreateIfNull) return null;
-				page = itsFile.create();
-				pid = page.getPageId();
-				itsPage.writeInt(itsOffset, pid);
-			}
-			else page = itsFile.get(pid);
-			return page;
-		}
-		
-		public void setPage(Page aPage)
-		{
-			itsPage.writeInt(itsOffset, aPage.getPageId());
-		}
-	}
-	
-	private class IntSlot
-	{
-		private Page itsPage;
-		private int itsOffset;
-		
-		public IntSlot()
-		{
-		}
-		
-		public IntSlot(Page aPage, int aOffset)
-		{
-			setup(aPage, aOffset);
-		}
-		
-		public void setup(Page aPage, int aOffset)
-		{
-			itsPage = aPage;
-			itsOffset = aOffset;
-		}
-		
-		public int get()
-		{
-			return itsPage.readInt(itsOffset);
-		}
-		
-		public void set(int aValue)
-		{
-			itsPage.writeInt(itsOffset, aValue);
-		}
-	}
 	
 	/**
 	 * Maintains a stack of page ids.
