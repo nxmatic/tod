@@ -41,6 +41,7 @@ public abstract class TupleBuffer<T extends Tuple> extends Sorter
 	
 	private final long[] itsKeyBuffer;
 	private int itsPosition;
+	private int itsLimit;
 	
 	public TupleBuffer(int aSize, int aPreviousPageId, int aNextPageId)
 	{
@@ -54,6 +55,7 @@ public abstract class TupleBuffer<T extends Tuple> extends Sorter
 		itsKeyBuffer[itsPosition] = aKey;
 		read0(itsPosition, aStream);
 		itsPosition++;
+		if (itsPosition > itsLimit) itsLimit = itsPosition;
 	}
 	
 	public void write(PageIOStream aStream)
@@ -75,7 +77,7 @@ public abstract class TupleBuffer<T extends Tuple> extends Sorter
 	 */
 	public long getKey(int aPosition)
 	{
-		assert aPosition < itsPosition;
+		assert aPosition < itsLimit : ""+aPosition;
 		return itsKeyBuffer[aPosition];
 	}
 	

@@ -13,6 +13,7 @@ import tod.impl.evdbng.db.file.StaticBTree;
 import tod.impl.evdbng.db.file.Tuple;
 import tod.impl.evdbng.db.file.TupleBuffer;
 import tod.impl.evdbng.db.file.TupleBufferFactory;
+import tod.impl.evdbng.db.file.mapped.MappedPagedFile;
 
 import com.sleepycat.bind.tuple.TupleBinding;
 import com.sleepycat.bind.tuple.TupleInput;
@@ -31,9 +32,9 @@ public class BDBvsBTree
 	
 	public static void main(String[] args)
 	{
-		mine_static();
+//		mine_static();
 		mine_insertable();
-		bdb();
+//		bdb();
 	}
 	
 	private static void bdb()
@@ -169,7 +170,7 @@ public class BDBvsBTree
 	
 	private static void mine_insertable()
 	{
-		final PagedFile file = PagedFile.create(new File("/home/gpothier/tmp/btreebench/mine"), true);
+		final PagedFile file = MappedPagedFile.create(new File("/home/gpothier/tmp/btreebench/mine"), true);
 		Page theDirectory = file.create();
 		final IntInsertableBTree btree = new IntInsertableBTree("test", file, new PidSlot(theDirectory, 0));
 		

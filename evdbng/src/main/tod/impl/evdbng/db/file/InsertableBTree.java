@@ -17,13 +17,14 @@ import zz.utils.Utils;
  */
 public abstract class InsertableBTree<T extends Tuple>
 {
+	private static final boolean CHECKS = false;
 	private static final boolean LOG = false;
 	
 	/**
 	 * Whether leaves are sorted. Becase we are less concerned about retrievel performance than
 	 * about insertion performance, we experiment with leaving the leaves unsorted.
 	 */
-	private static final boolean SORT_LEAVES = true;
+	private static final boolean SORT_LEAVES = false;
 	
 	/**
 	 * The name of this btree (the index it represents).
@@ -190,7 +191,8 @@ public abstract class InsertableBTree<T extends Tuple>
 		int theTupleCount = getPageHeader_TupleCount(aPage);
 		while (theIndex < theTupleCount)
 		{
-			if (aPage.readLong(theOffset) == aKey) return theIndex;
+			long theKey = aPage.readLong(theOffset);
+			if (theKey == aKey) return theIndex;
 			theIndex++;
 			theOffset += getTupleSize(0);
 		}
@@ -199,11 +201,12 @@ public abstract class InsertableBTree<T extends Tuple>
 	
 	public T getTupleAt(long aKey)
 	{
+		if (LOG) System.out.println("Looking up: "+aKey);
 		int theLevel = itsRootLevel;
 		Page thePage = getRootPage();
 		while(theLevel > 0)
 		{
-			if (LOG) System.out.println(internalPageToString(thePage));
+//			if (LOG) System.out.println(internalPageToString(thePage));
 			int theIndex = indexOf(thePage, theLevel, aKey);
 			if (theIndex < 0)
 			{
@@ -287,7 +290,7 @@ public abstract class InsertableBTree<T extends Tuple>
 		}
 		else
 		{
-//			assert indexOf_Linear(thePage, aKey) < 0;
+			if (CHECKS) assert indexOf_Linear(aPage, aKey) < 0;
 			int theTupleCount = getPageHeader_TupleCount(aPage);
 			return insertKey(aPage, aLevel, aPages, aIndexes, theTupleCount, aKey);
 		}		
@@ -295,7 +298,7 @@ public abstract class InsertableBTree<T extends Tuple>
 	
 	private void checkKeysSorted(Page aPage, int aLevel)
 	{
-		if (true) return;
+		if (! SORT_LEAVES && aLevel == 0) return;
 		int theTupleCount = getPageHeader_TupleCount(aPage);
 		long theLastKey = Long.MIN_VALUE;
 		for(int i=0;i<theTupleCount;i++)
@@ -315,7 +318,7 @@ public abstract class InsertableBTree<T extends Tuple>
 		
 		if (theTupleCount < theMaxCount)
 		{
-			checkKeysSorted(aPage, aLevel);
+			if (CHECKS) checkKeysSorted(aPage, aLevel);
 			int theOffset = getPageStartOffset() + aIndex*theTupleSize;
 			if (theTupleCount != aIndex) aPage.move(theOffset, (theTupleCount-aIndex)*theTupleSize, theTupleSize);
 			PageIOStream theStream = aPage.asIOStream();
@@ -323,7 +326,7 @@ public abstract class InsertableBTree<T extends Tuple>
 			theStream.writeLong(aKey);
 			if (LOG) Utils.println("Wrote key: %d to page %d.", aKey, aPage.getPageId());
 			setPageHeader_TupleCount(aPage, theTupleCount+1);
-			checkKeysSorted(aPage, aLevel);
+			if (CHECKS) checkKeysSorted(aPage, aLevel);
 			return theStream;
 		}
 		else
@@ -337,17 +340,20 @@ public abstract class InsertableBTree<T extends Tuple>
 			int theRightTuples = getPageHeader_TupleCount(theNewPage);
 			if (aKey < theRightKey) 
 			{
-				if (! SORT_LEAVES) aIndex = theLeftTuples;
+				if (! SORT_LEAVES && aLevel == 0) aIndex = theLeftTuples;
 				return insertKey(aPage, aLevel, aPages, aIndexes, aIndex, aKey);
 			}
 			else
 			{
-				if (! SORT_LEAVES) aIndex = theRightTuples;
+				if (! SORT_LEAVES && aLevel == 0) aIndex = theRightTuples;
 				else 
 				{
 					aIndex -= theLeftTuples;
-					int theCheckIndex = indexOf(theNewPage, aLevel, aKey);
-					assert aIndex == -theCheckIndex-1;
+					if (CHECKS)
+					{
+						int theCheckIndex = indexOf(theNewPage, aLevel, aKey);
+						assert aIndex == -theCheckIndex-1;
+					}
 				}
 				return insertKey(theNewPage, aLevel, aPages, aIndexes, aIndex, aKey);
 			}

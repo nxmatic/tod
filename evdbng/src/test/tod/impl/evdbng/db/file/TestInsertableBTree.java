@@ -9,6 +9,7 @@ import org.junit.Test;
 
 import tod.impl.evdbng.db.file.Page.PageIOStream;
 import tod.impl.evdbng.db.file.Page.PidSlot;
+import tod.impl.evdbng.db.file.mapped.MappedPagedFile;
 
 public class TestInsertableBTree
 {

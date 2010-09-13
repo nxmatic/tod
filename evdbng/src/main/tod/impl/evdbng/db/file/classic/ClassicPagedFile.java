@@ -882,6 +882,7 @@ public class ClassicPagedFile extends PagedFile
 
 				assert aSrcPos+aLength <= PAGE_SIZE;
 				assert aDstPos+aLength <= PAGE_SIZE;
+				assert aDest.getPageId() != getPageId();
 				
 				int theSrcBufferId = getValidBufferId();
 				int theDstBufferId = theDest.getValidBufferId();
