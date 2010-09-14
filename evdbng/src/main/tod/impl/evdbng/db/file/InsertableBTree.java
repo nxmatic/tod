@@ -17,7 +17,7 @@ import zz.utils.Utils;
  */
 public abstract class InsertableBTree<T extends Tuple>
 {
-	private static final boolean CHECKS = false;
+	private static final boolean CHECKS = true;
 	private static final boolean LOG = false;
 	
 	/**
@@ -117,9 +117,9 @@ public abstract class InsertableBTree<T extends Tuple>
 	 * Returns the offset at which keys or key/value pairs start in a page.
 	 * This leaves rooms for pointers and stuff.
 	 */
-	protected int getPageStartOffset()
+	protected int getPageHeaderSize()
 	{
-		return 2;
+		return 3;
 	}
 	
 	private int getPageHeader_TupleCount(Page aPage)
@@ -132,6 +132,16 @@ public abstract class InsertableBTree<T extends Tuple>
 		aPage.writeShort(0, aCount);
 	}
 	
+	private boolean getPageHeader_PageSorted(Page aPage)
+	{
+		return aPage.readBoolean(2);
+	}
+	
+	private void setPageHeader_PageSorted(Page aPage, boolean aSorted)
+	{
+		aPage.writeBoolean(2, aSorted);
+	}
+	
 	private int getTupleSize(int aLevel)
 	{
 		TupleBufferFactory<?> theFactory = aLevel == 0 ? itsTupleBufferFactory : INTERNAL;
@@ -140,25 +150,25 @@ public abstract class InsertableBTree<T extends Tuple>
 	
 	private long getKeyAt(Page aPage, int aLevel, int aIndex)
 	{
-		int theOffset = getPageStartOffset() + aIndex*getTupleSize(aLevel);
+		int theOffset = getPageHeaderSize() + aIndex*getTupleSize(aLevel);
 		return aPage.readLong(theOffset);
 	}
 	
 	private void setInternalKeyAt(Page aPage, int aIndex, long aKey)
 	{
-		int theOffset = getPageStartOffset() + aIndex*getTupleSize(0);
+		int theOffset = getPageHeaderSize() + aIndex*getTupleSize(0);
 		aPage.writeLong(theOffset, aKey);
 	}
 	
 	private int getInternalPidAt(Page aPage, int aIndex)
 	{
-		int theOffset = getPageStartOffset() + aIndex*getTupleSize(0);
+		int theOffset = getPageHeaderSize() + aIndex*getTupleSize(0);
 		return aPage.readInt(theOffset+8);
 	}
 	
 	private int getTuplesPerPage(int aLevel)
 	{
-		return (PagedFile.PAGE_SIZE-getPageStartOffset())/getTupleSize(aLevel);
+		return (PagedFile.PAGE_SIZE-getPageHeaderSize())/getTupleSize(aLevel);
 	}
 	
 	/**
@@ -184,21 +194,6 @@ public abstract class InsertableBTree<T extends Tuple>
         return -(low + 1);  // key not found
 	}
 	
-	private int indexOf_Linear(Page aPage, long aKey)
-	{
-		int theOffset = getPageStartOffset();
-		int theIndex = 0;
-		int theTupleCount = getPageHeader_TupleCount(aPage);
-		while (theIndex < theTupleCount)
-		{
-			long theKey = aPage.readLong(theOffset);
-			if (theKey == aKey) return theIndex;
-			theIndex++;
-			theOffset += getTupleSize(0);
-		}
-		return -1;
-	}
-	
 	public T getTupleAt(long aKey)
 	{
 		if (LOG) System.out.println("Looking up: "+aKey);
@@ -219,11 +214,12 @@ public abstract class InsertableBTree<T extends Tuple>
 		}
 		
 		// Reached leaf page
-		int theIndex = SORT_LEAVES ? indexOf(thePage, 0, aKey) : indexOf_Linear(thePage, aKey);
+		ensureSorted(thePage);
+		int theIndex = indexOf(thePage, 0, aKey);
 
 		if (theIndex < 0) return null;
 		PageIOStream theStream = thePage.asIOStream();
-		theStream.setPos(getPageStartOffset() + theIndex*(8+itsTupleBufferFactory.getDataSize()) + 8);
+		theStream.setPos(getPageHeaderSize() + theIndex*(8+itsTupleBufferFactory.getDataSize()) + 8);
 		return itsTupleBufferFactory.readTuple(aKey, theStream);
 	}
 	
@@ -277,28 +273,22 @@ public abstract class InsertableBTree<T extends Tuple>
 		}
 		
 		// Reached leaf page
-		return insertKey(thePage, 0, thePages, theIndexes, aKey);
-	}
-	
-	private PageIOStream insertKey(Page aPage, int aLevel, Page[] aPages, int[] aIndexes, long aKey)
-	{
 		if (SORT_LEAVES)
 		{
-			int theIndex = indexOf(aPage, aLevel, aKey);
+			int theIndex = indexOf(thePage, 0, aKey);
 			if (theIndex >= 0) throw new RuntimeException("Key already present: "+aKey);
-			return insertKey(aPage, aLevel, aPages, aIndexes, -theIndex-1, aKey);
+			return insertKey(thePage, 0, thePages, theIndexes, -theIndex-1, aKey);
 		}
 		else
 		{
-			if (CHECKS) assert indexOf_Linear(aPage, aKey) < 0;
-			int theTupleCount = getPageHeader_TupleCount(aPage);
-			return insertKey(aPage, aLevel, aPages, aIndexes, theTupleCount, aKey);
+			int theTupleCount = getPageHeader_TupleCount(thePage);
+			return insertKey(thePage, 0, thePages, theIndexes, theTupleCount, aKey);
 		}		
 	}
 	
 	private void checkKeysSorted(Page aPage, int aLevel)
 	{
-		if (! SORT_LEAVES && aLevel == 0) return;
+		if (aLevel == 0 && !getPageHeader_PageSorted(aPage)) return;
 		int theTupleCount = getPageHeader_TupleCount(aPage);
 		long theLastKey = Long.MIN_VALUE;
 		for(int i=0;i<theTupleCount;i++)
@@ -319,19 +309,19 @@ public abstract class InsertableBTree<T extends Tuple>
 		if (theTupleCount < theMaxCount)
 		{
 			if (CHECKS) checkKeysSorted(aPage, aLevel);
-			int theOffset = getPageStartOffset() + aIndex*theTupleSize;
+			int theOffset = getPageHeaderSize() + aIndex*theTupleSize;
 			if (theTupleCount != aIndex) aPage.move(theOffset, (theTupleCount-aIndex)*theTupleSize, theTupleSize);
 			PageIOStream theStream = aPage.asIOStream();
 			theStream.setPos(theOffset);
 			theStream.writeLong(aKey);
 			if (LOG) Utils.println("Wrote key: %d to page %d.", aKey, aPage.getPageId());
 			setPageHeader_TupleCount(aPage, theTupleCount+1);
+			if (! SORT_LEAVES && aLevel == 0) setPageHeader_PageSorted(aPage, false);
 			if (CHECKS) checkKeysSorted(aPage, aLevel);
 			return theStream;
 		}
 		else
 		{
-			if (! SORT_LEAVES && aLevel == 0) sortLeaves(aPage);
 			Page theNewPage = splitPage(aPage, aLevel, aPages, aIndexes);
 			long theRightKey = getKeyAt(theNewPage, aLevel, 0);
 			if (theRightKey == aKey) throw new RuntimeException("Key already present: "+aKey);
@@ -360,15 +350,17 @@ public abstract class InsertableBTree<T extends Tuple>
 		}
 	}
 	
-	private void sortLeaves(Page aPage)
+	private void ensureSorted(Page aPage)
 	{
+		if (SORT_LEAVES) return;
+		if (getPageHeader_PageSorted(aPage)) return;
+		
 		int theTupleCount = getPageHeader_TupleCount(aPage);
-		assert theTupleCount == getTuplesPerPage(0);
 
 		// Decode page into tuple buffer
 		TupleBuffer<T> theBuffer = itsTupleBufferFactory.create(theTupleCount, 0, 0);
 		PageIOStream theStream = aPage.asIOStream();
-		theStream.setPos(getPageStartOffset());
+		theStream.setPos(getPageHeaderSize());
 		for(int i=0;i<theTupleCount;i++)
 		{
 			long theKey = theStream.readLong();
@@ -379,31 +371,39 @@ public abstract class InsertableBTree<T extends Tuple>
 		theBuffer.sort();
 		
 		// Re-encode the sorted buffer
-		theStream.setPos(getPageStartOffset());
+		theStream.setPos(getPageHeaderSize());
 		theBuffer.setPosition(0);
 		for(int i=0;i<theTupleCount;i++)
 		{
 			theStream.writeLong(theBuffer.getKey(i));
 			theBuffer.write(theStream);
 		}
+		
+		setPageHeader_PageSorted(aPage, true);
 	}
 	
 	private Page splitPage(Page aPage, int aLevel, Page[] aPages, int[] aIndexes)
 	{
+		if (aLevel == 0) ensureSorted(aPage);
 		int theTupleCount = getTuplesPerPage(aLevel);
 		assert theTupleCount == getPageHeader_TupleCount(aPage);
 		
 		int theLeftTuples = theTupleCount/2;
 		int theRightTuples = theTupleCount-theLeftTuples;
-		
 
 		Page theNewPage = getFile().create();
 		setPageHeader_TupleCount(aPage, theLeftTuples);
 		setPageHeader_TupleCount(theNewPage, theRightTuples);
 		
+		if (! SORT_LEAVES && aLevel == 0)
+		{
+			setPageHeader_PageSorted(aPage, true);
+			setPageHeader_PageSorted(theNewPage, true);
+		}
+		
 		long theRightKey = getKeyAt(aPage, aLevel, theLeftTuples);
 		int theTupleSize = getTupleSize(aLevel);
-		aPage.copy(getPageStartOffset()+theLeftTuples*theTupleSize, theNewPage, getPageStartOffset(), theRightTuples*theTupleSize);
+		aPage.copy(getPageHeaderSize()+theLeftTuples*theTupleSize, theNewPage, getPageHeaderSize(), theRightTuples*theTupleSize);
 
 		assert aLevel <= itsRootLevel;
 		if (aLevel == itsRootLevel)
@@ -416,7 +416,7 @@ public abstract class InsertableBTree<T extends Tuple>
 
 			long theLeftKey = getKeyAt(aPage, aLevel, 0);
 			PageIOStream theStream = theNewRoot.asIOStream();
-			theStream.setPos(getPageStartOffset());
+			theStream.setPos(getPageHeaderSize());
 			theStream.writeLong(theLeftKey);
 			theStream.writePagePointer(aPage.getPageId());
 			theStream.writeLong(theRightKey);
