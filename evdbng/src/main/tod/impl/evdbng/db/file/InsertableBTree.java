@@ -35,11 +35,6 @@ public abstract class InsertableBTree<T extends Tuple>
 	private PidSlot itsRootPageSlot;
 	
 	/**
-	 * The level of the root page. If the root page is also a leaf page, the level is 0.
-	 */
-	private int itsRootLevel;
-	
-	/**
 	 * Size of data associated to each tuple.
 	 */
 	private final TupleBufferFactory<T> itsTupleBufferFactory = getTupleBufferFactory();
@@ -91,9 +86,15 @@ public abstract class InsertableBTree<T extends Tuple>
 		if (thePage == null)
 		{
 			thePage = getFile().create();
+			setPageHeader_Level(thePage, 0);
 			itsRootPageSlot.setPage(thePage);
 		}
 		return thePage;
+	}
+	
+	private int getRootLevel()
+	{
+		return getPageHeader_Level(getRootPage());
 	}
 	
 	protected void logLeafTuple(long aKey, String aExtradata)
@@ -119,7 +120,7 @@ public abstract class InsertableBTree<T extends Tuple>
 	 */
 	protected int getPageHeaderSize()
 	{
-		return 3;
+		return 4;
 	}
 	
 	private int getPageHeader_TupleCount(Page aPage)
@@ -140,6 +141,16 @@ public abstract class InsertableBTree<T extends Tuple>
 	private void setPageHeader_PageSorted(Page aPage, boolean aSorted)
 	{
 		aPage.writeBoolean(2, aSorted);
+	}
+	
+	private int getPageHeader_Level(Page aPage)
+	{
+		return aPage.readByte(3);
+	}
+	
+	private void setPageHeader_Level(Page aPage, int aLevel)
+	{
+		aPage.writeByte(3, aLevel);
 	}
 	
 	private int getTupleSize(int aLevel)
@@ -197,7 +208,7 @@ public abstract class InsertableBTree<T extends Tuple>
 	public T getTupleAt(long aKey)
 	{
 		if (LOG) System.out.println("Looking up: "+aKey);
-		int theLevel = itsRootLevel;
+		int theLevel = getRootLevel();
 		Page thePage = getRootPage();
 		while(theLevel > 0)
 		{
@@ -250,7 +261,7 @@ public abstract class InsertableBTree<T extends Tuple>
 		int[] theIndexes = new int[DB_MAX_INDEX_LEVELS]; // MAX instead of root level in hope the compiler can optimize better.
 		Page[] thePages = new Page[DB_MAX_INDEX_LEVELS];
 		
-		int theLevel = itsRootLevel;
+		int theLevel = getRootLevel();
 		Page thePage = getRootPage();
 		while(theLevel > 0)
 		{
@@ -405,13 +416,14 @@ public abstract class InsertableBTree<T extends Tuple>
 		int theTupleSize = getTupleSize(aLevel);
 		aPage.copy(getPageHeaderSize()+theLeftTuples*theTupleSize, theNewPage, getPageHeaderSize(), theRightTuples*theTupleSize);
 
-		assert aLevel <= itsRootLevel;
-		if (aLevel == itsRootLevel)
+		int theRootLevel = getRootLevel();
+		assert aLevel <= theRootLevel;
+		if (aLevel == theRootLevel)
 		{
 			// Create a new root
 			Page theNewRoot = getFile().create();
 			setPageHeader_TupleCount(theNewRoot, 2);
-			itsRootLevel++;
+			setPageHeader_Level(theNewRoot, theRootLevel+1);
 			itsRootPageSlot.setPage(theNewRoot);
 
 			long theLeftKey = getKeyAt(aPage, aLevel, 0);

@@ -9,6 +9,8 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import javax.naming.OperationNotSupportedException;
+
 import tod.gui.kit.AbstractNavButton;
 import tod.impl.evdbng.db.file.Sorter;
 
@@ -26,7 +28,7 @@ public class Pipeline
 	private static final int COMPACTED_BLOCKS_THRESHOLD = 4*MB;
 	private static final int COMPACTED_BLOCKS_TOPICK = COMPACTED_BLOCKS_THRESHOLD*75/100;
 	
-	private static final boolean COMPACT_SORTED_BLOCKS = true;
+	private static final boolean COMPACT_SORTED_BLOCKS = false;
 	
 	private static ThreadPoolExecutor createThreadPoolExecutor()
 	{
@@ -92,7 +94,6 @@ public class Pipeline
 						thePickedSize += theData.getSize();
 					}
 					else theRemaining.add(theData);
-					
 				}
 				itsSortedBlocksSize -= thePickedSize;
 				
@@ -104,10 +105,12 @@ public class Pipeline
 	
 	private static byte[] compressSortedIds(long[] aIds)
 	{
+		throw new UnsupportedOperationException();
 	}
 	
 	private static long[] decompressSortedIds(byte[] aData)
 	{
+		throw new UnsupportedOperationException();
 	}
 	
 	public class PerThreadIndex
@@ -296,7 +299,7 @@ public class Pipeline
 		}
 	}
 	
-	private class InvertBlocksTask extends Sorter implements Runnable
+	private class InvertBlocksTask extends Sorter.Sortable implements Runnable
 	{
 		private final ArrayList<AbstractBlockData> itsBlocks;
 		
@@ -342,16 +345,41 @@ public class Pipeline
 			}
 			
 			// Sort
-			sort(itsObjectIds);
+			Sorter.sort(this, 0, itsObjectIds.length);
 			
 			// Compact
 		}
 
 		@Override
+		protected int compare(int a, int b)
+		{
+			long oa = itsObjectIds[a];
+			long ob = itsObjectIds[b];
+			
+			if (oa > ob) return 1;
+			else if (oa < ob) return -1;
+			else
+			{
+				long ba = itsBlockIds[a];
+				long bb = itsBlockIds[b];
+
+				if (ba > bb) return 1;
+				else if (ba < bb) return -1;
+				else
+				{
+					int ta = itsThreadIds[a];
+					int tb = itsThreadIds[b];
+					return ta - tb;
+				}
+			}
+		}
+
+		@Override
 		protected void swap(int a, int b)
 		{
-			swap(itsBlockIds, a, b);
-			swap(itsThreadIds, a, b);
+			Sorter.swap(itsObjectIds, a, b);
+			Sorter.swap(itsBlockIds, a, b);
+			Sorter.swap(itsThreadIds, a, b);
 		}
 	}
 }

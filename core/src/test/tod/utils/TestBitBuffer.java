@@ -121,4 +121,17 @@ public class TestBitBuffer
 			if (v > 128) v = 0;
 		}
 	}
+	
+	@Test public void testGammaInt()
+	{
+		BitBuffer buffer = BitBuffer.allocate(N);
+
+		for(int i=Short.MIN_VALUE;i<Short.MAX_VALUE;i++)
+		{
+			buffer.position(0);
+			buffer.putGamma(i);
+			buffer.position(0);
+			Assert.assertEquals(i, buffer.getGammaInt());
+		}
+	}
 }

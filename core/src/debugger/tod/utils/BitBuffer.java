@@ -33,6 +33,8 @@ package tod.utils;
 
 import java.nio.BufferOverflowException;
 
+import org.junit.Test;
+
 import zz.utils.bit.BitUtils;
 
 public class BitBuffer
@@ -132,6 +134,7 @@ public class BitBuffer
 	{
 		checkRemaining(aCount);
 		aBits &= ILOWPASSMASKS[aCount];
+		int mask = ILOWPASSMASKS[aCount];
 		
 		int index = itsPos;
 		int offset = index & 31;
@@ -139,6 +142,8 @@ public class BitBuffer
 		
 		// Write lower order bits
 		int lbits = aBits << offset;
+		int lmask = mask << offset;
+		itsData[index] &= ~lmask;
 		itsData[index] |= lbits;
 
 		// Write higher order bits
@@ -146,6 +151,8 @@ public class BitBuffer
 		if (rem > 0)
 		{
 			int hbits = aBits >>> (aCount-rem);
+			int hmask = mask >>> (aCount-rem);
+			itsData[index+1] &= ~hmask;
 			itsData[index+1] |= hbits;
 		}
 		
@@ -232,5 +239,53 @@ public class BitBuffer
 				data = itsData[index++];
 			}
 		}
+	}
+	
+	public void putGamma(int aValue)
+	{
+		if (aValue >= 0)
+		{
+			put(0, 1);
+		}
+		else
+		{
+			put(1, 1);
+			aValue = -aValue;
+		}
+		int bits = 32 - Integer.numberOfLeadingZeros(aValue);
+		putUnary(bits);
+		put(aValue, bits);
+	}
+	
+	public int getGammaInt()
+	{
+		int sign = getInt(1);
+		int bits = getUnary();
+		int theValue = getInt(bits);
+		return (sign == 0) ? theValue : -theValue;
+	}
+
+	public void putGamma(long aValue)
+	{
+		if (aValue >= 0)
+		{
+			put(0, 1);
+		}
+		else
+		{
+			put(1, 1);
+			aValue = -aValue;
+		}
+		int bits = 64 - Long.numberOfLeadingZeros(aValue);
+		putUnary(bits);
+		put(aValue, bits);
+	}
+	
+	public long getGammaLong()
+	{
+		int sign = getInt(1);
+		int bits = getUnary();
+		long theValue = getLong(bits);
+		return (sign == 0) ? theValue : -theValue;
 	}
 }
