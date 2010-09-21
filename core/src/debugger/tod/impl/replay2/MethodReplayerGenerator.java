@@ -1082,7 +1082,7 @@ public abstract class MethodReplayerGenerator
 		s.DUP();
 		
 		s.ALOAD(itsTmpTargetVar);
-		s.LDC(StructureDatabaseUtils.getFieldId(itsDatabase, aNode.owner, aNode.name, false));
+		s.LDC(StructureDatabaseUtils.getFieldId(itsDatabase, aNode.owner, aNode.name, true));
 		s.INVOKEVIRTUAL(CLS_EVENTCOLLECTOR_REPLAY, "fieldWrite", "("+DSC_OBJECTID+"I)V");
 		
 		s.ILOAD(theType, itsTmpValueVar);

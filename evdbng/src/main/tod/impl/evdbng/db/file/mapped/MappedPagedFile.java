@@ -146,6 +146,13 @@ public class MappedPagedFile extends PagedFile
 		}
 
 		@Override
+		public void clear()
+		{
+			for(int i=0;i<PagedFile.PAGE_SIZE;i+=8) 
+				itsBuffer.putLong(itsOffset+i, 0);
+		}
+		
+		@Override
 		public boolean readBoolean(int aPosition)
 		{
 			assert aPosition >= 0 && aPosition < PagedFile.PAGE_SIZE : ""+aPosition;
@@ -263,6 +270,14 @@ public class MappedPagedFile extends PagedFile
 			assert aPosition >= 0 && aPosition+9 <= PagedFile.PAGE_SIZE : ""+aPosition;
 			itsBuffer.put(itsOffset+aPosition, (byte) aByte);				
 			itsBuffer.putLong(itsOffset+aPosition+1, aLong);				
+		}
+
+		@Override
+		public void writeLI(int aPosition, long aLong, int aInt)
+		{
+			assert aPosition >= 0 && aPosition+12 <= PagedFile.PAGE_SIZE : ""+aPosition;
+			itsBuffer.putLong(itsOffset+aPosition, aLong);				
+			itsBuffer.putInt(itsOffset+aPosition+8, aInt);				
 		}
 
 		@Override

@@ -12,7 +12,11 @@ import java.util.concurrent.TimeUnit;
 import javax.naming.OperationNotSupportedException;
 
 import tod.gui.kit.AbstractNavButton;
+import tod.impl.evdbng.db.fieldwriteindex.OnDiskIndex.ObjectAccessStore;
+import tod.impl.evdbng.db.file.PagedFile;
 import tod.impl.evdbng.db.file.Sorter;
+import tod.impl.evdbng.db.file.Page.PidSlot;
+import zz.utils.Utils;
 
 import gnu.trove.TLongHashSet;
 
@@ -43,8 +47,10 @@ public class Pipeline
 	
 	private final ThreadPoolExecutor itsPool = createThreadPoolExecutor();
 	
-	
+	private final OnDiskIndex itsIndex;
 	private final Object itsSortedBlocksMonitor = new Object();
+	
+	private final List<PerThreadIndex> itsPerThreadIndexes = new ArrayList<Pipeline.PerThreadIndex>();
 	
 	/**
 	 * Stores compacted id blocks. The blocks can be compressed.
@@ -52,6 +58,22 @@ public class Pipeline
 	private ArrayList<AbstractBlockData> itsSortedBlocks = new ArrayList<AbstractBlockData>();
 	
 	private int itsSortedBlocksSize = 0;
+	
+	public Pipeline(PidSlot aDirectoryPageSlot)
+	{
+		itsIndex = new OnDiskIndex(aDirectoryPageSlot);
+	}
+	
+	public PerThreadIndex getIndex(int aThreadId)
+	{
+		PerThreadIndex theIndex = Utils.listGet(itsPerThreadIndexes, aThreadId);
+		if (theIndex == null)
+		{
+			theIndex = new PerThreadIndex(aThreadId);
+			Utils.listSet(itsPerThreadIndexes, aThreadId, theIndex);
+		}
+		return theIndex;
+	}
 	
 	private void postBlockSort(RawBlockData aData)
 	{
@@ -131,15 +153,19 @@ public class Pipeline
 		
 		public void registerAccess(long aObjectId)
 		{
+			assert aObjectId > 0;
 			itsSet.add(aObjectId);
 		}
 		
 		public void startBlock(long aBlockId)
 		{
 			long[] theValues = itsSet.toArray();
-			itsSet.clear();
 			
-			postBlockSort(new RawBlockData(itsThreadId, itsCurrentBlockId, theValues));
+			if (theValues.length > 0)
+			{
+				itsSet.clear();
+				postBlockSort(new RawBlockData(itsThreadId, itsCurrentBlockId, theValues));
+			}
 			
 			itsCurrentBlockId = aBlockId;
 		}
@@ -322,9 +348,10 @@ public class Pipeline
 				theCount += theData.getCount();
 			}
 			
-			itsObjectIds = new long[theCount];
-			itsBlockIds = new long[theCount];
-			itsThreadIds = new int[theCount];
+			// We store the PIVOT at index 0
+			itsObjectIds = new long[theCount+1];
+			itsBlockIds = new long[theCount+1];
+			itsThreadIds = new int[theCount+1];
 			
 			// Fill the arrays
 			theCount = 0;
@@ -337,38 +364,61 @@ public class Pipeline
 				
 				for(long theObjectId : theBlockObjectIds)
 				{
-					itsObjectIds[theCount] = theObjectId;
-					itsBlockIds[theCount] = theBlockId;
-					itsThreadIds[theCount] = theThreadId;
+					itsObjectIds[theCount+1] = theObjectId;
+					itsBlockIds[theCount+1] = theBlockId;
+					itsThreadIds[theCount+1] = theThreadId;
 					theCount++;
 				}
 			}
 			
 			// Sort
-			Sorter.sort(this, 0, itsObjectIds.length);
+			Sorter.sort(this, 0, itsObjectIds.length-1);
 			
-			// Compact
+			// Store
+			synchronized(itsIndex)
+			{
+				long theLastObjectId = 0;
+				ObjectAccessStore theStore = null;
+				for(int i=1;i<theCount+1;i++)
+				{
+					long theObjectId = itsObjectIds[i];
+					if (theObjectId != theLastObjectId)
+					{
+						theStore = itsIndex.getStore(theObjectId, false);
+						theLastObjectId = theObjectId;
+					}
+					theStore.append(itsBlockIds[i], itsThreadIds[i]);
+				}
+			}
+		}
+
+		@Override
+		protected void setPivot(int aIndex)
+		{
+			itsObjectIds[0] = itsObjectIds[aIndex+1];
+			itsBlockIds[0] = itsBlockIds[aIndex+1];
+			itsThreadIds[0] = itsThreadIds[aIndex+1];
 		}
 
 		@Override
 		protected int compare(int a, int b)
 		{
-			long oa = itsObjectIds[a];
-			long ob = itsObjectIds[b];
+			long oa = itsObjectIds[a+1];
+			long ob = itsObjectIds[b+1];
 			
 			if (oa > ob) return 1;
 			else if (oa < ob) return -1;
 			else
 			{
-				long ba = itsBlockIds[a];
-				long bb = itsBlockIds[b];
+				long ba = itsBlockIds[a+1];
+				long bb = itsBlockIds[b+1];
 
 				if (ba > bb) return 1;
 				else if (ba < bb) return -1;
 				else
 				{
-					int ta = itsThreadIds[a];
-					int tb = itsThreadIds[b];
+					int ta = itsThreadIds[a+1];
+					int tb = itsThreadIds[b+1];
 					return ta - tb;
 				}
 			}
@@ -377,9 +427,11 @@ public class Pipeline
 		@Override
 		protected void swap(int a, int b)
 		{
-			Sorter.swap(itsObjectIds, a, b);
-			Sorter.swap(itsBlockIds, a, b);
-			Sorter.swap(itsThreadIds, a, b);
+			assert a != PIVOT;
+			assert b != PIVOT;
+			Sorter.swap(itsObjectIds, a+1, b+1);
+			Sorter.swap(itsBlockIds, a+1, b+1);
+			Sorter.swap(itsThreadIds, a+1, b+1);
 		}
 	}
 }

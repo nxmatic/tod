@@ -21,16 +21,15 @@ public abstract class InsertableBTree<T extends Tuple>
 	private static final boolean LOG = false;
 	
 	/**
-	 * Whether leaves are sorted. Becase we are less concerned about retrievel performance than
+	 * Whether leaves are sorted. Because we are less concerned about retrievel performance than
 	 * about insertion performance, we experiment with leaving the leaves unsorted.
 	 */
-	private static final boolean SORT_LEAVES = false;
+	private static final boolean SORT_LEAVES = true;
 	
 	/**
 	 * The name of this btree (the index it represents).
 	 */
 	private final String itsName;
-	private final PagedFile itsFile;
 	
 	private PidSlot itsRootPageSlot;
 	
@@ -73,10 +72,9 @@ public abstract class InsertableBTree<T extends Tuple>
 		}
 	}
 	
-	public InsertableBTree(String aName, PagedFile aFile, PidSlot aRootPageSlot)
+	public InsertableBTree(String aName, PidSlot aRootPageSlot)
 	{
 		itsName = aName;
-		itsFile = aFile;
 		itsRootPageSlot = aRootPageSlot;
 	}
 	
@@ -104,7 +102,7 @@ public abstract class InsertableBTree<T extends Tuple>
 	
 	public PagedFile getFile()
 	{
-		return itsFile;
+		return itsRootPageSlot.getFile();
 	}
 
 	/**
@@ -256,8 +254,10 @@ public abstract class InsertableBTree<T extends Tuple>
 	 * Adds a key to the tree, and returns a {@link PageIOStream}
 	 * to which the extra data can be written.
 	 */
-	protected PageIOStream insertLeafKey(long aKey)
+	protected PageIOStream insertLeafKey(long aKey, boolean aAllowOverwrite)
 	{
+		if (aAllowOverwrite && ! SORT_LEAVES) throw new UnsupportedOperationException();
+		
 		int[] theIndexes = new int[DB_MAX_INDEX_LEVELS]; // MAX instead of root level in hope the compiler can optimize better.
 		Page[] thePages = new Page[DB_MAX_INDEX_LEVELS];
 		
@@ -287,7 +287,17 @@ public abstract class InsertableBTree<T extends Tuple>
 		if (SORT_LEAVES)
 		{
 			int theIndex = indexOf(thePage, 0, aKey);
-			if (theIndex >= 0) throw new RuntimeException("Key already present: "+aKey);
+			if (theIndex >= 0) 
+			{
+				if (aAllowOverwrite)
+				{
+					int theTupleSize = getTupleSize(0);
+					PageIOStream theStream = thePage.asIOStream();
+					theStream.setPos(getPageHeaderSize() + theIndex*theTupleSize + 8);
+					return theStream;
+				}
+				else throw new RuntimeException("Key already present: "+aKey);
+			}
 			return insertKey(thePage, 0, thePages, theIndexes, -theIndex-1, aKey);
 		}
 		else
@@ -312,10 +322,9 @@ public abstract class InsertableBTree<T extends Tuple>
 	
 	private PageIOStream insertKey(Page aPage, int aLevel, Page[] aPages, int[] aIndexes, int aIndex, long aKey)
 	{
-		TupleBufferFactory<?> theFactory = aLevel == 0 ? itsTupleBufferFactory : INTERNAL;
 		int theTupleCount = getPageHeader_TupleCount(aPage);
 		int theMaxCount = getTuplesPerPage(aLevel);
-		int theTupleSize = 8+theFactory.getDataSize();
+		int theTupleSize = getTupleSize(aLevel);
 		
 		if (theTupleCount < theMaxCount)
 		{

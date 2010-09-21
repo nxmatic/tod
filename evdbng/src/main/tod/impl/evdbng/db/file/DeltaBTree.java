@@ -486,7 +486,7 @@ public class DeltaBTree
 	{
 		public DecodedPagesCache()
 		{
-			super(128);
+			super(64);
 		}
 		
 		@Override

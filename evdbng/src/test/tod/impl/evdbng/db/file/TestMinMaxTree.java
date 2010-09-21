@@ -320,6 +320,12 @@ public class TestMinMaxTree
 		}
 
 		@Override
+		public void clear()
+		{
+			throw new NotImplementedException();
+		}
+		
+		@Override
 		public boolean readBoolean(int aPosition)
 		{
 			return itsBuffer.get(aPosition) != 0;
@@ -374,6 +380,12 @@ public class TestMinMaxTree
 
 		@Override
 		public void writeBL(int aPosition, int aByte, long aLong)
+		{
+			throw new NotImplementedException();
+		}
+		
+		@Override
+		public void writeLI(int aPosition, long aLong, int aInt)
 		{
 			throw new NotImplementedException();
 		}

@@ -52,6 +52,7 @@ public abstract class Page
 		itsDecodedPage = aDecodedPage != null ? new WeakReference<Object>(aDecodedPage) : null;
 	}
 	
+	public abstract void clear();
 	public abstract boolean readBoolean(int aPosition);
 	public abstract void writeBoolean(int aPosition, boolean aValue);
 	public abstract void readBytes(int aPosition, byte[] aBuffer, int aOffset, int aCount);
@@ -68,6 +69,7 @@ public abstract class Page
 	public abstract void writeBS(int aPosition, int aByte, int aShort);
 	public abstract void writeBI(int aPosition, int aByte, int aInt);
 	public abstract void writeBL(int aPosition, int aByte, long aLong);
+	public abstract void writeLI(int aPosition, long aLong, int aInt);
 	public abstract void writeSSSI(int aPosition, short aShort1, short aShort2, short aShort3, int aInt);
 	public abstract void writeInternalTupleData(int aPosition, int aPageId, long aTupleCount);
 	
@@ -685,76 +687,131 @@ public abstract class Page
 			itsCurrentStream.writeInternalTupleData(aPageId, aTupleCount);
 		}
 	}
-
-	public static class IntSlot
+	
+	public static abstract class Slot
 	{
 		private Page itsPage;
 		private int itsOffset;
 		
+		public Slot()
+		{
+		}
+		
+		public Slot(Page aPage, int aOffset)
+		{
+			setup(aPage, aOffset);
+		}
+		
+		public void setup(Page aPage, int aOffset)
+		{
+			itsPage = aPage;
+			itsOffset = aOffset;
+		}
+		
+		public PagedFile getFile()
+		{
+			return getContainerPage().getFile();
+		}
+		
+		public Page getContainerPage()
+		{
+			return itsPage;
+		}
+		
+		public int getContainerOffset()
+		{
+			return itsOffset;
+		}
+	}
+
+	public static class IntSlot extends Slot
+	{
 		public IntSlot()
 		{
 		}
 		
 		public IntSlot(Page aPage, int aOffset)
 		{
-			setup(aPage, aOffset);
-		}
-		
-		public void setup(Page aPage, int aOffset)
-		{
-			itsPage = aPage;
-			itsOffset = aOffset;
+			super(aPage, aOffset);
 		}
 		
 		public int get()
 		{
-			return itsPage.readInt(itsOffset);
+			return getContainerPage().readInt(getContainerOffset());
 		}
 		
 		public void set(int aValue)
 		{
-			itsPage.writeInt(itsOffset, aValue);
+			getContainerPage().writeInt(getContainerOffset(), aValue);
 		}
 	}
 	
-	public static class PidSlot
+	public static class ByteSlot extends Slot
 	{
-		private Page itsPage;
-		private int itsOffset;
+		public ByteSlot()
+		{
+		}
 		
+		public ByteSlot(Page aPage, int aOffset)
+		{
+			super(aPage, aOffset);
+		}
+		
+		public byte get()
+		{
+			return getContainerPage().readByte(getContainerOffset());
+		}
+		
+		public void set(int aValue)
+		{
+			getContainerPage().writeByte(getContainerOffset(), aValue);
+		}
+	}
+	
+	public static class PidSlot extends Slot
+	{
 		public PidSlot()
 		{
 		}
 		
 		public PidSlot(Page aPage, int aOffset)
 		{
-			setup(aPage, aOffset);
+			super(aPage, aOffset);
 		}
 		
-		public void setup(Page aPage, int aOffset)
+		protected int getPid()
 		{
-			itsPage = aPage;
-			itsOffset = aOffset;
+			return getContainerPage().readInt(getContainerOffset());
+		}
+		
+		protected void setPid(int aPid)
+		{
+			getContainerPage().writeInt(getContainerOffset(), aPid);
 		}
 		
 		public Page getPage(boolean aCreateIfNull)
 		{
 			Page page;
-			int pid = itsPage.readInt(itsOffset);
+			int pid = getPid();
 			if (pid == 0)
 			{
 				if (! aCreateIfNull) return null;
-				page = itsPage.getFile().create();
+				page = getFile().create();
 				pid = page.getPageId();
-				itsPage.writeInt(itsOffset, pid);
+				setPid(pid);
 			}
-			else page = itsPage.getFile().get(pid);
+			else page = getFile().get(pid);
 			return page;
+		}
+		
+		public boolean hasPage()
+		{ 
+			return getPid() != 0;
 		}
 		
 		public void setPage(Page aPage)
 		{
-			itsPage.writeInt(itsOffset, aPage.getPageId());
+			setPid(aPage.getPageId());
 		}
 	}
 

@@ -36,11 +36,12 @@ public class TestDeltaBTree
 			v += dv;
 //			System.out.println("("+k+", "+v+")");
 			btree.insertLeafTuple(k, v);
+			if (random.nextInt(1000) < 2) btree.flush();
 			if ((i & 0xffff) == 0) System.out.println(i);
 		}
 		System.out.println("sync");
-		file.flush();
 		btree.flush();
+		file.flush();
 
 		random = new Random(8);
 		System.out.println("Checking...");
@@ -54,6 +55,7 @@ public class TestDeltaBTree
 			k += dk;
 			int dv = (int) (Math.log(random.nextInt(1000000))*(random.nextInt(11)-5));
 			v += dv;
+			random.nextInt(1000);
 			if (k != lastKey)
 			{
 				int[] theValues = btree.getValues(lastKey);

@@ -223,19 +223,20 @@ public abstract class Sorter
 			}
 			m = med3(x, l, m, n); // Mid-size, med of 3
 		}
+		x.setPivot(m);
 		
 		// Establish Invariant: v* (<v)* (>v)* v*
 		int a = off, b = a, c = off + len - 1, d = c;
 		while (true)
 		{
-			while (b <= c && x.compare(b, m) <= 0)
+			while (b <= c && x.compare(b, Sortable.PIVOT) <= 0)
 			{
-				if (x.compare(b, m) == 0) x.swap(a++, b);
+				if (x.compare(b, Sortable.PIVOT) == 0) x.swap(a++, b);
 				b++;
 			}
-			while (c >= b && x.compare(c, m) >= 0)
+			while (c >= b && x.compare(c, Sortable.PIVOT) >= 0)
 			{
-				if (x.compare(c, m) == 0) x.swap(c, d--);
+				if (x.compare(c, Sortable.PIVOT) == 0) x.swap(c, d--);
 				c--;
 			}
 			if (b > c) break;
@@ -352,12 +353,15 @@ public abstract class Sorter
 	
 	public static abstract class Sortable
 	{
+		public static final int PIVOT = -1;
+		
+		protected abstract void setPivot(int aIndex);
+		
 		/**
 		 * returns the sign of s[a] - s[b]
 		 * s[a] <op> s[b] <=> s[a] - s[b] <op> 0 <=> compare(a, b) <op> 0
-		 * @param aIndex1
-		 * @param aIndex2
-		 * @return
+		 * @param a An index, or {@link #PIVOT}
+		 * @param b An index, or {@link #PIVOT}
 		 */
 		protected abstract int compare(int a, int b);
 		

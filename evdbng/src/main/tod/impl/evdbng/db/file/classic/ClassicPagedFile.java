@@ -462,6 +462,25 @@ public class ClassicPagedFile extends PagedFile
 		}
 		
 		@Override
+		public void clear()
+		{
+			try
+			{
+				lock();
+
+				int theBufferId = getValidBufferId();
+				
+				ByteBuffer theBuffer = getBuffer();
+				for(int i=0;i<PagedFile.PAGE_SIZE;i+=8) theBuffer.putLong(i, 0);
+				modified(theBufferId);
+			}
+			finally
+			{
+				unlock();
+			}
+		}
+		
+		@Override
 		public boolean readBoolean(int aPosition)
 		{
 			try
@@ -800,6 +819,28 @@ public class ClassicPagedFile extends PagedFile
 		}
 		
 		
+		@Override
+		public void writeLI(int aPosition, long aLong, int aInt)
+		{
+			try
+			{
+				lock();
+
+				assert aPosition+12 <= PAGE_SIZE;
+				
+				int theBufferId = getValidBufferId();
+				int thePos = itsStartPos + aPosition;
+				
+				getBuffer().putLong(thePos, aLong);
+				getBuffer().putInt(thePos+8, aInt);
+				modified(theBufferId);
+			}
+			finally
+			{
+				unlock();
+			}
+		}
+
 		@Override
 		public void writeSSSI(int aPosition, short aShort1, short aShort2, short aShort3, int aInt)
 		{

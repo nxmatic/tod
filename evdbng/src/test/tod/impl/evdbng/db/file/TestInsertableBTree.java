@@ -136,7 +136,7 @@ public class TestInsertableBTree
 		
 		public void add(long aKey, int aData)
 		{
-			PageIOStream theStream = insertLeafKey(aKey);
+			PageIOStream theStream = insertLeafKey(aKey, false);
 			theStream.writeInt(aData);
 		}
 		
