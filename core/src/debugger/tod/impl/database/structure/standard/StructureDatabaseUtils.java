@@ -60,13 +60,16 @@ public class StructureDatabaseUtils
 			if (aFailIfAbsent) throw new RuntimeException("Class not found: "+aClassName);
 			else return -1;			
 		}
-		IFieldInfo theField = theClass.getField(aFieldName);
-		if (theField != null) return theField.getId();
-		else 
+		
+		while(theClass != null)
 		{
-			if (aFailIfAbsent) throw new RuntimeException("Field not found: "+aClassName+"."+aFieldName);
-			else return -1;
+			IFieldInfo theField = theClass.getField(aFieldName);
+			if (theField != null) return theField.getId();
+			else theClass = theClass.getSupertype(); 
 		}
+
+		if (aFailIfAbsent) throw new RuntimeException("Field not found: "+aClassName+"."+aFieldName);
+		else return -1;
 	}
 	
 

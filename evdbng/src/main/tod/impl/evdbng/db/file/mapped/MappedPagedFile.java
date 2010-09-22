@@ -146,10 +146,19 @@ public class MappedPagedFile extends PagedFile
 		}
 
 		@Override
-		public void clear()
+		public void clear(int aPosition, int aCount)
 		{
-			for(int i=0;i<PagedFile.PAGE_SIZE;i+=8) 
-				itsBuffer.putLong(itsOffset+i, 0);
+			int theEnd = aPosition + aCount;
+			while(aPosition+8 <= theEnd) 
+			{
+				itsBuffer.putLong(itsOffset+aPosition, 0);
+				aPosition += 8;
+			}
+			while(aPosition < theEnd)
+			{
+				itsBuffer.put(itsOffset+aPosition, (byte) 0);
+				aPosition++;
+			}
 		}
 		
 		@Override

@@ -715,5 +715,12 @@ public abstract class StaticBTree<T extends Tuple>
 		{
 			return new InternalTuple(aKey, aStream.readPagePointer(), aStream.readTupleCount());
 		}
+
+		@Override
+		public void clearTuple(PageIOStream aStream)
+		{
+			aStream.writePagePointer(0);
+			aStream.writeTupleCount(0);
+		}
 	};
 }

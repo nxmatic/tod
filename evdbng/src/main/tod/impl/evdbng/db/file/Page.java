@@ -52,7 +52,12 @@ public abstract class Page
 		itsDecodedPage = aDecodedPage != null ? new WeakReference<Object>(aDecodedPage) : null;
 	}
 	
-	public abstract void clear();
+	public final void clear()
+	{
+		clear(0, PagedFile.PAGE_SIZE);
+	}
+	
+	public abstract void clear(int aPosition, int aCount);
 	public abstract boolean readBoolean(int aPosition);
 	public abstract void writeBoolean(int aPosition, boolean aValue);
 	public abstract void readBytes(int aPosition, byte[] aBuffer, int aOffset, int aCount);
@@ -746,6 +751,28 @@ public abstract class Page
 		}
 	}
 	
+	public static class BooleanSlot extends Slot
+	{
+		public BooleanSlot()
+		{
+		}
+		
+		public BooleanSlot(Page aPage, int aOffset)
+		{
+			super(aPage, aOffset);
+		}
+		
+		public boolean get()
+		{
+			return getContainerPage().readByte(getContainerOffset()) != 0;
+		}
+		
+		public void set(boolean aValue)
+		{
+			getContainerPage().writeByte(getContainerOffset(), aValue ? 1 : 0);
+		}
+	}
+	
 	public static class ByteSlot extends Slot
 	{
 		public ByteSlot()
@@ -764,6 +791,29 @@ public abstract class Page
 		
 		public void set(int aValue)
 		{
+			getContainerPage().writeByte(getContainerOffset(), aValue);
+		}
+	}
+	
+	public static class UnsignedByteSlot extends Slot
+	{
+		public UnsignedByteSlot()
+		{
+		}
+		
+		public UnsignedByteSlot(Page aPage, int aOffset)
+		{
+			super(aPage, aOffset);
+		}
+		
+		public int get()
+		{
+			return getContainerPage().readByte(getContainerOffset()) & 0xff;
+		}
+		
+		public void set(int aValue)
+		{
+			assert (aValue & ~0xff) == 0 : aValue;
 			getContainerPage().writeByte(getContainerOffset(), aValue);
 		}
 	}

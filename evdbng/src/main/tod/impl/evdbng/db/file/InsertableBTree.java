@@ -250,6 +250,13 @@ public abstract class InsertableBTree<T extends Tuple>
 		return theBuilder.toString();
 	}
 	
+	private void clearTuple(PageIOStream aStream)
+	{
+		int thePosition = aStream.getPos();
+		itsTupleBufferFactory.clearTuple(aStream);
+		aStream.setPos(thePosition);
+	}
+	
 	/**
 	 * Adds a key to the tree, and returns a {@link PageIOStream}
 	 * to which the extra data can be written.
@@ -298,12 +305,16 @@ public abstract class InsertableBTree<T extends Tuple>
 				}
 				else throw new RuntimeException("Key already present: "+aKey);
 			}
-			return insertKey(thePage, 0, thePages, theIndexes, -theIndex-1, aKey);
+			PageIOStream theStream = insertKey(thePage, 0, thePages, theIndexes, -theIndex-1, aKey);
+			clearTuple(theStream);
+			return theStream;
 		}
 		else
 		{
 			int theTupleCount = getPageHeader_TupleCount(thePage);
-			return insertKey(thePage, 0, thePages, theIndexes, theTupleCount, aKey);
+			PageIOStream theStream = insertKey(thePage, 0, thePages, theIndexes, theTupleCount, aKey);
+			clearTuple(theStream);
+			return theStream;
 		}		
 	}
 	
@@ -424,6 +435,7 @@ public abstract class InsertableBTree<T extends Tuple>
 		long theRightKey = getKeyAt(aPage, aLevel, theLeftTuples);
 		int theTupleSize = getTupleSize(aLevel);
 		aPage.copy(getPageHeaderSize()+theLeftTuples*theTupleSize, theNewPage, getPageHeaderSize(), theRightTuples*theTupleSize);
+		aPage.clear(getPageHeaderSize()+theLeftTuples*theTupleSize, theRightTuples*theTupleSize);
 
 		int theRootLevel = getRootLevel();
 		assert aLevel <= theRootLevel;
@@ -532,6 +544,12 @@ public abstract class InsertableBTree<T extends Tuple>
 		public InternalTuple readTuple(long aKey, PageIOStream aStream)
 		{
 			return new InternalTuple(aKey, aStream.readPagePointer());
+		}
+
+		@Override
+		public void clearTuple(PageIOStream aStream)
+		{
+			aStream.writePagePointer(0);
 		}
 	};
 

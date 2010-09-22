@@ -374,6 +374,8 @@ public class Pipeline
 			// Sort
 			Sorter.sort(this, 0, itsObjectIds.length-1);
 			
+			Utils.println("Writing %d entries to disk.", theCount);
+			
 			// Store
 			synchronized(itsIndex)
 			{

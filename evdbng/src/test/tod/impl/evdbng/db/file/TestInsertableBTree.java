@@ -82,6 +82,12 @@ public class TestInsertableBTree
 		{
 			return new IntTuple(aKey, aStream.readInt());
 		}
+
+		@Override
+		public void clearTuple(PageIOStream aStream)
+		{
+			aStream.writeInt(0);
+		}
 	};
 	
 	private static class IntTupleBuffer extends TupleBuffer<IntTuple>
@@ -125,7 +131,7 @@ public class TestInsertableBTree
 	{
 		public IntInsertableBTree(String aName, PagedFile aFile, PidSlot aRootSlot)
 		{
-			super(aName, aFile, aRootSlot);
+			super(aName, aRootSlot);
 		}
 		
 		@Override

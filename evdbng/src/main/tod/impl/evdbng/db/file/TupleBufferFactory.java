@@ -53,7 +53,11 @@ public abstract class TupleBufferFactory<T extends Tuple>
 		{
 			return new SimpleTuple(aKey);
 		}
-		
+
+		@Override
+		public void clearTuple(PageIOStream aStream)
+		{
+		}
 	};
 	
 	public static final TupleBufferFactory<RoleTuple> ROLE = new TupleBufferFactory<RoleTuple>()
@@ -74,6 +78,12 @@ public abstract class TupleBufferFactory<T extends Tuple>
 		public RoleTuple readTuple(long aKey, PageIOStream aStream)
 		{
 			return new RoleTuple(aKey, (byte) aStream.readRole());
+		}
+
+		@Override
+		public void clearTuple(PageIOStream aStream)
+		{
+			aStream.writeRole(0);
 		}
 	};
 	
@@ -98,6 +108,13 @@ public abstract class TupleBufferFactory<T extends Tuple>
 					aStream.readPagePointer(),
 					aStream.readPageOffset());
 		}
+
+		@Override
+		public void clearTuple(PageIOStream aStream)
+		{
+			aStream.writePagePointer(0);
+			aStream.writePageOffset(0);
+		}
 	};
 	
 	public static final TupleBufferFactory<ObjectRefTuple> OBJECT_REF = new TupleBufferFactory<ObjectRefTuple>()
@@ -119,7 +136,12 @@ public abstract class TupleBufferFactory<T extends Tuple>
 		{
 			return new ObjectRefTuple(aKey, aStream.readLong());
 		}
-		
+
+		@Override
+		public void clearTuple(PageIOStream aStream)
+		{
+			aStream.writeLong(0);
+		}
 	};
 	
 	/**
@@ -133,4 +155,6 @@ public abstract class TupleBufferFactory<T extends Tuple>
 	public abstract int getDataSize();
 	
 	public abstract T readTuple(long aKey, PageIOStream aStream);
+	
+	public abstract void clearTuple(PageIOStream aStream);
 }

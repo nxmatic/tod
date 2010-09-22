@@ -2,17 +2,22 @@ package tod.impl.evdbng.db.fieldwriteindex;
 
 import tod.impl.evdbng.db.file.DeltaBTree;
 import tod.impl.evdbng.db.file.Page;
+import tod.impl.evdbng.db.file.Page.BooleanSlot;
 import tod.impl.evdbng.db.file.Page.ByteSlot;
 import tod.impl.evdbng.db.file.Page.IntSlot;
 import tod.impl.evdbng.db.file.Page.PageIOStream;
 import tod.impl.evdbng.db.file.Page.PidSlot;
+import tod.impl.evdbng.db.file.Page.UnsignedByteSlot;
 import tod.impl.evdbng.db.file.PagedFile;
+import zz.utils.Utils;
 import zz.utils.cache.MRUBuffer;
 
 public class OnDiskIndex
 {
 	private static final int[] OBJECTS_PER_SHAREDPAGE = {128, 64, 32, 16, 8, 4, 2};
 	private static final int N_LOG2_OBJECTSPERPAGE = OBJECTS_PER_SHAREDPAGE.length;
+	
+	private static final boolean LOG = false;
 	
 	private final PagedFile itsFile;
 	private Directory itsDirectory;
@@ -83,27 +88,52 @@ public class OnDiskIndex
 	 */
 	private SharedPage getSharedPage(int aLogMaxCount)
 	{
+		assert aLogMaxCount >= 0 && aLogMaxCount < N_LOG2_OBJECTSPERPAGE;
 		PageStack theStack = itsSharedPagesStack[aLogMaxCount];
 		Page thePage;
+		SharedPage theSharedPage;
 		if (theStack.isEmpty())
 		{
 			thePage = getEmptyPage();
 			thePage.writeByte(0, aLogMaxCount);
 			theStack.push(thePage.getPageId());
+//			if (LOG) Utils.println("New shared page: %d [%d]", thePage.getPageId(), aLogMaxCount);
+			theSharedPage = new SharedPage(thePage);
+			theSharedPage.markFree(true);
 		}
 		else
 		{
 			int thePid = theStack.peek();
 			thePage = getFile().get(thePid);
+//			if (LOG) Utils.println("Reusing shared page: %d [%d]", thePage.getPageId(), aLogMaxCount);
+			theSharedPage = new SharedPage(thePage);
+			assert theSharedPage.isMarkedFree();
+			assert theSharedPage.hasFreeIds();
 		}
-		return new SharedPage(thePage);
+		return theSharedPage;
 	}
 	
-	private void unfreeSharedPage(int aLogMaxCount, Page aPage)
+	private void unfreeSharedPage(SharedPage aPage)
 	{
-		PageStack theStack = itsSharedPagesStack[aLogMaxCount];
+		assert ! aPage.hasFreeIds();
+		if (! aPage.isMarkedFree()) return;
+//		if (LOG) Utils.println("Unfree shared page: %d", aPage.getPageId());
+		int theLogMaxCount = aPage.getLogMaxCount();
+		PageStack theStack = itsSharedPagesStack[theLogMaxCount];
 		int thePid = theStack.pop();
 		assert thePid == aPage.getPageId();
+		aPage.markFree(false);
+	}
+	
+	private void freeSharedPage(SharedPage aPage)
+	{
+		assert aPage.hasFreeIds();
+		if (aPage.isMarkedFree()) return;
+//		if (LOG) Utils.println("Free shared page: %d", aPage.getPageId());
+		int theLogMaxCount = aPage.getLogMaxCount();
+		PageStack theStack = itsSharedPagesStack[theLogMaxCount];
+		theStack.push(aPage.getPageId());
+		aPage.markFree(true);
 	}
 	
 	private class Directory
@@ -227,12 +257,14 @@ public class OnDiskIndex
 			if (theCount <= 0)
 			{
 				Page thePrevPage = itsPrevPageSlot.getPage(false);
-				setCurrentPage(thePrevPage);
-				theCount = itsCountSlot.get();
-				assert theCount == ITEMS_PER_PAGE;
+				if (thePrevPage == null) return 0;
+				else
+				{
+					setCurrentPage(thePrevPage);
+					theCount = itsCountSlot.get();
+					assert theCount == ITEMS_PER_PAGE;
+				}
 			}
-			
-			if (theCount == 0) return 0;
 			
 			theCount--;
 			itsCountSlot.set(theCount);
@@ -357,11 +389,48 @@ public class OnDiskIndex
 		/**
 		 * Number of objects currently stored in this page 
 		 */
-		private ByteSlot itsCurrentCount;
+		private UnsignedByteSlot itsCurrentCount;
+		
+		private BooleanSlot itsMarkedFree;
+		
+		private long itsLastObjectFieldId = 0;
+		private int itsLastIndex = -1;
 		
 		public SharedPage(Page aPage)
 		{
+			itsPage = aPage;
 			itsLogMaxCount = aPage.readByte(0);
+			assert itsLogMaxCount >= 0 && itsLogMaxCount < N_LOG2_OBJECTSPERPAGE : ""+itsLogMaxCount;
+			itsCurrentCount = new UnsignedByteSlot(aPage, 1);
+			itsMarkedFree = new BooleanSlot(aPage, 2);
+			if (LOG) Utils.println("Shared page (<init>) %d: %d/%d", getPageId(), getCurrentCount(), getMaxCount());
+			check();
+		}
+		
+		private void check()
+		{
+			assert itsPage.readByte(3) == 0;
+		}
+		
+		private void checkCount()
+		{
+			int theCount = 0;
+			for(int i=0;i<getMaxCount();i++)
+			{
+				long theId = getId(i);
+				if (theId != 0) theCount++;
+			}
+			assert theCount == getCurrentCount(): theCount+", "+getCurrentCount();
+		}
+		
+		public boolean isMarkedFree()
+		{
+			return itsMarkedFree.get();
+		}
+		
+		public void markFree(boolean aFree)
+		{
+			itsMarkedFree.set(aFree);
 		}
 		
 		public int getPageId()
@@ -401,6 +470,7 @@ public class OnDiskIndex
 		public void setCurrentCount(int aCount)
 		{
 			itsCurrentCount.set(aCount);
+			check();
 		}
 		
 		private int getIdsOffset()
@@ -431,12 +501,12 @@ public class OnDiskIndex
 		 */
 		private int getValuesCount()
 		{
-			return (PagedFile.PAGE_SIZE-getValuesOffset())/getValueSize();
+			return ((PagedFile.PAGE_SIZE-getValuesOffset())/getMaxCount())/getValueSize();
 		}
 		
 		private int getValuesOffset(int aIndex)
 		{
-			return getValuesOffset()+aIndex*getValuesCount();
+			return getValuesOffset()+aIndex*getValueSize()*getValuesCount();
 		}
 		
 		private long getId(int aIndex)
@@ -446,7 +516,15 @@ public class OnDiskIndex
 		
 		private void setId(int aIndex, long aId)
 		{
+			if (aId == 0 && aIndex == itsLastIndex)
+			{
+				assert getId(aIndex) == itsLastObjectFieldId;
+				itsLastObjectFieldId = 0;
+				itsLastIndex = -1;
+			}
 			itsPage.writeLong(getIdsOffset()+8*aIndex, aId);
+			check();
+			checkCount();
 		}
 		
 		/**
@@ -454,12 +532,13 @@ public class OnDiskIndex
 		 */
 		private int getValuesCount(int aIndex)
 		{
-			return itsPage.readByte(getCountsOffset()+aIndex);
+			return itsPage.readByte(getCountsOffset()+aIndex) & 0xff;
 		}
 		
 		private void setValuesCount(int aIndex, int aCount)
 		{
 			itsPage.writeByte(getCountsOffset()+aIndex, aCount);
+			check();
 		}
 		
 		/**
@@ -467,21 +546,32 @@ public class OnDiskIndex
 		 * If it is not found and there are still empty indexes,
 		 * an empty index is used.
 		 */
-		private int indexOf(long aObjectFieldId)
+		public int indexOf(long aObjectFieldId)
 		{
+			assert aObjectFieldId != 0;
+			if (aObjectFieldId == itsLastObjectFieldId) return itsLastIndex;
+			
+			itsLastObjectFieldId = aObjectFieldId;
 			int theFreeIndex = -1;
 			for(int i=0;i<getMaxCount();i++)
 			{
 				long theId = getId(i);
 				if (theId == 0 && theFreeIndex == -1) theFreeIndex = i;
-				else if (theId == aObjectFieldId) return i;
+				else if (theId == aObjectFieldId) 
+				{
+					itsLastIndex = i;
+					return i;
+				}
 			}
 			if (theFreeIndex >= 0)
 			{
-				itsPage.writeLong(theFreeIndex, aObjectFieldId);
-				itsCurrentCount.set(itsCurrentCount.get()+1);
+				setCurrentCount(getCurrentCount()+1);
+				setId(theFreeIndex, aObjectFieldId);
+				itsLastIndex = theFreeIndex;
 				return theFreeIndex;
 			}
+			assert ! hasFreeIds();
+			itsLastIndex = -1;
 			return -1;
 		}
 		
@@ -489,6 +579,7 @@ public class OnDiskIndex
 		{
 			int theIndex = indexOf(aObjectFieldId);
 			if (theIndex == -1) throw new RuntimeException("Shared page has no free indexes");
+			assert getCurrentCount() > 0;
 		
 			int theCount = getValuesCount(theIndex);
 			if (theCount == getValuesCount()) return dumpToLargerStore(aSlot, theIndex, aObjectFieldId, aBlockId, aThreadId);
@@ -497,6 +588,7 @@ public class OnDiskIndex
 				int theOffset = getValuesOffset(theIndex) + theCount*getValueSize();
 				itsPage.writeLI(theOffset, aBlockId, aThreadId);
 				setValuesCount(theIndex, theCount+1);
+				check();
 				return null;
 			}
 		}
@@ -521,16 +613,26 @@ public class OnDiskIndex
 				Object theDump = theSharedPage.addTuple(null, aObjectFieldId, aBlockId, aThreadId);
 				assert theDump == null;
 				setValuesCount(aIndex, 0);
-				setId(aIndex, 0);
 				setCurrentCount(getCurrentCount()-1);
+				setId(aIndex, 0);
 				aSlot.setSharedPage(theSharedPage);
+				check();
+
+				if (! theSharedPage.hasFreeIds()) unfreeSharedPage(theSharedPage);
+				freeSharedPage(this);
 				
-				if (! theSharedPage.hasFreeIds()) unfreeSharedPage(itsLogMaxCount+1, theSharedPage.itsPage);
+				if (LOG) Utils.println("Moved object %d from p.%d [%d/%d] to p.%d [%d/%d]", 
+						aObjectFieldId, 
+						getPageId(), 
+						getCurrentCount(), getMaxCount(),
+						theSharedPage.getPageId(),
+						theSharedPage.getCurrentCount(), theSharedPage.getMaxCount());
 				
 				return theSharedPage;
 			}
 			else
 			{
+				assert getCurrentCount() > 0;
 				DeltaBTree theBTree = aSlot.toBTree();
 				int theValuesCount = getValuesCount(aIndex);
 				int theValuesOffset = getValuesOffset(aIndex);
@@ -543,9 +645,30 @@ public class OnDiskIndex
 					theBTree.insertLeafTuple(theBlockId, theThreadId);
 				}
 				theBTree.insertLeafTuple(aBlockId, aThreadId);
-				
+
+				setValuesCount(aIndex, 0);
+				setCurrentCount(getCurrentCount()-1);
+				setId(aIndex, 0);
+				check();
+
+				freeSharedPage(this);
+
+				if (LOG) Utils.println("Moved object %d from page %d to btree", aObjectFieldId, getPageId());
+
 				return theBTree;
 			}
+		}
+		
+		@Override
+		public String toString()
+		{
+			return String.format(
+					"ids off.: %d, counts off.: %d, values off.: %d, values count: %d, max count: %d", 
+					getIdsOffset(),
+					getCountsOffset(),
+					getValuesOffset(),
+					getValuesCount(),
+					getMaxCount());
 		}
 	}
 	
@@ -572,18 +695,23 @@ public class OnDiskIndex
 				assert itsObjectFieldId > 0;
 				itsSharedPage = getSharedPage(0);
 				itsSlot.setSharedPage(itsSharedPage);
+				assert itsSharedPage.hasFreeIds();
 				itsDeltaBTree = null;
+				if (LOG) Utils.println("Object %d on p.%d [%d/%d] (initial)", aObjectFieldId, itsSharedPage.getPageId(), itsSharedPage.getCurrentCount(), itsSharedPage.getMaxCount());
 			}
 			else if (itsSlot.isSharedPage())
 			{
 				// Shared page
 				itsSharedPage = itsSlot.getSharedPage(OnDiskIndex.this);
+				if (LOG) Utils.println("Object %d on p.%d [%d/%d]", aObjectFieldId, itsSharedPage.getPageId(), itsSharedPage.getCurrentCount(), itsSharedPage.getMaxCount());
+				assert itsSharedPage.indexOf(aObjectFieldId) != -1;
 				itsDeltaBTree = null;
 			}
 			else
 			{
 				// DeltaBTree
 				itsDeltaBTree = itsSlot.getBTree();
+				if (LOG) Utils.println("Object %d on btree", aObjectFieldId);
 				itsSharedPage = null;
 			}
 		}
@@ -599,8 +727,18 @@ public class OnDiskIndex
 			if (itsSharedPage != null)
 			{
 				Object theDump = itsSharedPage.addTuple(itsSlot, itsObjectFieldId, aBlockId, aThreadId);
-				if (theDump instanceof DeltaBTree) itsDeltaBTree = (DeltaBTree) theDump;
-				else if (theDump instanceof SharedPage) itsSharedPage = (SharedPage) theDump;
+				if (! itsSharedPage.hasFreeIds()) unfreeSharedPage(itsSharedPage);
+
+				if (theDump instanceof DeltaBTree)
+				{
+					itsDeltaBTree = (DeltaBTree) theDump;
+					itsSharedPage = null;
+				}
+				else if (theDump instanceof SharedPage) 
+				{
+					itsSharedPage = (SharedPage) theDump;
+					itsDeltaBTree = null;
+				}
 				else assert theDump == null;
 			}
 			else
@@ -625,7 +763,7 @@ public class OnDiskIndex
 		
 		private void flush()
 		{
-			throw new UnsupportedOperationException();
+			if (itsDeltaBTree != null) itsDeltaBTree.flush();
 		}
 	}
 	

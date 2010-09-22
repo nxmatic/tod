@@ -462,7 +462,7 @@ public class ClassicPagedFile extends PagedFile
 		}
 		
 		@Override
-		public void clear()
+		public void clear(int aPosition, int aCount)
 		{
 			try
 			{
@@ -471,7 +471,19 @@ public class ClassicPagedFile extends PagedFile
 				int theBufferId = getValidBufferId();
 				
 				ByteBuffer theBuffer = getBuffer();
-				for(int i=0;i<PagedFile.PAGE_SIZE;i+=8) theBuffer.putLong(i, 0);
+				
+				int theEnd = aPosition + aCount;
+				while(aPosition+8 <= theEnd) 
+				{
+					theBuffer.putLong(aPosition, 0);
+					aPosition += 8;
+				}
+				while(aPosition < theEnd) 
+				{
+					theBuffer.put(aPosition, (byte) 0);
+					aPosition++;
+				}
+				
 				modified(theBufferId);
 			}
 			finally
@@ -826,7 +838,7 @@ public class ClassicPagedFile extends PagedFile
 			{
 				lock();
 
-				assert aPosition+12 <= PAGE_SIZE;
+				assert aPosition+12 <= PAGE_SIZE : ""+aPosition;
 				
 				int theBufferId = getValidBufferId();
 				int thePos = itsStartPos + aPosition;

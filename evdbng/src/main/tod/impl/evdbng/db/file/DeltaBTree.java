@@ -3,12 +3,14 @@ package tod.impl.evdbng.db.file;
 import static tod.impl.evdbng.DebuggerGridConfigNG.DB_MAX_INDEX_LEVELS;
 
 import gnu.trove.TIntArrayList;
+import gnu.trove.TLongArrayList;
 
 import java.util.Arrays;
 
 import tod.impl.evdbng.db.file.Page.PageIOStream;
 import tod.impl.evdbng.db.file.Page.PidSlot;
 import tod.utils.BitBuffer;
+import zz.utils.Utils;
 import zz.utils.cache.MRUBuffer;
 
 /**
@@ -311,6 +313,47 @@ public class DeltaBTree
 	}
 	
 	/**
+	 * Inserts a key in the middle of the tree.
+	 * This is achieved by removing all the keys that follow the added key
+	 * and re-inserting them, so this is inefficient as hell. But it should
+	 * not be called often.
+	 */
+	private void refill(long aKey, int aValue)
+	{
+		Utils.println("Key insertion: %d (last: %d)", aKey, itsCurrentLastKey);
+		
+		Page[] thePages = new Page[DB_MAX_INDEX_LEVELS];
+		int[] theIndexes = new int[DB_MAX_INDEX_LEVELS];
+		DecodedLeafPage theDecodedPage = drillTo(aKey, thePages, theIndexes);
+
+		TLongArrayList theKeys = new TLongArrayList();
+		TIntArrayList theValues = new TIntArrayList();
+		
+		theKeys.add(aKey);
+		theValues.add(aValue);
+		
+		int theIndex = theIndexes[0];
+		Page thePage = thePages[0];
+		if (theIndex < 0) theIndex = -theIndex-1;
+		
+		while(true)
+		{
+			theKeys.add(theDecodedPage.getKeyAt(theIndex));
+			theValues.add(theDecodedPage.getValueAt(theIndex));
+			theIndex++;
+			if (theIndex >= theDecodedPage.getTupleCount())
+			{
+				thePage = moveToNextPage(0, thePages, theIndexes);
+				if (thePage == null) break;
+				theDecodedPage = decodePage(thePage);
+				theIndex = 0;
+			}
+		} 
+
+		Utils.println("Shifting %d tuples", theValues.size());
+	}
+	
+	/**
 	 * Adds a (key, value) tuple to the tree.
 	 */
 	public void insertLeafTuple(long aKey, int aValue)
@@ -327,7 +370,7 @@ public class DeltaBTree
 		}
 		else
 		{
-			throw new UnsupportedOperationException("Not yet supported");
+			refill(aKey, aValue);
 		}
 	}
 	
@@ -361,38 +404,48 @@ public class DeltaBTree
 		return itsDecodedPagesCache.get(aPage.getPageId());
 	}
 	
-	public int[] getValues(long aKey)
+	private DecodedLeafPage drillTo(long aKey, Page[] aPages, int[] aIndexes)
 	{
-		Page[] thePages = new Page[DB_MAX_INDEX_LEVELS];
-		int[] theIndexes = new int[DB_MAX_INDEX_LEVELS];
 		int theLevel = itsCurrentRootLevel;
 		Page thePage = getRootPage();
 		while(theLevel > 0)
 		{
-			thePages[theLevel] = thePage;
+			aPages[theLevel] = thePage;
 			long theLastKey = getPageHeader_LastKey(thePage);
 			if (aKey <= theLastKey)
 			{
 				int theIndex = indexOf_Internal(thePage, aKey);
 				if (theIndex < 0) theIndex = -theIndex-1;
-				theIndexes[theLevel] = theIndex;
+				aIndexes[theLevel] = theIndex;
 				int thePid = getPidAt_Internal(thePage, theIndex);
 				thePage = getFile().get(thePid);
 			}
 			else
 			{
 				thePage = itsCurrentPages[theLevel-1];
-				theIndexes[theLevel] = -1;
+				aIndexes[theLevel] = -1;
 			}
 			theLevel--;
 		}
 		
-		thePages[theLevel] = thePage;
+		aPages[0] = thePage;
 		DecodedLeafPage theDecodedPage = decodePage(thePage);
 		int theIndex = theDecodedPage.indexOf(aKey);
-		if (theIndex < 0) return null;
-		
 		while(theIndex > 0 && theDecodedPage.getKeyAt(theIndex-1) == aKey) theIndex--;
+		
+		aIndexes[0] = theIndex;
+		return theDecodedPage;
+	}
+	
+	public int[] getValues(long aKey)
+	{
+		Page[] thePages = new Page[DB_MAX_INDEX_LEVELS];
+		int[] theIndexes = new int[DB_MAX_INDEX_LEVELS];
+		DecodedLeafPage theDecodedPage = drillTo(aKey, thePages, theIndexes);
+		
+		int theIndex = theIndexes[0];
+		Page thePage = thePages[0];
+		if (theIndex < 0) return null;
 		
 		TIntArrayList theResult = new TIntArrayList(4);
 		do

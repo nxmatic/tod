@@ -240,6 +240,12 @@ public class BDBvsBTree
 		{
 			return new IntTuple(aKey, aStream.readInt());
 		}
+
+		@Override
+		public void clearTuple(PageIOStream aStream)
+		{
+			aStream.writeInt(0);
+		}
 	};
 	
 	private static class IntTupleBuffer extends TupleBuffer<IntTuple>
@@ -303,7 +309,7 @@ public class BDBvsBTree
 	{
 		public IntInsertableBTree(String aName, PagedFile aFile, PidSlot aRootSlot)
 		{
-			super(aName, aFile, aRootSlot);
+			super(aName, aRootSlot);
 		}
 		
 		@Override
@@ -314,7 +320,7 @@ public class BDBvsBTree
 		
 		public void add(long aKey, int aData)
 		{
-			PageIOStream theStream = insertLeafKey(aKey);
+			PageIOStream theStream = insertLeafKey(aKey, false);
 			theStream.writeInt(aData);
 		}
 	}

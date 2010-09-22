@@ -73,6 +73,12 @@ public class ObjectBTree extends InsertableBTree<ObjectBTree.IntTuple>
 		{
 			return new IntTuple(aKey, aStream.readInt());
 		}
+
+		@Override
+		public void clearTuple(PageIOStream aStream)
+		{
+			aStream.writeInt(0);
+		}
 	};
 	
 	private static class IntTupleBuffer extends TupleBuffer<IntTuple>

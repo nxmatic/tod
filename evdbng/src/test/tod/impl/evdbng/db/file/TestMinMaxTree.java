@@ -320,7 +320,7 @@ public class TestMinMaxTree
 		}
 
 		@Override
-		public void clear()
+		public void clear(int aPosition, int aCount)
 		{
 			throw new NotImplementedException();
 		}
