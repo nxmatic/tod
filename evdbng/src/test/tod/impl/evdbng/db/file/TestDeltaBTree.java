@@ -16,7 +16,7 @@ public class TestDeltaBTree
 {
 	private static final int N = 10000000;
 	
-//	@Test
+	@Test
 	public void test()
 	{
 		final PagedFile file = PagedFile.create(new File("/home/gpothier/tmp/btreebench/mine"), true);
