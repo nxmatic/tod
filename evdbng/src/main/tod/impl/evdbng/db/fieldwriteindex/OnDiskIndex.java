@@ -721,30 +721,37 @@ public class OnDiskIndex
 			return itsObjectFieldId;
 		}
 		
-		public void append(long aBlockId, int aThreadId)
+		public void append(long[] aBlockIds, int[] aThreadIds, int aOffset, int aCount)
 		{
 			assert itsObjectFieldId > 0;
-			if (itsSharedPage != null)
+			while(aCount > 0)
 			{
-				Object theDump = itsSharedPage.addTuple(itsSlot, itsObjectFieldId, aBlockId, aThreadId);
-				if (! itsSharedPage.hasFreeIds()) unfreeSharedPage(itsSharedPage);
-
-				if (theDump instanceof DeltaBTree)
+				if (itsSharedPage != null)
 				{
-					itsDeltaBTree = (DeltaBTree) theDump;
-					itsSharedPage = null;
+					Object theDump = itsSharedPage.addTuple(itsSlot, itsObjectFieldId, aBlockIds[aOffset], aThreadIds[aOffset]);
+					if (! itsSharedPage.hasFreeIds()) unfreeSharedPage(itsSharedPage);
+	
+					if (theDump instanceof DeltaBTree)
+					{
+						itsDeltaBTree = (DeltaBTree) theDump;
+						itsSharedPage = null;
+					}
+					else if (theDump instanceof SharedPage) 
+					{
+						itsSharedPage = (SharedPage) theDump;
+						itsDeltaBTree = null;
+					}
+					else assert theDump == null;
+					
+					aOffset++;
+					aCount--;
 				}
-				else if (theDump instanceof SharedPage) 
+				else
 				{
-					itsSharedPage = (SharedPage) theDump;
-					itsDeltaBTree = null;
+					itsDeltaBTree.insertLeafTuples(aBlockIds, aThreadIds, aOffset, aCount);
+					break;
 				}
-				else assert theDump == null;
-			}
-			else
-			{
-				itsDeltaBTree.insertLeafTuple(aBlockId, aThreadId);
-			}
+			}				
 		}
 		
 		public int[] getThreadIds(long aBlockId)

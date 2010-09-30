@@ -379,17 +379,23 @@ public class Pipeline
 			// Store
 			synchronized(itsIndex)
 			{
-				long theLastObjectId = 0;
 				ObjectAccessStore theStore = null;
-				for(int i=1;i<theCount+1;i++)
+				long theLastObjectId = itsObjectIds[1];
+				int theOffset = 1;
+				int theSubCount = 0;
+				for(int i=1;i<=theCount+1;i++)
 				{
-					long theObjectId = itsObjectIds[i];
+					long theObjectId = i == theCount+1 ? 0 : itsObjectIds[i]; //  objId = 0 to force the last range to storage.
 					if (theObjectId != theLastObjectId)
 					{
-						theStore = itsIndex.getStore(theObjectId, false);
+						theStore = itsIndex.getStore(theLastObjectId, false);
+						theStore.append(itsBlockIds, itsThreadIds, theOffset, theSubCount);
+						
+						theOffset = i;
+						theSubCount = 0;
 						theLastObjectId = theObjectId;
 					}
-					theStore.append(itsBlockIds[i], itsThreadIds[i]);
+					theSubCount++;
 				}
 			}
 		}

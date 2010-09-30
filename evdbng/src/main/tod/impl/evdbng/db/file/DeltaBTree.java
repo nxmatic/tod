@@ -5,7 +5,9 @@ import static tod.impl.evdbng.DebuggerGridConfigNG.DB_MAX_INDEX_LEVELS;
 import gnu.trove.TIntArrayList;
 import gnu.trove.TLongArrayList;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 import tod.impl.evdbng.db.file.Page.PageIOStream;
 import tod.impl.evdbng.db.file.Page.PidSlot;
@@ -296,13 +298,15 @@ public class DeltaBTree
 		setPageHeader_LastKey(thePage, aLastKey);
 	}
 	
-	private void newLeafPage()
+	private void newLeafPage(List<Page> aFreePages)
 	{
 		saveCurrentLeafPage();
 		itsCurrentBuffer.position(0);
 		itsCurrentBuffer.limit(itsCurrentBuffer.capacity());
 
-		Page theNewPage = getFile().create();
+		Page theNewPage = aFreePages != null && ! aFreePages.isEmpty() ? 
+				aFreePages.remove(aFreePages.size()-1)
+				: getFile().create(); 
 		setPageHeader_Level(theNewPage, 0);
 		setPageHeader_TupleCount(theNewPage, 0);
 		// Last key/value are saved when the page is finished
@@ -312,45 +316,207 @@ public class DeltaBTree
 		itsCurrentTupleCount = 0;
 	}
 	
+	private static long min(long[] aValues, int aOffset, int aCount)
+	{
+		long theMin = Long.MAX_VALUE;
+		for(int i=0;i<aCount;i++)
+		{
+			long theValue = aValues[aOffset+i];
+			if (theValue < theMin) theMin = theValue;
+		}
+		return theMin;
+	}
+	
+	private boolean isSorted(long[] aValues, int aOffset, int aCount)
+	{
+		if (aCount < 2) return true;
+		long theLastValue = aValues[aOffset];
+		for(int i=1;i<aCount;i++)
+		{
+			long theValue = aValues[aOffset+i];
+			if (theValue < theLastValue) return false;
+			else theLastValue = theValue;
+		}
+		return true;
+	}
+	
+	private void collectSubtree(List<Page> aTarget, int aLevel, Page aPage)
+	{
+		aTarget.add(aPage);
+		if (aLevel > 0)
+		{
+			assert aLevel > 0;
+			int theTupleCount = getPageHeader_TupleCount(aPage);
+			for(int i=0;i<theTupleCount;i++)
+			{
+				int thePid = getPidAt_Internal(aPage, i);
+				Page theChild = getFile().get(thePid);
+				collectSubtree(aTarget, aLevel-1, theChild);
+			}
+		}
+	}
+	
+	/**
+	 * Trims the btree so that the last key is the one that precedes
+	 * that identified by the pages/indexes.
+	 * @return A list of pages that are free after the trimming.
+	 */
+	private List<Page> trim(Page[] aPages, int[] aIndexes)
+	{
+		List<Page> theResult = new ArrayList<Page>();
+		
+		for(int i=0;i<=itsCurrentRootLevel;i++)
+		{
+			Page thePage = aPages[i];
+			int theIndex = aIndexes[i];
+			
+			if (i > 0 && theIndex != -1)
+			{
+				assert theIndex >= 0;
+				int theTupleCount = getPageHeader_TupleCount(thePage);
+				for(int j=theIndex+1;j<theTupleCount;j++)
+				{
+					int thePid = getPidAt_Internal(thePage, j);
+					Page theChild = getFile().get(thePid);
+					collectSubtree(theResult, i-1, theChild);
+				}
+			}
+
+			if (theIndex < 0)
+			{
+				if (i == 0)
+				{
+					theIndex = -theIndex-1;
+				}
+				else
+				{
+					assert theIndex == -1;
+					assert aPages[i-1] == itsCurrentPages[i-1];
+					continue;
+				}
+			}
+			setPageHeader_TupleCount(thePage, theIndex);
+			if (i == 0) 
+			{
+				itsCurrentTupleCount = theIndex;
+				DecodedLeafPage theDecodedPage = getDecodedPage(thePage);
+				if (theIndex > 0)
+				{
+					itsCurrentLastKey = theDecodedPage.getKeyAt(theIndex-1);
+					itsCurrentLastValue = theDecodedPage.getValueAt(theIndex-1);
+				}
+				else
+				{
+					itsCurrentLastKey = theDecodedPage.getPrevLastKey();
+					itsCurrentLastValue = theDecodedPage.getPrevLastValue();
+				}
+				setPageHeader_LastKey(thePage, itsCurrentLastKey);
+				setPageHeader_LastValue(thePage, itsCurrentLastValue);
+			}
+			else
+			{
+				// Not necessary to update the last key/value for the page
+				// because it will be restored next time a tuple is added,
+				// and (I think) it is not needed for appending 
+			}
+			
+			if (itsCurrentPages[i].getPageId() != thePage.getPageId())
+			{
+				collectSubtree(theResult, i, itsCurrentPages[i]);
+				itsCurrentPages[i] = thePage;
+			}
+		}
+		
+		return theResult;
+	}
+	
 	/**
 	 * Inserts a key in the middle of the tree.
 	 * This is achieved by removing all the keys that follow the added key
 	 * and re-inserting them, so this is inefficient as hell. But it should
 	 * not be called often.
 	 */
-	private void refill(long aKey, int aValue)
+	private void refill(long[] aKeys, int[] aValues, int aOffset, int aCount)
 	{
-		Utils.println("Key insertion: %d (last: %d)", aKey, itsCurrentLastKey);
+		assert aCount > 0;
+		assert isSorted(aKeys, aOffset, aCount);
+	
+		flush();
+		Utils.println("Key insertion: %d-%d (last: %d)", aKeys[aOffset], aKeys[aOffset+aCount-1], itsCurrentLastKey);
 		
 		Page[] thePages = new Page[DB_MAX_INDEX_LEVELS];
 		int[] theIndexes = new int[DB_MAX_INDEX_LEVELS];
-		DecodedLeafPage theDecodedPage = drillTo(aKey, thePages, theIndexes);
-
+		DecodedLeafPage theDecodedPage = drillTo(aKeys[0], thePages, theIndexes);
+		
+		Page[] theInsertPages = thePages.clone();
+		int[] theInsertIndexes = theIndexes.clone();
+		
 		TLongArrayList theKeys = new TLongArrayList();
 		TIntArrayList theValues = new TIntArrayList();
-		
-		theKeys.add(aKey);
-		theValues.add(aValue);
 		
 		int theIndex = theIndexes[0];
 		Page thePage = thePages[0];
 		if (theIndex < 0) theIndex = -theIndex-1;
 		
+		// Extract the values from the BTree and at the same time merge with the new values.
 		while(true)
 		{
-			theKeys.add(theDecodedPage.getKeyAt(theIndex));
-			theValues.add(theDecodedPage.getValueAt(theIndex));
+			long theKey = theDecodedPage.getKeyAt(theIndex);
+			int theValue = theDecodedPage.getValueAt(theIndex);
+			
+			while(aCount > 0 && aKeys[aOffset] <= theKey)
+			{
+				theKeys.add(aKeys[aOffset]);
+				theValues.add(aValues[aOffset]);
+				aOffset++;
+				aCount--;
+			}
+			
+			theKeys.add(theKey);
+			theValues.add(theValue);
 			theIndex++;
 			if (theIndex >= theDecodedPage.getTupleCount())
 			{
 				thePage = moveToNextPage(0, thePages, theIndexes);
 				if (thePage == null) break;
-				theDecodedPage = decodePage(thePage);
+				theDecodedPage = getDecodedPage(thePage);
 				theIndex = 0;
 			}
 		} 
+		
+		while(aCount > 0)
+		{
+			theKeys.add(aKeys[aOffset]);
+			theValues.add(aValues[aOffset]);
+			aOffset++;
+			aCount--;
+		}
 
 		Utils.println("Shifting %d tuples", theValues.size());
+		List<Page> theFreedPages = trim(theInsertPages, theInsertIndexes);
+		loadCurrentLeafPage();
+		
+		int theCount = theKeys.size();
+		for(int i=0;i<theCount;i++)
+		{
+			long theKey = theKeys.get(i);
+			int theValue = theValues.get(i);
+			
+			appendLeafTuple(theKey, theValue, theFreedPages);
+		}
+		
+		assert theFreedPages.size() == 0;
+		itsDecodedPagesCache.dropAll(); // That's a bit more than strictly necessary, but we're on the safe side.
+	}
+	
+	private void appendLeafTuple(long aKey, int aValue, List<Page> aFreePages)
+	{
+		if (itsCurrentBuffer.remaining() < getMaxTupleBits_Leaf()) newLeafPage(aFreePages);
+		itsCurrentBuffer.putGamma(aKey-itsCurrentLastKey);
+		itsCurrentBuffer.putGamma(aValue-itsCurrentLastValue);
+		itsCurrentLastKey = aKey;
+		itsCurrentLastValue = aValue;
+		itsCurrentTupleCount++;
 	}
 	
 	/**
@@ -359,25 +525,38 @@ public class DeltaBTree
 	public void insertLeafTuple(long aKey, int aValue)
 	{
 		itsDecodedPagesCache.dropAll(); // That's a bit more than strictly necessary, but we're on the safe side.
-		if (aKey >= itsCurrentLastKey)
+		if (aKey >= itsCurrentLastKey) appendLeafTuple(aKey, aValue, null);
+		else refill(new long[] {aKey}, new int[] {aValue}, 0, 1);
+	}
+
+	public void insertLeafTuples(long[] aKeys, int[] aValues, int aOffset, int aCount)
+	{
+		itsDecodedPagesCache.dropAll(); // That's a bit more than strictly necessary, but we're on the safe side.
+		
+		while(aCount > 0)
 		{
-			if (itsCurrentBuffer.remaining() < getMaxTupleBits_Leaf()) newLeafPage();
-			itsCurrentBuffer.putGamma(aKey-itsCurrentLastKey);
-			itsCurrentBuffer.putGamma(aValue-itsCurrentLastValue);
-			itsCurrentLastKey = aKey;
-			itsCurrentLastValue = aValue;
-			itsCurrentTupleCount++;
-		}
-		else
-		{
-			refill(aKey, aValue);
+			long theKey = aKeys[aOffset];
+			int theValue = aValues[aOffset];
+			
+			if (theKey >= itsCurrentLastKey)
+			{
+				appendLeafTuple(theKey, theValue, null);
+				aOffset++;
+				aCount--;
+			}
+			else
+			{
+				refill(aKeys, aValues, aOffset, aCount);
+				break;
+			}
 		}
 	}
-	
+
 	private Page moveToNextPage(int aLevel, Page[] aPages, int[] aIndexes)
 	{
 		if (aPages[aLevel] == itsCurrentPages[aLevel]) return null;
 		
+		Page theNextPage;
 		Page theParentPage = aPages[aLevel+1];
 		int theParentIndex = aIndexes[aLevel+1];
 		int theParentTupleCount = getPageHeader_TupleCount(theParentPage);
@@ -386,7 +565,7 @@ public class DeltaBTree
 			theParentIndex++;
 			aIndexes[aLevel+1] = theParentIndex;
 			int thePid = getPidAt_Internal(theParentPage, theParentIndex);
-			return getFile().get(thePid);
+			theNextPage = getFile().get(thePid);
 		}
 		else if (theParentTupleCount == getTuplesPerPage_Internal())
 		{
@@ -394,12 +573,15 @@ public class DeltaBTree
 			aIndexes[aLevel+1] = 0;
 			aPages[aLevel+1] = theParentPage;
 			int thePid = getPidAt_Internal(theParentPage, 0);
-			return getFile().get(thePid);
+			theNextPage = getFile().get(thePid);
 		}
-		else return itsCurrentPages[aLevel];
+		else theNextPage = itsCurrentPages[aLevel];
+		
+		aPages[aLevel] = theNextPage;
+		return theNextPage;
 	}
 	
-	private DecodedLeafPage decodePage(Page aPage)
+	private DecodedLeafPage getDecodedPage(Page aPage)
 	{
 		return itsDecodedPagesCache.get(aPage.getPageId());
 	}
@@ -429,7 +611,7 @@ public class DeltaBTree
 		}
 		
 		aPages[0] = thePage;
-		DecodedLeafPage theDecodedPage = decodePage(thePage);
+		DecodedLeafPage theDecodedPage = getDecodedPage(thePage);
 		int theIndex = theDecodedPage.indexOf(aKey);
 		while(theIndex > 0 && theDecodedPage.getKeyAt(theIndex-1) == aKey) theIndex--;
 		
@@ -456,7 +638,7 @@ public class DeltaBTree
 			{
 				thePage = moveToNextPage(0, thePages, theIndexes);
 				if (thePage == null) break;
-				theDecodedPage = decodePage(thePage);
+				theDecodedPage = getDecodedPage(thePage);
 				theIndex = 0;
 			}
 		} while(theDecodedPage.getKeyAt(theIndex) == aKey);
@@ -469,6 +651,9 @@ public class DeltaBTree
 		private final int itsPageId;
 		private final long[] itsKeys;
 		private final int[] itsValues;
+		
+		private final long itsPrevLastKey;
+		private final int itsPrevLastValue;
 		
 		public DecodedLeafPage(Page aPage)
 		{
@@ -506,6 +691,13 @@ public class DeltaBTree
 					itsKeys[i] -= theKeysDelta;
 					itsValues[i] -= theValuesDelta;
 				}
+				itsPrevLastKey = -theKeysDelta;
+				itsPrevLastValue = -theValuesDelta;
+			}
+			else
+			{
+				itsPrevLastKey = theLastKey;
+				itsPrevLastValue = theLastValue;
 			}
 		}
 		
@@ -532,6 +724,16 @@ public class DeltaBTree
 		public int getValueAt(int aIndex)
 		{
 			return itsValues[aIndex];
+		}
+		
+		public long getPrevLastKey()
+		{
+			return itsPrevLastKey;
+		}
+		
+		public int getPrevLastValue()
+		{
+			return itsPrevLastValue;
 		}
 	}
 	

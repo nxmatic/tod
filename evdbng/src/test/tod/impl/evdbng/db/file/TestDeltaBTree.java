@@ -16,7 +16,7 @@ public class TestDeltaBTree
 {
 	private static final int N = 10000000;
 	
-	@Test
+//	@Test
 	public void test()
 	{
 		final PagedFile file = PagedFile.create(new File("/home/gpothier/tmp/btreebench/mine"), true);
@@ -67,6 +67,47 @@ public class TestDeltaBTree
 			vs.add(v);
 			if ((i & 0xffff) == 0) System.out.println(i);
 		}
+	}
+	
+	@Test
+	public void testRefill()
+	{
+		final PagedFile file = PagedFile.create(new File("/home/gpothier/tmp/btreebench/mine"), true);
+		Page theDirectory = file.create();
+		final DeltaBTree btree = new DeltaBTree("test", file, new PidSlot(theDirectory, 0));
+
+		final int k = 1000;
+		long[] theKeys = new long[k];
+		int[] theValues = new int[k];
 		
+		for(int i=0;i<k;i++)
+		{
+			theKeys[i] = i;
+			theValues[i] = i*2;
+		}
+		
+		for(int i=1;i<=k;i++)
+		{
+			if (i == 180)
+			{
+				System.out.println("TestDeltaBTree.testRefill()");
+			}
+			btree.insertLeafTuples(theKeys, theValues, 0, i);
+		}
+		
+		btree.flush();
+		
+		for(int i=0;i<k;i++)
+		{
+			int[] theResult = btree.getValues(theKeys[i]);
+			Assert.assertEquals(k-i, theResult.length);
+			Assert.assertTrue(checkValue(theResult, i*2));
+		}
+	}
+	
+	private boolean checkValue(int[] aResult, int aValue)
+	{
+		for(int i=0;i<aResult.length;i++) if (aResult[i] != aValue) return false;
+		return true;
 	}
 }
