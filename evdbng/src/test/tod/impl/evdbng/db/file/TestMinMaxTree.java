@@ -12,6 +12,7 @@ import org.junit.Test;
 
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 import tod.BenchBase;
+import tod.impl.evdbng.db.file.Page.PidSlot;
 
 /**
  * Tests for the {@link RangeMinMaxTree}.
@@ -23,10 +24,17 @@ public class TestMinMaxTree
 {
 	private static final File FILE = new File("test-rmmt.bin");
 	
+	private static RangeMinMaxTree createTree()
+	{
+		PagedFile theFile = PagedFile.create(FILE, true);
+		Page thePage = theFile.create();
+		return new RangeMinMaxTree(new PidSlot(thePage, 0));
+	}
+	
 	@Test
 	public void testGet()
 	{
-		RangeMinMaxTree tree = new RangeMinMaxTree(PagedFile.create(FILE, true));
+		RangeMinMaxTree tree = createTree();
 		
 		final int n = 10000000;
 		BitSet sequence = gen(n, 100);
@@ -76,8 +84,7 @@ public class TestMinMaxTree
 	
 	public static void main(String[] args)
 	{
-		PagedFile file = PagedFile.create(FILE, true);
-		final RangeMinMaxTree tree = new RangeMinMaxTree(file);
+		final RangeMinMaxTree tree = createTree();
 		final Page page = new ByteArrayPage(1);
 		final BitSet bits = new BitSet();
 		
@@ -114,8 +121,7 @@ public class TestMinMaxTree
 	@Test
 	public void testSearch_SamePage()
 	{
-		PagedFile file = PagedFile.create(FILE, true);
-		RangeMinMaxTree tree = new RangeMinMaxTree(file);
+		RangeMinMaxTree tree = createTree();
 		Page page = new ByteArrayPage(1);
 		BitSet bits = new BitSet();
 		
@@ -211,8 +217,7 @@ public class TestMinMaxTree
 	
 	private void testAllSearches_π(BitSet bits, int size)
 	{
-		PagedFile file = PagedFile.create(FILE, true);
-		RangeMinMaxTree tree = new RangeMinMaxTree(file);
+		RangeMinMaxTree tree = createTree();
 		
 		for(int i=0;i<size;i++) if (bits.get(i)) tree.open(); else tree.close();
 		

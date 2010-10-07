@@ -429,11 +429,23 @@ public class ReplayerLoader extends ClassLoader
 		byte[] theArgSorts = aDescriptor.getArgSorts();
 		Type theReturnType = getType(aDescriptor.getReturnSort(), TYPE_OBJECTID);
 		
+		// Compute thread replayer and behavior id slots
+		int theSlot = 0; 
+		if (! aDescriptor.isStatic()) theSlot++;
+		for(int theSort : theArgSorts)
+		{
+			Type theType = getType(theSort, TYPE_OBJECTID);
+			theSlot += theType.getSize();
+		}
+		int theThreadReplayerSlot = theSlot++; 
+		int theBehaviorIdSlot = theSlot++;
+		
 		MethodNode theMethod = createMethodNode(theDispatchSignature);
 		theMethod.access = Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC;
 
 		Label lBegin = new Label();
 		Label lEnd = new Label();
+		Label lExit = new Label();
 		Label lHandler = new Label();
 		
 		SList sw = new SList();
@@ -448,7 +460,7 @@ public class ReplayerLoader extends ClassLoader
 		sw.label(lBegin);
 
 		// Push args
-		int theSlot = 0; 
+		theSlot = 0; 
 		if (! aDescriptor.isStatic()) sw.ALOAD(theSlot++);
 		for(int theSort : theArgSorts)
 		{
@@ -456,9 +468,8 @@ public class ReplayerLoader extends ClassLoader
 			sw.ILOAD(theType, theSlot);
 			theSlot += theType.getSize();
 		}
-		int theThreadReplayerSlot = theSlot++; 
+		theSlot += 2;
 		sw.ALOAD(theThreadReplayerSlot); // Push the ThreadReplayer
-		int theBehaviorIdSlot = theSlot++;
 		
 		SList cases = new SList();
 		{
@@ -476,7 +487,7 @@ public class ReplayerLoader extends ClassLoader
 						theReplaySignature.name, 
 						theReplaySignature.descriptor);
 				
-				cases.IRETURN(theReturnType);
+				cases.GOTO(lExit);
 			}
 			
 			// Add case for out of scope
@@ -501,7 +512,7 @@ public class ReplayerLoader extends ClassLoader
 					"dispatch_OOS_"+getCompleteSigForSort(theReturnType.getSort()), 
 					"()"+theReturnType.getDescriptor());
 			
-			cases.IRETURN(theReturnType);
+			cases.GOTO(lExit);
 			
 			// Add default
 			cases.label(lDefault);
@@ -511,18 +522,35 @@ public class ReplayerLoader extends ClassLoader
 		}		
 
 		
-		// Create switch
+		// Get dispatch target
 		sw.ALOAD(theThreadReplayerSlot);
 		sw.INVOKEVIRTUAL(CLS_THREADREPLAYER, "getDispatchTarget", "()I");
 		sw.DUP();
 		sw.ISTORE(theBehaviorIdSlot);
+		
+		// Send event
+		sw.ALOAD(theThreadReplayerSlot);
+		sw.INVOKEVIRTUAL(CLS_THREADREPLAYER, "getCollector", "()"+DSC_EVENTCOLLECTOR_REPLAY);
+		sw.ILOAD(theBehaviorIdSlot);
+		sw.INVOKEVIRTUAL(CLS_EVENTCOLLECTOR_REPLAY, "enter", "(I)V");
+
+		// Create switch
 		sw.LOOKUPSWITCH(lDefault, theKeys, theLabels);
 		sw.add(cases);
 		
 		sw.label(lEnd);
+		
+		sw.label(lExit);
+		sw.ALOAD(theThreadReplayerSlot);
+		sw.INVOKEVIRTUAL(CLS_THREADREPLAYER, "getCollector", "()"+DSC_EVENTCOLLECTOR_REPLAY);
+		sw.INVOKEVIRTUAL(CLS_EVENTCOLLECTOR_REPLAY, "exit", "()V");
+		sw.IRETURN(theReturnType);
 
 		// Catch BehaviorExitException
 		sw.label(lHandler);
+		sw.ALOAD(theThreadReplayerSlot);
+		sw.INVOKEVIRTUAL(CLS_THREADREPLAYER, "getCollector", "()"+DSC_EVENTCOLLECTOR_REPLAY);
+		sw.INVOKEVIRTUAL(CLS_EVENTCOLLECTOR_REPLAY, "exitException", "()V");
 		sw.POP();
 		sw.ALOAD(theThreadReplayerSlot);
 		sw.INVOKESTATIC(CLS_INSCOPEREPLAYERFRAME, "expectException", "("+DSC_THREADREPLAYER+")V");

@@ -91,6 +91,7 @@ public abstract class DBSideIOThread
 	private final TmpIdManager itsTmpIdManager = new TmpIdManager();
 	
 	private long itsProcessedSize = 0;
+	private int itsPacketCount = 0;
 	
 	public DBSideIOThread(TODConfig aConfig, IMutableStructureDatabase aDatabase, InputStream aIn, LocalsSnapshot aSnapshot)
 	{
@@ -113,8 +114,6 @@ public abstract class DBSideIOThread
 			Utils.println("Starting replay.");
 			long t0 = System.currentTimeMillis();
 			
-			int thePacketCount = 0;
-			
 			loop:
 			while(! itsFinished && itsThrown == null)
 			{
@@ -130,9 +129,9 @@ public abstract class DBSideIOThread
 				default: throw new RuntimeException("Not handled: "+thePacketType);
 				}
 				
-				thePacketCount++;
+				itsPacketCount++;
 				
-				if (thePacketCount % 10000 == 0) Utils.println("Processed %d bytes (%d packets)", itsProcessedSize, thePacketCount);
+				if (itsPacketCount % 10000 == 0) printStats();
 			}
 			
 			if (itsThrown != null) throw itsThrown;
@@ -157,6 +156,11 @@ public abstract class DBSideIOThread
 		{
 			throw new RuntimeException(t);
 		}
+	}
+	
+	protected void printStats()
+	{
+		Utils.println("Processed %d bytes (%d packets)", itsProcessedSize, itsPacketCount);
 	}
 	
 	protected abstract EventCollector createCollector(int aThreadId);
@@ -272,10 +276,21 @@ public abstract class DBSideIOThread
 				@Override
 				protected EventCollector createCollector(int aThreadId)
 				{
-					EventCollector theCollector = new ObjectAccessDistributionEventCollector(aThreadId);
+//					EventCollector theCollector = new ObjectAccessDistributionEventCollector(aThreadId);
 //					EventCollector theCollector = new CounterEventCollector();
+					EventCollector theCollector = new ObjectWriteSerializeCollector(aThreadId);
 					theCollectors.put(aThreadId, theCollector);
 					return theCollector;
+				}
+				
+				@Override
+				protected void printStats()
+				{
+					super.printStats();
+					for(Map.Entry<Integer, EventCollector> theEntry : theCollectors.entrySet())
+					{
+						System.out.println(theEntry.getKey() + ": " + theEntry.getValue());
+					}
 				}
 			};
 			theIOThread.run();

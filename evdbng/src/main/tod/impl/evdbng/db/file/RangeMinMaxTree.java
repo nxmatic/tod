@@ -1,7 +1,9 @@
 package tod.impl.evdbng.db.file;
 
 import static tod.impl.evdbng.db.file.PagedFile.PAGE_SIZE;
+import tod.impl.evdbng.db.file.Page.IntSlot;
 import tod.impl.evdbng.db.file.Page.PageIOStream;
+import tod.impl.evdbng.db.file.Page.PidSlot;
 import zz.utils.bit.BitUtils;
 
 
@@ -23,7 +25,6 @@ public class RangeMinMaxTree
 		for(int i=31, j=1;i>=0;i--, j<<=1) MASKS[i] = j;
 	}
 
-	private final PagedFile itsFile;
 	private static final int BITS_PER_PAGE = PAGE_SIZE*8;
 	private static final int PACKETS_PER_PAGE = BITS_PER_PAGE/32;
 	private static final int MAX_LEVELS = 6;
@@ -42,7 +43,8 @@ public class RangeMinMaxTree
 	private static final int TUPLE_OFFSET_MAX = 4; 
 	private static final int TUPLE_OFFSET_PTR = 6; 
 	
-	
+	private final PidSlot itsDirectorySlot;
+	private final Directory itsDirectory;
 	
 	/**
 	 * The first page of each level of the tree. Index 0 corresponds to the leaves.
@@ -58,19 +60,98 @@ public class RangeMinMaxTree
 	private int[] itsCurrentMin = new int[MAX_LEVELS];
 	private int[] itsCurrentMax = new int[MAX_LEVELS]; 
 	
-	public RangeMinMaxTree(PagedFile aFile)
+	public RangeMinMaxTree(PidSlot aDirectorySlot)
 	{
-		itsFile = aFile;
-		itsLevels[0] = itsFile.create().asIOStream();
+		itsDirectorySlot = aDirectorySlot;
+		itsDirectory = new Directory(itsDirectorySlot.getPage(true));
 		
-		itsCurrentMin[0] = 1;
-		itsCurrentMax[0] = -1;
-		
-		for(int i=1;i<MAX_LEVELS;i++) 
+		for(int i=0;i<MAX_LEVELS;i++) itsLevels[i] = itsDirectory.getStream(i, false);
+		if (itsLevels[0] == null)
 		{
-			itsCurrentMin[i] = Short.MAX_VALUE;
-			itsCurrentMax[i] = Short.MIN_VALUE;
+			itsLevels[0] = itsDirectory.getStream(0, true);
+			itsDirectory.getMinSlot(0).set(1);
+			itsDirectory.getMaxSlot(0).set(-1);
+			for(int i=1;i<MAX_LEVELS;i++) 
+			{
+				itsDirectory.getMinSlot(i).set(Short.MAX_VALUE);
+				itsDirectory.getMaxSlot(i).set(Short.MIN_VALUE);
+			}
 		}
+		
+		for(int i=0;i<MAX_LEVELS;i++) 
+		{
+			itsCurrentMin[i] = itsDirectory.getMinSlot(i).get();
+			itsCurrentMax[i] = itsDirectory.getMaxSlot(i).get();
+		}
+	}
+	
+	public void flush()
+	{
+		for(int i=0;i<MAX_LEVELS;i++) 
+		{
+			itsDirectory.setStream(i, itsLevels[i]);
+			itsDirectory.getMinSlot(i).set(itsCurrentMin[i]);
+			itsDirectory.getMaxSlot(i).set(itsCurrentMax[i]);
+		}
+	}
+	
+	private static class Directory
+	{
+		private final Page itsPage;
+		private PidSlot[] itsLevelSlots = new PidSlot[MAX_LEVELS];
+		private IntSlot[] itsOffsetSlots = new IntSlot[MAX_LEVELS];
+		private IntSlot[] itsCurrentMinSlots = new IntSlot[MAX_LEVELS];
+		private IntSlot[] itsCurrentMaxSlots = new IntSlot[MAX_LEVELS];
+
+		public Directory(Page aPage)
+		{
+			itsPage = aPage;
+			int theOffset = 0;
+			for(int i=0;i<MAX_LEVELS;i++)
+			{
+				itsLevelSlots[i] = new PidSlot(itsPage, theOffset);
+				theOffset += PidSlot.size();
+				itsOffsetSlots[i] = new IntSlot(itsPage, theOffset);
+				theOffset += IntSlot.size();
+				itsCurrentMinSlots[i] = new IntSlot(aPage, theOffset);
+				theOffset += IntSlot.size();
+				itsCurrentMaxSlots[i] = new IntSlot(aPage, theOffset);
+				theOffset += IntSlot.size();
+			}
+		}
+		
+		public PageIOStream getStream(int aLevel, boolean aCreate)
+		{
+			Page thePage = itsLevelSlots[aLevel].getPage(aCreate);
+			if (thePage == null) return null;
+			int theOffset = itsOffsetSlots[aLevel].get();
+			PageIOStream theStream = thePage.asIOStream();
+			theStream.setPos(theOffset);
+			return theStream;
+		}
+		
+		public void setStream(int aLevel, PageIOStream aStream)
+		{
+			itsLevelSlots[aLevel].setPage(aStream.getPage());
+			itsOffsetSlots[aLevel].set(aStream.getPos());
+		}
+		
+		public IntSlot getMinSlot(int aLevel)
+		{
+			return itsCurrentMinSlots[aLevel];
+		}
+		
+		public IntSlot getMaxSlot(int aLevel)
+		{
+			return itsCurrentMaxSlots[aLevel];
+		}
+		
+		
+	}
+	
+	private PagedFile getFile()
+	{
+		return itsDirectorySlot.getFile();
 	}
 	
 	/**
@@ -207,7 +288,7 @@ public class RangeMinMaxTree
 		PageIOStream stream = itsLevels[l+1];
 		if (stream == null) 
 		{
-			stream = itsFile.create().asIOStream();
+			stream = getFile().create().asIOStream();
 			itsLevels[l+1] = stream;
 		}
 		
@@ -218,7 +299,7 @@ public class RangeMinMaxTree
 				itsLevels[l].getPage().getPageId());
 		if (stream.remaining() < TUPLE_BYTES) commitLevel(l+1);
 		
-		itsLevels[l] = itsFile.create().asIOStream();
+		itsLevels[l] = getFile().create().asIOStream();
 		
 		itsCurrentMin[l] = itsCurrentSum+1;
 		itsCurrentMax[l] = itsCurrentSum-1;
@@ -288,7 +369,7 @@ public class RangeMinMaxTree
 			}
 			
 			int id = parent.readInt(offset*TUPLE_BYTES + TUPLE_OFFSET_PTR);
-			return itsFile.get(id);
+			return getFile().get(id);
 		}
 	}
 	
@@ -356,7 +437,7 @@ public class RangeMinMaxTree
 				{
 					level--;
 					kInc /= TUPLES_PER_PAGE;
-					page = itsFile.get(childId);
+					page = getFile().get(childId);
 					break up;
 				}
 				lastSum = page.readShort(j*TUPLE_BYTES + TUPLE_OFFSET_SUM);
@@ -386,7 +467,7 @@ public class RangeMinMaxTree
 					level--;
 					kInc /= TUPLES_PER_PAGE;
 					int childId = page.readInt(j*TUPLE_BYTES + TUPLE_OFFSET_PTR);
-					page = itsFile.get(childId);
+					page = getFile().get(childId);
 					break;
 				}
 				lastSum = page.readShort(j*TUPLE_BYTES + TUPLE_OFFSET_SUM);
@@ -461,7 +542,7 @@ public class RangeMinMaxTree
 					{
 						level--;
 						kDec /= TUPLES_PER_PAGE;
-						page = itsFile.get(childId);
+						page = getFile().get(childId);
 						break up;
 					}
 					
@@ -497,7 +578,7 @@ public class RangeMinMaxTree
 					level--;
 					kDec /= TUPLES_PER_PAGE;
 					int childId = page.readInt(j*TUPLE_BYTES + TUPLE_OFFSET_PTR);
-					page = itsFile.get(childId);
+					page = getFile().get(childId);
 					break;
 				}
 				k -= kDec;

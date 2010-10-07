@@ -99,6 +99,7 @@ public abstract class MethodReplayerGenerator
 	private Label lCodeStart;
 	private Label lCodeEnd;
 //	private Label lExitException = new Label();
+	private Label lExit = new Label();
 	private List itsOriginalTryCatchNodes;
 
 	private Type[] itsArgTypes;
@@ -269,6 +270,7 @@ public abstract class MethodReplayerGenerator
 		// Setup/cleanup/handlers
 		addSnapshotSetup(itsMethodNode.instructions);
 		addExceptionHandling(itsMethodNode.instructions);
+		addEvents(itsMethodNode.instructions);
 		if (DebugFlags.USE_FIELD_CACHE) itsMethodNode.instructions.insert(itsMethodInfo.getFieldCacheInitInstructions());
 		itsMethodNode.instructions.add(itsAdditionalInstructions);
 
@@ -551,6 +553,56 @@ public abstract class MethodReplayerGenerator
 		aInsns.add(s);
 	}
 	
+	private void addEvents(InsnList aInsns)
+	{
+		SList s = new SList();
+
+		Label lStart = new Label();
+		Label lFinally = new Label();
+		Label lEnd = new Label();
+
+		// Insert entry instructions
+		{
+			pushCollector(s);
+			s.LDC(getBehaviorId());
+			s.INVOKEVIRTUAL(CLS_EVENTCOLLECTOR_REPLAY, "enter", "(I)V");
+
+			s.GOTO(lStart);
+		}
+		
+		// Insert exit instructions (every return statement is replaced by a GOTO to this block)
+		{
+			s.label(lExit);
+			
+			pushCollector(s);
+			s.INVOKEVIRTUAL(CLS_EVENTCOLLECTOR_REPLAY, "exit", "()V");
+
+			s.RETURN(Type.getReturnType(getMethodNode().desc));
+		}
+		
+		// Insert finally instructions
+		{
+			s.label(lFinally);
+			
+			pushCollector(s);
+			s.INVOKEVIRTUAL(CLS_EVENTCOLLECTOR_REPLAY, "exitException", "()V");
+
+			s.ATHROW();
+		}
+
+		s.label(lStart);
+
+		aInsns.insert(s);
+		
+		SList s2 = new SList();
+		s2.label(lEnd);
+		s2.NOP();
+		
+		aInsns.add(s2);
+		getMethodNode().visitTryCatchBlock(lStart, lEnd, lFinally, null);
+
+	}
+	
 	protected void addAdditionalInstructions(InsnList aInsns)
 	{
 		itsAdditionalInstructions.add(aInsns);
@@ -721,6 +773,16 @@ public abstract class MethodReplayerGenerator
 			case Opcodes.RET:
 				processRet(aInsns, (VarInsnNode) theNode);
 				break;
+				
+			case Opcodes.IRETURN:
+			case Opcodes.LRETURN:
+			case Opcodes.FRETURN:
+			case Opcodes.DRETURN:
+			case Opcodes.ARETURN:
+			case Opcodes.RETURN:
+				processReturn(aInsns, (InsnNode) theNode);
+				break;
+
 			}
 		}
 	}
@@ -1242,6 +1304,20 @@ public abstract class MethodReplayerGenerator
 		aNode.var = transformSlot(aNode.var);
 	}
 	
+	private void processReturn(InsnList aInsns, InsnNode aNode)
+	{
+		SyntaxInsnList s = new SyntaxInsnList();
+		s.GOTO(lExit);
+		
+		replace(aInsns, aNode, s);
+	}
+	
+	private void replace(InsnList aInsns, AbstractInsnNode aNode, InsnList aList)
+	{
+		aInsns.insert(aNode, aList);
+		aInsns.remove(aNode);
+	}
+
 	protected abstract void addSnapshotSetup(InsnList aInsns);
 	protected abstract void insertSnapshotProbe(SList s, AbstractInsnNode aReferenceNode, boolean aSaveStack);
 	

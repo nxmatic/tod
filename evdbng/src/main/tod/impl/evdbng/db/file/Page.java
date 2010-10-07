@@ -115,6 +115,14 @@ public abstract class Page
 	}
 
 	/**
+	 * Returns true iff both pages have the same id.
+	 */
+	public static boolean same(Page p1, Page p2)
+	{
+		return p1.getPageId() == p2.getPageId();
+	}
+	
+	/**
 	 * Provides a stream view of the page, with a current position and the ability to read/write
 	 * basic data types.
 	 * @author gpothier
@@ -731,6 +739,11 @@ public abstract class Page
 
 	public static class IntSlot extends Slot
 	{
+		public static int size()
+		{
+			return 4;
+		}
+		
 		public IntSlot()
 		{
 		}
@@ -751,8 +764,40 @@ public abstract class Page
 		}
 	}
 	
+	public static class LongSlot extends Slot
+	{
+		public static int size()
+		{
+			return 8;
+		}
+		
+		public LongSlot()
+		{
+		}
+		
+		public LongSlot(Page aPage, int aOffset)
+		{
+			super(aPage, aOffset);
+		}
+		
+		public long get()
+		{
+			return getContainerPage().readLong(getContainerOffset());
+		}
+		
+		public void set(long aValue)
+		{
+			getContainerPage().writeLong(getContainerOffset(), aValue);
+		}
+	}
+	
 	public static class BooleanSlot extends Slot
 	{
+		public static int size()
+		{
+			return 1;
+		}
+		
 		public BooleanSlot()
 		{
 		}
@@ -775,6 +820,11 @@ public abstract class Page
 	
 	public static class ByteSlot extends Slot
 	{
+		public static int size()
+		{
+			return 1;
+		}
+
 		public ByteSlot()
 		{
 		}
@@ -797,6 +847,11 @@ public abstract class Page
 	
 	public static class UnsignedByteSlot extends Slot
 	{
+		public static int size()
+		{
+			return 1;
+		}
+
 		public UnsignedByteSlot()
 		{
 		}
@@ -820,6 +875,11 @@ public abstract class Page
 	
 	public static class PidSlot extends Slot
 	{
+		public static int size()
+		{
+			return 4;
+		}
+		
 		public PidSlot()
 		{
 		}

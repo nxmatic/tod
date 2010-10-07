@@ -77,4 +77,16 @@ public abstract class EventCollector
 	public void localsSnapshot(LocalsSnapshot aSnapshot)
 	{
 	}
+	
+	public void enter(int aBehaviorId)
+	{
+	}
+	
+	public void exit()
+	{
+	}
+	
+	public void exitException()
+	{
+	}
 }

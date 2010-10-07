@@ -18,6 +18,7 @@ public class OnDiskIndex
 	private static final int N_LOG2_OBJECTSPERPAGE = OBJECTS_PER_SHAREDPAGE.length;
 	
 	private static final boolean LOG = false;
+	private static final boolean CHECK = false;
 	
 	private final PagedFile itsFile;
 	private Directory itsDirectory;
@@ -98,7 +99,7 @@ public class OnDiskIndex
 			thePage.writeByte(0, aLogMaxCount);
 			theStack.push(thePage.getPageId());
 //			if (LOG) Utils.println("New shared page: %d [%d]", thePage.getPageId(), aLogMaxCount);
-			theSharedPage = new SharedPage(thePage);
+			theSharedPage = new SharedPage(this, thePage);
 			theSharedPage.markFree(true);
 		}
 		else
@@ -106,7 +107,7 @@ public class OnDiskIndex
 			int thePid = theStack.peek();
 			thePage = getFile().get(thePid);
 //			if (LOG) Utils.println("Reusing shared page: %d [%d]", thePage.getPageId(), aLogMaxCount);
-			theSharedPage = new SharedPage(thePage);
+			theSharedPage = new SharedPage(this, thePage);
 			assert theSharedPage.isMarkedFree();
 			assert theSharedPage.hasFreeIds();
 		}
@@ -136,7 +137,7 @@ public class OnDiskIndex
 		aPage.markFree(true);
 	}
 	
-	private class Directory
+	private static class Directory
 	{
 		private static final int POS_PAGECOUNT = 0;
 		private static final int POS_EMPTYPAGESSTACK = 4;
@@ -353,7 +354,7 @@ public class OnDiskIndex
 		{
 			int thePid = getPid() >>> 1;
 			Page thePage = getFile().get(thePid);
-			return aIndex.new SharedPage(thePage);
+			return new SharedPage(aIndex, thePage);
 		}
 		
 		public void setSharedPage(SharedPage aPage)
@@ -376,9 +377,10 @@ public class OnDiskIndex
 	
 
 	
-	public class SharedPage
+	public static class SharedPage
 	{
-		private Page itsPage;
+		private final OnDiskIndex itsIndex;
+		private final Page itsPage;
 		
 		/**
 		 * An index into {@link OnDiskIndex#OBJECTS_PER_SHAREDPAGE}, that indicates 
@@ -396,8 +398,9 @@ public class OnDiskIndex
 		private long itsLastObjectFieldId = 0;
 		private int itsLastIndex = -1;
 		
-		public SharedPage(Page aPage)
+		public SharedPage(OnDiskIndex aIndex, Page aPage)
 		{
+			itsIndex = aIndex;
 			itsPage = aPage;
 			itsLogMaxCount = aPage.readByte(0);
 			assert itsLogMaxCount >= 0 && itsLogMaxCount < N_LOG2_OBJECTSPERPAGE : ""+itsLogMaxCount;
@@ -409,11 +412,13 @@ public class OnDiskIndex
 		
 		private void check()
 		{
+			if (! CHECK) return;
 			assert itsPage.readByte(3) == 0;
 		}
 		
 		private void checkCount()
 		{
+			if (! CHECK) return;
 			int theCount = 0;
 			for(int i=0;i<getMaxCount();i++)
 			{
@@ -448,7 +453,12 @@ public class OnDiskIndex
 		 */
 		public int getMaxCount()
 		{
-			return OnDiskIndex.OBJECTS_PER_SHAREDPAGE[itsLogMaxCount];
+			return getMaxCount(itsLogMaxCount);
+		}
+		
+		private static int getMaxCount(int aLogMaxCount)
+		{
+			return OnDiskIndex.OBJECTS_PER_SHAREDPAGE[aLogMaxCount];
 		}
 		
 		/**
@@ -473,25 +483,30 @@ public class OnDiskIndex
 			check();
 		}
 		
-		private int getIdsOffset()
+		private static int getIdsOffset()
 		{
 			return 4;
 		}
 		
-		private int getCountsOffset()
+		private static int getCountsOffset(int aLogMaxCount)
 		{
-			return getIdsOffset()+getMaxCount()*8;
+			return getIdsOffset()+getMaxCount(aLogMaxCount)*8;
 		}
 		
 		private int getValuesOffset()
 		{
-			return getCountsOffset()+getMaxCount();
+			return getCountsOffset(itsLogMaxCount)+getMaxCount();
+		}
+		
+		private static int getValuesOffsetForLogMaxCount(int aLogMaxCount)
+		{
+			return getCountsOffset(aLogMaxCount)+getMaxCount(aLogMaxCount);
 		}
 		
 		/**
 		 * Size of a single value
 		 */
-		private int getValueSize()
+		private static int getValueSize()
 		{
 			return 12;
 		}
@@ -499,14 +514,14 @@ public class OnDiskIndex
 		/**
 		 * Maximum number of values for each id
 		 */
-		private int getValuesCount()
+		private static int getMaxValuesCount(int aLogMaxCount)
 		{
-			return ((PagedFile.PAGE_SIZE-getValuesOffset())/getMaxCount())/getValueSize();
+			return ((PagedFile.PAGE_SIZE-getValuesOffsetForLogMaxCount(aLogMaxCount))/getMaxCount(aLogMaxCount))/getValueSize();
 		}
 		
 		private int getValuesOffset(int aIndex)
 		{
-			return getValuesOffset()+aIndex*getValueSize()*getValuesCount();
+			return getValuesOffset()+aIndex*getValueSize()*getMaxValuesCount(itsLogMaxCount);
 		}
 		
 		private long getId(int aIndex)
@@ -532,12 +547,12 @@ public class OnDiskIndex
 		 */
 		private int getValuesCount(int aIndex)
 		{
-			return itsPage.readByte(getCountsOffset()+aIndex) & 0xff;
+			return itsPage.readByte(getCountsOffset(itsLogMaxCount)+aIndex) & 0xff;
 		}
 		
 		private void setValuesCount(int aIndex, int aCount)
 		{
-			itsPage.writeByte(getCountsOffset()+aIndex, aCount);
+			itsPage.writeByte(getCountsOffset(itsLogMaxCount)+aIndex, aCount);
 			check();
 		}
 		
@@ -582,7 +597,7 @@ public class OnDiskIndex
 			assert getCurrentCount() > 0;
 		
 			int theCount = getValuesCount(theIndex);
-			if (theCount == getValuesCount()) return dumpToLargerStore(aSlot, theIndex, aObjectFieldId, aBlockId, aThreadId);
+			if (theCount == getMaxValuesCount(itsLogMaxCount)) return dumpToLargerStore(aSlot, theIndex, aObjectFieldId, aBlockId, aThreadId);
 			else
 			{
 				int theOffset = getValuesOffset(theIndex) + theCount*getValueSize();
@@ -598,7 +613,7 @@ public class OnDiskIndex
 			if (itsLogMaxCount < OBJECTS_PER_SHAREDPAGE.length-1)
 			{
 				// Dump to a larger shared page
-				SharedPage theSharedPage = getSharedPage(itsLogMaxCount+1);
+				SharedPage theSharedPage = itsIndex.getSharedPage(itsLogMaxCount+1);
 				int theValuesCount = getValuesCount(aIndex);
 				int theValuesOffset = getValuesOffset(aIndex);
 				for(int i=0;i<theValuesCount;i++)
@@ -618,8 +633,8 @@ public class OnDiskIndex
 				aSlot.setSharedPage(theSharedPage);
 				check();
 
-				if (! theSharedPage.hasFreeIds()) unfreeSharedPage(theSharedPage);
-				freeSharedPage(this);
+				if (! theSharedPage.hasFreeIds()) itsIndex.unfreeSharedPage(theSharedPage);
+				itsIndex.freeSharedPage(this);
 				
 				if (LOG) Utils.println("Moved object %d from p.%d [%d/%d] to p.%d [%d/%d]", 
 						aObjectFieldId, 
@@ -651,7 +666,7 @@ public class OnDiskIndex
 				setId(aIndex, 0);
 				check();
 
-				freeSharedPage(this);
+				itsIndex.freeSharedPage(this);
 
 				if (LOG) Utils.println("Moved object %d from page %d to btree", aObjectFieldId, getPageId());
 
@@ -665,9 +680,9 @@ public class OnDiskIndex
 			return String.format(
 					"ids off.: %d, counts off.: %d, values off.: %d, values count: %d, max count: %d", 
 					getIdsOffset(),
-					getCountsOffset(),
+					getCountsOffset(itsLogMaxCount),
 					getValuesOffset(),
-					getValuesCount(),
+					getMaxValuesCount(itsLogMaxCount),
 					getMaxCount());
 		}
 	}
@@ -693,11 +708,7 @@ public class OnDiskIndex
 			if (itsSlot.isNull())
 			{
 				assert itsObjectFieldId > 0;
-				itsSharedPage = getSharedPage(0);
-				itsSlot.setSharedPage(itsSharedPage);
-				assert itsSharedPage.hasFreeIds();
-				itsDeltaBTree = null;
-				if (LOG) Utils.println("Object %d on p.%d [%d/%d] (initial)", aObjectFieldId, itsSharedPage.getPageId(), itsSharedPage.getCurrentCount(), itsSharedPage.getMaxCount());
+				// Initialize later, but must keep the check
 			}
 			else if (itsSlot.isSharedPage())
 			{
@@ -721,8 +732,29 @@ public class OnDiskIndex
 			return itsObjectFieldId;
 		}
 		
+		private void init(int aInitialTupleCount)
+		{
+			// Check if we can use a shared page
+			for(int i=0;i<N_LOG2_OBJECTSPERPAGE;i++)
+			{
+				if (aInitialTupleCount < SharedPage.getMaxValuesCount(i)*8/10)
+				{
+					itsSharedPage = getSharedPage(i);
+					itsSlot.setSharedPage(itsSharedPage);
+					assert itsSharedPage.hasFreeIds();
+					itsDeltaBTree = null;
+					if (LOG) Utils.println("Object %d on p.%d [%d/%d] (initial)", itsObjectFieldId, itsSharedPage.getPageId(), itsSharedPage.getCurrentCount(), itsSharedPage.getMaxCount());
+					return;
+				}
+			}
+			itsSharedPage = null;
+			itsDeltaBTree = itsSlot.toBTree();
+		}
+		
 		public void append(long[] aBlockIds, int[] aThreadIds, int aOffset, int aCount)
 		{
+			if (itsSharedPage == null && itsDeltaBTree == null) init(aCount);
+			
 			assert itsObjectFieldId > 0;
 			while(aCount > 0)
 			{

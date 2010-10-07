@@ -88,10 +88,6 @@ public class TestDeltaBTree
 		
 		for(int i=1;i<=k;i++)
 		{
-			if (i == 180)
-			{
-				System.out.println("TestDeltaBTree.testRefill()");
-			}
 			btree.insertLeafTuples(theKeys, theValues, 0, i);
 		}
 		

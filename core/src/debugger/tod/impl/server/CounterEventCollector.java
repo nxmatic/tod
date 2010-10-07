@@ -36,33 +36,38 @@ import tod.impl.replay2.EventCollector;
 
 public class CounterEventCollector extends EventCollector
 {
-	private long itsCount = 0;
+	private long itsFieldReads = 0;
+	private long itsFieldWrites = 0;
+	private long itsSyncs = 0;
 
-	public long getCount()
-	{
-		return itsCount;
-	}
-	
 	protected void resetCount()
 	{
-		itsCount = 0;
+		itsFieldReads = 0;
+		itsFieldWrites = 0;
+		itsSyncs = 0;
 	}
 	
 	@Override
 	public void fieldRead(ObjectId aTarget, int aFieldId)
 	{
-		itsCount++;
+		itsFieldReads++;
 	}
 
 	@Override
 	public void fieldWrite(ObjectId aTarget, int aFieldId)
 	{
-		itsCount++;
+		itsFieldWrites++;
+	}
+	
+	@Override
+	public void sync(long aTimestamp)
+	{
+		itsSyncs++;
 	}
 
 	@Override
 	public String toString()
 	{
-		return "Count: "+itsCount;
+		return "reads: "+itsFieldReads+", writes: "+itsFieldWrites+", syncs: "+itsSyncs;
 	}
 }

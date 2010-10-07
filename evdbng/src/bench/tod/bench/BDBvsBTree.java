@@ -5,6 +5,7 @@ import java.io.File;
 import tod.BenchBase;
 import tod.BenchBase.BenchResults;
 import tod.impl.evdbng.db.file.InsertableBTree;
+import tod.impl.evdbng.db.file.IntInsertableBTree;
 import tod.impl.evdbng.db.file.Page;
 import tod.impl.evdbng.db.file.Page.PageIOStream;
 import tod.impl.evdbng.db.file.Page.PidSlot;
@@ -304,28 +305,4 @@ public class BDBvsBTree
 			theStream.writeInt(aData);
 		}
 	}
-	
-	private static class IntInsertableBTree extends InsertableBTree<IntTuple>
-	{
-		public IntInsertableBTree(String aName, PagedFile aFile, PidSlot aRootSlot)
-		{
-			super(aName, aRootSlot);
-		}
-		
-		@Override
-		protected TupleBufferFactory<IntTuple> getTupleBufferFactory()
-		{
-			return INT_TUPLEFACTORY;
-		}
-		
-		public void add(long aKey, int aData)
-		{
-			PageIOStream theStream = insertLeafKey(aKey, false);
-			theStream.writeInt(aData);
-		}
-	}
-	
-	
-
-
 }

@@ -29,8 +29,8 @@ public class Pipeline
 	private static final int QUEUE_SIZE = 128;
 	private static final int KEEPALIVE_TIME_MS = 10000;
 
-	private static final int COMPACTED_BLOCKS_THRESHOLD = 4*MB;
-	private static final int COMPACTED_BLOCKS_TOPICK = COMPACTED_BLOCKS_THRESHOLD*75/100;
+	private static final int COMPACTED_BLOCKS_THRESHOLD = 32*MB;
+	private static final int COMPACTED_BLOCKS_TOPICK = COMPACTED_BLOCKS_THRESHOLD*60/100;
 	
 	private static final boolean COMPACT_SORTED_BLOCKS = false;
 	
@@ -45,6 +45,7 @@ public class Pipeline
 				new ThreadPoolExecutor.CallerRunsPolicy());
 	}
 	
+	private int itsSubmittedJobs = 0;
 	private final ThreadPoolExecutor itsPool = createThreadPoolExecutor();
 	
 	private final OnDiskIndex itsIndex;
@@ -75,19 +76,61 @@ public class Pipeline
 		return theIndex;
 	}
 	
+	private synchronized void incSubmittedJobs()
+	{
+		itsSubmittedJobs++;
+	}
+	
+	private synchronized void decSubmittedJobs()
+	{
+		itsSubmittedJobs--;
+	}
+	
+	public synchronized void flush()
+	{
+		try
+		{
+			while(itsSubmittedJobs > 0) wait(1000);
+		}
+		catch (InterruptedException e)
+		{
+			throw new RuntimeException(e);
+		}
+	}
+	
+	private void submit(final Runnable aTask)
+	{
+		incSubmittedJobs();
+		itsPool.execute(new Runnable()
+		{
+			public void run()
+			{
+				try
+				{
+					aTask.run();
+				}
+				catch (Throwable e)
+				{
+					e.printStackTrace();
+				}
+				decSubmittedJobs();
+			}
+		});
+	}
+	
 	private void postBlockSort(RawBlockData aData)
 	{
-		itsPool.execute(new SortBlockTask(aData));
+		submit(new SortBlockTask(aData));
 	}
 	
 	private void postCompactBlock(RawBlockData aData)
 	{
-		itsPool.execute(new CompactBlockTask(aData));
+		submit(new CompactBlockTask(aData));
 	}
 	
 	private void postInvertBlocks(ArrayList<AbstractBlockData> aBlocks)
 	{
-		itsPool.execute(new InvertBlocksTask(aBlocks));
+		submit(new InvertBlocksTask(aBlocks));
 	}
 	
 	private void addSortedBlock(AbstractBlockData aData)
@@ -374,11 +417,12 @@ public class Pipeline
 			// Sort
 			Sorter.sort(this, 0, itsObjectIds.length-1);
 			
-			Utils.println("Writing %d entries to disk.", theCount);
-			
+			Utils.println("Preparing to write %d entries to disk.", theCount);
+
 			// Store
 			synchronized(itsIndex)
 			{
+				Utils.println("Writing (%d entries).", theCount);
 				ObjectAccessStore theStore = null;
 				long theLastObjectId = itsObjectIds[1];
 				int theOffset = 1;
@@ -397,6 +441,7 @@ public class Pipeline
 					}
 					theSubCount++;
 				}
+				Utils.println("Done (%d entries).", theCount);
 			}
 		}
 

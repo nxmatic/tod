@@ -907,13 +907,33 @@ public class ClassicPagedFile extends PagedFile
 				{
 					int theStart = itsStartPos + aPosition + aLength;
 					int theEnd = theStart - aLength;
-					for (int i=theStart-1;i>=theEnd;i--) theBuffer.put(i+aOffset, theBuffer.get(i));
+					while(theStart-8 >= theEnd)
+					{
+						theStart -= 8;
+						theBuffer.putLong(theStart+aOffset, theBuffer.getLong(theStart));
+					}
+					while(theStart-1 >= theEnd)
+					{
+						theStart--;
+						theBuffer.put(theStart+aOffset, theBuffer.get(theStart));
+					}
+//					for (int i=theStart-1;i>=theEnd;i--) theBuffer.put(i+aOffset, theBuffer.get(i));
 				}
 				else
 				{
 					int theStart = itsStartPos + aPosition;
 					int theEnd = theStart + aLength;
-					for (int i=theStart;i<theEnd;i++) theBuffer.put(i+aOffset, theBuffer.get(i));
+					while(theStart+8 <= theEnd)
+					{
+						theBuffer.putLong(theStart+aOffset, theBuffer.getLong(theStart));
+						theStart += 8;
+					}
+					while(theStart+1 <= theEnd)
+					{
+						theBuffer.put(theStart+aOffset, theBuffer.get(theStart));
+						theStart++;
+					}
+//					for (int i=theStart;i<theEnd;i++) theBuffer.put(i+aOffset, theBuffer.get(i));
 				}
 				
 				modified(theBufferId);

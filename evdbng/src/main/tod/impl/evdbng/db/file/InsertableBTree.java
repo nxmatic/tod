@@ -263,6 +263,7 @@ public abstract class InsertableBTree<T extends Tuple>
 	 */
 	protected PageIOStream insertLeafKey(long aKey, boolean aAllowOverwrite)
 	{
+		// If we allow overwrite we must sort the leaves, otherwise search is inefficient.
 		if (aAllowOverwrite && ! SORT_LEAVES) throw new UnsupportedOperationException();
 		
 		int[] theIndexes = new int[DB_MAX_INDEX_LEVELS]; // MAX instead of root level in hope the compiler can optimize better.

@@ -317,15 +317,32 @@ public class MappedPagedFile extends PagedFile
 			{
 				int theStart = itsOffset + aPosition + aLength;
 				int theEnd = theStart - aLength;
-				for (int i=theStart-1;i>=theEnd;i--) itsBuffer.put(i+aOffset, itsBuffer.get(i));
+				while(theStart-8 >= theEnd)
+				{
+					theStart -= 8;
+					itsBuffer.putLong(theStart+aOffset, itsBuffer.getLong(theStart));
+				}
+				while(theStart-1 >= theEnd)
+				{
+					theStart--;
+					itsBuffer.put(theStart+aOffset, itsBuffer.get(theStart));
+				}
 			}
 			else
 			{
 				int theStart = itsOffset + aPosition;
 				int theEnd = theStart + aLength;
-				for (int i=theStart;i<theEnd;i++) itsBuffer.put(i+aOffset, itsBuffer.get(i));
+				while(theStart+8 <= theEnd)
+				{
+					itsBuffer.putLong(theStart+aOffset, itsBuffer.getLong(theStart));
+					theStart += 8;
+				}
+				while(theStart+1 <= theEnd)
+				{
+					itsBuffer.put(theStart+aOffset, itsBuffer.get(theStart));
+					theStart++;
+				}
 			}
-			
 		}
 
 		@Override
@@ -340,13 +357,13 @@ public class MappedPagedFile extends PagedFile
 			int theSrc = itsOffset + aSrcPos;
 			int theDst = theDest.itsOffset + aDstPos;
 			
-//			while(aLength >= 8)
-//			{
-//				theDest.itsBuffer.putLong(theDst, itsBuffer.getLong(theSrc));
-//				theDst += 8;
-//				theSrc += 8;
-//				aLength -= 8;
-//			}
+			while(aLength >= 8)
+			{
+				theDest.itsBuffer.putLong(theDst, itsBuffer.getLong(theSrc));
+				theDst += 8;
+				theSrc += 8;
+				aLength -= 8;
+			}
 			while(aLength > 0)
 			{
 				theDest.itsBuffer.put(theDst++, itsBuffer.get(theSrc++));

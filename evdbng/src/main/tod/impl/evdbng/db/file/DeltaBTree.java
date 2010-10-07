@@ -99,13 +99,6 @@ public class DeltaBTree
 
 		itsCurrentPages[theLevel] = thePage;
 		loadCurrentLeafPage();
-		
-		// Forward the buffer until it is positioned right after the last tuple
-		for(int i=0;i<itsCurrentTupleCount;i++)
-		{
-			long kd = itsCurrentBuffer.getGammaLong();
-			int vd = itsCurrentBuffer.getGammaInt();
-		}
 	}
 	
 	private void loadCurrentLeafPage()
@@ -114,7 +107,9 @@ public class DeltaBTree
 		itsCurrentLastKey = getPageHeader_LastKey(thePage);
 		itsCurrentLastValue = getPageHeader_LastValue(thePage);
 		itsCurrentTupleCount = getPageHeader_TupleCount(thePage);
+		int theCurrentOffset = getPageHeader_CurrentOffset(thePage);
 		loadLeafPage(itsCurrentBuffer, thePage);
+		itsCurrentBuffer.position(theCurrentOffset);
 	}
 	
 	private static void loadLeafPage(BitBuffer aTarget, Page aPage)
@@ -129,12 +124,14 @@ public class DeltaBTree
 	private void saveCurrentLeafPage()
 	{
 		Page thePage = itsCurrentPages[0];
+		int theCurrentOffset = itsCurrentBuffer.position();
 		itsCurrentBuffer.position(0);
 		for(int i=getPageHeaderSize();i<PagedFile.PAGE_SIZE;i+=4)
 			thePage.writeInt(i, itsCurrentBuffer.getInt(32));
 		setPageHeader_LastKey(thePage, itsCurrentLastKey);
 		setPageHeader_LastValue(thePage, itsCurrentLastValue);
 		setPageHeader_TupleCount(thePage, itsCurrentTupleCount);
+		setPageHeader_CurrentOffset(thePage, theCurrentOffset);
 	}
 	
 	public void flush()
@@ -150,7 +147,7 @@ public class DeltaBTree
 	 */
 	private static int getPageHeaderSize()
 	{
-		return 16;
+		return 20;
 	}
 	
 	private static int getPageHeader_TupleCount(Page aPage)
@@ -201,6 +198,16 @@ public class DeltaBTree
 	private static void setPageHeader_LastValue(Page aPage, int aValue)
 	{
 		aPage.writeInt(12, aValue);
+	}
+	
+	private static int getPageHeader_CurrentOffset(Page aPage)
+	{
+		return aPage.readShort(16);
+	}
+	
+	private static void setPageHeader_CurrentOffset(Page aPage, int aOffset)
+	{
+		aPage.writeShort(16, aOffset);
 	}
 	
 	private static int getTupleSize_Internal()
@@ -391,7 +398,7 @@ public class DeltaBTree
 				else
 				{
 					assert theIndex == -1;
-					assert aPages[i-1] == itsCurrentPages[i-1];
+					assert Page.same(aPages[i-1], itsCurrentPages[i-1]);
 					continue;
 				}
 			}
@@ -442,7 +449,7 @@ public class DeltaBTree
 		assert isSorted(aKeys, aOffset, aCount);
 	
 		flush();
-		Utils.println("Key insertion: %d-%d (last: %d)", aKeys[aOffset], aKeys[aOffset+aCount-1], itsCurrentLastKey);
+		Utils.println("Key insertion: %d-%d (last: %d, count: %d)", aKeys[aOffset], aKeys[aOffset+aCount-1], itsCurrentLastKey, aCount);
 		
 		Page[] thePages = new Page[DB_MAX_INDEX_LEVELS];
 		int[] theIndexes = new int[DB_MAX_INDEX_LEVELS];
@@ -496,6 +503,14 @@ public class DeltaBTree
 		List<Page> theFreedPages = trim(theInsertPages, theInsertIndexes);
 		loadCurrentLeafPage();
 		
+		// Forward the buffer until it is positioned right after the last tuple
+		itsCurrentBuffer.position(0);
+		for(int i=0;i<itsCurrentTupleCount;i++)
+		{
+			long kd = itsCurrentBuffer.getGammaLong();
+			int vd = itsCurrentBuffer.getGammaInt();
+		}
+		
 		int theCount = theKeys.size();
 		for(int i=0;i<theCount;i++)
 		{
@@ -505,7 +520,7 @@ public class DeltaBTree
 			appendLeafTuple(theKey, theValue, theFreedPages);
 		}
 		
-		assert theFreedPages.size() == 0;
+		assert theFreedPages.size() == 0 : ""+theFreedPages.size();
 		itsDecodedPagesCache.dropAll(); // That's a bit more than strictly necessary, but we're on the safe side.
 	}
 	
@@ -554,7 +569,8 @@ public class DeltaBTree
 
 	private Page moveToNextPage(int aLevel, Page[] aPages, int[] aIndexes)
 	{
-		if (aPages[aLevel] == itsCurrentPages[aLevel]) return null;
+		assert aLevel <= itsCurrentRootLevel;
+		if (Page.same(aPages[aLevel], itsCurrentPages[aLevel])) return null;
 		
 		Page theNextPage;
 		Page theParentPage = aPages[aLevel+1];
@@ -570,10 +586,17 @@ public class DeltaBTree
 		else if (theParentTupleCount == getTuplesPerPage_Internal())
 		{
 			theParentPage = moveToNextPage(aLevel+1, aPages, aIndexes);
-			aIndexes[aLevel+1] = 0;
-			aPages[aLevel+1] = theParentPage;
-			int thePid = getPidAt_Internal(theParentPage, 0);
-			theNextPage = getFile().get(thePid);
+			if (theParentPage == null)
+			{
+				theNextPage = itsCurrentPages[aLevel];
+			}
+			else
+			{
+				aIndexes[aLevel+1] = 0;
+				aPages[aLevel+1] = theParentPage;
+				int thePid = getPidAt_Internal(theParentPage, 0);
+				theNextPage = getFile().get(thePid);
+			}
 		}
 		else theNextPage = itsCurrentPages[aLevel];
 		
@@ -592,6 +615,7 @@ public class DeltaBTree
 		Page thePage = getRootPage();
 		while(theLevel > 0)
 		{
+			assert thePage != null;
 			aPages[theLevel] = thePage;
 			long theLastKey = getPageHeader_LastKey(thePage);
 			if (aKey <= theLastKey)
@@ -610,6 +634,7 @@ public class DeltaBTree
 			theLevel--;
 		}
 		
+		assert thePage != null;
 		aPages[0] = thePage;
 		DecodedLeafPage theDecodedPage = getDecodedPage(thePage);
 		int theIndex = theDecodedPage.indexOf(aKey);

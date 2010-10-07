@@ -7,9 +7,9 @@ import junit.framework.Assert;
 
 import org.junit.Test;
 
-import tod.impl.evdbng.db.file.Page.PageIOStream;
 import tod.impl.evdbng.db.file.Page.PidSlot;
 import tod.impl.evdbng.db.file.mapped.MappedPagedFile;
+import zz.utils.Utils;
 
 public class TestInsertableBTree
 {
@@ -24,6 +24,7 @@ public class TestInsertableBTree
 
 		Random random = new Random(8);
 		System.out.println("Filling...");
+		long t0 = System.currentTimeMillis();
 		for(int i=0;i<N;i++)
 		{
 			long k = random.nextLong()*2;
@@ -33,6 +34,8 @@ public class TestInsertableBTree
 		}
 		System.out.println("sync");
 		file.flush();
+		long t1 = System.currentTimeMillis();
+		Utils.println("Took %02fs.", 0.001f*(t1-t0));
 
 		random = new Random(8);
 		System.out.println("Checking...");
@@ -47,109 +50,4 @@ public class TestInsertableBTree
 		
 	}
 	
-	private static class IntTuple extends Tuple
-	{
-		private final int itsData;
-		
-		public IntTuple(long aKey, int aData)
-		{
-			super(aKey);
-			itsData = aData;
-		}
-
-		public int getData()
-		{
-			return itsData;
-		}
-	}
-	
-	public static final TupleBufferFactory<IntTuple> INT_TUPLEFACTORY = new TupleBufferFactory<IntTuple>()
-	{
-		@Override
-		public IntTupleBuffer create(int aSize, int aPreviousPageId, int aNextPageId)
-		{
-			return new IntTupleBuffer(aSize, aPreviousPageId, aNextPageId);
-		}
-		
-		@Override
-		public int getDataSize()
-		{
-			return PageIOStream.intSize();
-		}
-
-		@Override
-		public IntTuple readTuple(long aKey, PageIOStream aStream)
-		{
-			return new IntTuple(aKey, aStream.readInt());
-		}
-
-		@Override
-		public void clearTuple(PageIOStream aStream)
-		{
-			aStream.writeInt(0);
-		}
-	};
-	
-	private static class IntTupleBuffer extends TupleBuffer<IntTuple>
-	{
-		private int[] itsDataBuffer;
-		
-		public IntTupleBuffer(int aSize, int aPreviousPageId, int aNextPageId)
-		{
-			super(aSize, aPreviousPageId, aNextPageId);
-			itsDataBuffer = new int[aSize];
-		}
-		
-		@Override
-		public void read0(int aPosition, PageIOStream aStream)
-		{
-			itsDataBuffer[aPosition] = aStream.readInt();
-		}
-		
-		@Override
-		public void write0(int aPosition, PageIOStream aStream)
-		{
-			aStream.writeInt(itsDataBuffer[aPosition]);
-		}
-		
-		@Override
-		public IntTuple getTuple(int aPosition)
-		{
-			return new IntTuple(
-					getKey(aPosition), 
-					itsDataBuffer[aPosition]);
-		}
-		
-		@Override
-		protected void swap(int a, int b)
-		{
-			swap(itsDataBuffer, a, b);
-		}
-	}
-	
-	private static class IntInsertableBTree extends InsertableBTree<IntTuple>
-	{
-		public IntInsertableBTree(String aName, PagedFile aFile, PidSlot aRootSlot)
-		{
-			super(aName, aRootSlot);
-		}
-		
-		@Override
-		protected TupleBufferFactory<IntTuple> getTupleBufferFactory()
-		{
-			return INT_TUPLEFACTORY;
-		}
-		
-		public void add(long aKey, int aData)
-		{
-			PageIOStream theStream = insertLeafKey(aKey, false);
-			theStream.writeInt(aData);
-		}
-		
-		public int get(long aKey)
-		{
-			IntTuple theTuple = getTupleAt(aKey);
-			return theTuple.getData();
-		}
-	}
 }
