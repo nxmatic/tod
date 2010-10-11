@@ -33,6 +33,7 @@ package tod.impl.replay2;
 
 import tod.core.database.structure.ObjectId;
 import tod.impl.replay2.ThreadReplayer.ExceptionInfo;
+import tod.impl.server.BufferStream.EndOfStreamException;
 import tod2.agent.Message;
 import zz.utils.Utils;
 
@@ -342,6 +343,10 @@ public class InScopeReplayerFrame
 			case Message.OUTOFSCOPE_BEHAVIOR_EXIT_EXCEPTION:
 			case Message.INSCOPE_BEHAVIOR_EXIT_EXCEPTION:
 				throw new BehaviorExitException();
+				
+			case Message.EXCEPTION:
+				// TODO: For now we consider that it means the program was terminated...
+				throw new EndOfStreamException();
 				
 			default: throw new UnexpectedMessageException(m);
 			}

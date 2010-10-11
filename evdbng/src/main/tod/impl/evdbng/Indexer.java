@@ -67,6 +67,7 @@ public class Indexer
 		private final int itsThreadId;
 		private final PerThreadIndex itsFieldsIndex;
 		private final CFlowIndex itsCFlowIndex;
+		private long itsLastSync;
 		
 		public Collector(int aThreadId)
 		{
@@ -88,6 +89,8 @@ public class Indexer
 		@Override
 		public void sync(long aTimestamp)
 		{
+			assert aTimestamp > itsLastSync : "last: "+itsLastSync+", current: "+aTimestamp;
+			itsLastSync = aTimestamp;
 			itsFieldsIndex.startBlock(aTimestamp);
 			itsCFlowIndex.sync(aTimestamp);
 		}

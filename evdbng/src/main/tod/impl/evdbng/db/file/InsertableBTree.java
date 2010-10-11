@@ -17,7 +17,7 @@ import zz.utils.Utils;
  */
 public abstract class InsertableBTree<T extends Tuple>
 {
-	private static final boolean CHECKS = true;
+	private static final boolean CHECKS = false;
 	private static final boolean LOG = false;
 	
 	/**
@@ -165,13 +165,13 @@ public abstract class InsertableBTree<T extends Tuple>
 	
 	private void setInternalKeyAt(Page aPage, int aIndex, long aKey)
 	{
-		int theOffset = getPageHeaderSize() + aIndex*getTupleSize(0);
+		int theOffset = getPageHeaderSize() + aIndex*getTupleSize(1);
 		aPage.writeLong(theOffset, aKey);
 	}
 	
 	private int getInternalPidAt(Page aPage, int aIndex)
 	{
-		int theOffset = getPageHeaderSize() + aIndex*getTupleSize(0);
+		int theOffset = getPageHeaderSize() + aIndex*getTupleSize(1);
 		return aPage.readInt(theOffset+8);
 	}
 	

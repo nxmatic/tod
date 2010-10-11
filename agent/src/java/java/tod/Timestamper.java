@@ -63,12 +63,6 @@ public class Timestamper extends Thread
 	
 	public volatile static long t = System.nanoTime() << TIMESTAMP_ADJUST_SHIFT;
 	
-	/**
-	 * An int to quickly check if the timestamp has changed.
-	 * Contains the lower 32 bits of timestamp.
-	 */
-	public volatile static int lt = (int) t;
-	
 	@Override
 	public void run()
 	{
@@ -90,7 +84,6 @@ public class Timestamper extends Thread
 	{
 		long theT = System.nanoTime() << TIMESTAMP_ADJUST_SHIFT; 
 		t = theT;
-		lt = (int) theT; 
 		return t;
 	}
 }

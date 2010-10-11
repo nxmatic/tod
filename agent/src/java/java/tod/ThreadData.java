@@ -94,7 +94,7 @@ public final class ThreadData
 	private RegisteredObjectsStack itsRegisteredObjectsStack = new RegisteredObjectsStack();
 	private RegisteredRefObjectsStack itsRegisteredRefObjectsStack = new RegisteredRefObjectsStack();
 	
-	private int itsLastSentLTimestamp = 0;
+	private long itsLastSentTimestamp = 0;
 
 	private int[] itsEvCount = new int[Message.MSG_COUNT];
 	private long[] itsEvData = new long[Message.MSG_COUNT];
@@ -432,11 +432,11 @@ public final class ThreadData
 	 */
 	private void checkTimestamp()
 	{
-		int theLTimestamp = Timestamper.lt;
-		if (theLTimestamp != itsLastSentLTimestamp)
+		long theTimestamp = Timestamper.t;
+		if (theTimestamp != itsLastSentTimestamp)
 		{
-			sendSync(Timestamper.t);
-			itsLastSentLTimestamp = theLTimestamp;
+			sendSync(theTimestamp);
+			itsLastSentTimestamp = theTimestamp;
 		}
 	}
 	
@@ -528,7 +528,7 @@ public final class ThreadData
 		commitBuffer();
 
 		msgStart(Message.NEW_ARRAY, 0);
-		checkTimestamp();
+//		checkTimestamp();
 		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.NEW_ARRAY, -1); 
 		sendMessageType(itsBuffer, Message.NEW_ARRAY);
 		sendValue(itsBuffer, aValue);
@@ -546,7 +546,7 @@ public final class ThreadData
 		commitBuffer();
 
 		msgStart(Message.CONSTANT, 0);
-		checkTimestamp();
+//		checkTimestamp();
 		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.CONSTANT, -1); 
 		sendMessageType(itsBuffer, Message.CONSTANT);
 		sendValue(itsBuffer, aValue);
@@ -564,7 +564,7 @@ public final class ThreadData
 		commitBuffer();
 
 		msgStart(Message.INSTANCEOF_OUTCOME, 0);
-		checkTimestamp();
+//		checkTimestamp();
 		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.INSTANCEOF_OUTCOME, -1); 
 		sendMessageType(itsBuffer, Message.INSTANCEOF_OUTCOME);
 		itsBuffer.put((byte) aOutcome);
@@ -585,7 +585,7 @@ public final class ThreadData
 
 		msgStart(Message.OBJECT_INITIALIZED, 0);
 
-		checkTimestamp();
+//		checkTimestamp();
 		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.OBJECT_INITIALIZED, -1); 
 		sendMessageType(itsBuffer, Message.OBJECT_INITIALIZED);
 		sendValue(itsBuffer, aValue);
@@ -666,7 +666,7 @@ public final class ThreadData
 		
 		msgStart(Message.HANDLER_REACHED, 0);
 		
-		checkTimestamp();
+//		checkTimestamp();
 		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.HANDLER_REACHED, aLocation); 
 		sendMessageType(itsBuffer, Message.HANDLER_REACHED);
 		itsBuffer.putInt(aLocation);

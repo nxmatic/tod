@@ -31,6 +31,7 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.server;
 
+import java.io.EOFException;
 import java.util.concurrent.ArrayBlockingQueue;
 
 import tod.utils.ByteBuffer;
@@ -121,48 +122,56 @@ public class BufferStream
 	public final byte get()
 	{
 		checkBuffer();
+		if (itsCurrentBuffer == null) throw new EndOfStreamException();
 		return itsCurrentBuffer.get();
 	}
 	
 	public final byte peek()
 	{
 		checkBuffer();
+		if (itsCurrentBuffer == null) throw new EndOfStreamException();
 		return itsCurrentBuffer.peek();
 	}
 	
 	public final char getChar()
 	{
 		checkBuffer();
+		if (itsCurrentBuffer == null) throw new EndOfStreamException();
 		return itsCurrentBuffer.getChar();
 	}
 	
 	public final short getShort()
 	{
 		checkBuffer();
+		if (itsCurrentBuffer == null) throw new EndOfStreamException();
 		return itsCurrentBuffer.getShort();
 	}
 	
 	public final int getInt()
 	{
 		checkBuffer();
+		if (itsCurrentBuffer == null) throw new EndOfStreamException();
 		return itsCurrentBuffer.getInt();
 	}
 	
 	public final long getLong()
 	{
 		checkBuffer();
+		if (itsCurrentBuffer == null) throw new EndOfStreamException();
 		return itsCurrentBuffer.getLong();
 	}
 	
 	public final float getFloat()
 	{
 		checkBuffer();
+		if (itsCurrentBuffer == null) throw new EndOfStreamException();
 		return itsCurrentBuffer.getFloat();
 	}
 	
 	public final double getDouble()
 	{
 		checkBuffer();
+		if (itsCurrentBuffer == null) throw new EndOfStreamException();
 		return itsCurrentBuffer.getDouble();
 	}
 	
@@ -172,6 +181,7 @@ public class BufferStream
 	public final String getString()
 	{
 		checkBuffer();
+		if (itsCurrentBuffer == null) throw new EndOfStreamException();
 		return itsCurrentBuffer.getString();
 	}
 	
@@ -180,5 +190,9 @@ public class BufferStream
 		itsFinished = true;
 		itsBuffers.clear();
 		itsCurrentBuffer = null;
+	}
+	
+	public static class EndOfStreamException extends RuntimeException
+	{
 	}
 }

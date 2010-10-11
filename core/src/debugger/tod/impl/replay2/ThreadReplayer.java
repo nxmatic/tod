@@ -41,6 +41,7 @@ import tod.core.database.structure.IBehaviorInfo;
 import tod.core.database.structure.IStructureDatabase;
 import tod.core.database.structure.ObjectId;
 import tod.impl.server.BufferStream;
+import tod.impl.server.BufferStream.EndOfStreamException;
 import tod2.agent.Message;
 import tod2.agent.ValueType;
 import zz.utils.Utils;
@@ -145,11 +146,6 @@ public abstract class ThreadReplayer
 	{
 		processStatelessMessages();
 		return nextMessage();
-	}
-	
-	public boolean hasMoreMessages()
-	{
-		return itsStream.remaining() > 0;
 	}
 	
 	private byte nextMessage()
@@ -460,13 +456,18 @@ public abstract class ThreadReplayer
 	 */
 	public void replay_main()
 	{
-		// Not using while(true), otherwise we crash when the stream ends.
-		while(hasMoreMessages())
+		try
 		{
-			byte m = getNextMessage();
-			
-			boolean theContinue = replay_OOS(m);
-			if (! theContinue) break;
+			while(true)
+			{
+				byte m = getNextMessage();
+				
+				boolean theContinue = replay_OOS(m);
+				if (! theContinue) break;
+			}
+		}
+		catch(EndOfStreamException e)
+		{
 		}
 	}
 	

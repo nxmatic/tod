@@ -89,7 +89,7 @@ public class RangeMinMaxTree
 	{
 		for(int i=0;i<MAX_LEVELS;i++) 
 		{
-			itsDirectory.setStream(i, itsLevels[i]);
+			if (itsLevels[i] != null) itsDirectory.setStream(i, itsLevels[i]);
 			itsDirectory.getMinSlot(i).set(itsCurrentMin[i]);
 			itsDirectory.getMaxSlot(i).set(itsCurrentMax[i]);
 		}
