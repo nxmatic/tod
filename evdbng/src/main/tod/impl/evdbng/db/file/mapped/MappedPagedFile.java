@@ -194,6 +194,18 @@ public class MappedPagedFile extends PagedFile
 		}
 
 		@Override
+		public void writeString(int aPosition, String aString, int aOffset, int aCount)
+		{
+			assert aPosition >= 0 && aPosition+aCount*2 <= PagedFile.PAGE_SIZE : ""+aPosition;
+			int thePos = itsOffset+aPosition;
+			for(int i=0;i<aCount;i++)
+			{
+				itsBuffer.putChar(thePos, aString.charAt(aOffset+i));
+				thePos += 2;
+			}
+		}
+
+		@Override
 		public byte readByte(int aPosition)
 		{
 			assert aPosition >= 0 && aPosition < PagedFile.PAGE_SIZE : ""+aPosition;

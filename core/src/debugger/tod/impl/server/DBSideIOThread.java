@@ -43,6 +43,7 @@ import java.util.Map;
 
 import tod.core.config.TODConfig;
 import tod.core.database.structure.IMutableStructureDatabase;
+import tod.core.database.structure.ObjectId;
 import tod.impl.database.structure.standard.StructureDatabase;
 import tod.impl.replay2.EventCollector;
 import tod.impl.replay2.LocalsSnapshot;
@@ -90,6 +91,11 @@ public abstract class DBSideIOThread
 	private final List<ThreadReplayerThread> itsReplayerThreads = new ArrayList<ThreadReplayerThread>();
 	private final TmpIdManager itsTmpIdManager = new TmpIdManager();
 	
+	/**
+	 * A collector for data that do not pertain to a particular thread.
+	 */
+	private EventCollector itsStaticCollector;
+	
 	private long itsProcessedSize = 0;
 	private int itsPacketCount = 0;
 	
@@ -126,6 +132,8 @@ public abstract class DBSideIOThread
 	{
 		try
 		{
+			itsStaticCollector = createCollector(-1);
+			
 			Utils.println("Starting replay.");
 			long t0 = System.currentTimeMillis();
 			
@@ -253,6 +261,8 @@ public abstract class DBSideIOThread
 	{
 		long theObjectId = ByteBuffer.getLongL(itsIn);
 		String theString = ByteBuffer.getString(itsIn);
+		
+		itsStaticCollector.registerString(new ObjectId(theObjectId), theString);
 		
 		itsProcessedSize += 8 + 4 + theString.length()*2;
 	}

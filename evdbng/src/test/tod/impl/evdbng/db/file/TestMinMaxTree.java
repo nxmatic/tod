@@ -420,6 +420,12 @@ public class TestMinMaxTree
 		}
 
 		@Override
+		public void writeString(int aPosition, String aString, int aOffset, int aCount)
+		{
+			throw new NotImplementedException();
+		}
+
+		@Override
 		public void writeInt(int aPosition, int aValue)
 		{
 			itsBuffer.putInt(aPosition, aValue);

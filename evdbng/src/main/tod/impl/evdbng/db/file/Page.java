@@ -62,6 +62,7 @@ public abstract class Page
 	public abstract void writeBoolean(int aPosition, boolean aValue);
 	public abstract void readBytes(int aPosition, byte[] aBuffer, int aOffset, int aCount);
 	public abstract void writeBytes(int aPosition, byte[] aBytes, int aOffset, int aCount);
+	public abstract void writeString(int aPosition, String aString, int aOffset, int aCount);
 	public abstract byte readByte(int aPosition);
 	public abstract void writeByte(int aPosition, int aValue);
 	public abstract short readShort(int aPosition);
@@ -176,6 +177,12 @@ public abstract class Page
 		public void writeBytes(byte[] aBytes, int aOffset, int aCount)
 		{
 			itsPage.writeBytes(getPos(), aBytes, aOffset, aCount);
+			skip(aCount);
+		}
+		
+		public void writeString(String aString, int aOffset, int aCount)
+		{
+			itsPage.writeString(getPos(), aString, aOffset, aCount);
 			skip(aCount);
 		}
 
@@ -604,6 +611,11 @@ public abstract class Page
 		{
 			return itsCurrentStream;
 		}
+		
+		public int remainingInCurrentPage()
+		{
+			return itsCurrentStream.remaining()-2*PageIOStream.pagePointerSize();
+		}
 
 		/**
 		 * Checks that the current page has enough space to hold aSpace more bytes.
@@ -612,7 +624,7 @@ public abstract class Page
 		private void checkSpace(int aSpace)
 		{
 			assert aSpace < PagedFile.PAGE_SIZE-2*PageIOStream.pagePointerSize();
-			if (itsCurrentStream.remaining()-2*PageIOStream.pagePointerSize() >= aSpace) return;
+			if (remainingInCurrentPage() >= aSpace) return;
 			
 			Page theNewPage = itsFile.create();
 			
@@ -692,6 +704,20 @@ public abstract class Page
 		{
 			checkSpace(aLength);
 			itsCurrentStream.writeBytes(aBytes, aOffset, aLength);
+		}
+		
+		public void writeString(String aString)
+		{
+			int theCount = aString.length();
+			int theOffset = 0;
+			while(theCount > 0)
+			{
+				int theCurrentCount = Math.min(theCount, remainingInCurrentPage()/2);
+				itsCurrentStream.writeString(aString, theOffset, theCurrentCount);
+				theOffset += theCurrentCount;
+				theCount -= theCurrentCount;
+				checkSpace(2);
+			}
 		}
 		
 		public void writeInternalTupleData(int aPageId, long aTupleCount)

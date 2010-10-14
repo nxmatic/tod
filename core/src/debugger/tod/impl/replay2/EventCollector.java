@@ -97,4 +97,8 @@ public abstract class EventCollector
 	public void exitException()
 	{
 	}
+	
+	public void registerString(ObjectId aId, String aString)
+	{
+	}
 }

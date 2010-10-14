@@ -577,6 +577,34 @@ public class ClassicPagedFile extends PagedFile
 				unlock();
 			}
 		}
+		
+		
+
+		@Override
+		public void writeString(int aPosition, String aString, int aOffset, int aCount)
+		{
+			try
+			{
+				lock();
+
+				assert aPosition+aCount*2 <= PAGE_SIZE;
+
+				int theBufferId = getValidBufferId();
+				int thePos = itsStartPos + aPosition;
+				ByteBuffer theBuffer = getBuffer().duplicate();
+
+				for(int i=0;i<aCount;i++)
+				{
+					theBuffer.putChar(thePos, aString.charAt(aOffset+i));
+					thePos += 2;
+				}
+				modified(theBufferId);
+			}
+			finally
+			{
+				unlock();
+			}
+		}
 
 		@Override
 		public byte readByte(int aPosition)

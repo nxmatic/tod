@@ -11,6 +11,7 @@ import tod.core.config.TODConfig;
 import tod.core.database.structure.IMutableStructureDatabase;
 import tod.core.database.structure.ObjectId;
 import tod.impl.database.structure.standard.StructureDatabase;
+import tod.impl.evdbng.db.StringIndex;
 import tod.impl.evdbng.db.cflowindex.CFlowIndex;
 import tod.impl.evdbng.db.fieldwriteindex.Pipeline;
 import tod.impl.evdbng.db.fieldwriteindex.Pipeline.PerThreadIndex;
@@ -28,6 +29,7 @@ public class Indexer
 	private final Page itsDirectoryPage;
 	
 	private final Pipeline itsFieldWritePipeline;
+	private final StringIndex itsStringIndex;
 	private List<Collector> itsCollectors = new ArrayList<Indexer.Collector>();
 	
 	private int itsDirectoryOffset = 0;
@@ -38,8 +40,8 @@ public class Indexer
 		if (itsFile.getPagesCount() == 0) itsDirectoryPage = itsFile.create();
 		else itsDirectoryPage = itsFile.get(1);
 		
-		itsFieldWritePipeline = new Pipeline(new PidSlot(itsDirectoryPage, itsDirectoryOffset));
-		itsDirectoryOffset += PidSlot.size();
+		itsFieldWritePipeline = new Pipeline(createPidSlot());
+		itsStringIndex = new StringIndex("strings", createPidSlot());
 	}
 	
 	private PidSlot createPidSlot()
@@ -56,12 +58,21 @@ public class Indexer
 		return theCollector;
 	}
 	
+	private void registerString(ObjectId aId, String aString)
+	{
+		itsStringIndex.addString(aId.getId(), aString);
+	}
+	
 	private void flush()
 	{
 		itsFieldWritePipeline.flush();
 		for (Collector theCollector : itsCollectors) theCollector.flush();
 	}
 	
+	/**
+	 * Event collector for a given thread.
+	 * @author gpothier
+	 */
 	private class Collector extends EventCollector
 	{
 		private final int itsThreadId;
@@ -72,8 +83,16 @@ public class Indexer
 		public Collector(int aThreadId)
 		{
 			itsThreadId = aThreadId;
-			itsFieldsIndex = itsFieldWritePipeline.getIndex(itsThreadId);
-			itsCFlowIndex = new CFlowIndex(createPidSlot());
+			if (aThreadId > 0)
+			{
+				itsFieldsIndex = itsFieldWritePipeline.getIndex(itsThreadId);
+				itsCFlowIndex = new CFlowIndex(createPidSlot());
+			}
+			else
+			{
+				itsFieldsIndex = null;
+				itsCFlowIndex = null;
+			}
 		}
 
 		@Override
@@ -123,12 +142,19 @@ public class Indexer
 			itsCFlowIndex.exit();
 		}
 		
+		@Override
+		public void registerString(ObjectId aId, String aString)
+		{
+			// Only one collector receives these events so no synchronization issues
+			Indexer.this.registerString(aId, aString);
+		}
+		
 		/**
 		 * Waits until all the processes associated with this collector are finished.
 		 */
 		public void flush()
 		{
-			itsCFlowIndex.flush();
+			if (itsCFlowIndex != null) itsCFlowIndex.flush();
 		}
 	}
 
