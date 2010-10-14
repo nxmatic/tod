@@ -40,11 +40,14 @@ import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.InsnNode;
 import org.objectweb.asm.tree.IntInsnNode;
+import org.objectweb.asm.tree.JumpInsnNode;
 import org.objectweb.asm.tree.LabelNode;
 import org.objectweb.asm.tree.LdcInsnNode;
 import org.objectweb.asm.tree.LocalVariableNode;
+import org.objectweb.asm.tree.LookupSwitchInsnNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
+import org.objectweb.asm.tree.TableSwitchInsnNode;
 import org.objectweb.asm.tree.TryCatchBlockNode;
 import org.objectweb.asm.tree.analysis.Analyzer;
 import org.objectweb.asm.tree.analysis.AnalyzerException;
@@ -406,8 +409,46 @@ public class BCIUtils implements Opcodes
 		checkMethod(aClassNode, aNode, new BasicInterpreter(), aAlwaysPrint);
 	}
 	
+	private static void checkLabel(LabelNode aLabelNode)
+	{
+		assert aLabelNode.getLabel().info == null || aLabelNode.getLabel().info == aLabelNode;		
+	}
+	
+	public static void checkLabels(MethodNode aNode)
+	{
+		for(int i=0;i<aNode.instructions.size();i++)
+		{
+			AbstractInsnNode theNode = aNode.instructions.get(i);
+
+			if (theNode instanceof LabelNode)
+			{
+				LabelNode theLabelNode = (LabelNode) theNode;
+				checkLabel(theLabelNode);
+			}
+			else if (theNode instanceof JumpInsnNode)
+			{
+				JumpInsnNode theJumpNode = (JumpInsnNode) theNode;
+				checkLabel(theJumpNode.label);
+			}
+			else if (theNode instanceof LookupSwitchInsnNode)
+			{
+				LookupSwitchInsnNode theLookupSwitchNode = (LookupSwitchInsnNode) theNode;
+				for(LabelNode theLabel : (List<LabelNode>) theLookupSwitchNode.labels) checkLabel(theLabel);
+				checkLabel(theLookupSwitchNode.dflt);
+			}
+			else if (theNode instanceof TableSwitchInsnNode)
+			{
+				TableSwitchInsnNode theTableSwitchNode = (TableSwitchInsnNode) theNode;
+				for(LabelNode theLabel : (List<LabelNode>) theTableSwitchNode.labels) checkLabel(theLabel);
+				checkLabel(theTableSwitchNode.dflt);
+			}
+			theNode = theNode.getNext();
+		}
+	}
+	
 	public static void checkMethod(ClassNode aClassNode, MethodNode aNode, Interpreter aInterpreter, boolean aAlwaysPrint)
 	{
+		checkLabels(aNode);
 		Analyzer theAnalyzer = new Analyzer(aInterpreter);
 		try
 		{
@@ -487,11 +528,14 @@ public class BCIUtils implements Opcodes
 	{
 		if (aFrame == null) return "null";
 		String s = aFrame.toString();
-		s = s.replace("Ltod/core/database/structure/ObjectId;", "O");
-		s = s.replace("Ltod/impl/replay2/ThreadReplayer;", "R");
-		s = s.replace("Ltod/impl/replay2/TmpObjectId;", "T");
+		s = s.replace("Ltod/core/database/structure/ObjectId;", "o");
+		s = s.replace("Ltod/impl/replay2/ThreadReplayer;", "r");
+		s = s.replace("Ltod/impl/replay2/TmpObjectId;", "t");
 		s = s.replace("Lnull;", "L");
 		s = s.replace("Ltod/impl/replay2/HandlerReachedException;", "h");
+		s = s.replace("Ltod/impl/replay2/EventCollector;", "c");
+		s = s.replace("Ltod/impl/replay2/LocalsSnapshot;", "s");
+		s = s.replace("Ljava/lang/Throwable;", "T");
 		return s;
 	}
 
@@ -613,6 +657,8 @@ public class BCIUtils implements Opcodes
 		theClone.visibleAnnotations = cloneList(aNode.visibleAnnotations);
 		theClone.visibleParameterAnnotations = cloneAnnotations(aNode.visibleParameterAnnotations);
 		
+		checkLabels(theClone);
+		
 		return theClone;
 	}
 	
@@ -629,15 +675,20 @@ public class BCIUtils implements Opcodes
 	
 	private static InsnList cloneInstructions(ClonerMap aMap, InsnList aList)
 	{
-		InsnList theClone = new InsnList();
+		InsnList theInsnListClone = new InsnList();
 		AbstractInsnNode theNode = aList.getFirst();
 		while(theNode != null)
 		{
-			theClone.add(theNode.clone(aMap));
+			AbstractInsnNode theClone = theNode.clone(aMap);
+			if (theClone instanceof LabelNode)
+			{
+				LabelNode theLabelNode = (LabelNode) theClone;
+			}
+			theInsnListClone.add(theClone);
 			theNode = theNode.getNext();
 		}
 		
-		return theClone;
+		return theInsnListClone;
 	}
 	
 	private static List<AnnotationNode>[] cloneAnnotations(List<AnnotationNode>[] aLists)

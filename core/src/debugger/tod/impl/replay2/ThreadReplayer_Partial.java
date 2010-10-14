@@ -31,10 +31,14 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.replay2;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+
 import tod.core.config.TODConfig;
 import tod.core.database.structure.IMutableStructureDatabase;
 import tod.core.database.structure.IStructureDatabase.SnapshotProbeInfo;
 import tod.impl.server.BufferStream;
+import tod.impl.server.BufferStream.EndOfStreamException;
 
 public class ThreadReplayer_Partial extends ThreadReplayer
 {
@@ -75,7 +79,6 @@ public class ThreadReplayer_Partial extends ThreadReplayer
 	@Override
 	public LocalsSnapshot getSnapshotForResume()
 	{
-		System.out.println("ThreadReplayer_Partial.getSnapshotForResume()");
 		LocalsSnapshot theSnapshot = itsSnapshot;
 		itsSnapshot = null; // Resume only once
 		return theSnapshot;
@@ -93,20 +96,40 @@ public class ThreadReplayer_Partial extends ThreadReplayer
 		getBehIdReceiver().setCurrentValue(itsSnapshot.getBehIdCurrentValue());
 		getObjIdReceiver().setCurrentValue(itsSnapshot.getObjIdCurrentValue());
 		
-		SnapshotProbeInfo theSnapshotProbeInfo = getDatabase().getSnapshotProbeInfo(itsSnapshot.getProbeId());
-		int theBehaviorId = theSnapshotProbeInfo.behaviorId;
-//		InScopeReplayerFrame theFrame = createInitialFrame(theBehaviorId);
-//		theFrame.invoke_PartialReplay();
+		try
+		{
+			SnapshotProbeInfo theSnapshotProbeInfo = getDatabase().getSnapshotProbeInfo(itsSnapshot.getProbeId());
+			
+			String theClassName = 
+				MethodReplayerGenerator.REPLAY_CLASS_PREFIX 
+				+ theSnapshotProbeInfo.behaviorId
+				+ "_" + theSnapshotProbeInfo.id;
+			
+			Class theClass = Class.forName(theClassName);
+			Method theInvokeMethod = theClass.getDeclaredMethod("invoke_PartialReplay", ThreadReplayer.class);
+			try
+			{
+				theInvokeMethod.invoke(null, this);
+			}
+			catch (InvocationTargetException e)
+			{
+				if (e.getCause() instanceof Exception) throw (Exception) e.getCause();
+				else throw e;
+			}
+		}
+		catch (EndOfStreamException e)
+		{
+		}
+		catch (Exception e)
+		{
+			throw new RuntimeException(e);
+		}
 		getStream().skipAll(); // Finishes 
 	}
 	
-//	private InScopeReplayerFrame createInitialFrame(int aBehaviorId)
-//	{
-//		ReplayerGenerator_Partial theGenerator = (ReplayerGenerator_Partial) getGenerator();
-//		InScopeReplayerFrame theFrame = theGenerator.createInitialFrame(aBehaviorId);
-//		theFrame.setup(this, getStream(), "initial", false, null);
-//		return theFrame;
-//	}
-	
-
+	@Override
+	protected void processSync(BufferStream aBuffer)
+	{
+		throw new EndOfStreamException();
+	}
 }

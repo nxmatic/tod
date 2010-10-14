@@ -43,7 +43,6 @@ import java.util.Set;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
-import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldInsnNode;
 import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.JumpInsnNode;
@@ -83,7 +82,7 @@ import zz.utils.Utils;
 public class MethodInfo
 {
 	private final IStructureDatabase itsDatabase;
-	private final ClassNode itsClassNode;
+	private final String itsClassName;
 	private final MethodNode itsMethodNode;
 	
 	/**
@@ -118,13 +117,14 @@ public class MethodInfo
 	 * {@link NewInvokeLink}, which indicates the corresponding NEW instruction and nesting level. 
 	 */
 	private Map<MethodInsnNode, NewInvokeLink> itsNewInvokeLinks;
+	private Map<TypeInsnNode, NewInvokeLink> itsInvokeNewLinks;
 	
 	private int itsMaxNewInvokeNesting = 0;
 
-	public MethodInfo(IStructureDatabase aDatabase, ClassNode aClassNode, MethodNode aMethodNode)
+	public MethodInfo(IStructureDatabase aDatabase, String aClassName, MethodNode aMethodNode)
 	{
 		itsDatabase = aDatabase;
-		itsClassNode = aClassNode;
+		itsClassName = aClassName;
 		itsMethodNode = aMethodNode;
 		setupFrames();
 		mapSelfAccesses();
@@ -132,9 +132,9 @@ public class MethodInfo
 		setupNewInvokeLinks();
 	}
 
-	public ClassNode getClassNode()
+	public String getClassName()
 	{
-		return itsClassNode;
+		return itsClassName;
 	}
 	
 	public MethodNode getMethodNode()
@@ -177,6 +177,11 @@ public class MethodInfo
 	public NewInvokeLink getNewInvokeLink(MethodInsnNode aNode)
 	{
 		return itsNewInvokeLinks.get(aNode);
+	}
+	
+	public NewInvokeLink getNewInvokeLink(TypeInsnNode aNode)
+	{
+		return itsInvokeNewLinks.get(aNode);
 	}
 	
 	public int getMaxNewInvokeNesting()
@@ -265,7 +270,7 @@ public class MethodInfo
 	private void setupFrames()
 	{
 		itsFramesMap = new HashMap<AbstractInsnNode, BCIFrame>();
-		BCIFrame[] theFrames = analyze_nocflow(getClassNode().name, getMethodNode());
+		BCIFrame[] theFrames = analyze_nocflow(getClassName(), getMethodNode());
 		
 		int i = 0; // Instruction rank
 		ListIterator<AbstractInsnNode> theIterator = getMethodNode().instructions.iterator();
@@ -591,7 +596,7 @@ public class MethodInfo
 			}
 		}
 		
-		if (! BCIUtils.CLS_OBJECT.equals(getClassNode().name) && isConstructor() && itsChainingInvocation == null) 
+		if (! BCIUtils.CLS_OBJECT.equals(getClassName()) && isConstructor() && itsChainingInvocation == null) 
 			throwRTEx("Should have constructor chaining");
 
 	}
@@ -603,6 +608,7 @@ public class MethodInfo
 	private void setupNewInvokeLinks()
 	{
 		itsNewInvokeLinks = new HashMap<MethodInsnNode, NewInvokeLink>();
+		itsInvokeNewLinks = new HashMap<TypeInsnNode, NewInvokeLink>();
 		
 		ListIterator<AbstractInsnNode> theIterator = getMethodNode().instructions.iterator();
 		while(theIterator.hasNext()) 
@@ -622,8 +628,9 @@ public class MethodInfo
 				{
 					int theNesting = countNews(theNew, theNode);
 					itsMaxNewInvokeNesting = Math.max(itsMaxNewInvokeNesting, theNesting);
-					NewInvokeLink theLink = new NewInvokeLink(theNew, theNesting);
+					NewInvokeLink theLink = new NewInvokeLink(theNew, theInvokeNode, theNesting);
 					itsNewInvokeLinks.put(theInvokeNode, theLink);
+					itsInvokeNewLinks.put(theNew, theLink);
 				}
 			}
 		}
@@ -633,7 +640,7 @@ public class MethodInfo
 	{
 		Utils.rtex(
 				"Error in %s.%s%s: %s", 
-				getClassNode().name, 
+				getClassName(), 
 				getMethodNode().name, 
 				getMethodNode().desc, 
 				aMessage);	
@@ -752,6 +759,8 @@ public class MethodInfo
 	 */
 	public static class BCIFrame extends Frame
 	{
+		private List<BCIValue> itsExtraLocals;
+		
 		public BCIFrame(Frame aSrc)
 		{
 			super(aSrc);
@@ -763,9 +772,36 @@ public class MethodInfo
 		}
 
 		@Override
+		public int getLocals()
+		{
+			return itsExtraLocals == null ? super.getLocals() : super.getLocals() + itsExtraLocals.size();
+		}
+		
+		@Override
 		public BCIValue getLocal(int aI) throws IndexOutOfBoundsException
 		{
-			return (BCIValue) super.getLocal(aI);
+			int theOriginalLocals = super.getLocals();
+			if (aI >= theOriginalLocals)
+			{
+				BCIValue theValue = itsExtraLocals.get(aI-theOriginalLocals);
+				if (theValue == null) 
+				{
+					theValue = new BCIValue(new BasicValue(null), null);
+					itsExtraLocals.set(aI-theOriginalLocals, theValue);
+				}
+				return theValue;
+			}
+			else 
+			{
+				return (BCIValue) super.getLocal(aI);
+			}
+		}
+		
+		public void setExtraLocal(int aIndex, Type aType)
+		{
+			if (itsExtraLocals == null) itsExtraLocals = new ArrayList<MethodInfo.BCIValue>();
+			int theOriginalLocals = super.getLocals();
+			Utils.listSet(itsExtraLocals, aIndex-theOriginalLocals, new BCIValue(new BasicValue(aType), null));
 		}
 
 		@Override
@@ -894,18 +930,25 @@ public class MethodInfo
 	public static class NewInvokeLink
 	{
 		private final TypeInsnNode itsNewInsn;
+		private final MethodInsnNode itsInvokeInsn;
 		private final int itsNestingLevel;
 
-		public NewInvokeLink(TypeInsnNode aNewInsn, int aNestingLevel)
+		public NewInvokeLink(TypeInsnNode aNewInsn, MethodInsnNode aInvokeInsn, int aNestingLevel)
 		{
 			assert aNewInsn != null;
 			itsNewInsn = aNewInsn;
+			itsInvokeInsn = aInvokeInsn;
 			itsNestingLevel = aNestingLevel;
 		}
 
 		public TypeInsnNode getNewInsn()
 		{
 			return itsNewInsn;
+		}
+		
+		public MethodInsnNode getInvokeInsn()
+		{
+			return itsInvokeInsn;
 		}
 
 		public int getNestingLevel()

@@ -413,19 +413,123 @@ public class InScopeReplayerFrame
 		else throw new UnexpectedMessageException(m);
 	}
 	
-
-	
-	/**
-	 * Note: can't read the value here as the type is not static
-	 * (otherwise we would need a switch, not efficient).
-	 */
-	public static void expectArrayRead(ThreadReplayer aReplayer)
+	public static boolean expectAndSendBooleanArrayRead(ThreadReplayer aReplayer, ObjectId aTarget, int aIndex)
 	{
-//		byte m = getNextMessage();
 		byte m = getNextMessageConsumingClassloading(aReplayer);
-		if (m == Message.ARRAY_READ) return;
-		else throw new UnexpectedMessageException(m);
+		if (m != Message.ARRAY_READ) throw new UnexpectedMessageException(m);
+		
+		boolean theValue = aReplayer.readBoolean();
+		
+		aReplayer.getCollector().arrayRead(aTarget, aIndex);
+		aReplayer.getCollector().value(theValue ? 1 : 0);
+		
+		return theValue;
 	}
+
+	public static byte expectAndSendByteArrayRead(ThreadReplayer aReplayer, ObjectId aTarget, int aIndex)
+	{
+		byte m = getNextMessageConsumingClassloading(aReplayer);
+		if (m != Message.ARRAY_READ) throw new UnexpectedMessageException(m);
+		
+		byte theValue = aReplayer.readByte();
+		
+		aReplayer.getCollector().arrayRead(aTarget, aIndex);
+		aReplayer.getCollector().value(theValue);
+		
+		return theValue;
+	}
+	
+	public static char expectAndSendCharArrayRead(ThreadReplayer aReplayer, ObjectId aTarget, int aIndex)
+	{
+		byte m = getNextMessageConsumingClassloading(aReplayer);
+		if (m != Message.ARRAY_READ) throw new UnexpectedMessageException(m);
+		
+		char theValue = aReplayer.readChar();
+		
+		aReplayer.getCollector().arrayRead(aTarget, aIndex);
+		aReplayer.getCollector().value(theValue);
+		
+		return theValue;
+	}
+	
+	public static double expectAndSendDoubleArrayRead(ThreadReplayer aReplayer, ObjectId aTarget, int aIndex)
+	{
+		byte m = getNextMessageConsumingClassloading(aReplayer);
+		if (m != Message.ARRAY_READ) throw new UnexpectedMessageException(m);
+		
+		double theValue = aReplayer.readDouble();
+		
+		aReplayer.getCollector().arrayRead(aTarget, aIndex);
+		aReplayer.getCollector().value(theValue);
+		
+		return theValue;
+	}
+	
+	public static float expectAndSendFloatArrayRead(ThreadReplayer aReplayer, ObjectId aTarget, int aIndex)
+	{
+		byte m = getNextMessageConsumingClassloading(aReplayer);
+		if (m != Message.ARRAY_READ) throw new UnexpectedMessageException(m);
+		
+		float theValue = aReplayer.readFloat();
+		
+		aReplayer.getCollector().arrayRead(aTarget, aIndex);
+		aReplayer.getCollector().value(theValue);
+		
+		return theValue;
+	}
+	
+	public static int expectAndSendIntArrayRead(ThreadReplayer aReplayer, ObjectId aTarget, int aIndex)
+	{
+		byte m = getNextMessageConsumingClassloading(aReplayer);
+		if (m != Message.ARRAY_READ) throw new UnexpectedMessageException(m);
+		
+		int theValue = aReplayer.readInt();
+		
+		aReplayer.getCollector().arrayRead(aTarget, aIndex);
+		aReplayer.getCollector().value(theValue);
+		
+		return theValue;
+	}
+	
+	public static long expectAndSendLongArrayRead(ThreadReplayer aReplayer, ObjectId aTarget, int aIndex)
+	{
+		byte m = getNextMessageConsumingClassloading(aReplayer);
+		if (m != Message.ARRAY_READ) throw new UnexpectedMessageException(m);
+		
+		long theValue = aReplayer.readLong();
+		
+		aReplayer.getCollector().arrayRead(aTarget, aIndex);
+		aReplayer.getCollector().value(theValue);
+		
+		return theValue;
+	}
+	
+	public static ObjectId expectAndSendRefArrayRead(ThreadReplayer aReplayer, ObjectId aTarget, int aIndex)
+	{
+		byte m = getNextMessageConsumingClassloading(aReplayer);
+		if (m != Message.ARRAY_READ) throw new UnexpectedMessageException(m);
+		
+		ObjectId theValue = aReplayer.readRef();
+		
+		aReplayer.getCollector().arrayRead(aTarget, aIndex);
+		aReplayer.getCollector().value(theValue);
+		
+		return theValue;
+	}
+	
+	public static short expectAndSendShortArrayRead(ThreadReplayer aReplayer, ObjectId aTarget, int aIndex)
+	{
+		byte m = getNextMessageConsumingClassloading(aReplayer);
+		if (m != Message.ARRAY_READ) throw new UnexpectedMessageException(m);
+		
+		short theValue = aReplayer.readShort();
+		
+		aReplayer.getCollector().arrayRead(aTarget, aIndex);
+		aReplayer.getCollector().value(theValue);
+		
+		return theValue;
+	}
+	
 	
 	public static int expectArrayLength(ThreadReplayer aReplayer)
 	{
@@ -471,8 +575,9 @@ public class InScopeReplayerFrame
 		return nextTmpId(aReplayer);
 	}
 	
-	public static void waitObjectInitialized(ThreadReplayer aReplayer, TmpObjectId aId)
+	public static void waitObjectInitialized(ThreadReplayer aReplayer, ObjectId aId)
 	{
+		TmpObjectId theObjectId = (TmpObjectId) aId;
 		byte theMessage = aReplayer.getNextMessage();
 		if (theMessage != Message.OBJECT_INITIALIZED) throw new UnexpectedMessageException(theMessage);
 		
@@ -484,7 +589,7 @@ public class InScopeReplayerFrame
 			Utils.println("ObjectInitialized [old: %d, new %d]", aId.getId(), theActualRef.getId());
 		}
 		
-		aId.setId(theActualRef.getId());
+		theObjectId.setId(theActualRef.getId());
 	}
 	
 	public static void waitConstructorTarget(ThreadReplayer aReplayer, ObjectId aId)

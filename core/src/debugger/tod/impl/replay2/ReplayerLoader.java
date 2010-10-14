@@ -87,6 +87,8 @@ public class ReplayerLoader extends ClassLoader
 	
 	private Map<IClassInfo, ClassNode> itsClassNodeCache = new HashMap<IClassInfo, ClassNode>();
 
+	private Set<String> itsAddedSnapshotSigs = new HashSet<String>();
+
 	public ReplayerLoader(
 			ClassLoader aParent, 
 			TODConfig aConfig,
@@ -181,6 +183,7 @@ public class ReplayerLoader extends ClassLoader
 			&& ! aName.equals(getClass().getName())
 			&& ! aName.equals(TmpIdManager.class.getName())
 			&& ! aName.equals(LocalsSnapshot.class.getName())
+			&& ! aName.equals(TmpObjectId.class.getName())
 			&& ! aName.equals(EventCollector.class.getName());
 	}
 	
@@ -224,7 +227,7 @@ public class ReplayerLoader extends ClassLoader
 				itsConfig, 
 				itsDatabase, 
 				itsDatabase.getBehavior(aBehaviorId, true), 
-				theClassNode, 
+				theClassNode.name, 
 				theMethodNode).generate();
 	}
 	
@@ -234,11 +237,14 @@ public class ReplayerLoader extends ClassLoader
 		ClassNode theClassNode = getClassNode(theBehavior.getDeclaringType());
 		MethodNode theMethodNode = findMethodNode(theClassNode, theBehavior);
 		
+		// We can instrument the same method twice (starting point and regular), so clone it. 
+		theMethodNode = BCIUtils.cloneMethod(theMethodNode); 
+		
 		return new MethodReplayerGenerator_Partial(
 				itsConfig, 
 				itsDatabase, 
 				itsDatabase.getBehavior(aBehaviorId, true), 
-				theClassNode, 
+				theClassNode.name, 
 				theMethodNode,
 				aSnapshotProbeId > 0 ? itsDatabase.getSnapshotProbeInfo(aSnapshotProbeId) : null).generate();
 	}
@@ -383,6 +389,11 @@ public class ReplayerLoader extends ClassLoader
 		for (String theSignature : itsDatabase.getRegisteredSnapshotSignatures())
 		{
 			modifyThreadReplayer_addSnapshotMethod(theClassNode, theSignature);
+			
+			// Add extra signatures that takes an extra object
+			// This is because of the NEW/INVOKE mechanism that stores a tmp id in a local
+			modifyThreadReplayer_addSnapshotMethod(theClassNode, theSignature+"L");
+			modifyThreadReplayer_addSnapshotMethod(theClassNode, theSignature+"LL");
 		}
 		
 		addClass(theClassNode);
@@ -438,7 +449,9 @@ public class ReplayerLoader extends ClassLoader
 			theSlot += theType.getSize();
 		}
 		int theThreadReplayerSlot = theSlot++; 
+		int theCollectorSlot = theSlot++; 
 		int theBehaviorIdSlot = theSlot++;
+		int theLastSlot = theSlot;
 		
 		MethodNode theMethod = createMethodNode(theDispatchSignature);
 		theMethod.access = Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC;
@@ -468,7 +481,6 @@ public class ReplayerLoader extends ClassLoader
 			sw.ILOAD(theType, theSlot);
 			theSlot += theType.getSize();
 		}
-		theSlot += 2;
 		sw.ALOAD(theThreadReplayerSlot); // Push the ThreadReplayer
 		
 		SList cases = new SList();
@@ -529,10 +541,46 @@ public class ReplayerLoader extends ClassLoader
 		sw.ISTORE(theBehaviorIdSlot);
 		
 		// Send event
-		sw.ALOAD(theThreadReplayerSlot);
-		sw.INVOKEVIRTUAL(CLS_THREADREPLAYER, "getCollector", "()"+DSC_EVENTCOLLECTOR_REPLAY);
-		sw.ILOAD(theBehaviorIdSlot);
-		sw.INVOKEVIRTUAL(CLS_EVENTCOLLECTOR_REPLAY, "enter", "(I)V");
+		if (itsFirstPass)
+		{
+			sw.ALOAD(theThreadReplayerSlot);
+			sw.INVOKEVIRTUAL(CLS_THREADREPLAYER, "getCollector", "()"+DSC_EVENTCOLLECTOR_REPLAY);
+			sw.ILOAD(theBehaviorIdSlot);
+			sw.pushInt(0);
+			sw.INVOKEVIRTUAL(CLS_EVENTCOLLECTOR_REPLAY, "enter", "(II)V");
+		}
+		else
+		{
+			int theArgCount = theArgSorts.length;
+			if (! aDescriptor.isStatic()) theArgCount++;
+			
+			sw.ALOAD(theThreadReplayerSlot);
+			sw.INVOKEVIRTUAL(CLS_THREADREPLAYER, "getCollector", "()"+DSC_EVENTCOLLECTOR_REPLAY);
+			sw.DUP();
+			sw.ASTORE(theCollectorSlot);
+			
+			sw.ILOAD(theBehaviorIdSlot);
+			sw.pushInt(theArgCount);
+			sw.INVOKEVIRTUAL(CLS_EVENTCOLLECTOR_REPLAY, "enter", "(II)V");
+
+			
+			theSlot = 0; 
+			if (! aDescriptor.isStatic()) 
+			{
+				sw.ALOAD(theCollectorSlot);
+				sw.ALOAD(0);
+				MethodReplayerGenerator.invokeValue(sw, TYPE_OBJECT);
+				theSlot++;
+			}
+			for(int theSort : theArgSorts)
+			{
+				Type theType = getType(theSort, TYPE_OBJECTID);
+				sw.ALOAD(theCollectorSlot);
+				sw.ILOAD(theType, theSlot);
+				MethodReplayerGenerator.invokeValue(sw, theType);
+				theSlot += theType.getSize();
+			}
+		}
 
 		// Create switch
 		sw.LOOKUPSWITCH(lDefault, theKeys, theLabels);
@@ -560,8 +608,8 @@ public class ReplayerLoader extends ClassLoader
 		theMethod.visitTryCatchBlock(lBegin, lEnd, lHandler, CLS_BEHAVIOREXITEXCEPTION);
 		
 		theMethod.instructions = sw;
-		theMethod.maxLocals = theSlot;
-		theMethod.maxStack = theSlot+2;
+		theMethod.maxLocals = theLastSlot;
+		theMethod.maxStack = theLastSlot+2;
 		
 		return theMethod;
 	}
@@ -767,11 +815,18 @@ public class ReplayerLoader extends ClassLoader
 	}
 
 
+	
 	private void modifyThreadReplayer_addSnapshotMethod(ClassNode aClassNode, String aSnapshotSig)
 	{
+		if (! itsAddedSnapshotSigs.add(aSnapshotSig)) return;
 		Type[] theSignature = new Type[aSnapshotSig.length()];
 		for(int i=0;i<theSignature.length;i++) theSignature[i] = BCIUtils.getTypeForSig(aSnapshotSig.charAt(i));
-		MethodNode theMethod = createSnapshotMethod(aClassNode, theSignature);
+		modifyThreadReplayer_addSnapshotMethod(aClassNode, theSignature);
+	}
+	
+	private void modifyThreadReplayer_addSnapshotMethod(ClassNode aClassNode, Type[] aSignature)
+	{
+		MethodNode theMethod = createSnapshotMethod(aClassNode, aSignature);
 		BCIUtils.checkMethod(aClassNode, theMethod, new ReplayerVerifier(), false);
 		aClassNode.methods.add(theMethod);
 	}

@@ -59,10 +59,16 @@ public class MethodReplayerGenerator_FirstPass extends MethodReplayerGenerator
 			TODConfig aConfig,
 			IMutableStructureDatabase aDatabase,
 			IBehaviorInfo aBehavior,
-			ClassNode aClassNode,
+			String aClassName,
 			MethodNode aMethodNode)
 	{
-		super(aConfig, aDatabase, aBehavior, aClassNode, aMethodNode);
+		super(aConfig, aDatabase, aBehavior, aClassName, aMethodNode);
+	}
+	
+	@Override
+	protected boolean sendAllEvents()
+	{
+		return false;
 	}
 	
 	@Override
@@ -113,7 +119,7 @@ public class MethodReplayerGenerator_FirstPass extends MethodReplayerGenerator
 		{
 			Type theType = theFrame.getLocal(i).getType();
 			if (theType == null) continue;
-
+			
 			theArgTypes.add(BCIUtils.getActualReplayType(theType));
 			s.ILOAD(theType, transformSlot(i));
 		}

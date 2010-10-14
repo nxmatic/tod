@@ -59,12 +59,26 @@ public class MethodReplayerGenerator_Partial extends MethodReplayerGenerator
 			TODConfig aConfig,
 			IMutableStructureDatabase aDatabase,
 			IBehaviorInfo aBehavior,
-			ClassNode aClassNode,
+			String aClassName,
 			MethodNode aMethodNode,
 			SnapshotProbeInfo aSnapshotProbeInfo)
 	{
-		super(aConfig, aDatabase, aBehavior, aClassNode, aMethodNode);
+		super(aConfig, aDatabase, aBehavior, aClassName, aMethodNode);
 		itsSnapshotProbeInfo = aSnapshotProbeInfo;
+	}
+	
+	@Override
+	protected String getClassName()
+	{
+		return itsSnapshotProbeInfo != null ? 
+				super.getClassName() + "_" + itsSnapshotProbeInfo.id
+				: super.getClassName();
+	}
+
+	@Override
+	protected boolean sendAllEvents()
+	{
+		return true;
 	}
 
 	@Override
@@ -105,7 +119,7 @@ public class MethodReplayerGenerator_Partial extends MethodReplayerGenerator
 		
 		s = new SList();
 		
-		s.ALOAD(0);
+		s.ALOAD(getThreadReplayerSlot());
 		s.INVOKEVIRTUAL(CLS_THREADREPLAYER, "getSnapshotForResume", "()"+DSC_LOCALSSNAPSHOT);
 		s.ASTORE(itsSnapshotVar);
 		
@@ -124,10 +138,10 @@ public class MethodReplayerGenerator_Partial extends MethodReplayerGenerator
 		{
 			Type theType = theFrame.getLocal(i).getType();
 			if (theType == null) continue;
-
+			
 			s.ALOAD(itsSnapshotVar);
 			invokeSnapshotPop(s, theType);
-			s.ISTORE(theType, i+1);
+			s.ISTORE(theType, transformSlot(i));
 		}
 		
 		itsResumeCode = s;

@@ -87,6 +87,16 @@ public class Indexer
 		}
 		
 		@Override
+		public void arrayWrite(ObjectId aTarget, int aIndex)
+		{
+			long theObjectId = aTarget != null ? aTarget.getId() : 0;
+			assert theObjectId < 0xffffffffffffL;
+			assert aIndex < 0xffff;
+			long theId = (theObjectId << 16) | aIndex;
+			itsFieldsIndex.registerAccess(theId);
+		}
+		
+		@Override
 		public void sync(long aTimestamp)
 		{
 			assert aTimestamp > itsLastSync : "last: "+itsLastSync+", current: "+aTimestamp;
@@ -96,7 +106,7 @@ public class Indexer
 		}
 		
 		@Override
-		public void enter(int aBehaviorId)
+		public void enter(int aBehaviorId, int aArgsCount)
 		{
 			itsCFlowIndex.enter();
 		}

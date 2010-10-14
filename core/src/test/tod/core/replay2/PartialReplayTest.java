@@ -42,33 +42,48 @@ import tod.core.database.structure.IMutableStructureDatabase;
 import tod.impl.database.structure.standard.StructureDatabase;
 import tod.impl.replay2.EventCollector;
 import tod.impl.replay2.LocalsSnapshot;
+import tod.impl.replay2.ReifyEventCollector;
+import tod.impl.replay2.ReplayerLoader;
 import tod.impl.server.DBSideIOThread;
 import zz.utils.Utils;
 
 public class PartialReplayTest
 {
-	
-	private static void partialReplay(File aEventsFile, TODConfig aConfig, IMutableStructureDatabase aDatabase, LocalsSnapshot aSnapshot) throws IOException
+	private static int partialReplay(
+			File aEventsFile, 
+			TODConfig aConfig, 
+			IMutableStructureDatabase aDatabase, 
+			LocalsSnapshot aSnapshot,
+			ReplayerLoader aLoader) throws IOException
 	{
-		System.out.println("Partial replay of snapshot at: "+aSnapshot.getProbeId());
+		Utils.println(
+				"Partial replay of snapshot: %d (packet start offset: %d, packet offset: %d)", 
+				aSnapshot.getProbeId(), 
+				aSnapshot.getPacketStartOffset(),
+				aSnapshot.getPacketOffset());
+		
 		FileInputStream fis = new FileInputStream(aEventsFile);
 		long theBytesToSkip = aSnapshot.getPacketStartOffset();
 		while(theBytesToSkip > 0) theBytesToSkip -= fis.skip(theBytesToSkip);
 		
-		DBSideIOThread theIOThread = new DBSideIOThread(aConfig, aDatabase, fis, aSnapshot)
+		final ReifyEventCollector theCollector = new ReifyEventCollector();
+		final boolean[] theCollectorCreated = {false};
+		
+		DBSideIOThread theIOThread = new DBSideIOThread(aConfig, aDatabase, fis, aSnapshot, aLoader)
 		{
 			@Override
 			protected EventCollector createCollector(int aThreadId)
 			{
-				MyEventCollector theCollector = new MyEventCollector();
-//				theCollectors.add(theCollector);
+				if (theCollectorCreated[0]) throw new RuntimeException(); // Only one thread
+				theCollectorCreated[0] = true;
 				return theCollector;
 			}
 		};
 		
 		theIOThread.setInitialSkip(aSnapshot.getPacketOffset());
 		theIOThread.run();
-		System.out.println("Done");
+		
+		return theCollector.getEvents().size();
 	}
 	
 	public static void main(String[] args) throws Exception
@@ -103,13 +118,22 @@ public class PartialReplayTest
 		}
 		System.out.println("Replay done.");
 		
+		System.out.println("Threads: "+theCollectors.size());
+		
+		ReplayerLoader theLoader = new ReplayerLoader(DBSideIOThread.class.getClassLoader(), theConfig, theDatabase, false);
+
+		int t = 1;
 		for (MyEventCollector theCollector : theCollectors)
 		{
+			Utils.println("[%d] Replaying %d snapshots", t++, theCollector.getSnapshots().size());
 			int i=0;
+			int theTotalCount = 0;
 			for(LocalsSnapshot theSnapshot : theCollector.getSnapshots())
 			{
 				Utils.println("Snapshot #%d", i++);
-				partialReplay(theEventsFile, theConfig, theDatabase, theSnapshot);
+				int theCount = partialReplay(theEventsFile, theConfig, theDatabase, theSnapshot, theLoader);
+				theTotalCount += theCount;
+				Utils.println("Count: %d, total: %d", theCount, theTotalCount);
 			}
 		}
 

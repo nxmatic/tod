@@ -95,13 +95,28 @@ public abstract class DBSideIOThread
 	
 	public DBSideIOThread(TODConfig aConfig, IMutableStructureDatabase aDatabase, InputStream aIn, LocalsSnapshot aSnapshot)
 	{
+		this(
+				aConfig, 
+				aDatabase, 
+				aIn, 
+				aSnapshot, 
+				new ReplayerLoader(DBSideIOThread.class.getClassLoader(), aConfig, aDatabase, aSnapshot == null));
+	}
+
+	public DBSideIOThread(
+			TODConfig aConfig, 
+			IMutableStructureDatabase aDatabase, 
+			InputStream aIn, 
+			LocalsSnapshot aSnapshot,
+			ReplayerLoader aLoader)
+	{
 		itsConfig = aConfig;
 		itsDatabase = aDatabase;
 		itsIn = aIn;
 		itsSnapshot = aSnapshot;
-		itsLoader = new ReplayerLoader(getClass().getClassLoader(), itsConfig, itsDatabase, itsSnapshot == null);
+		itsLoader = aLoader;
 	}
-
+	
 	public void setInitialSkip(int aInitialSkip)
 	{
 		itsInitialSkip = aInitialSkip;
@@ -220,8 +235,11 @@ public abstract class DBSideIOThread
 				itsInitialSkip = 0;
 			}
 		
-			ThreadReplayerThread theReplayerThread = getReplayerThread(theThreadId);
-			theReplayerThread.push(theBuffer);
+			if (theBuffer.remaining() > 0)
+			{
+				ThreadReplayerThread theReplayerThread = getReplayerThread(theThreadId);
+				theReplayerThread.push(theBuffer);
+			}
 		}
 		else
 		{
