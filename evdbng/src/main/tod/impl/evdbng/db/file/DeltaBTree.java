@@ -524,11 +524,33 @@ public class DeltaBTree
 		itsDecodedPagesCache.dropAll(); // That's a bit more than strictly necessary, but we're on the safe side.
 	}
 	
+	public static long itsKeysBits;
+	public static long itsValuesBits;
+	public static long itsEntriesCount;
+	
+	private static final boolean STATS = false;
+	
+	
 	private void appendLeafTuple(long aKey, int aValue, List<Page> aFreePages)
 	{
+		int p0 = 0;
+		int p1 = 0;
+		int p2 = 0;
+		
 		if (itsCurrentBuffer.remaining() < getMaxTupleBits_Leaf()) newLeafPage(aFreePages);
+		if (STATS) p0 = itsCurrentBuffer.position();
 		itsCurrentBuffer.putGamma(aKey-itsCurrentLastKey);
+		if (STATS) p1 = itsCurrentBuffer.position();
 		itsCurrentBuffer.putGamma(aValue-itsCurrentLastValue);
+		if (STATS) p2 = itsCurrentBuffer.position();
+		
+		if (STATS) 
+		{
+			itsKeysBits += p1-p0;
+			itsValuesBits += p2-p1;
+			itsEntriesCount++;
+		}
+		
 		itsCurrentLastKey = aKey;
 		itsCurrentLastValue = aValue;
 		itsCurrentTupleCount++;

@@ -196,7 +196,7 @@ public class Pipeline
 		
 		public void registerAccess(long aObjectId)
 		{
-			assert aObjectId > 0;
+			assert aObjectId >= 0;
 			itsSet.add(aObjectId);
 		}
 		

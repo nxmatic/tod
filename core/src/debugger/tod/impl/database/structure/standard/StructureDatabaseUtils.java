@@ -48,7 +48,7 @@ public class StructureDatabaseUtils
 		return theBehavior.getId();
 	}
 	
-	public static int getFieldId(
+	public static IFieldInfo getField(
 			IStructureDatabase aStructureDatabase, 
 			String aClassName, 
 			String aFieldName,
@@ -58,18 +58,38 @@ public class StructureDatabaseUtils
 		if (theClass == null)
 		{
 			if (aFailIfAbsent) throw new RuntimeException("Class not found: "+aClassName);
-			else return -1;			
+			else return null;			
 		}
 		
 		while(theClass != null)
 		{
 			IFieldInfo theField = theClass.getField(aFieldName);
-			if (theField != null) return theField.getId();
+			if (theField != null) return theField;
 			else theClass = theClass.getSupertype(); 
 		}
 
 		if (aFailIfAbsent) throw new RuntimeException("Field not found: "+aClassName+"."+aFieldName);
-		else return -1;
+		else return null;
+	}
+	
+	public static int getFieldId(
+			IStructureDatabase aStructureDatabase, 
+			String aClassName, 
+			String aFieldName,
+			boolean aFailIfAbsent)
+	{
+		IFieldInfo theField = getField(aStructureDatabase, aClassName, aFieldName, aFailIfAbsent);
+		return theField != null ? theField.getId() : -1;
+	}
+	
+	public static int getFieldSlotIndex(
+			IStructureDatabase aStructureDatabase, 
+			String aClassName, 
+			String aFieldName,
+			boolean aFailIfAbsent)
+	{
+		IFieldInfo theField = getField(aStructureDatabase, aClassName, aFieldName, aFailIfAbsent);
+		return theField != null ? theField.getSlotIndex() : -1;
 	}
 	
 

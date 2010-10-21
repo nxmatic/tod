@@ -22,6 +22,7 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 */
 package tod.core.database.structure;
 
+import java.io.IOException;
 import java.util.Map;
 
 import tod.core.database.structure.IBehaviorInfo.BytecodeRole;
@@ -112,4 +113,6 @@ public interface IMutableStructureDatabase extends IStructureDatabase
 	 * inconsistency.
 	 */
 	public void setAdviceSourceMap(Map<Integer, SourceRange> aMap);
+	
+	public void save() throws IOException;
 }

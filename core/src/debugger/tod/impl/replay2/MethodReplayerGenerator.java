@@ -84,6 +84,7 @@ import zz.utils.SetMap;
 public abstract class MethodReplayerGenerator
 {
 	public static final String REPLAY_CLASS_PREFIX = "$trepl$";
+	public static final String SNAPSHOT_CLASS_PREFIX = "$tsnap$";
 	public static final String SNAPSHOT_METHOD_NAME = "$tsnap";
 
 	private final TODConfig itsConfig;
@@ -300,7 +301,7 @@ public abstract class MethodReplayerGenerator
 		
 		byte[] theBytecode = theWriter.toByteArray();
 
-		BCIUtils.writeClass("/home/gpothier/tmp/tod/replayer/"+getClassDumpSubpath(), itsTarget, theBytecode);
+		BCIUtils.writeClass("/home/gpothier/tmp/tod/replayer/"+getClassDumpSubpath(), itsTarget.name, theBytecode);
 
 		// Check the methods
 		try
@@ -1193,7 +1194,7 @@ public abstract class MethodReplayerGenerator
 		if (aNode.getOpcode() == Opcodes.GETSTATIC) s.ACONST_NULL(); // Push "null" target
 		s.ALOAD(itsThreadReplayerSlot);
 		s.SWAP();
-		s.pushInt(StructureDatabaseUtils.getFieldId(itsDatabase, aNode.owner, aNode.name, false));
+		s.pushInt(StructureDatabaseUtils.getFieldSlotIndex(itsDatabase, aNode.owner, aNode.name, true));
 		
 		if (DebugFlags.USE_FIELD_CACHE)
 		{
@@ -1226,7 +1227,7 @@ public abstract class MethodReplayerGenerator
 		s.DUP();
 		
 		s.ALOAD(itsTmpTargetVar);
-		s.LDC(StructureDatabaseUtils.getFieldId(itsDatabase, aNode.owner, aNode.name, true));
+		s.LDC(StructureDatabaseUtils.getFieldSlotIndex(itsDatabase, aNode.owner, aNode.name, true));
 		s.INVOKEVIRTUAL(CLS_EVENTCOLLECTOR_REPLAY, "fieldWrite", "("+DSC_OBJECTID+"I)V");
 		
 		s.ILOAD(theType, itsTmpValueVar);

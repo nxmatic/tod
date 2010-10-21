@@ -103,6 +103,17 @@ public interface IClassInfo extends ITypeInfo
 	 * Returns all the fields of this class (excluding inherited ones).
 	 */
 	public Iterable<IFieldInfo> getFields();
+	
+	/**
+	 * Returns the number of fields in this class.
+	 */
+	public int getFieldCount();
+	
+	/**
+	 * Returns the total number of slots in this class, ie. the number of
+	 * fields of this class and its superclasses.
+	 */
+	public int getSlotsCount();
 
 	/**
 	 * Returns all the behaviors of this class (excluding inherited ones).

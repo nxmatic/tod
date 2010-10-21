@@ -135,11 +135,16 @@ public abstract class Page
 
 		public PageIOStream(Page aPage)
 		{
-			assert aPage != null;
-			itsPage = aPage;
-			setPos(0);
+			this(aPage, 0);
 		}
 
+		public PageIOStream(Page aPage, int aPosition)
+		{
+			assert aPage != null;
+			itsPage = aPage;
+			setPos(aPosition);
+		}
+		
 		public Page getPage()
 		{
 			return itsPage;

@@ -110,14 +110,12 @@ public class PartialReplayTest
 				}
 			};
 			theIOThread.run();
-			
 		}
 		catch (Throwable e)
 		{
 			e.printStackTrace();
 		}
 		System.out.println("Replay done.");
-		
 		System.out.println("Threads: "+theCollectors.size());
 		
 		ReplayerLoader theLoader = new ReplayerLoader(DBSideIOThread.class.getClassLoader(), theConfig, theDatabase, false);
@@ -131,9 +129,16 @@ public class PartialReplayTest
 			for(LocalsSnapshot theSnapshot : theCollector.getSnapshots())
 			{
 				Utils.println("Snapshot #%d", i++);
-				int theCount = partialReplay(theEventsFile, theConfig, theDatabase, theSnapshot, theLoader);
-				theTotalCount += theCount;
-				Utils.println("Count: %d, total: %d", theCount, theTotalCount);
+				try
+				{
+					int theCount = partialReplay(theEventsFile, theConfig, theDatabase, theSnapshot, theLoader);
+					theTotalCount += theCount;
+					Utils.println("Count: %d, total: %d", theCount, theTotalCount);
+				}
+				catch (Exception e)
+				{
+					e.printStackTrace();
+				}
 			}
 		}
 

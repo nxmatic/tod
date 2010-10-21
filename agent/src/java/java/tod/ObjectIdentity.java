@@ -22,9 +22,9 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 */
 package java.tod;
 
+import java.lang.reflect.Array;
 import java.tod.util.WeakLongHashMap;
 
-import tod2.agent.AgentConfig;
 import tod2.agent.AgentDebugFlags;
 import tod2.agent.util.BitUtilsLite;
 
@@ -62,7 +62,7 @@ public class ObjectIdentity
 	 * If this call causes the object to be tagged, the opposite of 
 	 * the actual tag value is returned.
 	 */
-	public static long get (Object aObject)
+	public static long get(Object aObject)
 	{
 		if (! USE_CACHE) 
 		{
@@ -89,15 +89,28 @@ public class ObjectIdentity
 	}
 	
 	private static native long get15(Object aObject);
-
+//
 	private static long itsNextId = 1;
 	
-	public static synchronized long nextId()
+	/**
+	 * Allocates a range of ids. Each object has a single id,
+	 * but we keep a number of empty ids after each "real" id
+	 * to represent each field (or slot) of the object.
+	 */
+	public static synchronized long nextId(int aSlots)
 	{
+//		assert aSlots > 0;
+		
 		// We create odd ids. Even ids are used for temporary ids (see TmpIdManager)
 		long theId = itsNextId;
-		itsNextId += 2;
+		itsNextId += 2*aSlots;
 		return theId;
+	}
+	
+	public static long nextIdFor(Object aObject)
+	{
+		if (aObject.getClass().isArray()) return nextId(Array.getLength(aObject));
+		else return nextId(1);
 	}
 	
 	private static int itsNextClassId = 1;
@@ -109,13 +122,14 @@ public class ObjectIdentity
 	
 	private static synchronized long get14(Object aObject)
 	{
-		long theId = MAP.get(aObject);
-		if (theId != 0) return theId;
-		else
-		{
-			theId = (nextId() << AgentConfig.HOST_BITS) | _AgentConfig.HOST_ID;
-			MAP.put(aObject, theId);
-			return -theId;
-		}
+		throw new UnsupportedOperationException();
+//		long theId = MAP.get(aObject);
+//		if (theId != 0) return theId;
+//		else
+//		{
+//			theId = (nextId() << AgentConfig.HOST_BITS) | _AgentConfig.HOST_ID;
+//			MAP.put(aObject, theId);
+//			return -theId;
+//		}
 	}
 }

@@ -47,14 +47,19 @@ public class CounterEventCollector extends EventCollector
 		itsSyncs = 0;
 	}
 	
+	public long getFieldAccessCount()
+	{
+		return itsFieldReads+itsFieldWrites;
+	}
+	
 	@Override
-	public void fieldRead(ObjectId aTarget, int aFieldId)
+	public void fieldRead(ObjectId aTarget, int aFieldSlotIndex)
 	{
 		itsFieldReads++;
 	}
 
 	@Override
-	public void fieldWrite(ObjectId aTarget, int aFieldId)
+	public void fieldWrite(ObjectId aTarget, int aFieldSlotIndex)
 	{
 		itsFieldWrites++;
 	}

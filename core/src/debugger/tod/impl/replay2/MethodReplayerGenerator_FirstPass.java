@@ -103,6 +103,7 @@ public class MethodReplayerGenerator_FirstPass extends MethodReplayerGenerator
 		BCIFrame theFrame = getMethodInfo().getFrame(aReferenceNode.getNext());
 		String theLocalsSig = BCIUtils.getSnapshotSig(theFrame, aSaveStack);
 		List<Type> theArgTypes = new ArrayList<Type>();
+		theArgTypes.add(BCIUtils.TYPE_THREADREPLAYER);
 		theArgTypes.add(Type.INT_TYPE); // Snapshot seq
 		theArgTypes.add(Type.INT_TYPE); // Probe id
 		Type[] theStackTypes = aSaveStack ? getStackTypes(theFrame) : null;
@@ -136,7 +137,7 @@ public class MethodReplayerGenerator_FirstPass extends MethodReplayerGenerator
 
 		String theDesc = Type.getMethodDescriptor(Type.INT_TYPE, theArgTypes.toArray(new Type[theArgTypes.size()]));
 
-		s.INVOKEVIRTUAL(CLS_THREADREPLAYER, MethodReplayerGenerator.SNAPSHOT_METHOD_NAME, theDesc);
+		s.INVOKESTATIC(SNAPSHOT_CLASS_PREFIX+theLocalsSig, MethodReplayerGenerator.SNAPSHOT_METHOD_NAME, theDesc);
 		s.ISTORE(itsSnapshotSeqVar);
 		
 		if (aSaveStack) genLoadStack(s, theStackTypes);

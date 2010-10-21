@@ -186,7 +186,7 @@ public class ClassInstrumenter
 		}
 		catch(Exception e)
 		{
-			BCIUtils.writeClass(getInstrumenter().getConfig().get(TODConfig.CLASS_CACHE_PATH)+"/err", getNode(), theBytecode);
+			BCIUtils.writeClass(getInstrumenter().getConfig().get(TODConfig.CLASS_CACHE_PATH)+"/err", getNode().name, theBytecode);
 			System.err.println("Class "+getNode().name+" failed check. Writing out bytecode.");
 			e.printStackTrace();
 		}
@@ -527,7 +527,8 @@ public class ClassInstrumenter
 		s.POP2();
 		
 		s.ALOAD(0);
-		s.INVOKESTATIC("java/tod/ObjectIdentity", "nextId", "()J");
+		s.pushInt(Math.max(1, itsClassInfo.getSlotsCount()));
+		s.INVOKESTATIC("java/tod/ObjectIdentity", "nextId", "(I)J");
 		s.DUP2_X1();
 		s.PUTFIELD(getNode().name, OBJID_FIELD, "J");
 		

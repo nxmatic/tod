@@ -1,0 +1,9 @@
+PLATFORM=linux_x64
+
+JAVA14_HOME=/home/gpothier/apps/java/j2sdk1.4.2_18/
+JAVA15_HOME=/home/gpothier/apps/java/jdk1.6.0_22/
+
+BOOST_INCLUDES=/usr/include
+BOOST_LIBS=/usr/lib
+BOOST_VERSION=
+BOOST_FLAVOR=mt

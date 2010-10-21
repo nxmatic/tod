@@ -156,7 +156,7 @@ implements IShareableStructureDatabase
 		itsConfig = aConfig;
 		itsAllowHomonymClasses = itsConfig.get(TODConfig.ALLOW_HOMONYM_CLASSES);
 		boolean theFileExists = aFile.exists();
-		itsFile = new RandomAccessFile(aFile, aForReplay ? "r" : "rw");
+		itsFile = new RandomAccessFile(aFile, "rw");
 		
 		itsClassNameInfos = itsAllowHomonymClasses ? new HashMap<String, ClassNameInfo>(1000) : null;
 		itsClassInfos = itsAllowHomonymClasses ? null : new HashMap<String, ClassInfo>(1000);
@@ -255,6 +255,7 @@ implements IShareableStructureDatabase
 			itsSnapshotProbesMap = new TLongObjectHashMap<SnapshotProbeInfo>();
 			for (SnapshotProbeInfo theProbe : itsSnapshotProbes)
 			{
+				if (theProbe == null) continue;
 				long theKey = getSnapshotProbeKey(theProbe.behaviorId, theProbe.probeIndex);
 				itsSnapshotProbesMap.put(theKey, theProbe);
 			}
@@ -298,9 +299,9 @@ implements IShareableStructureDatabase
 		return SAVING.get();
 	}
 
-
 	public void save() throws IOException
 	{
+		System.out.println("Saving structure database...");
 		long theOffset = itsFile.getFilePointer();
 		itsFile.seek(0);
 		itsFile.writeLong(theOffset);
@@ -335,6 +336,7 @@ implements IShareableStructureDatabase
 		{
 			SAVING.set(true);
 		}
+		System.out.println("Structure database saved.");
 	}
 	
 
@@ -636,7 +638,7 @@ implements IShareableStructureDatabase
 		Utils.listSet(itsFields, aField.getId(), (FieldInfo) aField);
 		for (Listener theListener : itsListeners) theListener.fieldAdded(aField);
 	}
-
+	
 	public ITypeInfo getNewType(String aName)
 	{
 		return getType(this, aName, true, false);
@@ -821,7 +823,7 @@ implements IShareableStructureDatabase
 		SnapshotProbeInfo theProbe = itsSnapshotProbesMap.get(theKey);
 		if (theProbe == null)
 		{
-			int theId = itsSnapshotProbesMap.size() + 1; 
+			int theId = itsIds.nextSnapshotProbeId(); 
 			theProbe = new SnapshotProbeInfo(theId, aBehaviorId, aProbeIndex, aSignature);
 			itsSnapshotProbesMap.put(theKey, theProbe);
 			Utils.listSet(itsSnapshotProbes, theId, theProbe);
@@ -1056,6 +1058,7 @@ implements IShareableStructureDatabase
 		private int itsNextFreeBehaviorId = 1;
 		private int itsNextFreeFieldId = 1;
 		private int itsNextFreeAspectId = 1;
+		private int itsNextFreeSnapshotProbeId = 1;
 
 		public synchronized int nextClassId()
 		{
@@ -1090,6 +1093,16 @@ implements IShareableStructureDatabase
 		public synchronized int nextAspectId()
 		{
 			return itsNextFreeAspectId++;
+		}
+		
+		public synchronized int nextSnapshotProbeId()
+		{
+			return itsNextFreeSnapshotProbeId++;
+		}
+		
+		public int getLastSnapshotProbeId()
+		{
+			return itsNextFreeSnapshotProbeId-1;
 		}
 		
 		/**

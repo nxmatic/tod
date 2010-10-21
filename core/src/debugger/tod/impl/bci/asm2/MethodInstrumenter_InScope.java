@@ -108,7 +108,7 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		// Abstracts and natives have no body.
 		if (isAbstract() || isNative()) return;
 		
-		itsMethodInfo = new MethodInfo(getDatabase(), getClassNode(), getNode());
+		itsMethodInfo = new MethodInfo(getDatabase(), getClassNode().name, getNode());
 		int theSlotsCount = itsMethodInfo.setupLocalCacheSlots(getNode().maxLocals);
 		getNode().maxLocals += theSlotsCount;			
 		

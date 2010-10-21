@@ -34,6 +34,7 @@ package tod.impl.replay2;
 import static tod.impl.bci.asm2.BCIUtils.*;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -78,6 +79,7 @@ public class ReplayerLoader extends ClassLoader
 	private final ClassLoader itsParent;
 	private TODConfig itsConfig;
 	private final IMutableStructureDatabase itsDatabase;
+	private final File itsCacheBase;
 	private final Map<String, byte[]> itsClassesMap = new HashMap<String, byte[]>();
 	
 	private boolean itsFirstPass;
@@ -86,8 +88,6 @@ public class ReplayerLoader extends ClassLoader
 	private Object itsGenerator;
 	
 	private Map<IClassInfo, ClassNode> itsClassNodeCache = new HashMap<IClassInfo, ClassNode>();
-
-	private Set<String> itsAddedSnapshotSigs = new HashSet<String>();
 
 	public ReplayerLoader(
 			ClassLoader aParent, 
@@ -100,6 +100,8 @@ public class ReplayerLoader extends ClassLoader
 		itsDatabase = aDatabase;
 		itsFirstPass = aFirstPass;
 		modifyBaseClasses(aDatabase);
+		
+		itsCacheBase = new File("/home/gpothier/tmp/tod/replayer/"+itsDatabase.getId()+(itsFirstPass ? "/first" : "/partial"));
 		
 		try
 		{
@@ -255,29 +257,65 @@ public class ReplayerLoader extends ClassLoader
 		byte[] theBytecode;
 		if (aName.startsWith(MethodReplayerGenerator.REPLAY_CLASS_PREFIX))
 		{
-			String theName = aName.substring(MethodReplayerGenerator.REPLAY_CLASS_PREFIX.length());
-			if (itsFirstPass)
+			File theCachedClassFile = new File(itsCacheBase, aName);
+			if (theCachedClassFile.exists())
 			{
-				int id = Integer.parseInt(theName);
-				theBytecode = createFirstPassReplayerClass(id);
+				try
+				{
+					theBytecode = Utils.readInputStream_byte(new FileInputStream(theCachedClassFile));
+				}
+				catch (IOException e)
+				{
+					throw new RuntimeException(e);
+				}
 			}
 			else
 			{
-				String[] theParts = theName.split("_");
-				if (theParts.length == 1)
+				String theName = aName.substring(MethodReplayerGenerator.REPLAY_CLASS_PREFIX.length());
+				if (itsFirstPass)
 				{
-					// Non-startup replayer
-					int theBehaviorId = Integer.parseInt(theParts[0]);
-					theBytecode = createPartialReplayerClass(theBehaviorId, 0);
+					int id = Integer.parseInt(theName);
+					theBytecode = createFirstPassReplayerClass(id);
 				}
 				else
 				{
-					// Startup replayer
-					int theBehaviorId = Integer.parseInt(theParts[0]);
-					int theSnapshotProbeId = Integer.parseInt(theParts[1]);
-					theBytecode = createPartialReplayerClass(theBehaviorId, theSnapshotProbeId);
+					String[] theParts = theName.split("_");
+					if (theParts.length == 1)
+					{
+						// Non-startup replayer
+						int theBehaviorId = Integer.parseInt(theParts[0]);
+						theBytecode = createPartialReplayerClass(theBehaviorId, 0);
+					}
+					else
+					{
+						// Startup replayer
+						int theBehaviorId = Integer.parseInt(theParts[0]);
+						int theSnapshotProbeId = Integer.parseInt(theParts[1]);
+						theBytecode = createPartialReplayerClass(theBehaviorId, theSnapshotProbeId);
+					}
+				}
+				
+				try
+				{
+					theCachedClassFile.getParentFile().mkdirs();
+					theCachedClassFile.createNewFile();
+					FileOutputStream theFileOutputStream = new FileOutputStream(theCachedClassFile);
+					theFileOutputStream.write(theBytecode);
+					theFileOutputStream.flush();
+					theFileOutputStream.close();
+				}
+				catch (IOException e)
+				{
+					throw new RuntimeException(e);
 				}
 			}
+		}
+		else if (aName.startsWith(MethodReplayerGenerator.SNAPSHOT_CLASS_PREFIX))
+		{
+			String theSignature = aName.substring(MethodReplayerGenerator.SNAPSHOT_CLASS_PREFIX.length());
+			theBytecode = createSnapshotClass(theSignature);
+			BCIUtils.writeClass("/home/gpothier/tmp/tod/replayer", aName, theBytecode);
+			assert theBytecode != null;
 		}
 		else
 		{
@@ -384,17 +422,6 @@ public class ReplayerLoader extends ClassLoader
 		ListMap<MethodDescriptor,IBehaviorInfo> theSignatureGroups = getDescriptorGroups();
 		createInScopeDispatchMethods(theClassNode, theSignatureGroups);
 		createOutOfScopeDispatchMethods(theClassNode, theSignatureGroups);
-		
-		// Create snapshot methods
-		for (String theSignature : itsDatabase.getRegisteredSnapshotSignatures())
-		{
-			modifyThreadReplayer_addSnapshotMethod(theClassNode, theSignature);
-			
-			// Add extra signatures that takes an extra object
-			// This is because of the NEW/INVOKE mechanism that stores a tmp id in a local
-			modifyThreadReplayer_addSnapshotMethod(theClassNode, theSignature+"L");
-			modifyThreadReplayer_addSnapshotMethod(theClassNode, theSignature+"LL");
-		}
 		
 		addClass(theClassNode);
 	}
@@ -813,20 +840,28 @@ public class ReplayerLoader extends ClassLoader
 		
 		return theMethod;
 	}
-
-
 	
-	private void modifyThreadReplayer_addSnapshotMethod(ClassNode aClassNode, String aSnapshotSig)
+	private byte[] createSnapshotClass(String aSignature)
 	{
-		if (! itsAddedSnapshotSigs.add(aSnapshotSig)) return;
-		Type[] theSignature = new Type[aSnapshotSig.length()];
-		for(int i=0;i<theSignature.length;i++) theSignature[i] = BCIUtils.getTypeForSig(aSnapshotSig.charAt(i));
-		modifyThreadReplayer_addSnapshotMethod(aClassNode, theSignature);
+		String theClassName = MethodReplayerGenerator.SNAPSHOT_CLASS_PREFIX+aSignature;
+		ClassNode theClassNode = new ClassNode();
+		theClassNode.name = theClassName;
+		theClassNode.access = Opcodes.ACC_PUBLIC;
+		theClassNode.superName = CLS_OBJECT;
+		theClassNode.version = Opcodes.V1_5;
+
+		addSnapshotMethod(theClassNode, aSignature);
+		
+		ClassWriter theWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+		theClassNode.accept(theWriter);
+		return theWriter.toByteArray();
 	}
 	
-	private void modifyThreadReplayer_addSnapshotMethod(ClassNode aClassNode, Type[] aSignature)
+	private void addSnapshotMethod(ClassNode aClassNode, String aSnapshotSig)
 	{
-		MethodNode theMethod = createSnapshotMethod(aClassNode, aSignature);
+		Type[] theSignature = new Type[aSnapshotSig.length()];
+		for(int i=0;i<theSignature.length;i++) theSignature[i] = BCIUtils.getTypeForSig(aSnapshotSig.charAt(i));
+		MethodNode theMethod = createSnapshotMethod(aClassNode, theSignature);
 		BCIUtils.checkMethod(aClassNode, theMethod, new ReplayerVerifier(), false);
 		aClassNode.methods.add(theMethod);
 	}
@@ -840,6 +875,7 @@ public class ReplayerLoader extends ClassLoader
 
 		LocalsMapInfo theLocalsMapInfo = new LocalsMapInfo();
 		List<Type> theArgTypes = new ArrayList<Type>();
+		theArgTypes.add(BCIUtils.TYPE_THREADREPLAYER);
 		theArgTypes.add(Type.INT_TYPE); // Current snapshot seq 
 		theArgTypes.add(Type.INT_TYPE); // Probe id
 		for (Type theType : aSnapshotSignature) 
@@ -851,7 +887,7 @@ public class ReplayerLoader extends ClassLoader
 		
 		theMethodNode.desc = Type.getMethodDescriptor(Type.INT_TYPE, theArgTypes.toArray(new Type[theArgTypes.size()]));
 		theMethodNode.exceptions = Collections.EMPTY_LIST;
-		theMethodNode.access = Opcodes.ACC_PUBLIC;
+		theMethodNode.access = Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC;
 		theMethodNode.tryCatchBlocks = Collections.EMPTY_LIST;
 		
 		int vSnapshotSeq = theMethodNode.maxLocals++;

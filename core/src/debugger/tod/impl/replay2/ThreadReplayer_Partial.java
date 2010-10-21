@@ -99,6 +99,7 @@ public class ThreadReplayer_Partial extends ThreadReplayer
 		try
 		{
 			SnapshotProbeInfo theSnapshotProbeInfo = getDatabase().getSnapshotProbeInfo(itsSnapshot.getProbeId());
+			assert theSnapshotProbeInfo != null : ""+itsSnapshot.getProbeId();
 			
 			String theClassName = 
 				MethodReplayerGenerator.REPLAY_CLASS_PREFIX 
@@ -124,7 +125,10 @@ public class ThreadReplayer_Partial extends ThreadReplayer
 		{
 			throw new RuntimeException(e);
 		}
-		getStream().skipAll(); // Finishes 
+		finally 
+		{
+			getStream().skipAll(); // Finishes 
+		}
 	}
 	
 	@Override

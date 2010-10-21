@@ -39,7 +39,7 @@ import zz.utils.Utils;
 
 public class InScopeReplayerFrame 
 {
-	public static int expectAndSendIntFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldId)
+	public static int expectAndSendIntFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldSlotIndex)
 	{
 		int theValue;
 		
@@ -47,13 +47,13 @@ public class InScopeReplayerFrame
 		if (m == Message.FIELD_READ) theValue = aReplayer.readInt();
 		else throw new UnexpectedMessageException(m);
 		
-		aReplayer.getCollector().fieldRead(aTarget, aFieldId);
+		aReplayer.getCollector().fieldRead(aTarget, aFieldSlotIndex);
 		aReplayer.getCollector().value(theValue);
 		
 		return theValue;
 	}
 	
-	public static int expectAndSendIntFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldId, int aCachedValue)
+	public static int expectAndSendIntFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldSlotIndex, int aCachedValue)
 	{
 		int theValue;
 		
@@ -65,13 +65,13 @@ public class InScopeReplayerFrame
 		default: throw new UnexpectedMessageException(m);
 		}
 		
-		aReplayer.getCollector().fieldRead(aTarget, aFieldId);
+		aReplayer.getCollector().fieldRead(aTarget, aFieldSlotIndex);
 		aReplayer.getCollector().value(theValue);
 		
 		return theValue;
 	}
 	
-	public static byte expectAndSendByteFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldId)
+	public static byte expectAndSendByteFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldSlotIndex)
 	{
 		byte theValue;
 		
@@ -79,13 +79,13 @@ public class InScopeReplayerFrame
 		if (m == Message.FIELD_READ) theValue = aReplayer.readByte();
 		else throw new UnexpectedMessageException(m);
 		
-		aReplayer.getCollector().fieldRead(aTarget, aFieldId);
+		aReplayer.getCollector().fieldRead(aTarget, aFieldSlotIndex);
 		aReplayer.getCollector().value(theValue);
 		
 		return theValue;
 	}
 	
-	public static byte expectAndSendIntFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldId, byte aCachedValue)
+	public static byte expectAndSendIntFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldSlotIndex, byte aCachedValue)
 	{
 		byte theValue;
 		
@@ -97,13 +97,13 @@ public class InScopeReplayerFrame
 		default: throw new UnexpectedMessageException(m);
 		}
 		
-		aReplayer.getCollector().fieldRead(aTarget, aFieldId);
+		aReplayer.getCollector().fieldRead(aTarget, aFieldSlotIndex);
 		aReplayer.getCollector().value(theValue);
 		
 		return theValue;
 	}
 	
-	public static boolean expectAndSendBooleanFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldId)
+	public static boolean expectAndSendBooleanFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldSlotIndex)
 	{
 		boolean theValue;
 		
@@ -111,13 +111,13 @@ public class InScopeReplayerFrame
 		if (m == Message.FIELD_READ) theValue = aReplayer.readBoolean();
 		else throw new UnexpectedMessageException(m);
 		
-		aReplayer.getCollector().fieldRead(aTarget, aFieldId);
+		aReplayer.getCollector().fieldRead(aTarget, aFieldSlotIndex);
 		aReplayer.getCollector().value(theValue ? 1 : 0);
 		
 		return theValue;
 	}
 	
-	public static boolean expectAndSendBooleanFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldId, boolean aCachedValue)
+	public static boolean expectAndSendBooleanFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldSlotIndex, boolean aCachedValue)
 	{
 		boolean theValue;
 		
@@ -129,13 +129,13 @@ public class InScopeReplayerFrame
 		default: throw new UnexpectedMessageException(m);
 		}
 		
-		aReplayer.getCollector().fieldRead(aTarget, aFieldId);
+		aReplayer.getCollector().fieldRead(aTarget, aFieldSlotIndex);
 		aReplayer.getCollector().value(theValue ? 1 : 0);
 		
 		return theValue;
 	}
 	
-	public static char expectAndSendCharFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldId)
+	public static char expectAndSendCharFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldSlotIndex)
 	{
 		char theValue;
 		
@@ -143,13 +143,13 @@ public class InScopeReplayerFrame
 		if (m == Message.FIELD_READ) theValue = aReplayer.readChar();
 		else throw new UnexpectedMessageException(m);
 		
-		aReplayer.getCollector().fieldRead(aTarget, aFieldId);
+		aReplayer.getCollector().fieldRead(aTarget, aFieldSlotIndex);
 		aReplayer.getCollector().value(theValue);
 		
 		return theValue;
 	}
 	
-	public static char expectAndSendCharFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldId, char aCachedValue)
+	public static char expectAndSendCharFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldSlotIndex, char aCachedValue)
 	{
 		char theValue;
 		
@@ -161,13 +161,13 @@ public class InScopeReplayerFrame
 		default: throw new UnexpectedMessageException(m);
 		}
 		
-		aReplayer.getCollector().fieldRead(aTarget, aFieldId);
+		aReplayer.getCollector().fieldRead(aTarget, aFieldSlotIndex);
 		aReplayer.getCollector().value(theValue);
 		
 		return theValue;
 	}
 	
-	public static short expectAndSendShortFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldId)
+	public static short expectAndSendShortFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldSlotIndex)
 	{
 		short theValue;
 		
@@ -175,13 +175,13 @@ public class InScopeReplayerFrame
 		if (m == Message.FIELD_READ) theValue = aReplayer.readShort();
 		else throw new UnexpectedMessageException(m);
 		
-		aReplayer.getCollector().fieldRead(aTarget, aFieldId);
+		aReplayer.getCollector().fieldRead(aTarget, aFieldSlotIndex);
 		aReplayer.getCollector().value(theValue);
 		
 		return theValue;
 	}
 	
-	public static short expectAndSendShortFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldId, short aCachedValue)
+	public static short expectAndSendShortFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldSlotIndex, short aCachedValue)
 	{
 		short theValue;
 		
@@ -193,13 +193,13 @@ public class InScopeReplayerFrame
 		default: throw new UnexpectedMessageException(m);
 		}
 		
-		aReplayer.getCollector().fieldRead(aTarget, aFieldId);
+		aReplayer.getCollector().fieldRead(aTarget, aFieldSlotIndex);
 		aReplayer.getCollector().value(theValue);
 		
 		return theValue;
 	}
 	
-	public static long expectAndSendLongFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldId)
+	public static long expectAndSendLongFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldSlotIndex)
 	{
 		long theValue;
 		
@@ -207,13 +207,13 @@ public class InScopeReplayerFrame
 		if (m == Message.FIELD_READ) theValue = aReplayer.readLong();
 		else throw new UnexpectedMessageException(m);
 		
-		aReplayer.getCollector().fieldRead(aTarget, aFieldId);
+		aReplayer.getCollector().fieldRead(aTarget, aFieldSlotIndex);
 		aReplayer.getCollector().value(theValue);
 		
 		return theValue;
 	}
 	
-	public static long expectAndSendLongFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldId, long aCachedValue)
+	public static long expectAndSendLongFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldSlotIndex, long aCachedValue)
 	{
 		long theValue;
 		
@@ -225,13 +225,13 @@ public class InScopeReplayerFrame
 		default: throw new UnexpectedMessageException(m);
 		}
 		
-		aReplayer.getCollector().fieldRead(aTarget, aFieldId);
+		aReplayer.getCollector().fieldRead(aTarget, aFieldSlotIndex);
 		aReplayer.getCollector().value(theValue);
 		
 		return theValue;
 	}
 	
-	public static float expectAndSendFloatFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldId)
+	public static float expectAndSendFloatFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldSlotIndex)
 	{
 		float theValue;
 		
@@ -239,13 +239,13 @@ public class InScopeReplayerFrame
 		if (m == Message.FIELD_READ) theValue = aReplayer.readFloat();
 		else throw new UnexpectedMessageException(m);
 		
-		aReplayer.getCollector().fieldRead(aTarget, aFieldId);
+		aReplayer.getCollector().fieldRead(aTarget, aFieldSlotIndex);
 		aReplayer.getCollector().value(theValue);
 		
 		return theValue;
 	}
 	
-	public static float expectAndSendFloatFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldId, float aCachedValue)
+	public static float expectAndSendFloatFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldSlotIndex, float aCachedValue)
 	{
 		float theValue;
 		
@@ -257,13 +257,13 @@ public class InScopeReplayerFrame
 		default: throw new UnexpectedMessageException(m);
 		}
 		
-		aReplayer.getCollector().fieldRead(aTarget, aFieldId);
+		aReplayer.getCollector().fieldRead(aTarget, aFieldSlotIndex);
 		aReplayer.getCollector().value(theValue);
 		
 		return theValue;
 	}
 	
-	public static double expectAndSendDoubleFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldId)
+	public static double expectAndSendDoubleFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldSlotIndex)
 	{
 		double theValue;
 		
@@ -271,13 +271,13 @@ public class InScopeReplayerFrame
 		if (m == Message.FIELD_READ) theValue = aReplayer.readDouble();
 		else throw new UnexpectedMessageException(m);
 		
-		aReplayer.getCollector().fieldRead(aTarget, aFieldId);
+		aReplayer.getCollector().fieldRead(aTarget, aFieldSlotIndex);
 		aReplayer.getCollector().value(theValue);
 		
 		return theValue;
 	}
 	
-	public static double expectAndSendDoubleFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldId, double aCachedValue)
+	public static double expectAndSendDoubleFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldSlotIndex, double aCachedValue)
 	{
 		double theValue;
 		
@@ -289,13 +289,13 @@ public class InScopeReplayerFrame
 		default: throw new UnexpectedMessageException(m);
 		}
 		
-		aReplayer.getCollector().fieldRead(aTarget, aFieldId);
+		aReplayer.getCollector().fieldRead(aTarget, aFieldSlotIndex);
 		aReplayer.getCollector().value(theValue);
 		
 		return theValue;
 	}
 	
-	public static ObjectId expectAndSendRefFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldId)
+	public static ObjectId expectAndSendRefFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldSlotIndex)
 	{
 		ObjectId theValue;
 		
@@ -303,13 +303,13 @@ public class InScopeReplayerFrame
 		if (m == Message.FIELD_READ) theValue = aReplayer.readRef();
 		else throw new UnexpectedMessageException(m);
 		
-		aReplayer.getCollector().fieldRead(aTarget, aFieldId);
+		aReplayer.getCollector().fieldRead(aTarget, aFieldSlotIndex);
 		aReplayer.getCollector().value(theValue);
 		
 		return theValue;
 	}
 	
-	public static ObjectId expectAndSendRefFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldId, ObjectId aCachedValue)
+	public static ObjectId expectAndSendRefFieldRead(ThreadReplayer aReplayer, ObjectId aTarget, int aFieldSlotIndex, ObjectId aCachedValue)
 	{
 		ObjectId theValue;
 		
@@ -321,7 +321,7 @@ public class InScopeReplayerFrame
 		default: throw new UnexpectedMessageException(m);
 		}
 		
-		aReplayer.getCollector().fieldRead(aTarget, aFieldId);
+		aReplayer.getCollector().fieldRead(aTarget, aFieldSlotIndex);
 		aReplayer.getCollector().value(theValue);
 		
 		return theValue;

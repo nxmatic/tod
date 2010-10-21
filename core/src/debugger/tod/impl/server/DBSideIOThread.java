@@ -132,7 +132,7 @@ public abstract class DBSideIOThread
 	{
 		try
 		{
-			itsStaticCollector = createCollector(-1);
+			if (itsSnapshot == null) itsStaticCollector = createCollector(-1);
 			
 			Utils.println("Starting replay.");
 			long t0 = System.currentTimeMillis();
@@ -170,6 +170,8 @@ public abstract class DBSideIOThread
 
 			long t1 = System.currentTimeMillis();
 			Utils.println("Replay took %.3fs", 0.001f*(t1-t0));
+			
+			if (itsSnapshot == null) itsDatabase.save();
 		}
 		catch (RuntimeException e)
 		{
@@ -262,7 +264,7 @@ public abstract class DBSideIOThread
 		long theObjectId = ByteBuffer.getLongL(itsIn);
 		String theString = ByteBuffer.getString(itsIn);
 		
-		itsStaticCollector.registerString(new ObjectId(theObjectId), theString);
+		if (itsStaticCollector != null) itsStaticCollector.registerString(new ObjectId(theObjectId), theString);
 		
 		itsProcessedSize += 8 + 4 + theString.length()*2;
 	}

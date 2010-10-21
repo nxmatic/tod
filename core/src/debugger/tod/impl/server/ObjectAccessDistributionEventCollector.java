@@ -56,20 +56,20 @@ public class ObjectAccessDistributionEventCollector extends CounterEventCollecto
 	}
 
 	@Override
-	public void fieldRead(ObjectId aTarget, int aFieldId)
+	public void fieldRead(ObjectId aTarget, int aFieldSlotIndex)
 	{
-		super.fieldRead(aTarget, aFieldId);
+		super.fieldRead(aTarget, aFieldSlotIndex);
 //		fieldAccess(aTarget, aFieldId);
 	}
 
 	@Override
-	public void fieldWrite(ObjectId aTarget, int aFieldId)
+	public void fieldWrite(ObjectId aTarget, int aFieldSlotIndex)
 	{
-		super.fieldWrite(aTarget, aFieldId);
-		fieldAccess(aTarget, aFieldId);
+		super.fieldWrite(aTarget, aFieldSlotIndex);
+		fieldAccess(aTarget, aFieldSlotIndex);
 	}
 	
-	protected void fieldAccess(ObjectId aTarget, int aFieldId)
+	protected void fieldAccess(ObjectId aTarget, int aFieldSlotIndex)
 	{
 		long id = aTarget != null ? aTarget.getId() : -1;
 		itsObjectsSet.add(id);
@@ -92,7 +92,7 @@ public class ObjectAccessDistributionEventCollector extends CounterEventCollecto
 			{
 				float avgUniqueObjects = 1f*itsTotalUniqueObjects/itsBlocks;
 				float avgAccesses = 1f*itsTotalAccesses/itsBlocks;
-				float avgEvents = 1f*getCount()/itsBlocks;
+				float avgEvents = 1f*getFieldAccessCount()/itsBlocks;
 				Utils.println(
 						"[TOD] Access distribution: uobj: %.2f, acc: %.2f, ev: %.2f - u/a: %.2f%%", 
 						avgUniqueObjects,

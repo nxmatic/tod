@@ -390,7 +390,7 @@ jlong agentimplGetObjectId(JNIEnv* jni, jobject obj)
 	if (tag != 0) return tag;
 	
 	// Not tagged yet, assign an oid.
-	tag = nextObjectId(jni);
+	tag = nextObjectId(jni, obj);
 	
 	err = jvmti->SetTag(obj, tag);
 	check_jvmti_error(jvmti, err, "SetTag");

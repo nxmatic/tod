@@ -28,4 +28,10 @@ public interface IFieldInfo extends IMemberInfo
 	 * The type of this field.
 	 */
 	public ITypeInfo getType();
+	
+	/**
+	 * Returns the slot index of this field, which corresponds to a conceptual
+	 * storage offset within each instance.
+	 */
+	public int getSlotIndex();
 }

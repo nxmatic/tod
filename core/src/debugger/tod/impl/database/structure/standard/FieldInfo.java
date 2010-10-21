@@ -44,17 +44,33 @@ public class FieldInfo extends MemberInfo implements IMutableFieldInfo
 	 * the handling of remote structure databases.
 	 */
 	private final long itsTypePtr;
+	
+	private final int itsSlotIndex;
 
 	public FieldInfo(
 			IShareableStructureDatabase aDatabase, 
 			int aId, 
-			ITypeInfo aDeclaringType, 
+			IClassInfo aDeclaringClass, 
 			String aName,
 			ITypeInfo aType,
 			int aAccessFlags)
 	{
-		super(aDatabase, aId, aDeclaringType, aName, aAccessFlags);
+		super(aDatabase, aId, aDeclaringClass, aName, aAccessFlags);
 		itsTypePtr = getTypePtr(aType);
+		itsSlotIndex = getSlotIndex(aDeclaringClass);
+	}
+	
+	private static int getSlotIndex(IClassInfo aDeclaringClass)
+	{
+		int theCount = 0;
+		IClassInfo theClass = aDeclaringClass;
+		while(theClass != null)
+		{
+			theCount += theClass.getFieldCount();
+			theClass = theClass.getSupertype();
+		}
+		
+		return theCount;
 	}
 
 	@Override
@@ -68,6 +84,11 @@ public class FieldInfo extends MemberInfo implements IMutableFieldInfo
 		return getType(getDatabase(), itsTypePtr);
 	}
 
+	public int getSlotIndex()
+	{
+		return itsSlotIndex;
+	}
+	
 	@Override
 	public String toString()
 	{

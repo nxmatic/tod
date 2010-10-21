@@ -42,10 +42,20 @@ import tod.core.database.structure.ObjectId;
  */
 public class ReifyEventCollector extends EventCollector
 {
-	private List<Event> itsEvents = new ArrayList<Event>();
+	private List<Event> itsEvents;
 	private ValuedEvent itsCurrentValuedEvent;
 	private BehaviorCallEvent itsCurrentCallEvent;
 	private int itsRemainingArgs;
+	
+	public ReifyEventCollector()
+	{
+		this(new ArrayList<Event>());
+	}
+
+	public ReifyEventCollector(List<Event> aEvents)
+	{
+		itsEvents = aEvents;
+	}
 
 	public List<Event> getEvents()
 	{
@@ -60,17 +70,17 @@ public class ReifyEventCollector extends EventCollector
 	}
 	
 	@Override
-	public void fieldRead(ObjectId aTarget, int aFieldId)
+	public void fieldRead(ObjectId aTarget, int aFieldSlotIndex)
 	{
-		FieldReadEvent theEvent = new FieldReadEvent(aTarget, aFieldId);
+		FieldReadEvent theEvent = new FieldReadEvent(aTarget, aFieldSlotIndex);
 		addEvent(theEvent);
 		itsCurrentValuedEvent = theEvent;
 	}
 
 	@Override
-	public void fieldWrite(ObjectId aTarget, int aFieldId)
+	public void fieldWrite(ObjectId aTarget, int aFieldSlotIndex)
 	{
-		FieldWriteEvent theEvent = new FieldWriteEvent(aTarget, aFieldId);
+		FieldWriteEvent theEvent = new FieldWriteEvent(aTarget, aFieldSlotIndex);
 		addEvent(theEvent);
 		itsCurrentValuedEvent = theEvent;
 	}

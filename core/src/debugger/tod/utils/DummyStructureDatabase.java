@@ -22,6 +22,7 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 */
 package tod.utils;
 
+import java.io.IOException;
 import java.util.Map;
 
 import tod.core.config.TODConfig;
@@ -238,6 +239,10 @@ implements IMutableStructureDatabase
 	}
 
 	public void replayModeChanges(int aClassId)
+	{
+	}
+	
+	public void save() throws IOException
 	{
 	}
 }

@@ -51,7 +51,7 @@ public class OnDiskIndex
 	
 	public ObjectAccessStore getStore(long aObjectFieldId, boolean aReadOnly)
 	{
-		return itsObjectAccessStoreCache.get(aReadOnly ? -aObjectFieldId : aObjectFieldId);
+		return itsObjectAccessStoreCache.get(aReadOnly ? -aObjectFieldId-1 : aObjectFieldId);
 	}
 	
 	/**
@@ -61,7 +61,7 @@ public class OnDiskIndex
 	 */
 	private ObjectAccessStore createStore(long aObjectFieldId)
 	{
-		if (aObjectFieldId > 0)
+		if (aObjectFieldId >= 0)
 		{
 			ObjectPageSlot theSlot = itsObjectBTree.getSlot(aObjectFieldId);
 			return new ObjectAccessStore(aObjectFieldId, theSlot);
@@ -69,7 +69,7 @@ public class OnDiskIndex
 		else
 		{
 			// Read-only
-			int thePid = itsObjectBTree.get(-aObjectFieldId);
+			int thePid = itsObjectBTree.get(-aObjectFieldId-1);
 			if (thePid == 0) return new ObjectAccessStore(0, null);
 			else throw new UnsupportedOperationException("Not yet");
 		}

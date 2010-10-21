@@ -85,7 +85,7 @@ int isInitializingExceptionMethods = 0;
 
 StaticVoidMethod* TOD_enable;
 StaticVoidMethod* TOD_start;
-StaticLongMethod* ObjectIdentity_nextId;
+StaticLongMethod* ObjectIdentity_nextIdFor;
 
 // Method IDs for methods whose exceptions are ignored
 jmethodID ignoredExceptionMethods[3];
@@ -446,7 +446,7 @@ void agentStart(JNIEnv* jni)
 	
 	TOD_enable = new StaticVoidMethod(jni, "java/tod/AgentReady", "nativeAgentLoaded", "()V");
 	TOD_start = new StaticVoidMethod(jni, "java/tod/AgentReady", "start", "()V");
-	ObjectIdentity_nextId = new StaticLongMethod(jni, "java/tod/ObjectIdentity", "nextId", "()J");
+	ObjectIdentity_nextIdFor = new StaticLongMethod(jni, "java/tod/ObjectIdentity", "nextIdFor", "(Ljava/lang/Object;)J");
 
 	TOD_enable->invoke(jni);
 	
@@ -523,9 +523,9 @@ JNIEXPORT jlong JNICALL Java_java_tod_ObjectIdentity_get15
 	agentimplGetObjectId(jni, obj);
 }
 
-jlong nextObjectId(JNIEnv* jni)
+jlong nextObjectId(JNIEnv* jni, jobject obj)
 {
-	return ObjectIdentity_nextId->invoke(jni);
+	return ObjectIdentity_nextIdFor->invoke(jni, obj);
 }
 
 JNIEXPORT jint JNICALL Java_java_tod__1AgConfig_getHostId

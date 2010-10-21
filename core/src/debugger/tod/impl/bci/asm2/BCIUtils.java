@@ -581,14 +581,14 @@ public class BCIUtils implements Opcodes
 		// }
 	}
 
-	public static void writeClass(String aRoot, ClassNode aNode, byte[] aData)
+	public static void writeClass(String aRoot, String aName, byte[] aData)
 	{
 		try
 		{
 			File theDir = new File(aRoot);
 			theDir.mkdirs();
 
-			File theFile = new File(theDir, aNode.name.replace('/', '.') + ".class");
+			File theFile = new File(theDir, aName.replace('/', '.') + ".class");
 			theFile.getParentFile().mkdirs();
 			
 			String theName = theFile.getName();

@@ -300,7 +300,8 @@ implements IMutableClassInfo, ISerializableLocationInfo
 	 */
 	public void register(IMutableFieldInfo aField)
 	{
-		getFieldsMap().put (aField.getName(), aField);
+		IMutableFieldInfo thePrevious = getFieldsMap().put(aField.getName(), aField);
+		assert thePrevious == null;
 		getStructureDatabase().registerField(aField);
 	}
 	
@@ -457,6 +458,23 @@ implements IMutableClassInfo, ISerializableLocationInfo
 		return (Iterable) getFieldsMap().values();
 	}
 	
+	public int getFieldCount()
+	{
+		return getFieldsMap().size();
+	}
+
+	public int getSlotsCount()
+	{
+		int theCount = 0;
+		IClassInfo theClass = this;
+		while(theClass != null)
+		{
+			theCount += theClass.getFieldCount();
+			theClass = theClass.getSupertype();
+		}
+		return theCount;
+	}
+
 	public Iterable<IBehaviorInfo> getBehaviors()
 	{
 		return (Iterable) getBehaviorsMap().values();

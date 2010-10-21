@@ -22,6 +22,7 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 */
 package tod.utils.remote;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -768,6 +769,11 @@ public class RemoteStructureDatabase implements RIStructureDatabase
 		}
 
 		public void replayModeChanges(int aClassId)
+		{
+			throw new UnsupportedOperationException();
+		}
+		
+		public void save() throws IOException
 		{
 			throw new UnsupportedOperationException();
 		}

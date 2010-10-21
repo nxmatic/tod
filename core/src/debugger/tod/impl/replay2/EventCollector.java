@@ -39,11 +39,11 @@ import tod.core.database.structure.ObjectId;
  */
 public abstract class EventCollector
 {
-	public void fieldRead(ObjectId aTarget, int aFieldId)
+	public void fieldRead(ObjectId aTarget, int aFieldSlotIndex)
 	{
 	}
 	
-	public void fieldWrite(ObjectId aTarget, int aFieldId)
+	public void fieldWrite(ObjectId aTarget, int aFieldSlotIndex)
 	{
 	}
 	

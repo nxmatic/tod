@@ -79,7 +79,7 @@ JNIEXPORT jstring JNICALL Java_java_tod__1AgConfig_getCollectorPort
 JNIEXPORT jstring JNICALL Java_java_tod__1AgConfig_getClientName
   (JNIEnv* jni, jclass);
 
-jlong nextObjectId(JNIEnv* jni);
+jlong nextObjectId(JNIEnv* jni, jobject obj);
 
 #ifdef __cplusplus
 }
