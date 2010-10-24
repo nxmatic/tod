@@ -1,14 +1,17 @@
 package tod.impl.evdbng.db.fieldwriteindex;
 
+import gnu.trove.TIntArrayList;
+import gnu.trove.TLongArrayList;
+import tod.impl.evdbng.db.Stats;
 import tod.impl.evdbng.db.file.DeltaBTree;
 import tod.impl.evdbng.db.file.Page;
 import tod.impl.evdbng.db.file.Page.BooleanSlot;
-import tod.impl.evdbng.db.file.Page.ByteSlot;
 import tod.impl.evdbng.db.file.Page.IntSlot;
 import tod.impl.evdbng.db.file.Page.PageIOStream;
 import tod.impl.evdbng.db.file.Page.PidSlot;
 import tod.impl.evdbng.db.file.Page.UnsignedByteSlot;
 import tod.impl.evdbng.db.file.PagedFile;
+import tod.utils.BitBuffer;
 import zz.utils.Utils;
 import zz.utils.cache.MRUBuffer;
 
@@ -31,6 +34,9 @@ public class OnDiskIndex
 
 	private final ObjectBTree itsObjectBTree;
 	private final ObjectAccessStoreCache itsObjectAccessStoreCache = new ObjectAccessStoreCache();
+	
+	private BitBuffer itsSinglesBuffer = BitBuffer.allocate((PagedFile.PAGE_SIZE-4)*8);
+	private SinglesPage itsCurrentSinglesPage;
 
 	public OnDiskIndex(PidSlot aDirectoryPageSlot)
 	{
@@ -42,6 +48,8 @@ public class OnDiskIndex
 		itsEmptyPagesStack = new PageStack(itsDirectory.getEmptyPagesStackSlot());
 		for(int i=0;i<N_LOG2_OBJECTSPERPAGE;i++)
 			itsSharedPagesStack[i] = new PageStack(itsDirectory.getIncompleteSharedPagesStackSlot(i));
+		
+		itsCurrentSinglesPage = new SinglesPage(this, itsSinglesBuffer);
 	}
 	
 	private PagedFile getFile()
@@ -52,6 +60,26 @@ public class OnDiskIndex
 	public ObjectAccessStore getStore(long aObjectFieldId, boolean aReadOnly)
 	{
 		return itsObjectAccessStoreCache.get(aReadOnly ? -aObjectFieldId-1 : aObjectFieldId);
+	}
+	
+	public void appendSingle(long aObjectFieldId, long aBlockId, int aThreadId)
+	{
+		ObjectPageSlot theSlot = itsObjectBTree.getSlot(aObjectFieldId);
+		if (! theSlot.isNull()) 
+		{
+			ObjectAccessStore theStore = getStore(aObjectFieldId, false);
+			theStore.append(new long[] {aBlockId}, new int[] {aThreadId}, 0, 1);
+		}
+		else
+		{
+			if (itsCurrentSinglesPage.isFull())
+			{
+				itsCurrentSinglesPage.dump();
+				itsCurrentSinglesPage = new SinglesPage(this, itsSinglesBuffer);
+			}
+			itsCurrentSinglesPage.append(aObjectFieldId, aBlockId, aThreadId);
+			theSlot.setSinglesPage(itsCurrentSinglesPage);
+		}
 	}
 	
 	/**
@@ -302,6 +330,13 @@ public class OnDiskIndex
 	 */
 	public static class ObjectPageSlot extends PidSlot
 	{
+		private static final int PID_TYPE_BITS = 2; 
+		private static final int PID_MASK = 0x3;
+		
+		private static final int PID_TYPE_SINGLES = 1;
+		private static final int PID_TYPE_SHARED = 2;
+		private static final int PID_TYPE_TREE = 3;
+		
 		public ObjectPageSlot(PageIOStream aStream)
 		{
 			super(aStream.getPage(), aStream.getPos());
@@ -312,7 +347,7 @@ public class OnDiskIndex
 		{
 			// This method should be called only if the store for the object is a delta BTree
 			assert ! aCreateIfNull;
-			int thePid = getPid() >>> 1;
+			int thePid = getPid() >>> PID_TYPE_BITS;
 			return getFile().get(thePid);
 		}
 		
@@ -320,46 +355,56 @@ public class OnDiskIndex
 		public void setPage(Page aPage)
 		{
 			// This method should be called only if the store for the object is a delta BTree
-			setPid(aPage.getPageId() << 1);
+			setPid((aPage.getPageId() << PID_TYPE_BITS) + PID_TYPE_TREE);
 		}
 
-		@Override
-		public int getPid()
-		{
-			return super.getPid();
-		}
-
-		@Override
-		public void setPid(int aPid)
-		{
-			super.setPid(aPid);
-		}
-		
 		public boolean isNull()
 		{
 			return getPid() == 0;
 		}
 		
+		private int getPidType()
+		{
+			return getPid() & PID_MASK;
+		}
+		
+		public boolean isSinglesPage()
+		{
+			return getPidType() == PID_TYPE_SINGLES;
+		}
+		
 		public boolean isSharedPage()
 		{
-			return (getPid() & 0x1) != 0;
+			return getPidType() == PID_TYPE_SHARED;
 		}
 		
 		public boolean isBTree()
 		{
-			return (getPid() & 0x1) != 0;
+			return getPidType() == PID_TYPE_TREE;
+		}
+		
+		public SinglesPage getSinglesPage(OnDiskIndex aIndex)
+		{
+			int thePid = getPid() >>> PID_TYPE_BITS;
+			Page thePage = getFile().get(thePid);
+			return new SinglesPage(aIndex, thePage);
+		}
+		
+		public void setSinglesPage(SinglesPage aPage)
+		{
+			setPid((aPage.getPageId() << PID_TYPE_BITS) + PID_TYPE_SINGLES);
 		}
 		
 		public SharedPage getSharedPage(OnDiskIndex aIndex)
 		{
-			int thePid = getPid() >>> 1;
+			int thePid = getPid() >>> PID_TYPE_BITS;
 			Page thePage = getFile().get(thePid);
 			return new SharedPage(aIndex, thePage);
 		}
 		
 		public void setSharedPage(SharedPage aPage)
 		{
-			setPid((aPage.getPageId() << 1) + 1);
+			setPid((aPage.getPageId() << PID_TYPE_BITS) + PID_TYPE_SHARED);
 		}
 		
 		public DeltaBTree getBTree()
@@ -370,12 +415,154 @@ public class OnDiskIndex
 		public DeltaBTree toBTree()
 		{
 			Page theRoot = getFile().create();
-			setPid(theRoot.getPageId() << 1);
+			setPid((theRoot.getPageId() << PID_TYPE_BITS) + PID_TYPE_TREE);
 			return new DeltaBTree("oas", getFile(), this);
 		}
 	}
 	
+	/**
+	 * Stores entries for single objects, ie. objects that appear in a single block 
+	 * (up to the moment they are first registered).
+	 * If an object later happens to have more than a single access, it is moved to a larger store,
+	 * but it is not removed from the singles page (for efficiency reasons).
+	 * @author gpothier
+	 */
+	public static class SinglesPage
+	{
+		private final OnDiskIndex itsIndex;
+		private final Page itsPage;
+		
+		private long itsLastObjectFieldId;
+		private long itsLastBlockId;
+		private int itsLastThreadId;
+		
+		private int itsEntriesCount = 0;
+		
+		private BitBuffer itsBuffer;
+		private DecodedSinglesPage itsDecodedEntries;
+		
+		public SinglesPage(OnDiskIndex aIndex, BitBuffer aBuffer)
+		{
+			itsIndex = aIndex;
+			itsPage = aIndex.getFile().create();
+			
+			itsBuffer = aBuffer;
+			itsBuffer.erase();
+			itsBuffer.position(0);
+		}
+		
+		public SinglesPage(OnDiskIndex aIndex, Page aPage)
+		{
+			itsIndex = aIndex;
+			itsPage = aPage;
+			
+			itsBuffer = BitBuffer.allocate((PagedFile.PAGE_SIZE-4)*8);
+			itsEntriesCount = aPage.readInt(0);
+			for(int i=4;i<PagedFile.PAGE_SIZE;i+=4)
+				itsBuffer.put(itsPage.readInt(i), 32);
 
+			itsBuffer.position(0);
+			itsDecodedEntries = new DecodedSinglesPage(itsEntriesCount, itsBuffer);
+		}
+		
+		public Entry getEntry(long aObjectFieldId)
+		{
+			return itsDecodedEntries.getEntry(aObjectFieldId);
+		}
+
+		
+		public boolean isFull()
+		{
+			return itsBuffer.remaining() < 2*(64+64+32); // The maximum size of an entry (2* is because of gamma codes)
+		}
+		
+		public void dump()
+		{
+			assert itsDecodedEntries == null; // decoded means read-only
+
+			itsPage.writeInt(0, itsEntriesCount);
+			itsBuffer.position(0);
+			for(int i=4;i<PagedFile.PAGE_SIZE;i+=4)
+				itsPage.writeInt(i, itsBuffer.getInt(32));
+		}
+		
+		public void append(long aObjectFieldId, long aBlockId, int aThreadId)
+		{
+			assert itsDecodedEntries == null; // decoded means read-only
+			
+			itsBuffer.putGamma(aObjectFieldId-itsLastObjectFieldId);
+			itsBuffer.putGamma(aBlockId-itsLastBlockId);
+			itsBuffer.putGamma(aThreadId-itsLastThreadId);
+			
+			itsLastObjectFieldId = aObjectFieldId;
+			itsLastBlockId = aBlockId;
+			itsLastThreadId = aThreadId;
+			
+			itsEntriesCount++;
+		}
+		
+		public int getPageId()
+		{
+			return itsPage.getPageId();
+		}
+	}
+	
+	public static class DecodedSinglesPage
+	{
+		private long[] itsObjectFieldIds;
+		private long[] itsBlockIds;
+		private int[] itsThreadIds;
+		
+		public DecodedSinglesPage(int aCount, BitBuffer aBuffer)
+		{
+			itsObjectFieldIds = new long[aCount];
+			itsBlockIds = new long[aCount];
+			itsThreadIds = new int[aCount];
+			
+			long theLastObjectFieldId = 0;
+			long theLastBlockId = 0;
+			int theLastThreadId = 0;
+
+			for(int i=0;i<aCount;i++)
+			{
+				long theObjectFieldId = theLastObjectFieldId + aBuffer.getGammaLong();
+				long theBlockId = theLastBlockId + aBuffer.getGammaLong();
+				int theThreadId = theLastThreadId + aBuffer.getGammaInt();
+				
+				itsObjectFieldIds[i] = theObjectFieldId;
+				itsBlockIds[i] = theBlockId;
+				itsThreadIds[i] = theThreadId;
+				
+				theLastObjectFieldId = theObjectFieldId;
+				theLastBlockId = theBlockId;
+				theLastThreadId = theThreadId;
+			}
+		}
+		
+		public Entry getEntry(long aObjectFieldId)
+		{
+			for(int i=0;i<itsObjectFieldIds.length;i++)
+			{
+				if (itsObjectFieldIds[i] == aObjectFieldId)
+					return new Entry(aObjectFieldId, itsBlockIds[i], itsThreadIds[i]);
+			}
+			return null;
+		}
+	}
+	
+	public static class Entry
+	{
+		public final long objectFieldId;
+		public final long blockId;
+		public final int threadId;
+		
+		public Entry(long aObjectFieldId, long aBlockId, int aThreadId)
+		{
+			objectFieldId = aObjectFieldId;
+			blockId = aBlockId;
+			threadId = aThreadId;
+		}
+	}
 	
 	public static class SharedPage
 	{
@@ -687,6 +874,23 @@ public class OnDiskIndex
 		}
 	}
 	
+	private static long[] insert(long aValue, long[] aArray, int aOffset, int aCount)
+	{
+		long[] theResult = new long[aCount+1];
+		theResult[0] = aValue;
+		System.arraycopy(aArray, aOffset, theResult, 1, aCount);
+		return theResult;
+	}
+
+	private static int[] insert(int aValue, int[] aArray, int aOffset, int aCount)
+	{
+		int[] theResult = new int[aCount+1];
+		theResult[0] = aValue;
+		System.arraycopy(aArray, aOffset, theResult, 1, aCount);
+		return theResult;
+	}
+	
+	
 	public class ObjectAccessStore 
 	{
 		/**
@@ -697,6 +901,7 @@ public class OnDiskIndex
 		
 		private ObjectPageSlot itsSlot;
 		
+		private SinglesPage itsSinglesPage;
 		private SharedPage itsSharedPage;
 		private DeltaBTree itsDeltaBTree;
 
@@ -710,20 +915,23 @@ public class OnDiskIndex
 				assert itsObjectFieldId > 0;
 				// Initialize later, but must keep the check
 			}
+			else if (itsSlot.isSinglesPage())
+			{
+				if (Stats.COLLECT) Stats.NO_LONGER_SINGLES++;
+				itsSinglesPage = itsSlot.getSinglesPage(OnDiskIndex.this);
+			}
 			else if (itsSlot.isSharedPage())
 			{
 				// Shared page
 				itsSharedPage = itsSlot.getSharedPage(OnDiskIndex.this);
 				if (LOG) Utils.println("Object %d on p.%d [%d/%d]", aObjectFieldId, itsSharedPage.getPageId(), itsSharedPage.getCurrentCount(), itsSharedPage.getMaxCount());
 				assert itsSharedPage.indexOf(aObjectFieldId) != -1;
-				itsDeltaBTree = null;
 			}
 			else
 			{
 				// DeltaBTree
 				itsDeltaBTree = itsSlot.getBTree();
 				if (LOG) Utils.println("Object %d on btree", aObjectFieldId);
-				itsSharedPage = null;
 			}
 		}
 
@@ -751,8 +959,19 @@ public class OnDiskIndex
 			itsDeltaBTree = itsSlot.toBTree();
 		}
 		
+		
 		public void append(long[] aBlockIds, int[] aThreadIds, int aOffset, int aCount)
 		{
+			if (itsSinglesPage != null)
+			{
+				Entry theEntry = itsSinglesPage.getEntry(itsObjectFieldId);
+				assert theEntry.objectFieldId == itsObjectFieldId;
+				aBlockIds = insert(theEntry.blockId, aBlockIds, aOffset, aCount);
+				aThreadIds = insert(theEntry.threadId, aThreadIds, aOffset, aCount);
+				aCount++;
+				aOffset = 0;
+			}
+			
 			if (itsSharedPage == null && itsDeltaBTree == null) init(aCount);
 			
 			assert itsObjectFieldId > 0;

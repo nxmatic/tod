@@ -42,13 +42,14 @@ import gnu.trove.TLongLongHashMap;
  */
 public class TmpIdManager
 {
-	/**
-	 * Maps temporary ids to definitive ids.
-	 */
-	private final TLongLongHashMap itsTmpIdsMap = new TLongLongHashMap();
-	
+	private final EventCollector itsCollector;
 	private long itsNextId = 2; // We use even ids. Odd ids are created by the agent
 	
+	public TmpIdManager(EventCollector aCollector)
+	{
+		itsCollector = aCollector;
+	}
+
 	public synchronized long nextId()
 	{
 		long theId = itsNextId;
@@ -61,7 +62,7 @@ public class TmpIdManager
 	 */
 	public synchronized void associate(long aTmpId, long aRealId)
 	{
-		itsTmpIdsMap.put(aTmpId, aRealId);
+		if (itsCollector != null) itsCollector.associateIds(aTmpId, aRealId);
 	}
 
 

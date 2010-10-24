@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import tod.impl.evdbng.db.Stats;
 import tod.impl.evdbng.db.file.Page.PageIOStream;
 import tod.impl.evdbng.db.file.Page.PidSlot;
 import tod.utils.BitBuffer;
@@ -449,7 +450,6 @@ public class DeltaBTree
 		assert isSorted(aKeys, aOffset, aCount);
 	
 		flush();
-		Utils.println("Key insertion: %d-%d (last: %d, count: %d)", aKeys[aOffset], aKeys[aOffset+aCount-1], itsCurrentLastKey, aCount);
 		
 		Page[] thePages = new Page[DB_MAX_INDEX_LEVELS];
 		int[] theIndexes = new int[DB_MAX_INDEX_LEVELS];
@@ -499,7 +499,11 @@ public class DeltaBTree
 			aCount--;
 		}
 
-		Utils.println("Shifting %d tuples", theValues.size());
+		if (Stats.COLLECT)
+		{
+			Stats.DELTABTREE_REFILLS++;
+			Stats.DELTABTREE_REFILLS_AMOUNT += theValues.size();
+		}
 		List<Page> theFreedPages = trim(theInsertPages, theInsertIndexes);
 		loadCurrentLeafPage();
 		
@@ -524,11 +528,6 @@ public class DeltaBTree
 		itsDecodedPagesCache.dropAll(); // That's a bit more than strictly necessary, but we're on the safe side.
 	}
 	
-	public static long itsKeysBits;
-	public static long itsValuesBits;
-	public static long itsEntriesCount;
-	
-	private static final boolean STATS = false;
 	
 	
 	private void appendLeafTuple(long aKey, int aValue, List<Page> aFreePages)
@@ -538,17 +537,17 @@ public class DeltaBTree
 		int p2 = 0;
 		
 		if (itsCurrentBuffer.remaining() < getMaxTupleBits_Leaf()) newLeafPage(aFreePages);
-		if (STATS) p0 = itsCurrentBuffer.position();
+		if (Stats.COLLECT) p0 = itsCurrentBuffer.position();
 		itsCurrentBuffer.putGamma(aKey-itsCurrentLastKey);
-		if (STATS) p1 = itsCurrentBuffer.position();
+		if (Stats.COLLECT) p1 = itsCurrentBuffer.position();
 		itsCurrentBuffer.putGamma(aValue-itsCurrentLastValue);
-		if (STATS) p2 = itsCurrentBuffer.position();
+		if (Stats.COLLECT) p2 = itsCurrentBuffer.position();
 		
-		if (STATS) 
+		if (Stats.COLLECT) 
 		{
-			itsKeysBits += p1-p0;
-			itsValuesBits += p2-p1;
-			itsEntriesCount++;
+			Stats.DELTABTREE_KEY_BITS += p1-p0;
+			Stats.DELTABTREE_VALUE_BITS += p2-p1;
+			Stats.DELTABTREE_ENTRIES_COUNT++;
 		}
 		
 		itsCurrentLastKey = aKey;

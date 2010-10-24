@@ -31,11 +31,15 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.replay2;
 
+import java.io.Serializable;
+
 import tod.core.database.structure.ObjectId;
 import tod.utils.ByteBuffer;
 
-public class LocalsSnapshot
+public class LocalsSnapshot implements Serializable
 {
+	private static final long serialVersionUID = 5471154741961L;
+
 	/**
 	 * Offset of the start of the current packet in the trace file.
 	 */

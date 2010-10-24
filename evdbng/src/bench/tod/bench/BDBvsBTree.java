@@ -173,7 +173,7 @@ public class BDBvsBTree
 	{
 		final PagedFile file = MappedPagedFile.create(new File("/home/gpothier/tmp/btreebench/mine"), true);
 		Page theDirectory = file.create();
-		final IntInsertableBTree btree = new IntInsertableBTree("test", file, new PidSlot(theDirectory, 0));
+		final IntInsertableBTree btree = new IntInsertableBTree("test", new PidSlot(theDirectory, 0));
 		
 		BenchResults b = BenchBase.benchmark(new Runnable()
 		{

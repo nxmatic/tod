@@ -101,4 +101,12 @@ public abstract class EventCollector
 	public void registerString(ObjectId aId, String aString)
 	{
 	}
+
+	/**
+	 * Registers the association between a temporary id and the corresponding final id.
+	 */
+	public void associateIds(long aTmpId, long aRealId) 
+	{
+	}
+
 }

@@ -52,12 +52,13 @@ public class MappedPagedFile extends PagedFile
 
 	private MappedByteBuffer getChunkBuffer(int aChunkId)
 	{
+		assert aChunkId >= 0;
 		MappedByteBuffer theBuffer = Utils.listGet(itsBuffers, aChunkId);
 		if (theBuffer == null)
 		{
 			try
 			{
-				theBuffer = itsChannel.map(MapMode.READ_WRITE, aChunkId*CHUNK_SIZE, CHUNK_SIZE);
+				theBuffer = itsChannel.map(MapMode.READ_WRITE, ((long)aChunkId)*CHUNK_SIZE, CHUNK_SIZE);
 				theBuffer.order(ByteOrder.nativeOrder());
 				Utils.listSet(itsBuffers, aChunkId, theBuffer);
 			}

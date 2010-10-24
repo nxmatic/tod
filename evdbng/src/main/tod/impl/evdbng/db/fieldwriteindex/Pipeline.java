@@ -12,6 +12,7 @@ import java.util.concurrent.TimeUnit;
 import javax.naming.OperationNotSupportedException;
 
 import tod.gui.kit.AbstractNavButton;
+import tod.impl.evdbng.db.Stats;
 import tod.impl.evdbng.db.fieldwriteindex.OnDiskIndex.ObjectAccessStore;
 import tod.impl.evdbng.db.file.PagedFile;
 import tod.impl.evdbng.db.file.Sorter;
@@ -368,6 +369,7 @@ public class Pipeline
 		}
 	}
 	
+	
 	private class InvertBlocksTask extends Sorter.Sortable implements Runnable
 	{
 		private final ArrayList<AbstractBlockData> itsBlocks;
@@ -391,7 +393,7 @@ public class Pipeline
 				theCount += theData.getCount();
 			}
 			
-			// We store the PIVOT at index 0
+			// We store the PIVOT at index 0, hence the +1
 			itsObjectIds = new long[theCount+1];
 			itsBlockIds = new long[theCount+1];
 			itsThreadIds = new int[theCount+1];
@@ -432,8 +434,21 @@ public class Pipeline
 					long theObjectId = i == theCount+1 ? 0 : itsObjectIds[i]; //  objId = 0 to force the last range to storage.
 					if (theObjectId != theLastObjectId)
 					{
-						theStore = itsIndex.getStore(theLastObjectId, false);
-						theStore.append(itsBlockIds, itsThreadIds, theOffset, theSubCount);
+						if (theSubCount == 1)
+						{
+							itsIndex.appendSingle(itsObjectIds[theOffset], itsBlockIds[theOffset], itsThreadIds[theOffset]);
+						}
+						else
+						{
+							theStore = itsIndex.getStore(theLastObjectId, false);
+							theStore.append(itsBlockIds, itsThreadIds, theOffset, theSubCount);
+						}
+						
+						if (Stats.COLLECT)
+						{
+							int x = Math.min(theSubCount, Stats.SUB_STATS.length-1);
+							Stats.SUB_STATS[x]++;
+						}
 						
 						theOffset = i;
 						theSubCount = 0;

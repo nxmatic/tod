@@ -22,7 +22,6 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.evdbng.db.file;
 
-import tod.impl.dbgrid.db.ObjectsDatabase;
 
 /**
  * A tuple that stores information on object references,

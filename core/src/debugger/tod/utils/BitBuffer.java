@@ -130,6 +130,16 @@ public class BitBuffer
 		return this;
 	}
 	
+	/**
+	 * Erases the content of the buffer (fills it with 0s).
+	 * Also clears it.
+	 */
+	public final void erase()
+	{
+		 for(int i=0;i<itsData.length;i++) itsData[i] = 0;
+		 clear();
+	}
+	
 	public void put(int aBits, int aCount)
 	{
 		checkRemaining(aCount);
@@ -199,9 +209,9 @@ public class BitBuffer
 		if (aCount <= 32) return getInt(aCount);
 		else
 		{
-			int l = getInt(32);
+			long l = getInt(32);
 			long h = getInt(aCount-32);
-			return l | (h << 32);
+			return (l & 0xffffffffL) | (h << 32);
 		}
 	}
 	

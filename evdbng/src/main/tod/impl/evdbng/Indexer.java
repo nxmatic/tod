@@ -15,6 +15,7 @@ import tod.core.database.structure.IStructureDatabase;
 import tod.core.database.structure.ObjectId;
 import tod.impl.database.structure.standard.StructureDatabase;
 import tod.impl.evdbng.db.SnapshotIndex;
+import tod.impl.evdbng.db.Stats;
 import tod.impl.evdbng.db.StringIndex;
 import tod.impl.evdbng.db.cflowindex.CFlowIndex;
 import tod.impl.evdbng.db.fieldwriteindex.Pipeline;
@@ -72,7 +73,7 @@ public class Indexer
 	private Collector createCollector(int aThreadId)
 	{
 		Collector theCollector = new Collector(aThreadId);
-		Utils.listSet(itsCollectors, aThreadId, theCollector);
+		if (aThreadId >= 0) Utils.listSet(itsCollectors, aThreadId, theCollector);
 		return theCollector;
 	}
 	
@@ -96,12 +97,14 @@ public class Indexer
 				@Override
 				protected EventCollector createCollector(int aThreadId)
 				{
-					return createCollector(aThreadId);
+					return Indexer.this.createCollector(aThreadId);
 				}
 			};
 			theIOThread.run();
 			
 			flush();
+
+			Stats.print();
 		}
 		catch (FileNotFoundException e)
 		{

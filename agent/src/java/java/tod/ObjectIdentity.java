@@ -46,7 +46,7 @@ public class ObjectIdentity
 	private static final boolean USE_JAVA = false;//_AgentConfig.JAVA14;
 	private static final WeakLongHashMap MAP = USE_JAVA ? new WeakLongHashMap() : null;
 
-	private static final int OBJID_CACHE_SIZE = BitUtilsLite.pow2i(3);
+	private static final int OBJID_CACHE_SIZE = BitUtilsLite.pow2i(2);
 	private static final int OBJID_CACHE_MASK = OBJID_CACHE_SIZE - 1;
 	private static Object[] itsObjIdCacheKey = new Object[OBJID_CACHE_SIZE];
 	private static long[] itsObjIdCacheValue = new long[OBJID_CACHE_SIZE];
@@ -55,6 +55,7 @@ public class ObjectIdentity
 	public static int itsObjIdCacheAccess = 0;
 	public static int itsObjIdCacheHit = 0;
 
+	public static final boolean FAKE_ID = false;
 	
 	/**
 	 * Retrieves the identifier of an object.
@@ -64,6 +65,8 @@ public class ObjectIdentity
 	 */
 	public static long get(Object aObject)
 	{
+		if (FAKE_ID) return 1;
+		
 		if (! USE_CACHE) 
 		{
 			long theId = USE_JAVA ? get14(aObject) : get15(aObject);

@@ -89,7 +89,7 @@ public abstract class DBSideIOThread
 	
 	private final ReplayerLoader itsLoader;
 	private final List<ThreadReplayerThread> itsReplayerThreads = new ArrayList<ThreadReplayerThread>();
-	private final TmpIdManager itsTmpIdManager = new TmpIdManager();
+	private TmpIdManager itsTmpIdManager;
 	
 	/**
 	 * A collector for data that do not pertain to a particular thread.
@@ -133,6 +133,7 @@ public abstract class DBSideIOThread
 		try
 		{
 			if (itsSnapshot == null) itsStaticCollector = createCollector(-1);
+			itsTmpIdManager = new TmpIdManager(itsStaticCollector);
 			
 			Utils.println("Starting replay.");
 			long t0 = System.currentTimeMillis();

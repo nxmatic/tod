@@ -1,6 +1,7 @@
 package tod.impl.evdbng.db.file;
 
 import static tod.impl.evdbng.db.file.PagedFile.PAGE_SIZE;
+import tod.impl.evdbng.db.Stats;
 import tod.impl.evdbng.db.file.Page.IntSlot;
 import tod.impl.evdbng.db.file.Page.PageIOStream;
 import tod.impl.evdbng.db.file.Page.PidSlot;
@@ -176,6 +177,7 @@ public class RangeMinMaxTree
 		if (itsCurrentPacketMask == 0) writePacket();
 		
 		itsSize++;
+		if (Stats.COLLECT) Stats.RMM_BITS++;
 	}
 	
 	/**
@@ -191,6 +193,7 @@ public class RangeMinMaxTree
 		if (itsCurrentPacketMask == 0) writePacket();
 		
 		itsSize++;
+		if (Stats.COLLECT) Stats.RMM_BITS++;
 	}
 	
 	public boolean isLeaf(long i)
@@ -289,6 +292,7 @@ public class RangeMinMaxTree
 		if (stream == null) 
 		{
 			stream = getFile().create().asIOStream();
+			if (Stats.COLLECT) Stats.RMM_PAGES++;
 			itsLevels[l+1] = stream;
 		}
 		
@@ -300,6 +304,7 @@ public class RangeMinMaxTree
 		if (stream.remaining() < TUPLE_BYTES) commitLevel(l+1);
 		
 		itsLevels[l] = getFile().create().asIOStream();
+		if (Stats.COLLECT) Stats.RMM_PAGES++;
 		
 		itsCurrentMin[l] = itsCurrentSum+1;
 		itsCurrentMax[l] = itsCurrentSum-1;
