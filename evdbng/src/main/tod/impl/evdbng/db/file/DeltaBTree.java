@@ -10,6 +10,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import tod.impl.evdbng.db.Stats;
+import tod.impl.evdbng.db.Stats.Account;
 import tod.impl.evdbng.db.file.Page.PageIOStream;
 import tod.impl.evdbng.db.file.Page.PidSlot;
 import tod.utils.BitBuffer;
@@ -30,6 +31,7 @@ public class DeltaBTree
 	 * The name of this btree (the index it represents).
 	 */
 	private final String itsName;
+	private final Account itsAccount;
 	private final PagedFile itsFile;
 	
 	private PidSlot itsRootPageSlot;
@@ -51,9 +53,10 @@ public class DeltaBTree
 	
 	private DecodedPagesCache itsDecodedPagesCache = new DecodedPagesCache();
 
-	public DeltaBTree(String aName, PagedFile aFile, PidSlot aRootPageSlot)
+	public DeltaBTree(String aName, Account aAccount, PagedFile aFile, PidSlot aRootPageSlot)
 	{
 		itsName = aName;
+		itsAccount = aAccount;
 		itsFile = aFile;
 		itsRootPageSlot = aRootPageSlot;
 		init();
@@ -69,7 +72,7 @@ public class DeltaBTree
 		Page thePage = itsRootPageSlot.getPage(false);
 		if (thePage == null)
 		{
-			thePage = getFile().create();
+			thePage = getFile().create(itsAccount);
 			setPageHeader_Level(thePage, 0);
 			setPageHeader_TupleCount(thePage, 0);
 			setPageHeader_LastKey(thePage, 0);
@@ -279,7 +282,7 @@ public class DeltaBTree
 	{
 		if (aLevel > itsCurrentRootLevel)
 		{
-			Page theNewRootPage = getFile().create();
+			Page theNewRootPage = getFile().create(itsAccount);
 			setPageHeader_Level(theNewRootPage, aLevel);
 			setPageHeader_TupleCount(theNewRootPage, 0);
 			itsCurrentPages[aLevel] = theNewRootPage;
@@ -293,7 +296,7 @@ public class DeltaBTree
 		if (theTupleCount >= getTuplesPerPage_Internal())
 		{
 			appendInternalTuple(aLevel+1, getPageHeader_LastKey(thePage), thePage.getPageId());
-			Page theNewPage = getFile().create();
+			Page theNewPage = getFile().create(itsAccount);
 			setPageHeader_Level(theNewPage, aLevel);
 			setPageHeader_TupleCount(theNewPage, 0);
 			itsCurrentPages[aLevel] = theNewPage;
@@ -314,7 +317,7 @@ public class DeltaBTree
 
 		Page theNewPage = aFreePages != null && ! aFreePages.isEmpty() ? 
 				aFreePages.remove(aFreePages.size()-1)
-				: getFile().create(); 
+				: getFile().create(itsAccount); 
 		setPageHeader_Level(theNewPage, 0);
 		setPageHeader_TupleCount(theNewPage, 0);
 		// Last key/value are saved when the page is finished
@@ -588,7 +591,7 @@ public class DeltaBTree
 		}
 	}
 
-	private Page moveToNextPage(int aLevel, Page[] aPages, int[] aIndexes)
+	protected Page moveToNextPage(int aLevel, Page[] aPages, int[] aIndexes)
 	{
 		assert aLevel <= itsCurrentRootLevel;
 		if (Page.same(aPages[aLevel], itsCurrentPages[aLevel])) return null;
@@ -625,12 +628,12 @@ public class DeltaBTree
 		return theNextPage;
 	}
 	
-	private DecodedLeafPage getDecodedPage(Page aPage)
+	protected DecodedLeafPage getDecodedPage(Page aPage)
 	{
 		return itsDecodedPagesCache.get(aPage.getPageId());
 	}
 	
-	private DecodedLeafPage drillTo(long aKey, Page[] aPages, int[] aIndexes)
+	protected DecodedLeafPage drillTo(long aKey, Page[] aPages, int[] aIndexes)
 	{
 		int theLevel = itsCurrentRootLevel;
 		Page thePage = getRootPage();
@@ -672,7 +675,6 @@ public class DeltaBTree
 		DecodedLeafPage theDecodedPage = drillTo(aKey, thePages, theIndexes);
 		
 		int theIndex = theIndexes[0];
-		Page thePage = thePages[0];
 		if (theIndex < 0) return null;
 		
 		TIntArrayList theResult = new TIntArrayList(4);
@@ -682,7 +684,7 @@ public class DeltaBTree
 			theIndex++;
 			if (theIndex >= theDecodedPage.getTupleCount())
 			{
-				thePage = moveToNextPage(0, thePages, theIndexes);
+				Page thePage = moveToNextPage(0, thePages, theIndexes);
 				if (thePage == null) break;
 				theDecodedPage = getDecodedPage(thePage);
 				theIndex = 0;
@@ -692,7 +694,7 @@ public class DeltaBTree
 		return theResult.toNativeArray();
 	}
 	
-	private static class DecodedLeafPage
+	protected static class DecodedLeafPage
 	{
 		private final int itsPageId;
 		private final long[] itsKeys;

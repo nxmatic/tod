@@ -27,7 +27,7 @@ public class TestMinMaxTree
 	private static RangeMinMaxTree createTree()
 	{
 		PagedFile theFile = PagedFile.create(FILE, true);
-		Page thePage = theFile.create();
+		Page thePage = theFile.create(wer);
 		return new RangeMinMaxTree(new PidSlot(thePage, 0));
 	}
 	

@@ -1,8 +1,10 @@
 package tod.impl.evdbng.db.fieldwriteindex;
 
+import static tod.impl.evdbng.DebuggerGridConfigNG.DB_MAX_INDEX_LEVELS;
 import gnu.trove.TIntArrayList;
-import gnu.trove.TLongArrayList;
 import tod.impl.evdbng.db.Stats;
+import tod.impl.evdbng.db.Stats.Account;
+import tod.impl.evdbng.db.fieldwriteindex.Pipeline.ThreadIds;
 import tod.impl.evdbng.db.file.DeltaBTree;
 import tod.impl.evdbng.db.file.Page;
 import tod.impl.evdbng.db.file.Page.BooleanSlot;
@@ -57,17 +59,17 @@ public class OnDiskIndex
 		return itsFile;
 	}
 	
-	public ObjectAccessStore getStore(long aObjectFieldId, boolean aReadOnly)
+	public ObjectAccessStore getStore(long aSlotId, boolean aReadOnly)
 	{
-		return itsObjectAccessStoreCache.get(aReadOnly ? -aObjectFieldId-1 : aObjectFieldId);
+		return itsObjectAccessStoreCache.get(aReadOnly ? -aSlotId-1 : aSlotId);
 	}
 	
-	public void appendSingle(long aObjectFieldId, long aBlockId, int aThreadId)
+	public void appendSingle(long aSlotId, long aBlockId, int aThreadId)
 	{
-		ObjectPageSlot theSlot = itsObjectBTree.getSlot(aObjectFieldId);
+		ObjectPageSlot theSlot = itsObjectBTree.getSlot(aSlotId);
 		if (! theSlot.isNull()) 
 		{
-			ObjectAccessStore theStore = getStore(aObjectFieldId, false);
+			ObjectAccessStore theStore = getStore(aSlotId, false);
 			theStore.append(new long[] {aBlockId}, new int[] {aThreadId}, 0, 1);
 		}
 		else
@@ -77,7 +79,7 @@ public class OnDiskIndex
 				itsCurrentSinglesPage.dump();
 				itsCurrentSinglesPage = new SinglesPage(this, itsSinglesBuffer);
 			}
-			itsCurrentSinglesPage.append(aObjectFieldId, aBlockId, aThreadId);
+			itsCurrentSinglesPage.append(aSlotId, aBlockId, aThreadId);
 			theSlot.setSinglesPage(itsCurrentSinglesPage);
 		}
 	}
@@ -85,19 +87,19 @@ public class OnDiskIndex
 	/**
 	 * Really creates the {@link ObjectAccessStore}; only called when the OAS is not
 	 * found in the cache.
-	 * @param aObjectFieldId Negative value means readonly.
+	 * @param aSlotId Negative value means readonly.
 	 */
-	private ObjectAccessStore createStore(long aObjectFieldId)
+	private ObjectAccessStore createStore(long aSlotId)
 	{
-		if (aObjectFieldId >= 0)
+		if (aSlotId >= 0)
 		{
-			ObjectPageSlot theSlot = itsObjectBTree.getSlot(aObjectFieldId);
-			return new ObjectAccessStore(aObjectFieldId, theSlot);
+			ObjectPageSlot theSlot = itsObjectBTree.getSlot(aSlotId);
+			return new ObjectAccessStore(aSlotId, theSlot);
 		}
 		else
 		{
 			// Read-only
-			int thePid = itsObjectBTree.get(-aObjectFieldId-1);
+			int thePid = itsObjectBTree.get(-aSlotId-1);
 			if (thePid == 0) return new ObjectAccessStore(0, null);
 			else throw new UnsupportedOperationException("Not yet");
 		}
@@ -106,7 +108,7 @@ public class OnDiskIndex
 	private Page getEmptyPage()
 	{
 		int thePid = itsEmptyPagesStack.pop();
-		if (thePid == 0) return getFile().create();
+		if (thePid == 0) return getFile().create(Stats.ACC_OBJECTS);
 		else return getFile().get(thePid);
 	}
 	
@@ -183,12 +185,12 @@ public class OnDiskIndex
 			itsPage = aPage;
 			
 			itsCountSlot = new IntSlot(itsPage, POS_PAGECOUNT);
-			itsEmptyPagesSlot = new PidSlot(itsPage, POS_EMPTYPAGESSTACK);
-			itsObjectMapSlot = new PidSlot(itsPage, POS_OBJECTMAP);
+			itsEmptyPagesSlot = new PidSlot(Stats.ACC_OBJECTS, itsPage, POS_EMPTYPAGESSTACK);
+			itsObjectMapSlot = new PidSlot(Stats.ACC_OBJECTS, itsPage, POS_OBJECTMAP);
 			
 			itsSharedPagesSlots = new PidSlot[N_LOG2_OBJECTSPERPAGE];
 			for(int i=0;i<itsSharedPagesSlots.length;i++)
-				itsSharedPagesSlots[i] = new PidSlot(itsPage, POS_SHAREDPAGES_START+4*i);
+				itsSharedPagesSlots[i] = new PidSlot(Stats.ACC_OBJECTS, itsPage, POS_SHAREDPAGES_START+4*i);
 		}
 
 		public IntSlot getCountSlot()
@@ -234,8 +236,8 @@ public class OnDiskIndex
 		private final PidSlot itsCurrentPageSlot;
 		private Page itsCurrentPage;
 		
-		private PidSlot itsNextPageSlot = new PidSlot();
-		private PidSlot itsPrevPageSlot = new PidSlot();
+		private PidSlot itsNextPageSlot = new PidSlot(Stats.ACC_OBJECTS);
+		private PidSlot itsPrevPageSlot = new PidSlot(Stats.ACC_OBJECTS);
 		private IntSlot itsCountSlot = new IntSlot();
 
 		public PageStack(PidSlot aCurrentPageSlot)
@@ -267,7 +269,7 @@ public class OnDiskIndex
 				Page theNextPage = itsNextPageSlot.getPage(false);
 				if (theNextPage == null)
 				{
-					theNextPage = itsFile.create();
+					theNextPage = itsFile.create(Stats.ACC_OBJECTS);
 					theNextPage.writeInt(POS_PREV_ID, itsCurrentPage.getPageId());
 					itsNextPageSlot.setPage(theNextPage);
 				}
@@ -339,7 +341,7 @@ public class OnDiskIndex
 		
 		public ObjectPageSlot(PageIOStream aStream)
 		{
-			super(aStream.getPage(), aStream.getPos());
+			super(Stats.ACC_OBJECTS, aStream.getPage(), aStream.getPos());
 		}
 		
 		@Override
@@ -407,16 +409,16 @@ public class OnDiskIndex
 			setPid((aPage.getPageId() << PID_TYPE_BITS) + PID_TYPE_SHARED);
 		}
 		
-		public DeltaBTree getBTree()
+		public MyDeltaBTree getBTree()
 		{
-			return new DeltaBTree("oas", getFile(), this);
+			return new MyDeltaBTree("oas", Stats.ACC_OBJECTS, getFile(), this);
 		}
 		
-		public DeltaBTree toBTree()
+		public MyDeltaBTree toBTree()
 		{
-			Page theRoot = getFile().create();
+			Page theRoot = getFile().create(Stats.ACC_OBJECTS);
 			setPid((theRoot.getPageId() << PID_TYPE_BITS) + PID_TYPE_TREE);
-			return new DeltaBTree("oas", getFile(), this);
+			return new MyDeltaBTree("oas", Stats.ACC_OBJECTS, getFile(), this);
 		}
 	}
 	
@@ -432,7 +434,7 @@ public class OnDiskIndex
 		private final OnDiskIndex itsIndex;
 		private final Page itsPage;
 		
-		private long itsLastObjectFieldId;
+		private long itsLastSlotId;
 		private long itsLastBlockId;
 		private int itsLastThreadId;
 		
@@ -444,7 +446,7 @@ public class OnDiskIndex
 		public SinglesPage(OnDiskIndex aIndex, BitBuffer aBuffer)
 		{
 			itsIndex = aIndex;
-			itsPage = aIndex.getFile().create();
+			itsPage = aIndex.getFile().create(Stats.ACC_OBJECTS);
 			
 			itsBuffer = aBuffer;
 			itsBuffer.erase();
@@ -465,9 +467,9 @@ public class OnDiskIndex
 			itsDecodedEntries = new DecodedSinglesPage(itsEntriesCount, itsBuffer);
 		}
 		
-		public Entry getEntry(long aObjectFieldId)
+		public Entry getEntry(long aSlotId)
 		{
-			return itsDecodedEntries.getEntry(aObjectFieldId);
+			return itsDecodedEntries.getEntry(aSlotId);
 		}
 
 		
@@ -486,15 +488,15 @@ public class OnDiskIndex
 				itsPage.writeInt(i, itsBuffer.getInt(32));
 		}
 		
-		public void append(long aObjectFieldId, long aBlockId, int aThreadId)
+		public void append(long aSlotId, long aBlockId, int aThreadId)
 		{
 			assert itsDecodedEntries == null; // decoded means read-only
 			
-			itsBuffer.putGamma(aObjectFieldId-itsLastObjectFieldId);
+			itsBuffer.putGamma(aSlotId-itsLastSlotId);
 			itsBuffer.putGamma(aBlockId-itsLastBlockId);
 			itsBuffer.putGamma(aThreadId-itsLastThreadId);
 			
-			itsLastObjectFieldId = aObjectFieldId;
+			itsLastSlotId = aSlotId;
 			itsLastBlockId = aBlockId;
 			itsLastThreadId = aThreadId;
 			
@@ -509,42 +511,42 @@ public class OnDiskIndex
 	
 	public static class DecodedSinglesPage
 	{
-		private long[] itsObjectFieldIds;
+		private long[] itsSlotIds;
 		private long[] itsBlockIds;
 		private int[] itsThreadIds;
 		
 		public DecodedSinglesPage(int aCount, BitBuffer aBuffer)
 		{
-			itsObjectFieldIds = new long[aCount];
+			itsSlotIds = new long[aCount];
 			itsBlockIds = new long[aCount];
 			itsThreadIds = new int[aCount];
 			
-			long theLastObjectFieldId = 0;
+			long theLastSlotId = 0;
 			long theLastBlockId = 0;
 			int theLastThreadId = 0;
 
 			for(int i=0;i<aCount;i++)
 			{
-				long theObjectFieldId = theLastObjectFieldId + aBuffer.getGammaLong();
+				long theSlotId = theLastSlotId + aBuffer.getGammaLong();
 				long theBlockId = theLastBlockId + aBuffer.getGammaLong();
 				int theThreadId = theLastThreadId + aBuffer.getGammaInt();
 				
-				itsObjectFieldIds[i] = theObjectFieldId;
+				itsSlotIds[i] = theSlotId;
 				itsBlockIds[i] = theBlockId;
 				itsThreadIds[i] = theThreadId;
 				
-				theLastObjectFieldId = theObjectFieldId;
+				theLastSlotId = theSlotId;
 				theLastBlockId = theBlockId;
 				theLastThreadId = theThreadId;
 			}
 		}
 		
-		public Entry getEntry(long aObjectFieldId)
+		public Entry getEntry(long aSlotId)
 		{
-			for(int i=0;i<itsObjectFieldIds.length;i++)
+			for(int i=0;i<itsSlotIds.length;i++)
 			{
-				if (itsObjectFieldIds[i] == aObjectFieldId)
-					return new Entry(aObjectFieldId, itsBlockIds[i], itsThreadIds[i]);
+				if (itsSlotIds[i] == aSlotId)
+					return new Entry(aSlotId, itsBlockIds[i], itsThreadIds[i]);
 			}
 			return null;
 		}
@@ -552,13 +554,13 @@ public class OnDiskIndex
 	
 	public static class Entry
 	{
-		public final long objectFieldId;
+		public final long slotId;
 		public final long blockId;
 		public final int threadId;
 		
-		public Entry(long aObjectFieldId, long aBlockId, int aThreadId)
+		public Entry(long aSlotId, long aBlockId, int aThreadId)
 		{
-			objectFieldId = aObjectFieldId;
+			slotId = aSlotId;
 			blockId = aBlockId;
 			threadId = aThreadId;
 		}
@@ -582,7 +584,7 @@ public class OnDiskIndex
 		
 		private BooleanSlot itsMarkedFree;
 		
-		private long itsLastObjectFieldId = 0;
+		private long itsLastSlotId = 0;
 		private int itsLastIndex = -1;
 		
 		public SharedPage(OnDiskIndex aIndex, Page aPage)
@@ -720,8 +722,8 @@ public class OnDiskIndex
 		{
 			if (aId == 0 && aIndex == itsLastIndex)
 			{
-				assert getId(aIndex) == itsLastObjectFieldId;
-				itsLastObjectFieldId = 0;
+				assert getId(aIndex) == itsLastSlotId;
+				itsLastSlotId = 0;
 				itsLastIndex = -1;
 			}
 			itsPage.writeLong(getIdsOffset()+8*aIndex, aId);
@@ -743,23 +745,82 @@ public class OnDiskIndex
 			check();
 		}
 		
+		public ThreadIds getThreadIds(long aSlotId, long aBlockId)
+		{
+			int theIndex = indexOf_readOnly(aSlotId);
+			if (theIndex == -1) throw new RuntimeException("Slot not found: "+aSlotId);
+		
+			TIntArrayList theSameBlockThreadIds = new TIntArrayList();
+			long thePrevBlockId = 0;
+			TIntArrayList thePrevBlockThreadIds = new TIntArrayList();
+			
+			int theCount = getValuesCount(theIndex);
+			int theOffset = getValuesOffset(theIndex);
+			for(int i=0;i<theCount;i++)
+			{
+				long theBlockId = itsPage.readLong(theOffset);
+				int theThreadId = itsPage.readInt(theOffset+PageIOStream.longSize());
+				
+				assert theBlockId >= thePrevBlockId;
+				
+				if (theBlockId < aBlockId)
+				{
+					if (theBlockId != thePrevBlockId)
+					{
+						thePrevBlockId = theBlockId;
+						thePrevBlockThreadIds.reset();
+					}
+					thePrevBlockThreadIds.add(theThreadId);
+				}
+				else if (theBlockId == aBlockId)
+				{
+					theSameBlockThreadIds.add(theThreadId);
+				}
+				else break;
+				
+				theOffset += getValueSize();
+			}
+			
+			return new ThreadIds(
+					theSameBlockThreadIds.toNativeArray(), 
+					thePrevBlockId, 
+					thePrevBlockThreadIds.toNativeArray());
+		}
+		
 		/**
 		 * Returns the index of the given id.
 		 * If it is not found and there are still empty indexes,
 		 * an empty index is used.
 		 */
-		public int indexOf(long aObjectFieldId)
+		public int indexOf_readOnly(long aSlotId)
 		{
-			assert aObjectFieldId != 0;
-			if (aObjectFieldId == itsLastObjectFieldId) return itsLastIndex;
+			assert aSlotId != 0;
 			
-			itsLastObjectFieldId = aObjectFieldId;
+			for(int i=0;i<getMaxCount();i++)
+			{
+				long theId = getId(i);
+				if (theId == aSlotId) return i; 
+			}
+			return -1;
+		}
+		
+		/**
+		 * Returns the index of the given id.
+		 * If it is not found and there are still empty indexes,
+		 * an empty index is used.
+		 */
+		public int indexOf(long aSlotId)
+		{
+			assert aSlotId != 0;
+			if (aSlotId == itsLastSlotId) return itsLastIndex;
+			
+			itsLastSlotId = aSlotId;
 			int theFreeIndex = -1;
 			for(int i=0;i<getMaxCount();i++)
 			{
 				long theId = getId(i);
 				if (theId == 0 && theFreeIndex == -1) theFreeIndex = i;
-				else if (theId == aObjectFieldId) 
+				else if (theId == aSlotId) 
 				{
 					itsLastIndex = i;
 					return i;
@@ -768,7 +829,7 @@ public class OnDiskIndex
 			if (theFreeIndex >= 0)
 			{
 				setCurrentCount(getCurrentCount()+1);
-				setId(theFreeIndex, aObjectFieldId);
+				setId(theFreeIndex, aSlotId);
 				itsLastIndex = theFreeIndex;
 				return theFreeIndex;
 			}
@@ -777,14 +838,14 @@ public class OnDiskIndex
 			return -1;
 		}
 		
-		public Object addTuple(ObjectPageSlot aSlot, long aObjectFieldId, long aBlockId, int aThreadId)
+		public Object addTuple(ObjectPageSlot aSlot, long aSlotId, long aBlockId, int aThreadId)
 		{
-			int theIndex = indexOf(aObjectFieldId);
+			int theIndex = indexOf(aSlotId);
 			if (theIndex == -1) throw new RuntimeException("Shared page has no free indexes");
 			assert getCurrentCount() > 0;
 		
 			int theCount = getValuesCount(theIndex);
-			if (theCount == getMaxValuesCount(itsLogMaxCount)) return dumpToLargerStore(aSlot, theIndex, aObjectFieldId, aBlockId, aThreadId);
+			if (theCount == getMaxValuesCount(itsLogMaxCount)) return dumpToLargerStore(aSlot, theIndex, aSlotId, aBlockId, aThreadId);
 			else
 			{
 				int theOffset = getValuesOffset(theIndex) + theCount*getValueSize();
@@ -795,7 +856,7 @@ public class OnDiskIndex
 			}
 		}
 		
-		private Object dumpToLargerStore(ObjectPageSlot aSlot, int aIndex, long aObjectFieldId, long aBlockId, int aThreadId)
+		private Object dumpToLargerStore(ObjectPageSlot aSlot, int aIndex, long aSlotId, long aBlockId, int aThreadId)
 		{
 			if (itsLogMaxCount < OBJECTS_PER_SHAREDPAGE.length-1)
 			{
@@ -809,10 +870,10 @@ public class OnDiskIndex
 					theValuesOffset += 8;
 					int theThreadId = itsPage.readInt(theValuesOffset);
 					theValuesOffset += 4;
-					Object theDump = theSharedPage.addTuple(null, aObjectFieldId, theBlockId, theThreadId);
+					Object theDump = theSharedPage.addTuple(null, aSlotId, theBlockId, theThreadId);
 					assert theDump == null;
 				}
-				Object theDump = theSharedPage.addTuple(null, aObjectFieldId, aBlockId, aThreadId);
+				Object theDump = theSharedPage.addTuple(null, aSlotId, aBlockId, aThreadId);
 				assert theDump == null;
 				setValuesCount(aIndex, 0);
 				setCurrentCount(getCurrentCount()-1);
@@ -824,7 +885,7 @@ public class OnDiskIndex
 				itsIndex.freeSharedPage(this);
 				
 				if (LOG) Utils.println("Moved object %d from p.%d [%d/%d] to p.%d [%d/%d]", 
-						aObjectFieldId, 
+						aSlotId, 
 						getPageId(), 
 						getCurrentCount(), getMaxCount(),
 						theSharedPage.getPageId(),
@@ -835,7 +896,7 @@ public class OnDiskIndex
 			else
 			{
 				assert getCurrentCount() > 0;
-				DeltaBTree theBTree = aSlot.toBTree();
+				MyDeltaBTree theBTree = aSlot.toBTree();
 				int theValuesCount = getValuesCount(aIndex);
 				int theValuesOffset = getValuesOffset(aIndex);
 				for(int i=0;i<theValuesCount;i++)
@@ -855,7 +916,7 @@ public class OnDiskIndex
 
 				itsIndex.freeSharedPage(this);
 
-				if (LOG) Utils.println("Moved object %d from page %d to btree", aObjectFieldId, getPageId());
+				if (LOG) Utils.println("Moved object %d from page %d to btree", aSlotId, getPageId());
 
 				return theBTree;
 			}
@@ -874,6 +935,62 @@ public class OnDiskIndex
 		}
 	}
 	
+	private static class MyDeltaBTree extends DeltaBTree
+	{
+		public MyDeltaBTree(String aName, Account aAccount, PagedFile aFile, PidSlot aRootPageSlot)
+		{
+			super(aName, aAccount, aFile, aRootPageSlot);
+		}
+	
+		public ThreadIds getThreadIds(long aBlockId)
+		{
+			TIntArrayList theSameBlockThreadIds = new TIntArrayList();
+			long thePrevBlockId = 0;
+			TIntArrayList thePrevBlockThreadIds = new TIntArrayList();
+			
+
+			Page[] thePages = new Page[DB_MAX_INDEX_LEVELS];
+			int[] theIndexes = new int[DB_MAX_INDEX_LEVELS];
+			DecodedLeafPage theDecodedPage = drillTo(aBlockId, thePages, theIndexes);
+			
+			int theIndex = theIndexes[0];
+			
+			if (theIndex >= 0)
+			{
+				// Retrieve results for this block.
+				int[] theOriginalIndexes = theIndexes.clone();
+				Page[] theOriginalPages = thePages.clone();
+				
+				assert theDecodedPage.getKeyAt(theIndex) == aBlockId;
+				while(theDecodedPage.getKeyAt(theIndex) == aBlockId)
+				{
+					theSameBlockThreadIds.add(theDecodedPage.getValueAt(theIndex));
+					theIndex++;
+					if (theIndex >= theDecodedPage.getTupleCount())
+					{
+						Page thePage = moveToNextPage(0, thePages, theIndexes);
+						if (thePage == null) break;
+						theDecodedPage = getDecodedPage(thePage);
+						theIndex = 0;
+					}
+				}
+				
+				theIndexes = theOriginalIndexes;
+				thePages = theOriginalPages;
+			}
+			
+			// retrieve results for the previous block
+			return new ThreadIds(
+					theSameBlockThreadIds.toNativeArray(), 
+					thePrevBlockId, 
+					thePrevBlockThreadIds.toNativeArray());
+		}
+	}
+	
+	/**
+	 * Creates a new array where the first element is the given value, and the remaining
+	 * is the contents of the given array slice
+	 */
 	private static long[] insert(long aValue, long[] aArray, int aOffset, int aCount)
 	{
 		long[] theResult = new long[aCount+1];
@@ -882,6 +999,10 @@ public class OnDiskIndex
 		return theResult;
 	}
 
+	/**
+	 * Creates a new array where the first element is the given value, and the remaining
+	 * is the contents of the given array slice
+	 */
 	private static int[] insert(int aValue, int[] aArray, int aOffset, int aCount)
 	{
 		int[] theResult = new int[aCount+1];
@@ -897,22 +1018,22 @@ public class OnDiskIndex
 		 * Id of the object/field whose accesses are stored here.
 		 * Negative value means read-only.
 		 */
-		private long itsObjectFieldId;
+		private long itsSlotId;
 		
 		private ObjectPageSlot itsSlot;
 		
 		private SinglesPage itsSinglesPage;
 		private SharedPage itsSharedPage;
-		private DeltaBTree itsDeltaBTree;
+		private MyDeltaBTree itsDeltaBTree;
 
-		public ObjectAccessStore(long aObjectFieldId, ObjectPageSlot aSlot)
+		public ObjectAccessStore(long aSlotId, ObjectPageSlot aSlot)
 		{
-			itsObjectFieldId = aObjectFieldId;
+			itsSlotId = aSlotId;
 			itsSlot = aSlot;
 			
 			if (itsSlot.isNull())
 			{
-				assert itsObjectFieldId > 0;
+				assert itsSlotId > 0;
 				// Initialize later, but must keep the check
 			}
 			else if (itsSlot.isSinglesPage())
@@ -924,20 +1045,20 @@ public class OnDiskIndex
 			{
 				// Shared page
 				itsSharedPage = itsSlot.getSharedPage(OnDiskIndex.this);
-				if (LOG) Utils.println("Object %d on p.%d [%d/%d]", aObjectFieldId, itsSharedPage.getPageId(), itsSharedPage.getCurrentCount(), itsSharedPage.getMaxCount());
-				assert itsSharedPage.indexOf(aObjectFieldId) != -1;
+				if (LOG) Utils.println("Object %d on p.%d [%d/%d]", aSlotId, itsSharedPage.getPageId(), itsSharedPage.getCurrentCount(), itsSharedPage.getMaxCount());
+				assert itsSharedPage.indexOf(aSlotId) != -1;
 			}
 			else
 			{
 				// DeltaBTree
 				itsDeltaBTree = itsSlot.getBTree();
-				if (LOG) Utils.println("Object %d on btree", aObjectFieldId);
+				if (LOG) Utils.println("Object %d on btree", aSlotId);
 			}
 		}
 
-		public long getObjectFieldId()
+		public long getSlotId()
 		{
-			return itsObjectFieldId;
+			return itsSlotId;
 		}
 		
 		private void init(int aInitialTupleCount)
@@ -951,7 +1072,7 @@ public class OnDiskIndex
 					itsSlot.setSharedPage(itsSharedPage);
 					assert itsSharedPage.hasFreeIds();
 					itsDeltaBTree = null;
-					if (LOG) Utils.println("Object %d on p.%d [%d/%d] (initial)", itsObjectFieldId, itsSharedPage.getPageId(), itsSharedPage.getCurrentCount(), itsSharedPage.getMaxCount());
+					if (LOG) Utils.println("Object %d on p.%d [%d/%d] (initial)", itsSlotId, itsSharedPage.getPageId(), itsSharedPage.getCurrentCount(), itsSharedPage.getMaxCount());
 					return;
 				}
 			}
@@ -964,27 +1085,29 @@ public class OnDiskIndex
 		{
 			if (itsSinglesPage != null)
 			{
-				Entry theEntry = itsSinglesPage.getEntry(itsObjectFieldId);
-				assert theEntry.objectFieldId == itsObjectFieldId;
+				// We are not single anymore
+				Entry theEntry = itsSinglesPage.getEntry(itsSlotId);
+				assert theEntry.slotId == itsSlotId;
 				aBlockIds = insert(theEntry.blockId, aBlockIds, aOffset, aCount);
 				aThreadIds = insert(theEntry.threadId, aThreadIds, aOffset, aCount);
 				aCount++;
 				aOffset = 0;
+				itsSinglesPage = null;
 			}
 			
 			if (itsSharedPage == null && itsDeltaBTree == null) init(aCount);
 			
-			assert itsObjectFieldId > 0;
+			assert itsSlotId > 0;
 			while(aCount > 0)
 			{
 				if (itsSharedPage != null)
 				{
-					Object theDump = itsSharedPage.addTuple(itsSlot, itsObjectFieldId, aBlockIds[aOffset], aThreadIds[aOffset]);
+					Object theDump = itsSharedPage.addTuple(itsSlot, itsSlotId, aBlockIds[aOffset], aThreadIds[aOffset]);
 					if (! itsSharedPage.hasFreeIds()) unfreeSharedPage(itsSharedPage);
 	
-					if (theDump instanceof DeltaBTree)
+					if (theDump instanceof MyDeltaBTree)
 					{
-						itsDeltaBTree = (DeltaBTree) theDump;
+						itsDeltaBTree = (MyDeltaBTree) theDump;
 						itsSharedPage = null;
 					}
 					else if (theDump instanceof SharedPage) 
@@ -1005,20 +1128,26 @@ public class OnDiskIndex
 			}				
 		}
 		
-		public int[] getThreadIds(long aBlockId)
+		public ThreadIds getThreadIds(long aBlockId)
 		{
-			throw new UnsupportedOperationException();
+			if (itsSinglesPage != null)
+			{
+				Entry theEntry = itsSinglesPage.getEntry(itsSlotId);
+				assert theEntry.slotId == itsSlotId;
+				if (theEntry.blockId == aBlockId) return new ThreadIds(new int[] { theEntry.threadId });
+				else return new ThreadIds(new int[0]);
+			}
+			else if (itsSharedPage != null)
+			{
+				return itsSharedPage.getThreadIds(itsSlotId, aBlockId);
+			}
+			else if (itsDeltaBTree != null)
+			{
+				return itsDeltaBTree.getThreadIds(aBlockId);
+			}
+			else throw new RuntimeException();
 		}
 
-		/**
-		 * Returns the ids of threads that accessed the object in the block that
-		 * preceedes the given block.
-		 */
-		public int[] getPrevThreadIds(long aBlockId)
-		{
-			throw new UnsupportedOperationException();
-		}
-		
 		private void flush()
 		{
 			if (itsDeltaBTree != null) itsDeltaBTree.flush();
@@ -1035,7 +1164,7 @@ public class OnDiskIndex
 		@Override
 		protected Long getKey(ObjectAccessStore aValue)
 		{
-			return aValue.getObjectFieldId();
+			return aValue.getSlotId();
 		}
 
 		@Override
@@ -1048,7 +1177,7 @@ public class OnDiskIndex
 		@Override
 		protected void dropped(ObjectAccessStore aValue)
 		{
-			if (aValue.getObjectFieldId() > 0) aValue.flush();
+			if (aValue.getSlotId() > 0) aValue.flush();
 		}
 	}
 

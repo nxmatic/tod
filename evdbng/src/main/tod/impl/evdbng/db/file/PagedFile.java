@@ -3,6 +3,7 @@ package tod.impl.evdbng.db.file;
 import java.io.File;
 
 import tod.impl.evdbng.DebuggerGridConfigNG;
+import tod.impl.evdbng.db.Stats.Account;
 import tod.impl.evdbng.db.file.classic.ClassicPagedFile;
 import zz.utils.monitoring.AggregationType;
 import zz.utils.monitoring.Monitor;
@@ -118,8 +119,9 @@ public abstract class PagedFile
 	
 	/**
 	 * Creates a new page.
+	 * @param aAccount The account the charge for the page creation.
 	 */
-	public abstract Page create();
+	public abstract Page create(Account aAccount);
 	
 	/**
 	 * Flushes all dirty buffers to disk

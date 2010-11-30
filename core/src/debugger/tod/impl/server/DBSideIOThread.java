@@ -171,8 +171,6 @@ public abstract class DBSideIOThread
 
 			long t1 = System.currentTimeMillis();
 			Utils.println("Replay took %.3fs", 0.001f*(t1-t0));
-			
-			if (itsSnapshot == null) itsDatabase.save();
 		}
 		catch (RuntimeException e)
 		{
@@ -181,6 +179,17 @@ public abstract class DBSideIOThread
 		catch (Throwable t)
 		{
 			throw new RuntimeException(t);
+		}
+		finally
+		{
+			try
+			{
+				if (itsSnapshot == null) itsDatabase.save();
+			}
+			catch (IOException e)
+			{
+				throw new RuntimeException(e);
+			}
 		}
 	}
 	

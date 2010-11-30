@@ -49,7 +49,7 @@ import tod.impl.bci.asm2.MethodInfo.BCIFrame;
 public class MethodReplayerGenerator_Partial extends MethodReplayerGenerator
 {
 	private int itsSnapshotVar;
-	private final SnapshotProbeInfo itsSnapshotProbeInfo;
+	private final SnapshotProbeInfo itsResumeSnapshotProbeInfo;
 	
 	private int itsProbeIndex = 0;
 	private Label itsStartProbe;
@@ -61,17 +61,17 @@ public class MethodReplayerGenerator_Partial extends MethodReplayerGenerator
 			IBehaviorInfo aBehavior,
 			String aClassName,
 			MethodNode aMethodNode,
-			SnapshotProbeInfo aSnapshotProbeInfo)
+			SnapshotProbeInfo aResumeSnapshotProbeInfo)
 	{
 		super(aConfig, aDatabase, aBehavior, aClassName, aMethodNode);
-		itsSnapshotProbeInfo = aSnapshotProbeInfo;
+		itsResumeSnapshotProbeInfo = aResumeSnapshotProbeInfo;
 	}
 	
 	@Override
 	protected String getClassName()
 	{
-		return itsSnapshotProbeInfo != null ? 
-				super.getClassName() + "_" + itsSnapshotProbeInfo.id
+		return itsResumeSnapshotProbeInfo != null ? 
+				super.getClassName() + "_" + itsResumeSnapshotProbeInfo.id
 				: super.getClassName();
 	}
 
@@ -97,7 +97,7 @@ public class MethodReplayerGenerator_Partial extends MethodReplayerGenerator
 	@Override
 	protected void addSnapshotSetup(InsnList aInsns)
 	{
-		if (itsSnapshotProbeInfo == null || getBehaviorId() != itsSnapshotProbeInfo.behaviorId) return;
+		if (itsResumeSnapshotProbeInfo == null || getBehaviorId() != itsResumeSnapshotProbeInfo.behaviorId) return;
 		
 		SList s = new SList();
 		s.add(itsResumeCode);
@@ -108,43 +108,55 @@ public class MethodReplayerGenerator_Partial extends MethodReplayerGenerator
 	@Override
 	protected void insertSnapshotProbe(SList s, AbstractInsnNode aReferenceNode, boolean aSaveStack)
 	{
-		if (itsSnapshotProbeInfo == null || getBehaviorId() != itsSnapshotProbeInfo.behaviorId) return;
-		itsProbeIndex++;
-		if (itsProbeIndex != itsSnapshotProbeInfo.probeIndex) return;
-		
-		BCIFrame theFrame = getMethodInfo().getFrame(aReferenceNode.getNext());
-
-		itsStartProbe = new Label();
-		s.label(itsStartProbe);
-		
-		s = new SList();
-		
-		s.ALOAD(getThreadReplayerSlot());
-		s.INVOKEVIRTUAL(CLS_THREADREPLAYER, "getSnapshotForResume", "()"+DSC_LOCALSSNAPSHOT);
-		s.ASTORE(itsSnapshotVar);
-		
-		if (aSaveStack)
+		boolean theResumeProbe = true;
+		if (itsResumeSnapshotProbeInfo == null || getBehaviorId() != itsResumeSnapshotProbeInfo.behaviorId) theResumeProbe = false;
+		else
 		{
-			Type[] theStackTypes = getStackTypes(theFrame);
-			for(Type theType : theStackTypes) 
+			itsProbeIndex++;
+			if (itsProbeIndex != itsResumeSnapshotProbeInfo.probeIndex) theResumeProbe = false;
+		}
+		
+		if (theResumeProbe)
+		{
+			BCIFrame theFrame = getMethodInfo().getFrame(aReferenceNode.getNext());
+
+			itsStartProbe = new Label();
+			s.label(itsStartProbe);
+			
+			s = new SList();
+			
+			s.ALOAD(getThreadReplayerSlot());
+			s.INVOKEVIRTUAL(CLS_THREADREPLAYER, "getSnapshotForResume", "()"+DSC_LOCALSSNAPSHOT);
+			s.ASTORE(itsSnapshotVar);
+			
+			if (aSaveStack)
 			{
+				Type[] theStackTypes = getStackTypes(theFrame);
+				for(Type theType : theStackTypes) 
+				{
+					s.ALOAD(itsSnapshotVar);
+					invokeSnapshotPop(s, theType);
+				}
+			}
+
+			int theLocals = theFrame.getLocals();
+			for(int i=theLocals-1;i>=0;i--) 
+			{
+				Type theType = theFrame.getLocal(i).getType();
+				if (theType == null) continue;
+				
 				s.ALOAD(itsSnapshotVar);
 				invokeSnapshotPop(s, theType);
+				s.ISTORE(theType, transformSlot(i));
 			}
-		}
-
-		int theLocals = theFrame.getLocals();
-		for(int i=theLocals-1;i>=0;i--) 
-		{
-			Type theType = theFrame.getLocal(i).getType();
-			if (theType == null) continue;
 			
-			s.ALOAD(itsSnapshotVar);
-			invokeSnapshotPop(s, theType);
-			s.ISTORE(theType, transformSlot(i));
+			itsResumeCode = s;
 		}
-		
-		itsResumeCode = s;
+		else
+		{
+			s.ALOAD(getThreadReplayerSlot());
+			s.INVOKEVIRTUAL(CLS_THREADREPLAYER, "checkSnapshotKill", "()V");
+		}
 	}
 	
 	private static void invokeSnapshotPop(SList s, Type aType)

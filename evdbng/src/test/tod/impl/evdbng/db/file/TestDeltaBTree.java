@@ -20,7 +20,7 @@ public class TestDeltaBTree
 	public void test()
 	{
 		final PagedFile file = PagedFile.create(new File("/home/gpothier/tmp/btreebench/mine"), true);
-		Page theDirectory = file.create();
+		Page theDirectory = file.create(wer);
 		final DeltaBTree btree = new DeltaBTree("test", file, new PidSlot(theDirectory, 0));
 
 		Random random = new Random(8);
@@ -73,7 +73,7 @@ public class TestDeltaBTree
 	public void testRefill()
 	{
 		final PagedFile file = PagedFile.create(new File("/home/gpothier/tmp/btreebench/mine"), true);
-		Page theDirectory = file.create();
+		Page theDirectory = file.create(wer);
 		final DeltaBTree btree = new DeltaBTree("test", file, new PidSlot(theDirectory, 0));
 
 		final int k = 1000;

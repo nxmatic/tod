@@ -43,13 +43,14 @@ import tod.impl.database.structure.standard.StructureDatabase;
 import tod.impl.replay2.EventCollector;
 import tod.impl.replay2.LocalsSnapshot;
 import tod.impl.replay2.ReifyEventCollector;
+import tod.impl.replay2.ReifyEventCollector.Event;
 import tod.impl.replay2.ReplayerLoader;
 import tod.impl.server.DBSideIOThread;
 import zz.utils.Utils;
 
 public class PartialReplayTest
 {
-	private static int partialReplay(
+	private static List<Event> partialReplay(
 			File aEventsFile, 
 			TODConfig aConfig, 
 			IMutableStructureDatabase aDatabase, 
@@ -57,8 +58,9 @@ public class PartialReplayTest
 			ReplayerLoader aLoader) throws IOException
 	{
 		Utils.println(
-				"Partial replay of snapshot: %d (packet start offset: %d, packet offset: %d)", 
+				"Partial replay of snapshot: %d (block id: %d, packet start offset: %d, packet offset: %d)", 
 				aSnapshot.getProbeId(), 
+				aSnapshot.getBlockId(),
 				aSnapshot.getPacketStartOffset(),
 				aSnapshot.getPacketOffset());
 		
@@ -83,7 +85,14 @@ public class PartialReplayTest
 		theIOThread.setInitialSkip(aSnapshot.getPacketOffset());
 		theIOThread.run();
 		
-		return theCollector.getEvents().size();
+		return theCollector.getEvents();
+	}
+	
+	private static int countCFlowEvents(List<Event> aEvents)
+	{
+		int theCount = 0;
+		for(Event theEvent : aEvents) if (theEvent.isCFlowEvent()) theCount++;
+		return theCount;
 	}
 	
 	public static void main(String[] args) throws Exception
@@ -126,14 +135,18 @@ public class PartialReplayTest
 			Utils.println("[%d] Replaying %d snapshots", t++, theCollector.getSnapshots().size());
 			int i=0;
 			int theTotalCount = 0;
+			int theTotalCFlowCount = 0;
 			for(LocalsSnapshot theSnapshot : theCollector.getSnapshots())
 			{
 				Utils.println("Snapshot #%d", i++);
 				try
 				{
-					int theCount = partialReplay(theEventsFile, theConfig, theDatabase, theSnapshot, theLoader);
+					List<Event> theEvents = partialReplay(theEventsFile, theConfig, theDatabase, theSnapshot, theLoader);
+					int theCount = theEvents.size();
+					int theCFlowCount = countCFlowEvents(theEvents);
 					theTotalCount += theCount;
-					Utils.println("Count: %d, total: %d", theCount, theTotalCount);
+					theTotalCFlowCount += theCFlowCount;
+					Utils.println("Count: %d (cflow: %d), total: %d (cflow: %d)", theCount, theCFlowCount, theTotalCount, theTotalCFlowCount);
 				}
 				catch (Exception e)
 				{
@@ -146,10 +159,13 @@ public class PartialReplayTest
 		System.err.println("END");
 	}
 	
-
 	private static class MyEventCollector extends EventCollector
 	{
 		private List<LocalsSnapshot> itsSnapshots = new ArrayList<LocalsSnapshot>();
+		private int itsEnterExitCount = 0;
+		private int itsEnterExitCountTotal = 0;
+		private long itsCurrentBlockId;
+		private int itsSnapshotSeq;
 		
 		public List<LocalsSnapshot> getSnapshots()
 		{
@@ -159,8 +175,39 @@ public class PartialReplayTest
 		@Override
 		public void localsSnapshot(LocalsSnapshot aSnapshot)
 		{
+			Utils.println("%d cflow events before snapshot %d.%d (%d total)", itsEnterExitCount, itsCurrentBlockId, itsSnapshotSeq, itsEnterExitCountTotal);
+			itsSnapshotSeq++;
+			itsEnterExitCount = 0;
 			itsSnapshots.add(aSnapshot);
 		}
 		
+		@Override
+		public void sync(long aTimestamp)
+		{
+			Utils.println("%d snapshots since last sync", itsSnapshotSeq);
+			itsCurrentBlockId = aTimestamp;
+			itsSnapshotSeq = 0;
+		}
+
+		@Override
+		public void enter(int aBehaviorId, int aArgsCount)
+		{
+			itsEnterExitCount++;
+			itsEnterExitCountTotal++;
+		}
+
+		@Override
+		public void exit()
+		{
+			itsEnterExitCount++;
+			itsEnterExitCountTotal++;
+		}
+
+		@Override
+		public void exitException()
+		{
+			itsEnterExitCount++;
+			itsEnterExitCountTotal++;
+		}
 	}
 }

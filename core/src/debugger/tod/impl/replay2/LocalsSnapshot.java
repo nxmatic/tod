@@ -40,6 +40,8 @@ public class LocalsSnapshot implements Serializable
 {
 	private static final long serialVersionUID = 5471154741961L;
 
+	private long itsBlockId;
+	
 	/**
 	 * Offset of the start of the current packet in the trace file.
 	 */
@@ -83,12 +85,14 @@ public class LocalsSnapshot implements Serializable
 	private ObjectId[] itsRefValues;
 	
 	public LocalsSnapshot(
+			long aBlockId,
 			long aPacketStartOffset,
 			int aPacketOffset,
 			int aProbeId,
 			int aBehIdCurrentValue,
 			long aObjIdCurrentValue)
 	{
+		itsBlockId = aBlockId;
 		itsPacketStartOffset = aPacketStartOffset;
 		itsPacketOffset = aPacketOffset;
 		itsProbeId = aProbeId;
@@ -101,6 +105,7 @@ public class LocalsSnapshot implements Serializable
 	 */
 	public LocalsSnapshot(ByteBuffer aBuffer)
 	{
+		itsBlockId = aBuffer.getLong();
 		itsPacketStartOffset = aBuffer.getLong();
 		itsPacketOffset = aBuffer.getInt();
 		itsProbeId = aBuffer.getInt();
@@ -133,6 +138,7 @@ public class LocalsSnapshot implements Serializable
 	 */
 	public void write(ByteBuffer aBuffer)
 	{
+		aBuffer.putLong(itsBlockId);
 		aBuffer.putLong(itsPacketStartOffset);
 		aBuffer.putInt(itsPacketOffset);
 		aBuffer.putInt(itsProbeId);
@@ -153,6 +159,11 @@ public class LocalsSnapshot implements Serializable
 		
 		aBuffer.putShort((short) itsRefValues.length);
 		for(int i=0;i<itsRefValues.length;i++) aBuffer.putLong(itsRefValues[i].getId());
+	}
+	
+	public long getBlockId()
+	{
+		return itsBlockId;
 	}
 	
 	public long getPacketStartOffset()

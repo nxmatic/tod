@@ -38,15 +38,10 @@ import zz.utils.Utils;
 
 public class ThreadReplayer_FirstPass extends ThreadReplayer
 {
-	/**
-	 * Minimum number of messages between snapshots.
-	 * Usually snapshots are taken (roughly) after each SYNC, but if there are too few
-	 * messages since the previous SYNC, the snapshot is deferred.
-	 */
-	private static final int MIN_MESSAGES_BETWEEN_SNAPSHOTS = 100000;
 	
 	private int itsSnapshotSeq = 1;
 	private int itsMessagesSinceLastSnapshot = 0;
+	private long itsLastTimestamp = 0;
 	
 	public ThreadReplayer_FirstPass(
 			ReplayerLoader aLoader,
@@ -75,6 +70,7 @@ public class ThreadReplayer_FirstPass extends ThreadReplayer
 		if (ThreadReplayer.ECHO && ThreadReplayer.ECHO_FORREAL)
 			Utils.println("Creating snapshot: probe %d, #%d.", aProbeId, itsSnapshotCount++);
 		return new LocalsSnapshot(
+				itsLastTimestamp,
 				getStream().getPacketStartOffset(), 
 				getStream().position(), 
 				aProbeId,
@@ -88,6 +84,12 @@ public class ThreadReplayer_FirstPass extends ThreadReplayer
 		return itsSnapshotSeq;
 	}
 	
+	@Override
+	public void checkSnapshotKill()
+	{
+		throw new UnsupportedOperationException();
+	}
+
 	@Override
 	public LocalsSnapshot getSnapshotForResume()
 	{
@@ -114,10 +116,12 @@ public class ThreadReplayer_FirstPass extends ThreadReplayer
 	}
 	
 	@Override
-	protected void processSync(BufferStream aBuffer)
+	protected void processSync(long aTimestamp)
 	{
-		super.processSync(aBuffer);
+		super.processSync(aTimestamp);
 		if (itsMessagesSinceLastSnapshot >= MIN_MESSAGES_BETWEEN_SNAPSHOTS) itsSnapshotSeq++;
+		itsLastTimestamp = aTimestamp;
 	}
+	
 
 }

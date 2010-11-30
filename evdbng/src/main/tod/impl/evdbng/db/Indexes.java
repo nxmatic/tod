@@ -22,20 +22,13 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.evdbng.db;
 
-import java.lang.reflect.Array;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
-
 import tod.core.database.structure.IStructureDatabase.ProbeInfo;
 import tod.impl.evdbng.DebuggerGridConfigNG;
-import tod.impl.evdbng.ObjectCodecNG;
-import tod.impl.evdbng.SplittedConditionHandler;
 import tod.impl.evdbng.db.IndexSet.IndexManager;
-import tod.impl.evdbng.db.file.StaticBTree;
 import tod.impl.evdbng.db.file.PagedFile;
-import tod.impl.evdbng.db.file.RoleTree;
 import tod.impl.evdbng.db.file.SequenceTree;
 import tod.impl.evdbng.db.file.SimpleTree;
+import tod.impl.evdbng.db.file.StaticBTree;
 import tod.impl.evdbng.db.file.Tuple;
 import tod.impl.evdbng.db.file.TupleFinder.NoMatch;
 import zz.utils.monitoring.AggregationType;
@@ -60,22 +53,11 @@ public class Indexes
 	private SimpleIndexSet itsThreadIndexSet;
 	private SimpleIndexSet itsDepthIndexSet;
 	private SimpleIndexSet itsLocationIndexSet;
-	private RoleIndexSet itsBehaviorIndexSet;
 	private SimpleIndexSet itsAdviceSourceIdIndexSet;
 	private SimpleIndexSet itsAdviceCFlowIndexSet; // Distinct from above to implement pointcut history.
 	private SimpleIndexSet itsRoleIndexSet;
 	private SimpleIndexSet itsFieldIndexSet;
 	private SimpleIndexSet itsVariableIndexSet;
-	
-	/**
-	 * (Split) index sets for array indexes 
-	 */
-	private SimpleIndexSet[] itsArrayIndexIndexSets;
-	
-	/**
-	 * (Split) index sets for object ids.
-	 */
-	private RoleIndexSet[] itsObjectIndexeSets;
 	
 	private long itsMaxObjectId = 0;
 	
@@ -93,54 +75,17 @@ public class Indexes
 	{
 		Monitor.getInstance().register(this);
 		
-		itsTimestampTree = new SequenceTree("[EventDatabase] timestamp tree", aFile);
+		itsTimestampTree = new SequenceTree("[EventDatabase] timestamp tree", null, aFile);
 		
-		itsTypeIndexSet = new SimpleIndexSet(itsIndexManager, "type", aFile);
-		itsThreadIndexSet = new SimpleIndexSet(itsIndexManager, "thread", aFile);
-		itsDepthIndexSet = new SimpleIndexSet(itsIndexManager, "depth", aFile);
-		itsLocationIndexSet = new SimpleIndexSet(itsIndexManager, "bytecodeLoc.", aFile);
-		itsAdviceSourceIdIndexSet = new SimpleIndexSet(itsIndexManager, "advice src id", aFile);
-		itsAdviceCFlowIndexSet = new SimpleIndexSet(itsIndexManager, "advice cflow", aFile);
-		itsRoleIndexSet = new SimpleIndexSet(itsIndexManager, "role", aFile);
-		itsBehaviorIndexSet = new RoleIndexSet(itsIndexManager, "behavior", aFile);
-		itsFieldIndexSet = new SimpleIndexSet(itsIndexManager, "field", aFile);
-		itsVariableIndexSet = new SimpleIndexSet(itsIndexManager, "variable", aFile);
-
-		itsArrayIndexIndexSets = createSplitIndex("arIndex", SimpleIndexSet.class, aFile);
-		itsObjectIndexeSets = createSplitIndex("object", RoleIndexSet.class, aFile);
-	}
-	
-	/**
-	 * Creates all the sub indexes for a split index.
-	 * @param aName Name base of the indexes
-	 * @param aIndexClass Class of each index
-	 */
-	private <T extends IndexSet> T[] createSplitIndex(
-			String aName, 
-			Class<T> aIndexClass, 
-			PagedFile aFile)
-	{
-		try
-		{
-			Constructor<T> theConstructor = aIndexClass.getConstructor(
-					IndexManager.class,
-					String.class,
-					PagedFile.class);
-			
-			T[] theResult = (T[]) Array.newInstance(aIndexClass, 2);
-			theResult[0] = theConstructor.newInstance(itsIndexManager, aName+"_0", aFile);
-			theResult[1] = theConstructor.newInstance(itsIndexManager, aName+"_1", aFile);
-			
-			return theResult;
-		}
-		catch (InvocationTargetException e)
-		{
-			throw new RuntimeException(e.getCause());
-		}
-		catch (Exception e)
-		{
-			throw new RuntimeException(e);
-		}
+		itsTypeIndexSet = new SimpleIndexSet(itsIndexManager, "type", null, aFile);
+		itsThreadIndexSet = new SimpleIndexSet(itsIndexManager, "thread", null, aFile);
+		itsDepthIndexSet = new SimpleIndexSet(itsIndexManager, "depth", null, aFile);
+		itsLocationIndexSet = new SimpleIndexSet(itsIndexManager, "bytecodeLoc.", null, aFile);
+		itsAdviceSourceIdIndexSet = new SimpleIndexSet(itsIndexManager, "advice src id", null, aFile);
+		itsAdviceCFlowIndexSet = new SimpleIndexSet(itsIndexManager, "advice cflow", null, aFile);
+		itsRoleIndexSet = new SimpleIndexSet(itsIndexManager, "role", null, aFile);
+		itsFieldIndexSet = new SimpleIndexSet(itsIndexManager, "field", null, aFile);
+		itsVariableIndexSet = new SimpleIndexSet(itsIndexManager, "variable", null, aFile);
 	}
 	
 	/**
@@ -158,20 +103,9 @@ public class Indexes
 		itsAdviceSourceIdIndexSet.dispose();
 		itsAdviceCFlowIndexSet.dispose();
 		itsRoleIndexSet.dispose();
-		itsBehaviorIndexSet.dispose();
 		itsFieldIndexSet.dispose();
 		itsVariableIndexSet.dispose();
 
-		for (int i=0;i<itsArrayIndexIndexSets.length;i++)
-		{
-			itsArrayIndexIndexSets[i].dispose();
-		}
-		
-		for (int i=0;i<itsObjectIndexeSets.length;i++)
-		{
-			itsObjectIndexeSets[i].dispose();
-		}
-		
 		itsIndexManager.dispose();
 	}
 	
@@ -188,19 +122,8 @@ public class Indexes
 		itsAdviceSourceIdIndexSet.flushTasks();
 		itsAdviceCFlowIndexSet.flushTasks();
 		itsRoleIndexSet.flushTasks();
-		itsBehaviorIndexSet.flushTasks();
 		itsFieldIndexSet.flushTasks();
 		itsVariableIndexSet.flushTasks();
-
-		for (int i=0;i<itsArrayIndexIndexSets.length;i++)
-		{
-			itsArrayIndexIndexSets[i].flushTasks();
-		}
-		
-		for (int i=0;i<itsObjectIndexeSets.length;i++)
-		{
-			itsObjectIndexeSets[i].flushTasks();
-		}
 	}
 	
 	public void registerTimestamp(long aTimestamp)
@@ -283,16 +206,6 @@ public class Indexes
 		return itsRoleIndexSet.getIndex(aIndex);
 	}
 	
-	public void indexBehavior(int aIndex, long aEventId, byte aRole)
-	{
-		itsBehaviorIndexSet.add(aIndex, aEventId, aRole);
-	}
-	
-	public RoleTree getBehaviorIndex(int aIndex)
-	{
-		return itsBehaviorIndexSet.getIndex(aIndex);
-	}
-	
 	public void indexField(int aIndex, long aEventId)
 	{
 		itsFieldIndexSet.add(aIndex, aEventId);
@@ -311,35 +224,6 @@ public class Indexes
 	public SimpleTree getVariableIndex(int aIndex)
 	{
 		return itsVariableIndexSet.getIndex(aIndex);
-	}
-	
-	public void indexArrayIndex(int aIndex, long aEventId)
-	{
-		SplittedConditionHandler.INDEXES.add(itsArrayIndexIndexSets, aIndex, aEventId, (byte) 0);
-	}
-	
-	public SimpleTree getArrayIndexIndex(int aPart, int aPartialKey)
-	{
-		return itsArrayIndexIndexSets[aPart].getIndex(aPartialKey);
-	}
-	
-	public void indexObject(Object aObject, long aEventId, byte aRole)
-	{
-		long theId = ObjectCodecNG.getObjectId(aObject, false);
-		indexObject(theId, aEventId, aRole);
-	}
-
-	public void indexObject(long aIndex, long aEventId, byte aRole)
-	{
-		if (aIndex > Integer.MAX_VALUE) throw new RuntimeException("Object index overflow: "+aIndex);
-		int theId = (int) aIndex;
-		itsMaxObjectId = Math.max(itsMaxObjectId, aIndex);
-		SplittedConditionHandler.OBJECTS.add(itsObjectIndexeSets, theId, aEventId, aRole);
-	}
-	
-	public RoleTree getObjectIndex(int aPart, int aPartialKey)
-	{
-		return itsObjectIndexeSets[aPart].getIndex(aPartialKey);
 	}
 	
 	@Probe(key = "max object id", aggr = AggregationType.MAX)

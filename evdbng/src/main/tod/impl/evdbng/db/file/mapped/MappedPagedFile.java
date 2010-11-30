@@ -12,6 +12,8 @@ import java.nio.channels.FileChannel.MapMode;
 import java.util.ArrayList;
 import java.util.List;
 
+import tod.impl.evdbng.db.Stats;
+import tod.impl.evdbng.db.Stats.Account;
 import tod.impl.evdbng.db.file.Page;
 import tod.impl.evdbng.db.file.PagedFile;
 import zz.utils.Utils;
@@ -96,8 +98,9 @@ public class MappedPagedFile extends PagedFile
 	}
 
 	@Override
-	public synchronized Page create()
+	public synchronized Page create(Account aAccount)
 	{
+		Stats.charge(aAccount);
 		return get(++itsPagesCount);
 	}
 
@@ -179,7 +182,7 @@ public class MappedPagedFile extends PagedFile
 		@Override
 		public void readBytes(int aPosition, byte[] aBuffer, int aOffset, int aCount)
 		{
-			assert aPosition >= 0 && aPosition+aCount <= PagedFile.PAGE_SIZE : ""+aPosition;
+			assert aPosition >= 0 && aPosition+aCount <= PagedFile.PAGE_SIZE : ""+aPosition+", "+aCount;
 			ByteBuffer theBuffer = itsBuffer.duplicate();
 			theBuffer.position(itsOffset+aPosition);
 			theBuffer.get(aBuffer, aOffset, aCount);

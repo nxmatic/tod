@@ -32,13 +32,13 @@ public class Message
 	/**
 	 * Entering into an in-scope behavior
 	 */
-	public static final byte INSCOPE_BEHAVIOR_ENTER = 10;
+	public static final byte INSCOPE_BEHAVIOR_ENTER_FROM_SCOPE = 10;
 	
 	/**
 	 * Entering into an in-scope <clinit> behavior.
 	 * This is different from {@link #INSCOPE_BEHAVIOR_ENTER} so that the replayer code is simper.
 	 */
-	public static final byte INSCOPE_CLINIT_ENTER = 11;
+	public static final byte INSCOPE_CLINIT_ENTER_FROM_SCOPE = 11;
 	
 	/**
 	 * Entering into {@link ClassLoader#loadClassInternal} or similar methods.
@@ -52,7 +52,7 @@ public class Message
 	/**
 	 * Same as {@link #INSCOPE_BEHAVIOR_ENTER} but behavior id is a delta relative to previous
 	 */
-	public static final byte INSCOPE_BEHAVIOR_ENTER_DELTA = 15;
+	public static final byte INSCOPE_BEHAVIOR_ENTER_DELTA_FROM_SCOPE = 15;
 	
 	/**
 	 * Behavior arguments, in the case the behavior was called from non-instrumented code.
@@ -94,7 +94,13 @@ public class Message
 	 */
 	public static final byte SYNC = 32;
 	
-	public static final int MSG_COUNT = 32;
+	public static final byte INSCOPE_BEHAVIOR_ENTER_FROM_OUTOFSCOPE = 33;
+	public static final byte INSCOPE_BEHAVIOR_ENTER_DELTA_FROM_OUTOFSCOPE = 34;
+	public static final byte INSCOPE_CLINIT_ENTER_FROM_OUTOFSCOPE = 35;
+	
+
+	
+	public static final int MSG_COUNT = 35;
 	
 	public static final String[] _NAMES = 
 	{
@@ -108,12 +114,12 @@ public class Message
 		"OBJECT_INITIALIZED",
 		"EXCEPTION",
 		"HANDLER_REACHED",
-		"INSCOPE_BEHAVIOR_ENTER",
-		"INSCOPE_CLINIT_ENTER",
+		"INSCOPE_BEHAVIOR_ENTER_FROM_SCOPE",
+		"INSCOPE_CLINIT_ENTER_FROM_SCOPE",
 		"CLASSLOADER_ENTER",
 		"CLASSLOADER_EXIT_NORMAL",
 		"CLASSLOADER_EXIT_EXCEPTION",
-		"INSCOPE_BEHAVIOR_ENTER_DELTA",
+		"INSCOPE_BEHAVIOR_ENTER_DELTA_FROM_SCOPE",
 		"BEHAVIOR_ENTER_ARGS",
 		"CONSTRUCTOR_TARGET",
 		"INSCOPE_BEHAVIOR_EXIT_NORMAL",
@@ -130,6 +136,9 @@ public class Message
 		"REGISTER_CLASS",
 		"REGISTER_CLASSLOADER",
 		"REGISTER_THREAD",
-		"SYNC"
+		"SYNC",
+		"INSCOPE_BEHAVIOR_ENTER_FROM_OUTOFSCOPE",
+		"INSCOPE_BEHAVIOR_ENTER_DELTA_FROM_OUTOFSCOPE",
+		"INSCOPE_CLINIT_ENTER_FROM_OUTOFSCOPE"
 	};
 }

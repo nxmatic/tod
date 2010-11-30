@@ -23,6 +23,7 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 package tod.impl.evdbng.db.file;
 
 import tod.core.DebugFlags;
+import tod.impl.evdbng.db.Stats.Account;
 import tod.impl.evdbng.db.file.Page.PageIOStream;
 
 /**
@@ -33,14 +34,14 @@ public class SimpleTree extends StaticBTree<SimpleTuple>
 {
 //	private AddTask itsCurrentTask = new AddTask();
 
-	public SimpleTree(String aName, PagedFile aFile)
+	public SimpleTree(String aName, Account aAccount, PagedFile aFile)
 	{
-		super(aName, aFile);
+		super(aName, aAccount, aFile);
 	}
 
-	public SimpleTree(String aName, PagedFile aFile, PageIOStream aStream)
+	public SimpleTree(String aName, Account aAccount, PagedFile aFile, PageIOStream aStream)
 	{
-		super(aName, aFile, aStream);
+		super(aName, aAccount, aFile, aStream);
 	}
 
 	@Override

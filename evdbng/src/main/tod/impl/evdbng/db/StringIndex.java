@@ -15,9 +15,9 @@ public class StringIndex extends LongInsertableBTree
 	
 	public StringIndex(String aName, PidSlot aRootSlot)
 	{
-		super(aName, aRootSlot);
+		super(aName, Stats.ACC_STRINGS, aRootSlot);
 		// TODO: we should have a directory
-		itsDataStream = new ChainedPageIOStream(getFile());
+		itsDataStream = new ChainedPageIOStream(Stats.ACC_STRINGS, getFile());
 	}
 
 	public void addString(long aId, String aValue)

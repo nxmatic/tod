@@ -2,6 +2,7 @@ package tod.impl.evdbng.db.file;
 
 import static tod.impl.evdbng.db.file.PagedFile.PAGE_SIZE;
 import tod.impl.evdbng.db.Stats;
+import tod.impl.evdbng.db.Stats.Account;
 import tod.impl.evdbng.db.file.Page.IntSlot;
 import tod.impl.evdbng.db.file.Page.PageIOStream;
 import tod.impl.evdbng.db.file.Page.PidSlot;
@@ -44,6 +45,7 @@ public class RangeMinMaxTree
 	private static final int TUPLE_OFFSET_MAX = 4; 
 	private static final int TUPLE_OFFSET_PTR = 6; 
 	
+	private final Account itsAccount;
 	private final PidSlot itsDirectorySlot;
 	private final Directory itsDirectory;
 	
@@ -61,10 +63,11 @@ public class RangeMinMaxTree
 	private int[] itsCurrentMin = new int[MAX_LEVELS];
 	private int[] itsCurrentMax = new int[MAX_LEVELS]; 
 	
-	public RangeMinMaxTree(PidSlot aDirectorySlot)
+	public RangeMinMaxTree(Account aAccount, PidSlot aDirectorySlot)
 	{
+		itsAccount = aAccount;
 		itsDirectorySlot = aDirectorySlot;
-		itsDirectory = new Directory(itsDirectorySlot.getPage(true));
+		itsDirectory = new Directory(itsAccount, itsDirectorySlot.getPage(true));
 		
 		for(int i=0;i<MAX_LEVELS;i++) itsLevels[i] = itsDirectory.getStream(i, false);
 		if (itsLevels[0] == null)
@@ -98,19 +101,21 @@ public class RangeMinMaxTree
 	
 	private static class Directory
 	{
+		private final Account itsAccount;
 		private final Page itsPage;
 		private PidSlot[] itsLevelSlots = new PidSlot[MAX_LEVELS];
 		private IntSlot[] itsOffsetSlots = new IntSlot[MAX_LEVELS];
 		private IntSlot[] itsCurrentMinSlots = new IntSlot[MAX_LEVELS];
 		private IntSlot[] itsCurrentMaxSlots = new IntSlot[MAX_LEVELS];
 
-		public Directory(Page aPage)
+		public Directory(Account aAccount, Page aPage)
 		{
+			itsAccount = aAccount;
 			itsPage = aPage;
 			int theOffset = 0;
 			for(int i=0;i<MAX_LEVELS;i++)
 			{
-				itsLevelSlots[i] = new PidSlot(itsPage, theOffset);
+				itsLevelSlots[i] = new PidSlot(itsAccount, itsPage, theOffset);
 				theOffset += PidSlot.size();
 				itsOffsetSlots[i] = new IntSlot(itsPage, theOffset);
 				theOffset += IntSlot.size();
@@ -229,18 +234,30 @@ public class RangeMinMaxTree
 		else return findopen(i-1);
 	}
 	
+	public long getClose(long i)
+	{
+		assert get(i) == true; // must be an open
+		return findclose(i);
+	}
+	
+	public long getOpen(long i)
+	{
+		assert get(i) == false; // must be a close
+		return findopen(i);
+	}
+	
 	public long subtreeSize(long i)
 	{
 		assert isOpen(i);
 		return (findclose(i)-i+1)/2;
 	}
 	
-	private boolean isOpen(long i)
+	public boolean isOpen(long i)
 	{
 		return get(i) == true;
 	}
 	
-	private boolean isClose(long i)
+	public boolean isClose(long i)
 	{
 		return get(i) == false;
 	}
@@ -291,7 +308,7 @@ public class RangeMinMaxTree
 		PageIOStream stream = itsLevels[l+1];
 		if (stream == null) 
 		{
-			stream = getFile().create().asIOStream();
+			stream = getFile().create(itsAccount).asIOStream();
 			if (Stats.COLLECT) Stats.RMM_PAGES++;
 			itsLevels[l+1] = stream;
 		}
@@ -303,7 +320,7 @@ public class RangeMinMaxTree
 				itsLevels[l].getPage().getPageId());
 		if (stream.remaining() < TUPLE_BYTES) commitLevel(l+1);
 		
-		itsLevels[l] = getFile().create().asIOStream();
+		itsLevels[l] = getFile().create(itsAccount).asIOStream();
 		if (Stats.COLLECT) Stats.RMM_PAGES++;
 		
 		itsCurrentMin[l] = itsCurrentSum+1;

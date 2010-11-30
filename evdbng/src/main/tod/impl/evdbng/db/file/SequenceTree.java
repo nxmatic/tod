@@ -26,6 +26,7 @@ import tod.core.DebugFlags;
 import tod.impl.evdbng.DebuggerGridConfigNG;
 import tod.impl.evdbng.db.DBExecutor;
 import tod.impl.evdbng.db.DBExecutor.DBTask;
+import tod.impl.evdbng.db.Stats.Account;
 import tod.impl.evdbng.db.file.Page.PageIOStream;
 import tod.impl.evdbng.db.file.TupleFinder.NoMatch;
 
@@ -41,9 +42,9 @@ public class SequenceTree extends StaticBTree<SimpleTuple>
 {
 	private AddTask itsCurrentTask = new AddTask();
 
-	public SequenceTree(String aName, PagedFile aFile)
+	public SequenceTree(String aName, Account aAccount, PagedFile aFile)
 	{
-		super(aName, aFile);
+		super(aName, aAccount, aFile);
 	}
 
 	@Override

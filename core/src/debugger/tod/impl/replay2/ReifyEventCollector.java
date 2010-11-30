@@ -31,6 +31,14 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.replay2;
 
+import gnu.trove.TByteArrayList;
+import gnu.trove.TIntArrayList;
+
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -42,310 +50,481 @@ import tod.core.database.structure.ObjectId;
  */
 public class ReifyEventCollector extends EventCollector
 {
-	private List<Event> itsEvents;
-	private ValuedEvent itsCurrentValuedEvent;
-	private BehaviorCallEvent itsCurrentCallEvent;
-	private int itsRemainingArgs;
+	private EventList itsEventList;
 	
-	public ReifyEventCollector()
+	public ReifyEventCollector(int aThreadId, long aBlockId)
 	{
-		this(new ArrayList<Event>());
+		this(new EventList(aThreadId, aBlockId));
 	}
 
-	public ReifyEventCollector(List<Event> aEvents)
+	public ReifyEventCollector(EventList aEventList)
 	{
-		itsEvents = aEvents;
+		itsEventList = aEventList;
 	}
 
-	public List<Event> getEvents()
+	public EventList getEventList()
 	{
-		return itsEvents;
-	}
-	
-	private void addEvent(Event aEvent)
-	{
-		itsEvents.add(aEvent);
-		if (itsCurrentCallEvent != null) itsCurrentCallEvent.addChild(aEvent);
-		if (itsEvents.size() % 100000 == 0) System.out.println(itsEvents.size());
+		return itsEventList;
 	}
 	
 	@Override
 	public void fieldRead(ObjectId aTarget, int aFieldSlotIndex)
 	{
-		FieldReadEvent theEvent = new FieldReadEvent(aTarget, aFieldSlotIndex);
-		addEvent(theEvent);
-		itsCurrentValuedEvent = theEvent;
+		itsEventList.startEvent(EventList.FieldReadEvent.TYPE);
+		itsEventList.put(aTarget);
+		itsEventList.put(aFieldSlotIndex);
 	}
 
 	@Override
 	public void fieldWrite(ObjectId aTarget, int aFieldSlotIndex)
 	{
-		FieldWriteEvent theEvent = new FieldWriteEvent(aTarget, aFieldSlotIndex);
-		addEvent(theEvent);
-		itsCurrentValuedEvent = theEvent;
+		itsEventList.startEvent(EventList.FieldWriteEvent.TYPE);
+		itsEventList.put(aTarget);
+		itsEventList.put(aFieldSlotIndex);
 	}
 
 	@Override
 	public void arrayRead(ObjectId aTarget, int aIndex)
 	{
-		ArrayReadEvent theEvent = new ArrayReadEvent(aTarget, aIndex);
-		addEvent(theEvent);
-		itsCurrentValuedEvent = theEvent;
+		itsEventList.startEvent(EventList.ArrayReadEvent.TYPE);
+		itsEventList.put(aTarget);
+		itsEventList.put(aIndex);
 	}
 	
 	@Override
 	public void arrayWrite(ObjectId aTarget, int aIndex)
 	{
-		ArrayWriteEvent theEvent = new ArrayWriteEvent(aTarget, aIndex);
-		addEvent(theEvent);
-		itsCurrentValuedEvent = theEvent;
+		itsEventList.startEvent(EventList.ArrayWriteEvent.TYPE);
+		itsEventList.put(aTarget);
+		itsEventList.put(aIndex);
+	}
+	
+	@Override
+	public void localWrite(int aSlot)
+	{
+		itsEventList.startEvent(EventList.LocalWriteEvent.TYPE);
+		itsEventList.put(aSlot);
 	}
 	
 	@Override
 	public void sync(long aTimestamp)
 	{
-		addEvent(new SyncEvent(aTimestamp));
+		itsEventList.startEvent(EventList.SyncEvent.TYPE);
 	}
 
-	private void storeValue(Object aValue)
-	{
-		if (itsRemainingArgs > 0)
-		{
-			itsCurrentCallEvent.addArg(aValue);
-			itsRemainingArgs--;
-		}
-		else
-		{
-			itsCurrentValuedEvent.setValue(aValue);
-			itsCurrentValuedEvent = null;		
-		}
-	}
-	
 	@Override
 	public void value(ObjectId aValue)
 	{
-		storeValue(aValue);
+		itsEventList.put(aValue);
 	}
 
 	@Override
 	public void value(int aValue)
 	{
-		storeValue(aValue);
+		itsEventList.put(aValue);
 	}
 
 	@Override
 	public void value(long aValue)
 	{
-		storeValue(aValue);
+		itsEventList.put(aValue);
 	}
 
 	@Override
 	public void value(float aValue)
 	{
-		storeValue(aValue);
+		itsEventList.put(aValue);
 	}
 
 	@Override
 	public void value(double aValue)
 	{
-		storeValue(aValue);
+		itsEventList.put(aValue);
 	}
 
 	@Override
 	public void enter(int aBehaviorId, int aArgsCount)
 	{
-		BehaviorCallEvent theEvent = new BehaviorCallEvent(itsCurrentCallEvent, aBehaviorId, aArgsCount);
-		addEvent(theEvent);
-		itsCurrentCallEvent = theEvent;
-		itsRemainingArgs = aArgsCount;
+		itsEventList.startEvent(EventList.BehaviorCallEvent.TYPE);
+		itsEventList.put(aArgsCount);
 	}
 
 	@Override
 	public void exit()
 	{
-		BehaviorReturnEvent theEvent = new BehaviorReturnEvent();
-		addEvent(theEvent);
-		if (itsCurrentCallEvent != null) itsCurrentCallEvent = itsCurrentCallEvent.getParent();
+		itsEventList.startEvent(EventList.BehaviorReturnEvent.TYPE);
 	}
 
 	@Override
 	public void exitException()
 	{
-		BehaviorThrowEvent theEvent = new BehaviorThrowEvent();
-		addEvent(theEvent);
-		if (itsCurrentCallEvent != null) itsCurrentCallEvent = itsCurrentCallEvent.getParent();
+		itsEventList.startEvent(EventList.BehaviorThrowEvent.TYPE);
 	}
 
-	public static abstract class Event
-	{
-	}
 	
-	private static abstract class ValuedEvent extends Event
+	public static class EventList
 	{
-		private Object itsValue;
-
-		void setValue(Object aValue)
-		{
-			itsValue = aValue;
-		}
-	}
-	
-	public static abstract class FieldEvent extends ValuedEvent
-	{
-		private final ObjectId itsObjectId;
-		private final int itsFieldId;
+		private final int itsThreadId;
+		private final long itsBlockId;
 		
-		public FieldEvent(ObjectId aObjectId, int aFieldId)
-		{
-			itsObjectId = aObjectId;
-			itsFieldId = aFieldId;
-		}
+		private TByteArrayList itsEventTypes = new TByteArrayList(16384);
+		private TIntArrayList itsDataOffsets = new TIntArrayList(16384);
+		private ByteArrayOutputStream itsOut = new ByteArrayOutputStream(16384);
+		private DataOutputStream itsDataOut = new DataOutputStream(itsOut);
+		private byte[] itsDataBuffer;
 		
-		public ObjectId getObjectId()
+		public EventList(int aThreadId, long aBlockId)
 		{
-			return itsObjectId;
-		}
-		
-		public int getFieldId()
-		{
-			return itsFieldId;
-		}
-	}
-
-	public static class FieldWriteEvent extends FieldEvent
-	{
-		public FieldWriteEvent(ObjectId aObjectId, int aFieldId)
-		{
-			super(aObjectId, aFieldId);
-		}
-	}
-
-	public static class FieldReadEvent extends FieldEvent
-	{
-		public FieldReadEvent(ObjectId aObjectId, int aFieldId)
-		{
-			super(aObjectId, aFieldId);
-		}
-	}
-	
-	public static abstract class ArrayEvent extends ValuedEvent
-	{
-		private final ObjectId itsObjectId;
-		private final int itsIndex;
-		
-		public ArrayEvent(ObjectId aObjectId, int aIndex)
-		{
-			itsObjectId = aObjectId;
-			itsIndex = aIndex;
-		}
-		
-		public ObjectId getObjectId()
-		{
-			return itsObjectId;
+			itsThreadId = aThreadId;
+			itsBlockId = aBlockId;
 		}
 
-		public int getIndex()
+		public int getThreadId()
 		{
-			return itsIndex;
+			return itsThreadId;
 		}
-	}
-	
-	public static class ArrayWriteEvent extends ArrayEvent
-	{
-		public ArrayWriteEvent(ObjectId aObjectId, int aFieldId)
+		
+		public long getBlockId()
 		{
-			super(aObjectId, aFieldId);
+			return itsBlockId;
 		}
-	}
-	
-	public static class ArrayReadEvent extends ArrayEvent
-	{
-		public ArrayReadEvent(ObjectId aObjectId, int aFieldId)
+		
+		private void startEvent(byte aType)
 		{
-			super(aObjectId, aFieldId);
+			itsEventTypes.add(aType);
+			itsDataOffsets.add(itsOut.size());
+			itsDataBuffer = null;
 		}
-	}
-	
-	public static class LocalWriteEvent extends ValuedEvent
-	{
-		private final int itsSlot;
+		
+		public int size()
+		{
+			return itsEventTypes.size();
+		}
+		
+		public boolean isCFlowEvent(int aIndex)
+		{
+			byte theType = getEventType(aIndex);
+			switch(theType)
+			{
+			case BehaviorCallEvent.TYPE:
+			case BehaviorReturnEvent.TYPE:
+			case BehaviorThrowEvent.TYPE:
+				return true;
+				
+			default:
+				return false;
+			}
+		}
+		
+		public byte getEventType(int aIndex)
+		{
+			return itsEventTypes.get(aIndex);
+		}
+		
+		private void put(byte aValue)
+		{
+			try
+			{
+				itsDataOut.writeByte(aValue);
+			}
+			catch (IOException e)
+			{
+				throw new RuntimeException(e);
+			}
+		}
+		
+		private void put(int aValue)
+		{
+			try
+			{
+				itsDataOut.writeInt(aValue);
+			}
+			catch (IOException e)
+			{
+				throw new RuntimeException(e);
+			}
+		}
+		
+		private void put(long aValue)
+		{
+			try
+			{
+				itsDataOut.writeLong(aValue);
+			}
+			catch (IOException e)
+			{
+				throw new RuntimeException(e);
+			}
+		}
+		
+		private void put(float aValue)
+		{
+			try
+			{
+				itsDataOut.writeFloat(aValue);
+			}
+			catch (IOException e)
+			{
+				throw new RuntimeException(e);
+			}
+		}
+		
+		private void put(double aValue)
+		{
+			try
+			{
+				itsDataOut.writeDouble(aValue);
+			}
+			catch (IOException e)
+			{
+				throw new RuntimeException(e);
+			}
+		}
+		
+		private void put(ObjectId aObjectId)
+		{
+			put(aObjectId != null ? aObjectId.getId() : 0L);
+		}
+		
+		private static ObjectId getObjectId(DataInputStream aStream) throws IOException
+		{
+			long theId = aStream.readLong();
+			return theId != 0 ? new ObjectId(theId) : null;
+		}
+		
+		public Event getEvent(int aPosition)
+		{
+			try
+			{
+				int theOffset = itsDataOffsets.get(aPosition);
+				if (itsDataBuffer == null) itsDataBuffer = itsOut.toByteArray();
+				DataInputStream theData = new DataInputStream(new ByteArrayInputStream(itsDataBuffer));
+				while(theOffset > 0) theOffset -= theData.skipBytes(theOffset);
+				
+				switch(getEventType(aPosition))
+				{
+				case FieldWriteEvent.TYPE:
+					return new FieldWriteEvent(getObjectId(theData), theData.readInt());
+				case FieldReadEvent.TYPE:
+					return new FieldReadEvent(getObjectId(theData), theData.readInt());
+				default:
+					throw new RuntimeException("Not handled: "+getEventType(aPosition));
+				}
+			}
+			catch (Exception e)
+			{
+				throw new RuntimeException(e);
+			}
+		}
+		
+		public static abstract class Event
+		{
+			/**
+			 * Returns true for method call and return events.
+			 */
+			public boolean isCFlowEvent()
+			{
+				return false;
+			}
+		}
+		
+		private static abstract class ValuedEvent extends Event
+		{
+			private Object itsValue;
 
-		public LocalWriteEvent(int aSlot)
+			void setValue(Object aValue)
+			{
+				itsValue = aValue;
+			}
+		}
+		
+		public static abstract class FieldEvent extends ValuedEvent
 		{
-			itsSlot = aSlot;
+			private final ObjectId itsObjectId;
+			private final int itsFieldId;
+			
+			public FieldEvent(ObjectId aObjectId, int aFieldId)
+			{
+				itsObjectId = aObjectId;
+				itsFieldId = aFieldId;
+			}
+			
+			public ObjectId getObjectId()
+			{
+				return itsObjectId;
+			}
+			
+			public int getFieldId()
+			{
+				return itsFieldId;
+			}
 		}
 
-		public int getSlot()
+		public static class FieldWriteEvent extends FieldEvent
 		{
-			return itsSlot;
-		}
-	}
-	
-	public static class BehaviorCallEvent extends Event
-	{
-		private final BehaviorCallEvent itsParent;
-		private final int itsBehavioId;
-		private final Object[] itsArguments;
-		private int itsArgIndex;
-		private List<Event> itsChildren;
-		
-		public BehaviorCallEvent(BehaviorCallEvent aParent, int aBehavioId, int aArgsCount)
-		{
-			itsParent = aParent;
-			itsBehavioId = aBehavioId;
-			itsArguments = aArgsCount != 0 ? new Object[aArgsCount] : null;
-		}
-		
-		public BehaviorCallEvent getParent()
-		{
-			return itsParent;
+			public static final byte TYPE = 1;
+			
+			public FieldWriteEvent(ObjectId aObjectId, int aFieldId)
+			{
+				super(aObjectId, aFieldId);
+			}
 		}
 
-		public int getBehavioId()
+		public static class FieldReadEvent extends FieldEvent
 		{
-			return itsBehavioId;
-		}
-		
-		public void addArg(Object aValue)
-		{
-			itsArguments[itsArgIndex++] = aValue;
-		}
-		
-		public void addChild(Event aEvent)
-		{
-			if (itsChildren == null) itsChildren = new ArrayList<Event>();
-			itsChildren.add(aEvent);
-		}
-	}
-	
-	public static class BehaviorReturnEvent extends ValuedEvent
-	{
-		public BehaviorReturnEvent()
-		{
-			super();
-		}
-	}
-	
-	public static class BehaviorThrowEvent extends ValuedEvent
-	{
-		public BehaviorThrowEvent()
-		{
-			super();
-		}
-	}
-	
-	public static class SyncEvent extends Event
-	{
-		private final long itsTimestamp;
+			public static final byte TYPE = 2;
 
-		public SyncEvent(long aTimestamp)
-		{
-			itsTimestamp = aTimestamp;
+			public FieldReadEvent(ObjectId aObjectId, int aFieldId)
+			{
+				super(aObjectId, aFieldId);
+			}
 		}
 		
-		public long getTimestamp()
+		public static abstract class ArrayEvent extends ValuedEvent
 		{
-			return itsTimestamp;
+			private final ObjectId itsObjectId;
+			private final int itsIndex;
+			
+			public ArrayEvent(ObjectId aObjectId, int aIndex)
+			{
+				itsObjectId = aObjectId;
+				itsIndex = aIndex;
+			}
+			
+			public ObjectId getObjectId()
+			{
+				return itsObjectId;
+			}
+
+			public int getIndex()
+			{
+				return itsIndex;
+			}
 		}
+		
+		public static class ArrayWriteEvent extends ArrayEvent
+		{
+			public static final byte TYPE = 3;
+
+			public ArrayWriteEvent(ObjectId aObjectId, int aFieldId)
+			{
+				super(aObjectId, aFieldId);
+			}
+		}
+		
+		public static class ArrayReadEvent extends ArrayEvent
+		{
+			public static final byte TYPE = 4;
+
+			public ArrayReadEvent(ObjectId aObjectId, int aFieldId)
+			{
+				super(aObjectId, aFieldId);
+			}
+		}
+		
+		public static class LocalWriteEvent extends ValuedEvent
+		{
+			public static final byte TYPE = 5;
+
+			private final int itsSlot;
+
+			public LocalWriteEvent(int aSlot)
+			{
+				itsSlot = aSlot;
+			}
+
+			public int getSlot()
+			{
+				return itsSlot;
+			}
+		}
+		
+		public static class BehaviorCallEvent extends Event
+		{
+			public static final byte TYPE = 6;
+			
+			private final int itsBehavioId;
+			private final Object[] itsArguments;
+			private int itsArgIndex;
+			private List<Event> itsChildren;
+			
+			public BehaviorCallEvent(int aBehavioId, int aArgsCount)
+			{
+				itsBehavioId = aBehavioId;
+				itsArguments = aArgsCount != 0 ? new Object[aArgsCount] : null;
+			}
+			
+			@Override
+			public boolean isCFlowEvent()
+			{
+				return true;
+			}
+			
+			public int getBehavioId()
+			{
+				return itsBehavioId;
+			}
+			
+			public void addArg(Object aValue)
+			{
+				itsArguments[itsArgIndex++] = aValue;
+			}
+			
+			public void addChild(Event aEvent)
+			{
+				if (itsChildren == null) itsChildren = new ArrayList<Event>();
+				itsChildren.add(aEvent);
+			}
+		}
+		
+		public static class BehaviorReturnEvent extends ValuedEvent
+		{
+			public static final byte TYPE = 7;
+			
+			public BehaviorReturnEvent()
+			{
+				super();
+			}
+
+			@Override
+			public boolean isCFlowEvent()
+			{
+				return true;
+			}
+		}
+		
+		public static class BehaviorThrowEvent extends ValuedEvent
+		{
+			public static final byte TYPE = 8;
+
+			public BehaviorThrowEvent()
+			{
+				super();
+			}
+
+			@Override
+			public boolean isCFlowEvent()
+			{
+				return true;
+			}
+		}
+		
+		public static class SyncEvent extends Event
+		{
+			public static final byte TYPE = 9;
+
+			private final long itsTimestamp;
+
+			public SyncEvent(long aTimestamp)
+			{
+				itsTimestamp = aTimestamp;
+			}
+			
+			public long getTimestamp()
+			{
+				return itsTimestamp;
+			}
+		}
+
 	}
 }

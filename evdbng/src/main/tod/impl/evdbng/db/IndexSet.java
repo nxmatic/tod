@@ -31,6 +31,7 @@ import java.util.List;
 import tod.impl.database.AbstractFilteredBidiIterator;
 import tod.impl.database.IBidiIterator;
 import tod.impl.evdbng.DebuggerGridConfigNG;
+import tod.impl.evdbng.db.Stats.Account;
 import tod.impl.evdbng.db.file.StaticBTree;
 import tod.impl.evdbng.db.file.Page;
 import tod.impl.evdbng.db.file.PagedFile;
@@ -90,6 +91,8 @@ public abstract class IndexSet<T extends Tuple>
 	 */
 	private final String itsName;
 	
+	private final Account itsAccount;
+	
 	private final PagedFile itsFile;
 	
 	private int itsIndexCount = 0;
@@ -98,10 +101,11 @@ public abstract class IndexSet<T extends Tuple>
 	private int itsLoadCount = 0;
 
 	
-	public IndexSet(IndexManager aIndexManager, String aName, PagedFile aFile)
+	public IndexSet(IndexManager aIndexManager, String aName, Account aAccount, PagedFile aFile)
 	{
 		itsIndexManager = aIndexManager;
 		itsName = aName;
+		itsAccount = aAccount;
 		itsFile = aFile;
 		itsIndexes = new ArrayList<Entry<BTreeWrapper<T>>>();
 		
@@ -125,6 +129,11 @@ public abstract class IndexSet<T extends Tuple>
 		return itsName;
 	}
 
+	public Account getAccount()
+	{
+		return itsAccount;
+	}
+	
 	public void dispose()
 	{
 		Monitor.getInstance().unregister(this);		
@@ -195,7 +204,7 @@ public abstract class IndexSet<T extends Tuple>
 		Page thePage;
 		if (thePageId == 0)
 		{
-			thePage = itsFile.create();
+			thePage = itsFile.create(itsAccount);
 			itsIndexPages.set(aIndex/itsIndexesPerPage, thePage.getPageId());
 		}
 		else

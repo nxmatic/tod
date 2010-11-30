@@ -29,6 +29,7 @@ import java.io.FileNotFoundException;
 import java.io.PrintWriter;
 
 import tod.core.DebugFlags;
+import tod.impl.evdbng.db.Stats.Account;
 import tod.impl.evdbng.db.file.Page.ChainedPageIOStream;
 import tod.impl.evdbng.db.file.Page.PageIOStream;
 import tod.impl.evdbng.db.file.TupleFinder.Match;
@@ -43,6 +44,8 @@ import tod.impl.evdbng.db.file.TupleFinder.NoMatch;
  */
 public abstract class StaticBTree<T extends Tuple>
 {
+	private final Account itsAccount;
+	
 	/**
 	 * The name of this btree (the index it represents).
 	 */
@@ -129,13 +132,14 @@ public abstract class StaticBTree<T extends Tuple>
 		}
 	}
 	
-	public StaticBTree(String aName, PagedFile aFile)
+	public StaticBTree(String aName, Account aAccount, PagedFile aFile)
 	{
 		itsName = aName;
+		itsAccount = aAccount;
 		itsFile = aFile;
 
 		// Init pages
-		itsChains[0] = new MyChainedPageIOStream<T>(itsFile, this, 0);
+		itsChains[0] = new MyChainedPageIOStream<T>(itsAccount, itsFile, this, 0);
 		startLeafPage();
 		itsRootPage = itsChains[0].getCurrentPage();
 		itsFirstLeafPageId = itsRootPage.getPageId();
@@ -145,9 +149,10 @@ public abstract class StaticBTree<T extends Tuple>
 	/**
 	 * Reconstructs a previously-written tree from the given struct.
 	 */
-	public StaticBTree(String aName, PagedFile aFile, PageIOStream aStream)
+	public StaticBTree(String aName, Account aAccount, PagedFile aFile, PageIOStream aStream)
 	{
 		itsName = aName;
+		itsAccount = aAccount;
 		itsFile = aFile;
 
 		int theRootPageId = aStream.readPagePointer();
@@ -164,7 +169,7 @@ public abstract class StaticBTree<T extends Tuple>
 			// chains
 			int thePageId = aStream.readPagePointer();
 			int thePos = aStream.readPageOffset();
-			itsChains[i] = new MyChainedPageIOStream<T>(getFile(), thePageId, thePos, this, i);
+			itsChains[i] = new MyChainedPageIOStream<T>(itsAccount, getFile(), thePageId, thePos, this, i);
 			itsChains[i].getCurrentStream().setPos(thePos);
 			
 			// last keys
@@ -441,7 +446,7 @@ public abstract class StaticBTree<T extends Tuple>
 			// We need one more level
 			assert itsRootLevel == aLevel;
 			itsRootLevel++;
-			theChain = new MyChainedPageIOStream<T>(itsFile, this, itsRootLevel);
+			theChain = new MyChainedPageIOStream<T>(itsAccount, itsFile, this, itsRootLevel);
 			itsRootPage = theChain.getCurrentPage();
 			itsChains[itsRootLevel] = theChain;
 			
@@ -604,16 +609,16 @@ public abstract class StaticBTree<T extends Tuple>
 		private final StaticBTree<T> itsTree;
 		private final int itsLevel;
 		
-		public MyChainedPageIOStream(PagedFile aFile, StaticBTree<T> aTree, int aLevel)
+		public MyChainedPageIOStream(Account aAccount, PagedFile aFile, StaticBTree<T> aTree, int aLevel)
 		{
-			super(aFile);
+			super(aAccount, aFile);
 			itsTree = aTree;
 			itsLevel = aLevel;
 		}
 		
-		public MyChainedPageIOStream(PagedFile aFile, int aPageId, int aPosition, StaticBTree<T> aTree, int aLevel)
+		public MyChainedPageIOStream(Account aAccount, PagedFile aFile, int aPageId, int aPosition, StaticBTree<T> aTree, int aLevel)
 		{
-			super(aFile, aPageId, aPosition);
+			super(aAccount, aFile, aPageId, aPosition);
 			itsTree = aTree;
 			itsLevel = aLevel;
 		}

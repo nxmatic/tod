@@ -12,6 +12,7 @@ import java.util.concurrent.TimeUnit;
 import javax.naming.OperationNotSupportedException;
 
 import tod.gui.kit.AbstractNavButton;
+import tod.impl.evdbng.Indexer.EventRef;
 import tod.impl.evdbng.db.Stats;
 import tod.impl.evdbng.db.fieldwriteindex.OnDiskIndex.ObjectAccessStore;
 import tod.impl.evdbng.db.file.PagedFile;
@@ -177,6 +178,35 @@ public class Pipeline
 	private static long[] decompressSortedIds(byte[] aData)
 	{
 		throw new UnsupportedOperationException();
+	}
+	
+	public ThreadIds inspect(long aSlotId, EventRef aReferenceEventRef)
+	{
+		ObjectAccessStore theStore = itsIndex.getStore(aSlotId, true);
+		return theStore.getThreadIds(aReferenceEventRef.blockId);
+	}
+	
+	/**
+	 * Two arrays of thread ids that represent the result of a query.
+	 * @author gpothier
+	 */
+	public static class ThreadIds
+	{
+		public final int[] sameBlockThreadIds;
+		public final long prevBlockId;
+		public final int[] prevBlockThreadIds;
+		
+		public ThreadIds(int[] aSameBlockThreadIds)
+		{
+			this(aSameBlockThreadIds, 0, null);
+		}
+		
+		public ThreadIds(int[] aSameBlockThreadIds, long aPrevBlockId, int[] aPrevBlockThreadIds)
+		{
+			sameBlockThreadIds = aSameBlockThreadIds;
+			prevBlockId = aPrevBlockId;
+			prevBlockThreadIds = aPrevBlockThreadIds;
+		}
 	}
 	
 	public class PerThreadIndex
@@ -444,11 +474,7 @@ public class Pipeline
 							theStore.append(itsBlockIds, itsThreadIds, theOffset, theSubCount);
 						}
 						
-						if (Stats.COLLECT)
-						{
-							int x = Math.min(theSubCount, Stats.SUB_STATS.length-1);
-							Stats.SUB_STATS[x]++;
-						}
+						if (Stats.COLLECT) Stats.sub(theSubCount);
 						
 						theOffset = i;
 						theSubCount = 0;

@@ -34,6 +34,8 @@ import java.util.Map;
 import java.util.concurrent.locks.ReentrantLock;
 
 import tod.impl.evdbng.DebuggerGridConfigNG;
+import tod.impl.evdbng.db.Stats;
+import tod.impl.evdbng.db.Stats.Account;
 import tod.impl.evdbng.db.file.Page;
 import tod.impl.evdbng.db.file.PagedFile;
 import zz.utils.primitive.IntArray;
@@ -156,7 +158,7 @@ public class ClassicPagedFile extends PagedFile
 	}
 	
 	@Override
-	public FilePage create()
+	public FilePage create(Account aAccount)
 	{
 		try
 		{
@@ -167,6 +169,8 @@ public class ClassicPagedFile extends PagedFile
 			thePageId = ++itsPagesCount;
 			FilePage thePage = itsBufferManager.create(this, thePageId);
 			itsPagesMap.put(thePageId, new PageRef(thePage));
+			
+			Stats.charge(aAccount);
 			
 			return thePage;
 		}

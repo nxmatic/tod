@@ -64,6 +64,7 @@ import org.objectweb.asm.tree.MultiANewArrayInsnNode;
 import org.objectweb.asm.tree.TryCatchBlockNode;
 import org.objectweb.asm.tree.TypeInsnNode;
 import org.objectweb.asm.tree.VarInsnNode;
+import org.objectweb.asm.tree.analysis.BasicValue;
 
 import tod.Util;
 import tod.core.DebugFlags;
@@ -1302,34 +1303,76 @@ public abstract class MethodReplayerGenerator
 	
 	private void processGetVar(InsnList aInsns, VarInsnNode aNode)
 	{
-//		Type theType = getTypeOrId(BCIUtils.getSort(aNode.getOpcode()));
-//		SList s = new SList();
-//		s.ILOAD(theType, aNode.var+1);
-//		
-//		aInsns.insert(aNode, s);
-//		aInsns.remove(aNode);
-		aNode.var = transformSlot(aNode.var);
+		int theOriginalVar = aNode.var;
+		int theTransformedVar = transformSlot(theOriginalVar);
+		aNode.var = theTransformedVar;
 	}
 
+	private static boolean isStackTopRet(BCIFrame aFrame)
+	{
+		int theStackSize = aFrame.getStackSize();
+		return aFrame.getStack(theStackSize-1).getBasicValue() == BasicValue.RETURNADDRESS_VALUE;
+	}
+	
+	private static boolean isLocalRet(BCIFrame aFrame, int aSlot)
+	{
+		return aFrame.getLocal(aSlot).getBasicValue() == BasicValue.RETURNADDRESS_VALUE;
+	}
+	
 	private void processPutVar(InsnList aInsns, VarInsnNode aNode)
 	{
-//		Type theType = getTypeOrId(BCIUtils.getSort(aNode.getOpcode()));
-//		SList s = new SList();
-//		s.ISTORE(theType, aNode.var+1);
-//		
-//		aInsns.insert(aNode, s);
-//		aInsns.remove(aNode);
-		aNode.var = transformSlot(aNode.var);
+		int theOriginalVar = aNode.var;
+		int theTransformedVar = transformSlot(theOriginalVar);
+		aNode.var = theTransformedVar;
+		
+		BCIFrame theFrame = itsMethodInfo.getFrame(aNode);
+		if (sendAllEvents() && ! isStackTopRet(theFrame))
+		{
+			Type theType = getTypeOrId(BCIUtils.getSort(aNode.getOpcode()));
+			
+			SList s = new SList();
+			s.ISTORE(theType, theTransformedVar);
+			
+			// Register event
+			pushCollector(s);
+			s.DUP();
+			
+			s.LDC(theOriginalVar);
+			s.INVOKEVIRTUAL(CLS_EVENTCOLLECTOR_REPLAY, "localWrite", "(I)V");
+			
+			s.ILOAD(theType, theTransformedVar);
+			invokeValue(s, theType);
+			
+			aInsns.insert(aNode, s);
+			aInsns.remove(aNode);
+		}
 	}
 	
 	private void processIinc(InsnList aInsns, IincInsnNode aNode)
 	{
-//		SList s = new SList();
-//		s.IINC(aNode.var+1, aNode.incr);
-//		
-//		aInsns.insert(aNode, s);
-//		aInsns.remove(aNode);
-		aNode.var = transformSlot(aNode.var);
+		int theOriginalVar = aNode.var;
+		int theTransformedVar = transformSlot(theOriginalVar);
+		aNode.var = theTransformedVar;
+
+		BCIFrame theFrame = itsMethodInfo.getFrame(aNode);
+		if (sendAllEvents() && ! isLocalRet(theFrame, theOriginalVar))
+		{
+			SList s = new SList();
+			s.IINC(theTransformedVar, aNode.incr);
+			
+			// Register event
+			pushCollector(s);
+			s.DUP();
+			
+			s.LDC(theOriginalVar);
+			s.INVOKEVIRTUAL(CLS_EVENTCOLLECTOR_REPLAY, "localWrite", "(I)V");
+			
+			s.ILOAD(theTransformedVar);
+			invokeValue(s, Type.INT_TYPE);
+			
+			aInsns.insert(aNode, s);
+			aInsns.remove(aNode);
+		}
 	}
 
 	/**

@@ -682,23 +682,25 @@ public final class ThreadData
 		
 		sendRegisteredObjects();
 		commitBuffer();
-		
-		msgStart(Message.INSCOPE_BEHAVIOR_ENTER, 0);
+
+		boolean theFromScope = isInScope();
+		byte theNormalMsg = theFromScope ? Message.INSCOPE_BEHAVIOR_ENTER_FROM_SCOPE : Message.INSCOPE_BEHAVIOR_ENTER_FROM_OUTOFSCOPE;
+		byte theDeltaMsg = theFromScope ? Message.INSCOPE_BEHAVIOR_ENTER_DELTA_FROM_SCOPE : Message.INSCOPE_BEHAVIOR_ENTER_DELTA_FROM_OUTOFSCOPE;
+
+		msgStart(theNormalMsg, 0);
 
 		checkTimestamp();
-		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.INSCOPE_BEHAVIOR_ENTER, aBehaviorId); 
-		itsBehIdSender.send(itsBuffer, aBehaviorId, Message.INSCOPE_BEHAVIOR_ENTER_DELTA, Message.INSCOPE_BEHAVIOR_ENTER);
+		if (AgentDebugFlags.EVENT_LOG) echoMessageType(theNormalMsg, aBehaviorId); 
+		itsBehIdSender.send(itsBuffer, aBehaviorId, theDeltaMsg, theNormalMsg);
 
 		msgStop();
-		
-		boolean theFromScope = isInScope();
 
 		pushInScope();
 		exit();
 		
 		return theFromScope;
 	}
-
+	
 	public boolean evInScopeClinitEnter(int aBehaviorId)
 	{
 		if (enter()) return true;
@@ -706,16 +708,18 @@ public final class ThreadData
 		sendRegisteredObjects();
 		commitBuffer();
 		
-		msgStart(Message.INSCOPE_CLINIT_ENTER, 0);
+		boolean theFromScope = isInScope();
+
+		byte theNormalMsg = theFromScope ? Message.INSCOPE_CLINIT_ENTER_FROM_SCOPE : Message.INSCOPE_CLINIT_ENTER_FROM_OUTOFSCOPE;
+
+		msgStart(theNormalMsg, 0);
 		
 		checkTimestamp();
-		if (AgentDebugFlags.EVENT_LOG) echoMessageType(Message.INSCOPE_CLINIT_ENTER, aBehaviorId);
-		sendMessageType(itsBuffer, Message.INSCOPE_CLINIT_ENTER);
+		if (AgentDebugFlags.EVENT_LOG) echoMessageType(theNormalMsg, aBehaviorId);
+		sendMessageType(itsBuffer, theNormalMsg);
 		itsBuffer.putInt(aBehaviorId);
 		
 		msgStop();
-
-		boolean theFromScope = isInScope();
 
 		pushInScope();
 		exit();

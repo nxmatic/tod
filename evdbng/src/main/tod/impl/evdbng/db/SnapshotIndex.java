@@ -7,7 +7,6 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 
 import tod.impl.evdbng.db.file.LongInsertableBTree;
-import tod.impl.evdbng.db.file.LongInsertableBTree.LongTuple;
 import tod.impl.evdbng.db.file.Page.ChainedPageIOStream;
 import tod.impl.evdbng.db.file.Page.PageIOStream;
 import tod.impl.evdbng.db.file.Page.PidSlot;
@@ -23,9 +22,9 @@ public class SnapshotIndex extends LongInsertableBTree
 	
 	public SnapshotIndex(String aName, PidSlot aRootSlot)
 	{
-		super(aName, aRootSlot);
+		super(aName, Stats.ACC_SNAPSHOTS, aRootSlot);
 		// TODO: we should have a directory
-		itsDataStream = new ChainedPageIOStream(getFile());
+		itsDataStream = new ChainedPageIOStream(Stats.ACC_SNAPSHOTS, getFile());
 	}
 
 	public void addSnapshot(long aId, LocalsSnapshot aSnapshot)
@@ -55,7 +54,7 @@ public class SnapshotIndex extends LongInsertableBTree
 	
 	public LocalsSnapshot getSnapshot(long aId)
 	{
-		LongTuple theTuple = getTupleAt(aId);
+		LongTuple theTuple = getTupleAt(aId, true);
 		if (theTuple == null) return null;
 		
 		long theValue = theTuple.getData();
@@ -65,6 +64,7 @@ public class SnapshotIndex extends LongInsertableBTree
 		PageIOStream theStream = new PageIOStream(getFile().get(thePid), theOffset);
 		int theSize = theStream.readInt();
 		byte[] theData = new byte[theSize];
+		if (theStream.remaining()-2*PageIOStream.pagePointerSize() < theSize) theStream = ChainedPageIOStream.getNextPage(theStream);
 		theStream.readBytes(theData, 0, theSize);
 		
 		try

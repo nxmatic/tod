@@ -39,10 +39,14 @@ import tod.core.database.structure.IMutableStructureDatabase;
 import tod.core.database.structure.IStructureDatabase.SnapshotProbeInfo;
 import tod.impl.server.BufferStream;
 import tod.impl.server.BufferStream.EndOfStreamException;
+import tod2.agent.Message;
+import zz.utils.Utils;
 
 public class ThreadReplayer_Partial extends ThreadReplayer
 {
 	private LocalsSnapshot itsSnapshot;
+	private boolean itsKillOnSnapshot = false;
+	private int itsMessagesSinceLastSnapshot = 0;
 
 	public ThreadReplayer_Partial(
 			ReplayerLoader aLoader,
@@ -56,6 +60,13 @@ public class ThreadReplayer_Partial extends ThreadReplayer
 	{
 		super(aLoader, aThreadId, aConfig, aDatabase, aCollector, aTmpIdManager, aBuffer);
 		itsSnapshot = aSnapshot;
+	}
+
+	@Override
+	public byte getNextMessage()
+	{
+		itsMessagesSinceLastSnapshot++;
+		return super.getNextMessage();
 	}
 
 	@Override
@@ -74,6 +85,20 @@ public class ThreadReplayer_Partial extends ThreadReplayer
 	public int getSnapshotSeq()
 	{
 		throw new UnsupportedOperationException();
+	}
+	
+	@Override
+	public void checkSnapshotKill()
+	{
+		if (itsKillOnSnapshot) throw new EndOfStreamException();
+	}
+	
+	@Override
+	protected void processSync(long aTimestamp)
+	{
+		super.processSync(aTimestamp);
+		if (itsMessagesSinceLastSnapshot >= MIN_MESSAGES_BETWEEN_SNAPSHOTS) 
+			itsKillOnSnapshot = true;
 	}
 
 	@Override
@@ -111,6 +136,14 @@ public class ThreadReplayer_Partial extends ThreadReplayer
 			try
 			{
 				theInvokeMethod.invoke(null, this);
+				while(true)
+				{
+					byte theMessage = peekNextMessage();
+					if (theMessage != Message.INSCOPE_BEHAVIOR_ENTER_FROM_OUTOFSCOPE
+							&& theMessage != Message.INSCOPE_BEHAVIOR_ENTER_DELTA_FROM_OUTOFSCOPE
+							&& theMessage != Message.INSCOPE_CLINIT_ENTER_FROM_OUTOFSCOPE) break;
+					replay_OOS_loop();
+				}
 			}
 			catch (InvocationTargetException e)
 			{
@@ -131,9 +164,4 @@ public class ThreadReplayer_Partial extends ThreadReplayer
 		}
 	}
 	
-	@Override
-	protected void processSync(BufferStream aBuffer)
-	{
-		throw new EndOfStreamException();
-	}
 }

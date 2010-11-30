@@ -7,6 +7,8 @@ import junit.framework.Assert;
 
 import org.junit.Test;
 
+import tod.impl.evdbng.db.Stats;
+import tod.impl.evdbng.db.Stats.Account;
 import tod.impl.evdbng.db.file.Page.PidSlot;
 import tod.impl.evdbng.db.file.mapped.MappedPagedFile;
 import zz.utils.Utils;
@@ -19,8 +21,8 @@ public class TestInsertableBTree
 	public void testInt()
 	{
 		final PagedFile file = PagedFile.create(new File("/home/gpothier/tmp/btreebench/mine"), true);
-		Page theDirectory = file.create();
-		final IntInsertableBTree btree = new IntInsertableBTree("test", new PidSlot(theDirectory, 0));
+		Page theDirectory = file.create(Stats.ACC_MISC);
+		final IntInsertableBTree btree = new IntInsertableBTree("test", Stats.ACC_MISC, new PidSlot(Stats.ACC_MISC, theDirectory, 0));
 
 		Random random = new Random(8);
 		System.out.println("Filling...");
@@ -44,7 +46,7 @@ public class TestInsertableBTree
 			long k = random.nextLong()*2;
 			int v = random.nextInt();
 			Assert.assertEquals(v, btree.get(k));
-			Assert.assertNull(btree.getTupleAt(k+1));
+			Assert.assertNull(btree.getTupleAt(k+1, true));
 			if ((i & 0xffff) == 0) System.out.println(i);
 		}
 		
@@ -54,8 +56,8 @@ public class TestInsertableBTree
 	public void testLong()
 	{
 		final PagedFile file = PagedFile.create(new File("/home/gpothier/tmp/btreebench/mine"), true);
-		Page theDirectory = file.create();
-		final LongInsertableBTree btree = new LongInsertableBTree("test", new PidSlot(theDirectory, 0));
+		Page theDirectory = file.create(Stats.ACC_MISC);
+		final LongInsertableBTree btree = new LongInsertableBTree("test", Stats.ACC_MISC, new PidSlot(Stats.ACC_MISC, theDirectory, 0));
 		
 		Random random = new Random(8);
 		System.out.println("Filling...");
@@ -79,7 +81,7 @@ public class TestInsertableBTree
 			long k = random.nextLong()*2;
 			int v = random.nextInt();
 			Assert.assertEquals(v, btree.get(k));
-			Assert.assertNull(btree.getTupleAt(k+1));
+			Assert.assertNull(btree.getTupleAt(k+1, true));
 			if ((i & 0xffff) == 0) System.out.println(i);
 		}
 		

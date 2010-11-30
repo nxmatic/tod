@@ -7,6 +7,7 @@ import java.io.FileNotFoundException;
 import java.io.PrintWriter;
 
 import tod.core.DebugFlags;
+import tod.impl.evdbng.db.Stats.Account;
 import tod.impl.evdbng.db.file.Page.PageIOStream;
 import tod.impl.evdbng.db.file.Page.PidSlot;
 import zz.utils.Utils;
@@ -30,6 +31,7 @@ public abstract class InsertableBTree<T extends Tuple>
 	 * The name of this btree (the index it represents).
 	 */
 	private final String itsName;
+	private final Account itsAccount;
 	
 	private PidSlot itsRootPageSlot;
 	
@@ -72,9 +74,10 @@ public abstract class InsertableBTree<T extends Tuple>
 		}
 	}
 	
-	public InsertableBTree(String aName, PidSlot aRootPageSlot)
+	public InsertableBTree(String aName, Account aAccount, PidSlot aRootPageSlot)
 	{
 		itsName = aName;
+		itsAccount = aAccount;
 		itsRootPageSlot = aRootPageSlot;
 	}
 	
@@ -83,7 +86,7 @@ public abstract class InsertableBTree<T extends Tuple>
 		Page thePage = itsRootPageSlot.getPage(false);
 		if (thePage == null)
 		{
-			thePage = getFile().create();
+			thePage = getFile().create(itsAccount);
 			setPageHeader_Level(thePage, 0);
 			itsRootPageSlot.setPage(thePage);
 		}
@@ -203,7 +206,7 @@ public abstract class InsertableBTree<T extends Tuple>
         return -(low + 1);  // key not found
 	}
 	
-	public T getTupleAt(long aKey)
+	public T getTupleAt(long aKey, boolean aExact)
 	{
 		if (LOG) System.out.println("Looking up: "+aKey);
 		int theLevel = getRootLevel();
@@ -215,7 +218,11 @@ public abstract class InsertableBTree<T extends Tuple>
 			if (theIndex < 0)
 			{
 				theIndex = -theIndex-2;
-				if (theIndex < 0) return null; // No such key
+				if (theIndex < 0) 
+				{
+					if (aExact) return null; // No such key
+					else theIndex = 0;
+				}
 			}
 			int theChildPid = getInternalPidAt(thePage, theIndex);
 			thePage = getFile().get(theChildPid);
@@ -226,9 +233,19 @@ public abstract class InsertableBTree<T extends Tuple>
 		ensureSorted(thePage);
 		int theIndex = indexOf(thePage, 0, aKey);
 
-		if (theIndex < 0) return null;
+		if (theIndex < 0) 
+		{
+			if (aExact) return null;
+			else theIndex = -theIndex-2;
+		}
+		
 		PageIOStream theStream = thePage.asIOStream();
 		theStream.setPos(getPageHeaderSize() + theIndex*(8+itsTupleBufferFactory.getDataSize()) + 8);
+		if (! aExact)
+		{
+			// Read the key
+			aKey = getKeyAt(thePage, 0, theIndex);
+		}
 		return itsTupleBufferFactory.readTuple(aKey, theStream);
 	}
 	
@@ -423,7 +440,7 @@ public abstract class InsertableBTree<T extends Tuple>
 		int theLeftTuples = theTupleCount/2;
 		int theRightTuples = theTupleCount-theLeftTuples;
 
-		Page theNewPage = getFile().create();
+		Page theNewPage = getFile().create(itsAccount);
 		setPageHeader_TupleCount(aPage, theLeftTuples);
 		setPageHeader_TupleCount(theNewPage, theRightTuples);
 		
@@ -443,7 +460,7 @@ public abstract class InsertableBTree<T extends Tuple>
 		if (aLevel == theRootLevel)
 		{
 			// Create a new root
-			Page theNewRoot = getFile().create();
+			Page theNewRoot = getFile().create(itsAccount);
 			setPageHeader_TupleCount(theNewRoot, 2);
 			setPageHeader_Level(theNewRoot, theRootLevel+1);
 			itsRootPageSlot.setPage(theNewRoot);

@@ -1,5 +1,6 @@
 package tod.impl.evdbng.db.fieldwriteindex;
 
+import tod.impl.evdbng.db.Stats;
 import tod.impl.evdbng.db.fieldwriteindex.OnDiskIndex.ObjectPageSlot;
 import tod.impl.evdbng.db.file.InsertableBTree;
 import tod.impl.evdbng.db.file.IntInsertableBTree;
@@ -13,7 +14,7 @@ public class ObjectBTree extends InsertableBTree<IntTuple>
 	
 	public ObjectBTree(String aName, PidSlot aRootSlot)
 	{
-		super(aName, aRootSlot);
+		super(aName, Stats.ACC_OBJECTS, aRootSlot);
 	}
 	
 	@Override
@@ -29,12 +30,17 @@ public class ObjectBTree extends InsertableBTree<IntTuple>
 	public ObjectPageSlot getSlot(long aKey)
 	{
 		PageIOStream theStream = insertLeafKey(aKey, true);
-		return new ObjectPageSlot(theStream);
+		ObjectPageSlot theSlot = new ObjectPageSlot(theStream);
+		if (Stats.COLLECT)
+		{
+			if (theSlot.isNull()) Stats.OBJECT_TREE_ENTRIES++;
+		}
+		return theSlot;
 	}
 	
 	public int get(long aKey)
 	{
-		IntTuple theTuple = getTupleAt(aKey);
+		IntTuple theTuple = getTupleAt(aKey, true);
 		return theTuple != null ? theTuple.getData() : 0;
 	}
 }

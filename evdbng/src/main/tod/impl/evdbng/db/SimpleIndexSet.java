@@ -24,11 +24,12 @@ package tod.impl.evdbng.db;
 
 import tod.impl.evdbng.DebuggerGridConfigNG;
 import tod.impl.evdbng.db.DBExecutor.DBTask;
-import tod.impl.evdbng.db.file.StaticBTree;
+import tod.impl.evdbng.db.Stats.Account;
+import tod.impl.evdbng.db.file.Page.PageIOStream;
 import tod.impl.evdbng.db.file.PagedFile;
 import tod.impl.evdbng.db.file.SimpleTree;
 import tod.impl.evdbng.db.file.SimpleTuple;
-import tod.impl.evdbng.db.file.Page.PageIOStream;
+import tod.impl.evdbng.db.file.StaticBTree;
 
 public class SimpleIndexSet extends IndexSet<SimpleTuple> 
 {
@@ -37,21 +38,22 @@ public class SimpleIndexSet extends IndexSet<SimpleTuple>
 	public SimpleIndexSet(
 			IndexManager aIndexManager, 
 			String aName, 
+			Account aAccount, 
 			PagedFile aFile)
 	{
-		super(aIndexManager, aName, aFile);
+		super(aIndexManager, aName, aAccount, aFile);
 	}
 
 	@Override
 	public StaticBTree<SimpleTuple> createIndex(int aIndex)
 	{
-		return new SimpleTree(getName()+"-"+aIndex, getFile());
+		return new SimpleTree(getName()+"-"+aIndex, getAccount(), getFile());
 	}
 
 	@Override
 	public StaticBTree<SimpleTuple> loadIndex(int aIndex, PageIOStream aStream)
 	{
-		return new SimpleTree(getName()+"-"+aIndex, getFile(), aStream);
+		return new SimpleTree(getName()+"-"+aIndex, getAccount(), getFile(), aStream);
 	}
 	
 	@Override

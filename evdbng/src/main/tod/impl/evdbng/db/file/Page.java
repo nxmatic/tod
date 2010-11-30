@@ -2,6 +2,8 @@ package tod.impl.evdbng.db.file;
 
 import java.lang.ref.WeakReference;
 
+import tod.impl.evdbng.db.Stats.Account;
+
 public abstract class Page
 {
 	/**
@@ -588,20 +590,30 @@ public abstract class Page
 	 */
 	public static class ChainedPageIOStream
 	{
+		private final Account itsAccount;
 		private final PagedFile itsFile;
 		private PageIOStream itsCurrentStream;
 		
-		public ChainedPageIOStream(PagedFile aFile)
+		public ChainedPageIOStream(Account aAccount, PagedFile aFile)
 		{
+			itsAccount = aAccount;
 			itsFile = aFile;
-			itsCurrentStream = itsFile.create().asIOStream();
+			itsCurrentStream = itsFile.create(itsAccount).asIOStream();
 		}
 		
-		public ChainedPageIOStream(PagedFile aFile, int aPageId, int aPosition)
+		public ChainedPageIOStream(Account aAccount, PagedFile aFile, int aPageId, int aPosition)
 		{
+			itsAccount = aAccount;
 			itsFile = aFile;
 			itsCurrentStream = itsFile.get(aPageId).asIOStream();
 			itsCurrentStream.setPos(aPosition);
+		}
+		
+		public static PageIOStream getNextPage(PageIOStream aStream)
+		{
+			aStream.setPos(PagedFile.PAGE_SIZE-PageIOStream.pagePointerSize());
+			int theNextPid = aStream.readPagePointer();
+			return aStream.getPage().getFile().get(theNextPid).asIOStream();
 		}
 		
 		/**
@@ -631,7 +643,7 @@ public abstract class Page
 			assert aSpace < PagedFile.PAGE_SIZE-2*PageIOStream.pagePointerSize();
 			if (remainingInCurrentPage() >= aSpace) return;
 			
-			Page theNewPage = itsFile.create();
+			Page theNewPage = itsFile.create(itsAccount);
 			
 			// Write next page id on current page
 			itsCurrentStream.setPos(PagedFile.PAGE_SIZE-PageIOStream.pagePointerSize());
@@ -906,18 +918,22 @@ public abstract class Page
 	
 	public static class PidSlot extends Slot
 	{
+		private final Account itsAccount;
+		
 		public static int size()
 		{
 			return 4;
 		}
 		
-		public PidSlot()
+		public PidSlot(Account aAccount)
 		{
+			itsAccount = aAccount;
 		}
 		
-		public PidSlot(Page aPage, int aOffset)
+		public PidSlot(Account aAccount, Page aPage, int aOffset)
 		{
 			super(aPage, aOffset);
+			itsAccount = aAccount;
 		}
 		
 		protected int getPid()
@@ -937,7 +953,7 @@ public abstract class Page
 			if (pid == 0)
 			{
 				if (! aCreateIfNull) return null;
-				page = getFile().create();
+				page = getFile().create(itsAccount);
 				pid = page.getPageId();
 				setPid(pid);
 			}

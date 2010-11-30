@@ -1,5 +1,6 @@
 package tod.impl.evdbng.db.file;
 
+import tod.impl.evdbng.db.Stats.Account;
 import tod.impl.evdbng.db.file.Page.PageIOStream;
 import tod.impl.evdbng.db.file.Page.PidSlot;
 
@@ -9,9 +10,9 @@ import tod.impl.evdbng.db.file.Page.PidSlot;
  */
 public class LongInsertableBTree extends InsertableBTree<LongInsertableBTree.LongTuple>
 {
-	public LongInsertableBTree(String aName, PidSlot aRootSlot)
+	public LongInsertableBTree(String aName, Account aAccount, PidSlot aRootSlot)
 	{
-		super(aName, aRootSlot);
+		super(aName, aAccount, aRootSlot);
 	}
 	
 	@Override
@@ -28,7 +29,7 @@ public class LongInsertableBTree extends InsertableBTree<LongInsertableBTree.Lon
 	
 	public long get(long aKey)
 	{
-		LongTuple theTuple = getTupleAt(aKey);
+		LongTuple theTuple = getTupleAt(aKey, true);
 		return theTuple.getData();
 	}
 	

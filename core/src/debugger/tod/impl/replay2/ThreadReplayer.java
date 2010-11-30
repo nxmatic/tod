@@ -55,6 +55,14 @@ public abstract class ThreadReplayer
 	}
 	public static final boolean ECHO = true;
 	public static boolean ECHO_FORREAL = false;
+	
+	/**
+	 * Minimum number of messages between snapshots.
+	 * Usually snapshots are taken (roughly) after each SYNC, but if there are too few
+	 * messages since the previous SYNC, the snapshot is deferred.
+	 */
+	protected static final int MIN_MESSAGES_BETWEEN_SNAPSHOTS = 100000;
+
 
 	private final int itsThreadId;
 	private final TODConfig itsConfig;
@@ -124,6 +132,12 @@ public abstract class ThreadReplayer
 	public abstract LocalsSnapshot createSnapshot(int aProbeId);
 	
 	public abstract int getSnapshotSeq();
+	
+	/**
+	 * Only for partial replay. Should be called by snapshot probes.
+	 * Throws an {@link EndOfStreamException} when the execution should be stopped at a probe.
+	 */
+	public abstract void checkSnapshotKill();
 	public abstract LocalsSnapshot getSnapshotForResume();
 	public abstract void registerSnapshot(LocalsSnapshot aSnapshot);
 	public abstract int getStartProbe();
@@ -182,7 +196,8 @@ public abstract class ThreadReplayer
 				replay_ClassLoader_loop();
 				break;
 				
-			case Message.INSCOPE_CLINIT_ENTER:
+			case Message.INSCOPE_CLINIT_ENTER_FROM_SCOPE:
+			case Message.INSCOPE_CLINIT_ENTER_FROM_OUTOFSCOPE:
 			{
 				getNextMessage();
 				int theBehaviorId = readInt();
@@ -346,6 +361,11 @@ public abstract class ThreadReplayer
 	{
 		long theTimestamp = aBuffer.getLong();
 		itsCollector.sync(theTimestamp);
+		processSync(theTimestamp);
+	}
+	
+	protected void processSync(long aTimestamp)
+	{
 	}
 	
 	public IntDeltaReceiver getBehIdReceiver()
@@ -502,15 +522,18 @@ public abstract class ThreadReplayer
 			processException();
 			break;
 		
-		case Message.INSCOPE_BEHAVIOR_ENTER: 
+		case Message.INSCOPE_BEHAVIOR_ENTER_FROM_SCOPE: 
+		case Message.INSCOPE_BEHAVIOR_ENTER_FROM_OUTOFSCOPE: 
 			dispatch_inscope(getBehIdReceiver().receiveFull(getStream()), this); 
 			break;
 			
-		case Message.INSCOPE_BEHAVIOR_ENTER_DELTA: 
+		case Message.INSCOPE_BEHAVIOR_ENTER_DELTA_FROM_SCOPE: 
+		case Message.INSCOPE_BEHAVIOR_ENTER_DELTA_FROM_OUTOFSCOPE: 
 			dispatch_inscope(getBehIdReceiver().receiveDelta(getStream()), this); 
 			break;
 			
-		case Message.INSCOPE_CLINIT_ENTER: 
+		case Message.INSCOPE_CLINIT_ENTER_FROM_SCOPE: 
+		case Message.INSCOPE_CLINIT_ENTER_FROM_OUTOFSCOPE: 
 			dispatch_inscope(getStream().getInt(), this); 
 			break;
 		
@@ -562,15 +585,18 @@ public abstract class ThreadReplayer
 			processException();
 			break;
 		
-		case Message.INSCOPE_BEHAVIOR_ENTER: 
+		case Message.INSCOPE_BEHAVIOR_ENTER_FROM_SCOPE: 
+		case Message.INSCOPE_BEHAVIOR_ENTER_FROM_OUTOFSCOPE: 
 			dispatch_inscope(getBehIdReceiver().receiveFull(getStream()), this); 
 			break;
 			
-		case Message.INSCOPE_BEHAVIOR_ENTER_DELTA: 
+		case Message.INSCOPE_BEHAVIOR_ENTER_DELTA_FROM_SCOPE: 
+		case Message.INSCOPE_BEHAVIOR_ENTER_DELTA_FROM_OUTOFSCOPE: 
 			dispatch_inscope(getBehIdReceiver().receiveDelta(getStream()), this); 
 			break;
 			
-		case Message.INSCOPE_CLINIT_ENTER: 
+		case Message.INSCOPE_CLINIT_ENTER_FROM_SCOPE: 
+		case Message.INSCOPE_CLINIT_ENTER_FROM_OUTOFSCOPE: 
 			dispatch_inscope(getStream().getInt(), this); 
 			break;
 		
@@ -771,13 +797,16 @@ public abstract class ThreadReplayer
 
 		switch(theMessage)
 		{
-		case Message.INSCOPE_BEHAVIOR_ENTER: 
+		case Message.INSCOPE_BEHAVIOR_ENTER_FROM_SCOPE: 
+		case Message.INSCOPE_BEHAVIOR_ENTER_FROM_OUTOFSCOPE: 
 			return getBehIdReceiver().receiveFull(getStream()); 
 			
-		case Message.INSCOPE_BEHAVIOR_ENTER_DELTA: 
+		case Message.INSCOPE_BEHAVIOR_ENTER_DELTA_FROM_SCOPE: 
+		case Message.INSCOPE_BEHAVIOR_ENTER_DELTA_FROM_OUTOFSCOPE: 
 			return getBehIdReceiver().receiveDelta(getStream()); 
 			
-		case Message.INSCOPE_CLINIT_ENTER: 
+		case Message.INSCOPE_CLINIT_ENTER_FROM_SCOPE: 
+		case Message.INSCOPE_CLINIT_ENTER_FROM_OUTOFSCOPE: 
 			return getStream().getInt(); 
 		
 		case Message.OUTOFSCOPE_BEHAVIOR_ENTER:
