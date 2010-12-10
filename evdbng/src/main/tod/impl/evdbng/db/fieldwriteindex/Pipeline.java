@@ -88,7 +88,7 @@ public class Pipeline
 		itsSubmittedJobs--;
 	}
 	
-	public synchronized void flush()
+	private synchronized void waitJobs()
 	{
 		try
 		{
@@ -98,6 +98,18 @@ public class Pipeline
 		{
 			throw new RuntimeException(e);
 		}
+	}
+	
+	public synchronized void flush()
+	{
+		for(PerThreadIndex theIndex : itsPerThreadIndexes) if (theIndex != null) theIndex.flush();
+		waitJobs();
+		synchronized (itsSortedBlocksMonitor)
+		{
+			Collections.sort(itsSortedBlocks);
+			postInvertBlocks(itsSortedBlocks);
+		}
+		waitJobs();
 	}
 	
 	private void submit(final Runnable aTask)
@@ -213,7 +225,7 @@ public class Pipeline
 	{
 		private final int itsThreadId;
 		private TLongHashSet itsSet = new TLongHashSet();
-		private long itsCurrentBlockId;
+		private long itsCurrentBlockId = 1;
 		
 		public PerThreadIndex(int aThreadId)
 		{
@@ -233,6 +245,17 @@ public class Pipeline
 		
 		public void startBlock(long aBlockId)
 		{
+			post();
+			itsCurrentBlockId = aBlockId;
+		}
+		
+		public void flush()
+		{
+			post();
+		}
+		
+		private synchronized void post()
+		{
 			long[] theValues = itsSet.toArray();
 			
 			if (theValues.length > 0)
@@ -240,8 +263,6 @@ public class Pipeline
 				itsSet.clear();
 				postBlockSort(new RawBlockData(itsThreadId, itsCurrentBlockId, theValues));
 			}
-			
-			itsCurrentBlockId = aBlockId;
 		}
 	}
 
@@ -257,6 +278,7 @@ public class Pipeline
 		
 		public AbstractBlockData(int aThreadId, long aBlockId)
 		{
+			assert aBlockId > 0;
 			itsThreadId = aThreadId;
 			itsBlockId = aBlockId;
 		}

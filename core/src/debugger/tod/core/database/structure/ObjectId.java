@@ -76,6 +76,13 @@ public class ObjectId implements Serializable
 		if (itsId != other.itsId) return false;
 		return true;
 	}
+	
+	public static boolean equals(ObjectId o1, ObjectId o2)
+	{
+		if (o1 == null && o2 == null) return true;
+		if (o1 == null || o2 == null) return false;
+		return o1.itsId == o2.itsId;
+	}
 
 	@Override
 	public String toString()

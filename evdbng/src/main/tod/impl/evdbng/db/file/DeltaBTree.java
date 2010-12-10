@@ -45,6 +45,8 @@ public class DeltaBTree
 	private int itsCurrentLastValue;
 	private int itsCurrentTupleCount;
 	
+	private boolean itsFlushed = true;
+	
 	/**
 	 * The current page as a bit buffer.
 	 * Work is done on the bit buffer, and written out to the page when the current page changes.
@@ -78,6 +80,7 @@ public class DeltaBTree
 			setPageHeader_LastKey(thePage, 0);
 			setPageHeader_LastValue(thePage, 0);
 			itsRootPageSlot.setPage(thePage);
+			itsFlushed = false;
 		}
 		return thePage;
 	}
@@ -140,9 +143,11 @@ public class DeltaBTree
 	
 	public void flush()
 	{
+		if (itsFlushed) return;
 		int p = itsCurrentBuffer.position();
 		saveCurrentLeafPage();
 		itsCurrentBuffer.position(p);
+		itsFlushed = true;
 	}
 	
 	/**
@@ -438,6 +443,8 @@ public class DeltaBTree
 			}
 		}
 		
+		itsFlushed = false;
+
 		return theResult;
 	}
 	
@@ -452,8 +459,6 @@ public class DeltaBTree
 		assert aCount > 0;
 		assert isSorted(aKeys, aOffset, aCount);
 	
-		flush();
-		
 		Page[] thePages = new Page[DB_MAX_INDEX_LEVELS];
 		int[] theIndexes = new int[DB_MAX_INDEX_LEVELS];
 		DecodedLeafPage theDecodedPage = drillTo(aKeys[0], thePages, theIndexes);
@@ -529,6 +534,8 @@ public class DeltaBTree
 		
 		assert theFreedPages.size() == 0 : ""+theFreedPages.size();
 		itsDecodedPagesCache.dropAll(); // That's a bit more than strictly necessary, but we're on the safe side.
+		
+		itsFlushed = false;
 	}
 	
 	
@@ -556,6 +563,8 @@ public class DeltaBTree
 		itsCurrentLastKey = aKey;
 		itsCurrentLastValue = aValue;
 		itsCurrentTupleCount++;
+		
+		itsFlushed = false;
 	}
 	
 	/**
@@ -589,6 +598,8 @@ public class DeltaBTree
 				break;
 			}
 		}
+		
+		itsFlushed = false;
 	}
 
 	protected Page moveToNextPage(int aLevel, Page[] aPages, int[] aIndexes)
@@ -635,6 +646,8 @@ public class DeltaBTree
 	
 	protected DecodedLeafPage drillTo(long aKey, Page[] aPages, int[] aIndexes)
 	{
+		flush();
+
 		int theLevel = itsCurrentRootLevel;
 		Page thePage = getRootPage();
 		while(theLevel > 0)

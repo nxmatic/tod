@@ -5,6 +5,8 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -19,6 +21,7 @@ import tod.impl.evdbng.db.StringIndex;
 import tod.impl.evdbng.db.cflowindex.CFlowIndex;
 import tod.impl.evdbng.db.fieldwriteindex.Pipeline;
 import tod.impl.evdbng.db.fieldwriteindex.Pipeline.PerThreadIndex;
+import tod.impl.evdbng.db.fieldwriteindex.Pipeline.ThreadIds;
 import tod.impl.evdbng.db.file.LongInsertableBTree.LongTuple;
 import tod.impl.evdbng.db.file.Page;
 import tod.impl.evdbng.db.file.Page.PidSlot;
@@ -28,7 +31,9 @@ import tod.impl.replay2.EventCollector;
 import tod.impl.replay2.LocalsSnapshot;
 import tod.impl.replay2.ReifyEventCollector;
 import tod.impl.replay2.ReifyEventCollector.EventList;
+import tod.impl.replay2.ReifyEventCollector.EventList.Event;
 import tod.impl.replay2.ReifyEventCollector.EventList.FieldReadEvent;
+import tod.impl.replay2.ReifyEventCollector.EventList.FieldWriteEvent;
 import tod.impl.replay2.ReplayerLoader;
 import tod.impl.server.DBSideIOThread;
 import zz.utils.Utils;
@@ -300,6 +305,18 @@ public class Indexer
 		}
 	}
 	
+	public static long fieldToSlotId(ObjectId aTarget, int aFieldSlotIndex)
+	{
+		// Must keep the id odd because of temp ids.
+		return aTarget != null ? aTarget.getId() + 2*aFieldSlotIndex : 1; 
+	}
+	
+	public static long arrayToSlotId(ObjectId aTarget, int aIndex)
+	{
+		// Must keep the id odd because of temp ids.
+		return aTarget.getId() + 2*aIndex; 
+	}
+	
 	/**
 	 * Event collector for a given thread.
 	 * @author gpothier
@@ -333,17 +350,13 @@ public class Indexer
 		@Override
 		public void fieldWrite(ObjectId aTarget, int aFieldSlotIndex)
 		{
-			// Must keep the id odd because of temp ids.
-			long theId = aTarget != null ? aTarget.getId() + 2*aFieldSlotIndex : 1; 
-			itsFieldsIndex.registerAccess(theId);
+			itsFieldsIndex.registerAccess(fieldToSlotId(aTarget, aFieldSlotIndex));
 		}
 		
 		@Override
 		public void arrayWrite(ObjectId aTarget, int aIndex)
 		{
-			// Must keep the id odd because of temp ids.
-			long theId = aTarget.getId() + 2*aIndex; 
-			itsFieldsIndex.registerAccess(theId);
+			itsFieldsIndex.registerAccess(arrayToSlotId(aTarget, aIndex));
 		}
 		
 		@Override
@@ -352,13 +365,16 @@ public class Indexer
 			assert aTimestamp > itsLastSync : "last: "+itsLastSync+", current: "+aTimestamp;
 			itsLastSync = aTimestamp;
 			itsSnapshotSeq = 0;
-			itsFieldsIndex.startBlock(aTimestamp);
 		}
 		
 		@Override
 		public void localsSnapshot(LocalsSnapshot aSnapshot)
 		{
-			if (itsSnapshotSeq == 0) itsCFlowIndex.snapshot(itsLastSync);
+			if (itsSnapshotSeq == 0) 
+			{
+				itsCFlowIndex.snapshot(itsLastSync);
+				itsFieldsIndex.startBlock(itsLastSync);
+			}
 			itsSnapshotIndex.addSnapshot(itsLastSync+itsSnapshotSeq, aSnapshot);
 			// There can be several snapshots for the same block 
 			// (because of mandatory snapshots after method calls).
@@ -404,29 +420,29 @@ public class Indexer
 	{
 		private long itsTotalTime;
 		private long itsMaxTime;
-		private long itsTotalSkip;
-		private long itsMaxSkip;
+		private int itsTotalResults;
+		private int itsMaxResults;
 		private int itsOperations;
 		
-		public void operation(long aTime, long aSkip)
+		public void operation(long aTime, int aResults)
 		{
 			assert aTime >= 0;
-			assert aSkip >= 0;
+			assert aResults >= 0;
 			itsTotalTime += aTime;
-			itsTotalSkip += aSkip;
+			itsTotalResults += aResults;
 			if (aTime > itsMaxTime) itsMaxTime = aTime;
-			if (aSkip > itsMaxSkip) itsMaxSkip = aSkip;
+			if (aResults > itsMaxResults) itsMaxResults = aResults;
 			itsOperations++;
 		}
 		
 		public void print()
 		{
 			Utils.println(
-					"Avg time: %f, Avg skip: %d, max time: %d, max skip: %d, operations: %d", 
+					"Avg time: %fms, Avg results: %.02f, max time: %d, max skip: %d, operations: %d", 
 					1f*itsTotalTime/itsOperations, 
-					itsTotalSkip/itsOperations,
+					1f*itsTotalResults/itsOperations,
 					itsMaxTime,
-					itsMaxSkip,
+					itsMaxResults,
 					itsOperations);
 		}
 	}
@@ -464,22 +480,59 @@ public class Indexer
 	
 	private InspectionBenchData itsInspectionBenchData;
 	
-	private static class FieldData
+	private static class FieldData implements Comparable<FieldData>
 	{
-		public final ObjectId itsObjectId;
-		public final int itsFieldSlotIndex;
+		public final ObjectId objectId;
+		public final int slotIndex;
 		
 		public FieldData(ObjectId aObjectId, int aFieldSlotIndex)
 		{
-			itsObjectId = aObjectId;
-			itsFieldSlotIndex = aFieldSlotIndex;
+			objectId = aObjectId;
+			slotIndex = aFieldSlotIndex;
+		}
+
+		public int compareTo(FieldData aOther)
+		{
+			long s1 = objectId != null ? objectId.getId() : 0;
+			s1 += slotIndex;
+			long s2 = aOther.objectId != null ? aOther.objectId.getId() : 0;
+			s1 += aOther.slotIndex;
+			return (int)((s1-s2) >> 32);
+		}
+
+		@Override
+		public int hashCode()
+		{
+			final int prime = 31;
+			int result = 1;
+			result = prime * result + ((objectId == null) ? 0 : objectId.hashCode());
+			result = prime * result + slotIndex;
+			return result;
+		}
+
+		@Override
+		public boolean equals(Object obj)
+		{
+			if (this == obj) return true;
+			if (obj == null) return false;
+			if (getClass() != obj.getClass()) return false;
+			FieldData other = (FieldData) obj;
+			if (objectId == null)
+			{
+				if (other.objectId != null) return false;
+			}
+			else if (!objectId.equals(other.objectId)) return false;
+			if (slotIndex != other.slotIndex) return false;
+			return true;
 		}
 	}
 	
 	private void benchInspection()
 	{
 		// 1. Collect a few fields
-		Set<FieldData> theAllFields = new HashSet<FieldData>();
+		Collection<FieldData> theAllFields = new HashSet<FieldData>();
+		final int S = 20;
+		final int N = 20;
 		
 		System.out.println("Collecting fields...");
 		for(int i=0;i<itsCollectors.size();i++)
@@ -494,37 +547,49 @@ public class Indexer
 			long thePosition = 0;
 			
 			Utils.println("Index size: %d", theIndex.size());
-			long theDelta = Math.max(theIndex.size()/100, 1);
+			long theDelta = Math.max(theIndex.size()/N, 1);
 			while(thePosition < theIndex.size())
 			{
 				thePosition += theDelta;
+				Utils.println("Position: %d, size: %d", thePosition, theIndex.size());
 				
 				Set<FieldData> theFields = new HashSet<Indexer.FieldData>();
 				
-				long theLocalPos = thePosition;
-				threshold:
-				while(theLocalPos < theIndex.size())
+				try
 				{
-					EventList theEvents = cflow_positionToBlock(i, theLocalPos);
-					
-					for(int j=0;j<theEvents.size();j++)
+					long theLocalPos = thePosition;
+					threshold:
+					while(theLocalPos < theIndex.size())
 					{
-						if (theEvents.getEventType(j) == EventList.FieldReadEvent.TYPE)
+						EventList theEvents = cflow_positionToBlock(i, theLocalPos);
+						
+						for(int j=0;j<theEvents.size();j++)
 						{
-							FieldReadEvent theEvent = (FieldReadEvent) theEvents.getEvent(j);
-							FieldData theFieldData = new FieldData(theEvent.getObjectId(), theEvent.getFieldId());
-							theFields.add(theFieldData);
-							if (theFields.size() == 100) break threshold;
+							if (theEvents.getEventType(j) == EventList.FieldReadEvent.TYPE)
+							{
+								FieldReadEvent theEvent = (FieldReadEvent) theEvents.getEvent(j);
+								FieldData theFieldData = new FieldData(theEvent.getObjectId(), theEvent.getFieldId());
+								theFields.add(theFieldData);
+								if (theFields.size() == S) break threshold;
+							}
 						}
+						
+						EventRef theLastEvent = new EventRef(theEvents.getThreadId(), theEvents.getBlockId(), theEvents.size()-1);
+						theLocalPos = cflow_eventToPosition(theLastEvent)+1;
 					}
-					
-					EventRef theLastEvent = new EventRef(theEvents.getThreadId(), theEvents.getBlockId(), theEvents.size()-1);
-					theLocalPos = cflow_eventToPosition(theLastEvent)+1;
-				}
 
-				theAllFields.addAll(theFields);
+					theAllFields.addAll(theFields);
+				}
+				catch (Exception e)
+				{
+					e.printStackTrace();
+				}
 			}
 		}
+		
+		List<FieldData> theSortedFields = new ArrayList<FieldData>(theAllFields);
+		Collections.sort(theSortedFields);
+		theAllFields = theSortedFields;
 		
 		// 2. Measure inspection
 		System.out.println("Measuring inspection...");
@@ -540,28 +605,108 @@ public class Indexer
 			CFlowIndex theIndex = theCollector.itsCFlowIndex;
 			
 			long thePosition = 0;
+			int theCount = 0;
+			int theSuccessCount = 0;
+			int theFailCount = 0;
 			
 			Utils.println("Index size: %d", theIndex.size());
 			while(thePosition < theIndex.size())
 			{
-				thePosition += theIndex.size()/100;
+				thePosition += theIndex.size()/N;
 				
-				EventRef theEvent = cflow_positionToEvent(i, thePosition);
+				EventRef theEvent;
+				try
+				{
+					theEvent = cflow_positionToEvent(i, thePosition);
+				}
+				catch (Throwable e)
+				{
+					continue;
+				}
 
 				for (FieldData theFieldData : theAllFields)
 				{
+					try
+					{
+						long t0 = System.currentTimeMillis();
+						EventRef[] theEventRefs = inspect(theFieldData.objectId, theFieldData.slotIndex, theEvent);
+						long t1 = System.currentTimeMillis();
+						itsInspectionBenchData.operation(t1-t0, theEventRefs.length);
+						theSuccessCount++;
+					}
+					catch (Throwable e)
+					{
+						theFailCount++;
+					}
+					theCount++;
 					
+					if (theCount % 100 == 0)
+					{
+						Utils.println(
+								"%d/%d - Success: %d (%d%%), fail: %d (%d%%)",
+								thePosition,
+								theIndex.size(),
+								theSuccessCount, 
+								100*theSuccessCount/theCount,
+								theFailCount,
+								100*theFailCount/theCount);
+					}
 				}
 			}
 		}
 
 		itsInspectionBenchData.print();
-
 	}
 	
-	private void inspect(ObjectId aObjectId, int aFieldId, EventRef aReferenceEventRef)
+	private EventRef[] inspect(ObjectId aObjectId, int aFieldId, EventRef aReferenceEventRef)
 	{
+		List<EventRef> theResult = new ArrayList<Indexer.EventRef>();
+		ThreadIds theThreadIds = itsFieldWritePipeline.inspect(fieldToSlotId(aObjectId, aFieldId), aReferenceEventRef);
 		
+		for(int theThreadId : theThreadIds.sameBlockThreadIds)
+		{
+			Block theBlock = getBlock(theThreadId, aReferenceEventRef.blockId);
+			EventList theEvents = theBlock.getEvents();
+			EventRef theLastCandidate = null;
+			
+			for(int i=0;i<theEvents.size();i++)
+			{
+				if (theEvents.getEventType(i) == EventList.FieldWriteEvent.TYPE)
+				{
+					FieldWriteEvent theEvent = (FieldWriteEvent) theEvents.getEvent(i);
+					if (ObjectId.equals(aObjectId, theEvent.getObjectId()) && aFieldId == theEvent.getFieldId())
+						theLastCandidate = new EventRef(theThreadId, aReferenceEventRef.blockId, i);
+				}
+				if (theThreadId == aReferenceEventRef.threadId && i >= aReferenceEventRef.positionInBlock) break;
+			}
+			
+			assert theThreadId == aReferenceEventRef.threadId || theLastCandidate != null;
+			
+			if (theLastCandidate != null) theResult.add(theLastCandidate);
+		}
+
+		if (theThreadIds.prevBlockThreadIds != null) for(int theThreadId : theThreadIds.prevBlockThreadIds)
+		{
+			Block theBlock = getBlock(theThreadId, theThreadIds.prevBlockId);
+			EventList theEvents = theBlock.getEvents();
+			EventRef theLastCandidate = null;
+			
+			for(int i=0;i<theEvents.size();i++)
+			{
+				if (theEvents.getEventType(i) == EventList.FieldWriteEvent.TYPE)
+				{
+					FieldWriteEvent theEvent = (FieldWriteEvent) theEvents.getEvent(i);
+					if (ObjectId.equals(aObjectId, theEvent.getObjectId()) && aFieldId == theEvent.getFieldId())
+						theLastCandidate = new EventRef(theThreadId, theThreadIds.prevBlockId, i);
+				}
+			}
+			
+			assert theLastCandidate != null;
+			
+			theResult.add(theLastCandidate);
+		}
+		
+		return theResult.toArray(new EventRef[theResult.size()]);
 	}
 	
 	private StepBenchData itsStepBenchData;
@@ -719,7 +864,8 @@ public class Indexer
 			final Indexer theIndexer = new Indexer(theConfig, theDatabase, theEventsFile, theIndexFile);
 
 			theIndexer.indexTrace();
-			theIndexer.benchStepping();
+//			theIndexer.benchStepping();
+			theIndexer.benchInspection();
 		}
 		catch (Throwable e)
 		{

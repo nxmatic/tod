@@ -61,7 +61,13 @@ public class OnDiskIndex
 	
 	public ObjectAccessStore getStore(long aSlotId, boolean aReadOnly)
 	{
-		return itsObjectAccessStoreCache.get(aReadOnly ? -aSlotId-1 : aSlotId);
+		if (aReadOnly)
+		{
+			ObjectAccessStore theStore = itsObjectAccessStoreCache.get(aSlotId, false);
+			if (theStore == null) theStore = itsObjectAccessStoreCache.get(-aSlotId-1);
+			return theStore;
+		}
+		else return itsObjectAccessStoreCache.get(aSlotId);
 	}
 	
 	public void appendSingle(long aSlotId, long aBlockId, int aThreadId)
@@ -74,6 +80,7 @@ public class OnDiskIndex
 		}
 		else
 		{
+//			Utils.println("Single entry to singles page: %d", aSlotId);
 			if (itsCurrentSinglesPage.isFull())
 			{
 				itsCurrentSinglesPage.dump();
@@ -99,9 +106,14 @@ public class OnDiskIndex
 		else
 		{
 			// Read-only
-			int thePid = itsObjectBTree.get(-aSlotId-1);
+			aSlotId = -aSlotId-1;
+			int thePid = itsObjectBTree.get(aSlotId);
 			if (thePid == 0) return new ObjectAccessStore(0, null);
-			else throw new UnsupportedOperationException("Not yet");
+			else 
+			{
+				ObjectPageSlot theSlot = itsObjectBTree.getSlot(aSlotId);
+				return new ObjectAccessStore(aSlotId, theSlot);
+			}
 		}
 	}
 	
@@ -490,6 +502,7 @@ public class OnDiskIndex
 		
 		public void append(long aSlotId, long aBlockId, int aThreadId)
 		{
+			assert aBlockId > 0;
 			assert itsDecodedEntries == null; // decoded means read-only
 			
 			itsBuffer.putGamma(aSlotId-itsLastSlotId);
@@ -948,7 +961,6 @@ public class OnDiskIndex
 			long thePrevBlockId = 0;
 			TIntArrayList thePrevBlockThreadIds = new TIntArrayList();
 			
-
 			Page[] thePages = new Page[DB_MAX_INDEX_LEVELS];
 			int[] theIndexes = new int[DB_MAX_INDEX_LEVELS];
 			DecodedLeafPage theDecodedPage = drillTo(aBlockId, thePages, theIndexes);
@@ -958,9 +970,6 @@ public class OnDiskIndex
 			if (theIndex >= 0)
 			{
 				// Retrieve results for this block.
-				int[] theOriginalIndexes = theIndexes.clone();
-				Page[] theOriginalPages = thePages.clone();
-				
 				assert theDecodedPage.getKeyAt(theIndex) == aBlockId;
 				while(theDecodedPage.getKeyAt(theIndex) == aBlockId)
 				{
@@ -975,11 +984,35 @@ public class OnDiskIndex
 					}
 				}
 				
-				theIndexes = theOriginalIndexes;
-				thePages = theOriginalPages;
+				theDecodedPage = drillTo(aBlockId-1, thePages, theIndexes);
+				theIndex = theIndexes[0];
 			}
 			
 			// retrieve results for the previous block
+			if (theIndex < 0) theIndex = -theIndex-2;
+			
+			thePrevBlockId = theDecodedPage.getKeyAt(theIndex);
+			
+			theDecodedPage = drillTo(thePrevBlockId, thePages, theIndexes);
+			
+			theIndex = theIndexes[0];
+			
+			assert theIndex >= 0;
+			assert theDecodedPage.getKeyAt(theIndex) == thePrevBlockId;
+			
+			while(theDecodedPage.getKeyAt(theIndex) == thePrevBlockId)
+			{
+				thePrevBlockThreadIds.add(theDecodedPage.getValueAt(theIndex));
+				theIndex++;
+				if (theIndex >= theDecodedPage.getTupleCount())
+				{
+					Page thePage = moveToNextPage(0, thePages, theIndexes);
+					if (thePage == null) break;
+					theDecodedPage = getDecodedPage(thePage);
+					theIndex = 0;
+				}
+			}
+			
 			return new ThreadIds(
 					theSameBlockThreadIds.toNativeArray(), 
 					thePrevBlockId, 
@@ -1034,6 +1067,7 @@ public class OnDiskIndex
 			if (itsSlot.isNull())
 			{
 				assert itsSlotId > 0;
+//				Utils.println("OAS with null slot: %d", aSlotId);
 				// Initialize later, but must keep the check
 			}
 			else if (itsSlot.isSinglesPage())
@@ -1135,6 +1169,7 @@ public class OnDiskIndex
 				Entry theEntry = itsSinglesPage.getEntry(itsSlotId);
 				assert theEntry.slotId == itsSlotId;
 				if (theEntry.blockId == aBlockId) return new ThreadIds(new int[] { theEntry.threadId });
+				else if (theEntry.blockId < aBlockId) return new ThreadIds(new int[0], theEntry.blockId, new int[] { theEntry.threadId });
 				else return new ThreadIds(new int[0]);
 			}
 			else if (itsSharedPage != null)
