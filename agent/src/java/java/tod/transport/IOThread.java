@@ -256,24 +256,6 @@ public class IOThread extends Thread
 		}
 	}
 	
-	private void sendModeChangesPacket(ModeChangesPacket aPacket) throws _IOException
-	{
-		itsHeaderBuffer.clear();
-		itsHeaderBuffer.put(Message.PACKET_TYPE_MODECHANGES);
-		itsHeaderBuffer.putInt(aPacket.data.length);
-
-		itsHeaderBuffer.flip();
-		itsChannel.write(itsHeaderBuffer);
-		
-		itsChannel.writeAll(aPacket.data, 0, aPacket.data.length);
-		
-		if (AgentDebugFlags.COLLECT_PROFILE) 
-		{
-			itsBytesSent += 5+aPacket.data.length;
-			itsPacketsSent++;
-		}
-	}
-	
 	private void checkStaleBuffers()
 	{
 //		long t = System.currentTimeMillis();
@@ -466,23 +448,6 @@ public class IOThread extends Thread
 			aIOThread.sendStringPacket(this);
 		}
 	}
-	
-	public static final class ModeChangesPacket extends Packet
-	{
-		public final byte[] data;
-
-		public ModeChangesPacket(byte[] aData)
-		{
-			data = aData;
-		}
-
-		@Override
-		protected void send(IOThread aIOThread) throws _IOException
-		{
-			aIOThread.sendModeChangesPacket(this);
-		}
-	}
-
 	
 	private class MyShutdownHook extends Thread
 	{

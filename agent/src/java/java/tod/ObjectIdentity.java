@@ -57,6 +57,11 @@ public class ObjectIdentity
 
 	public static final boolean FAKE_ID = false;
 	
+	static
+	{
+		if (FAKE_ID) System.err.println("*** WARNING: ObjectIdentity.FAKE_ID = true ***");
+	}
+	
 	/**
 	 * Retrieves the identifier of an object.
 	 * Returns a positive value if the object was already tagged.

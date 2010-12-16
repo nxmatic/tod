@@ -46,7 +46,6 @@ public class ThreadReplayer_Partial extends ThreadReplayer
 {
 	private LocalsSnapshot itsSnapshot;
 	private boolean itsKillOnSnapshot = false;
-	private int itsMessagesSinceLastSnapshot = 0;
 
 	public ThreadReplayer_Partial(
 			ReplayerLoader aLoader,
@@ -63,14 +62,7 @@ public class ThreadReplayer_Partial extends ThreadReplayer
 	}
 
 	@Override
-	public byte getNextMessage()
-	{
-		itsMessagesSinceLastSnapshot++;
-		return super.getNextMessage();
-	}
-
-	@Override
-	public void registerSnapshot(LocalsSnapshot aSnapshot)
+	public void registerSnapshot0(LocalsSnapshot aSnapshot)
 	{
 		throw new UnsupportedOperationException();
 	}
@@ -94,11 +86,9 @@ public class ThreadReplayer_Partial extends ThreadReplayer
 	}
 	
 	@Override
-	protected void processSync(long aTimestamp)
+	protected void processSync(long aTimestamp, boolean aSnapshotDue)
 	{
-		super.processSync(aTimestamp);
-		if (itsMessagesSinceLastSnapshot >= MIN_MESSAGES_BETWEEN_SNAPSHOTS) 
-			itsKillOnSnapshot = true;
+		if (aSnapshotDue) itsKillOnSnapshot = true;
 	}
 
 	@Override

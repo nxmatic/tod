@@ -36,6 +36,7 @@ import java.util.List;
 
 import org.objectweb.asm.Type;
 
+import tod.core.DebugFlags;
 import tod.core.config.TODConfig;
 import tod.core.database.structure.IBehaviorInfo;
 import tod.core.database.structure.IStructureDatabase;
@@ -53,17 +54,14 @@ public abstract class ThreadReplayer
 	{
 		System.out.println("ThreadReplayer loaded by: "+ThreadReplayer.class.getClassLoader());
 	}
-	public static final boolean ECHO = true;
-	public static boolean ECHO_FORREAL = false;
+	public static final boolean ECHO = false;
+	public static boolean ECHO_FORREAL = true;
 	
-	/**
-	 * Minimum number of messages between snapshots.
-	 * Usually snapshots are taken (roughly) after each SYNC, but if there are too few
-	 * messages since the previous SYNC, the snapshot is deferred.
-	 */
-	protected static final int MIN_MESSAGES_BETWEEN_SNAPSHOTS = 100000;
-
-
+	static
+	{
+		if (ECHO) System.err.println("*** WARNING: ThreadReplayer.ECHO == true");
+	}
+	
 	private final int itsThreadId;
 	private final TODConfig itsConfig;
 	private final IStructureDatabase itsDatabase;
@@ -88,6 +86,10 @@ public abstract class ThreadReplayer
 	private final EventCollector itsCollector;
 	private final ReplayerLoader itsLoader;
 	
+	private int itsMessagesSinceLastSnapshot = 0;
+	private long itsLastSync = 0;
+	private long itsLastSnapshotTimestamp = 0;
+
 	public ThreadReplayer(
 			ReplayerLoader aLoader,
 			int aThreadId,
@@ -104,6 +106,9 @@ public abstract class ThreadReplayer
 		itsCollector = aCollector;
 		itsTmpIdManager = aTmpIdManager;
 		itsStream = aBuffer;
+		
+		Utils.println("STIQ - Min. block size: %d", DebugFlags.STIQ_MIN_BLOCK_SIZE);
+		Utils.println("STIQ - Snapshot interval: %d", DebugFlags.STIQ_SNAPSHOT_INTERVAL);
 	}
 	
 	public BufferStream getStream()
@@ -139,7 +144,6 @@ public abstract class ThreadReplayer
 	 */
 	public abstract void checkSnapshotKill();
 	public abstract LocalsSnapshot getSnapshotForResume();
-	public abstract void registerSnapshot(LocalsSnapshot aSnapshot);
 	public abstract int getStartProbe();
 	
 	public LocalsSnapshot createSnapshot(
@@ -158,6 +162,7 @@ public abstract class ThreadReplayer
 
 	public byte getNextMessage()
 	{
+		itsMessagesSinceLastSnapshot++;
 		processStatelessMessages();
 		return nextMessage();
 	}
@@ -357,14 +362,34 @@ public abstract class ThreadReplayer
 		// TODO: register
 	}
 	
-	protected void processSync(BufferStream aBuffer)
+	protected final void processSync(BufferStream aBuffer)
 	{
 		long theTimestamp = aBuffer.getLong();
 		itsCollector.sync(theTimestamp);
-		processSync(theTimestamp);
+		
+		itsLastSync = theTimestamp;
+		
+		Utils.println("tid: %d, delta: %.02f, msgs: %d", itsThreadId, 0.000001f*(theTimestamp-itsLastSnapshotTimestamp), itsMessagesSinceLastSnapshot);
+		processSync(
+				theTimestamp,
+				theTimestamp-itsLastSnapshotTimestamp >= DebugFlags.STIQ_SNAPSHOT_INTERVAL
+				&& itsMessagesSinceLastSnapshot >= DebugFlags.STIQ_MIN_BLOCK_SIZE);
 	}
 	
-	protected void processSync(long aTimestamp)
+	protected void processSync(long aTimestamp, boolean aSnapshotDue)
+	{
+	}
+	
+	public final void registerSnapshot(LocalsSnapshot aSnapshot)
+	{
+		Utils.println("tid: %d - ThreadReplayer.registerSnapshot()", itsThreadId);
+		itsMessagesSinceLastSnapshot = 0;
+		itsLastSnapshotTimestamp = itsLastSync;
+		
+		registerSnapshot0(aSnapshot);
+	}
+
+	protected void registerSnapshot0(LocalsSnapshot aSnapshot)
 	{
 	}
 	

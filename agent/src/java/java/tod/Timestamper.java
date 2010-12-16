@@ -22,6 +22,9 @@ RSA Data Security, Inc. MD5 Message-Digest Algorithm".
 */
 package java.tod;
 
+import java.tod.io._IO;
+import java.tod.util._StringBuilder;
+
 import tod2.agent.util.BitUtilsLite;
 
 /**
@@ -63,6 +66,13 @@ public class Timestamper extends Thread
 	
 	public volatile static long t = System.nanoTime() << TIMESTAMP_ADJUST_SHIFT;
 	
+	private static final boolean PRINT_DELTA = false;
+	
+	private long itsLastTimestamp;
+	private long itsTotalDeltas;
+	private long itsTimeSincePrint;
+	private int itsCount;
+
 	@Override
 	public void run()
 	{
@@ -72,6 +82,29 @@ public class Timestamper extends Thread
 			{
 				update();
 				sleep(1);
+				
+				if (PRINT_DELTA)
+				{
+					if (itsLastTimestamp != 0)
+					{
+						long theDelta = t - itsLastTimestamp;
+						itsTotalDeltas += theDelta;
+						itsCount++;
+						
+						itsTimeSincePrint += theDelta;
+						if (itsTimeSincePrint > 1000000000L)
+						{
+							_StringBuilder theBuilder = new _StringBuilder();
+							theBuilder.append("Avg timestamp delta: ");
+							theBuilder.append(itsTotalDeltas / itsCount);
+							theBuilder.append("ns");
+							_IO.out(theBuilder.toString());
+							
+							itsTimeSincePrint = 0;
+						}
+					}
+					itsLastTimestamp = t;
+				}
 			}
 		}
 		catch (Exception e)

@@ -30,13 +30,15 @@ import org.python.core.PyObject;
 import org.python.core.PyStringMap;
 import org.python.util.PythonInterpreter;
 
+import tod.core.config.TODConfig;
+
 import zz.utils.Utils;
 
 public class JythonTest
 {
 	public static void main(String[] args) throws IOException
 	{
-		System.setProperty("python.home", "/home/gpothier/tmp/tod");
+		System.setProperty("python.home", TODConfig.TMPDIR);
 		String theScript = Utils.readInputStream(JythonTest.class.getResourceAsStream("getattr.py"));
 		PythonInterpreter interp = new PythonInterpreter();
 		

@@ -121,6 +121,7 @@ public abstract class DBSideIOThread
 		itsIn = aIn;
 		itsSnapshot = aSnapshot;
 		itsLoader = aLoader;
+		if (itsSnapshot != null) itsProcessedSize = itsSnapshot.getPacketStartOffset();
 	}
 	
 	public void setInitialSkip(int aInitialSkip)
@@ -148,7 +149,6 @@ public abstract class DBSideIOThread
 				{
 				case Message.PACKET_TYPE_THREAD: processThreadPacket(); break;
 				case Message.PACKET_TYPE_STRING: processStringPacket(); break;
-				case Message.PACKET_TYPE_MODECHANGES: processModeChangesPacket(); break;
 				case -1: break loop;
 				default: throw new RuntimeException("Not handled: "+thePacketType);
 				}
@@ -229,22 +229,30 @@ public abstract class DBSideIOThread
 		}
 	}
 	
-	private void skip(int aCount) throws IOException
+	private void skip(long aCount) throws IOException
 	{
 		while(aCount > 0) aCount -= itsIn.skip(aCount);
 	}
 	
 	private void processThreadPacket() throws IOException
 	{
+		long thePacketStartOffset = itsProcessedSize-1;
+
 		int theThreadId = ByteBuffer.getIntL(itsIn);
 		int theLength = ByteBuffer.getIntL(itsIn);
+		
+		if (itsSnapshot == null)
+		{
+			// During the initial replay, register the start of each thread packet.
+			RawTraceThreadIndex.startThreadPacket(theThreadId, thePacketStartOffset);
+		}
 		
 		// The first thread of a partial replay is the only thread to replay
 		if (itsSnapshot != null && itsReplayThreadId == 0) itsReplayThreadId = theThreadId;
 		
 		if (itsReplayThreadId == 0 || itsReplayThreadId == theThreadId) 
 		{
-			PacketBuffer theBuffer = new PacketBuffer(new byte[BUFFER_SIZE], itsProcessedSize-1);
+			PacketBuffer theBuffer = new PacketBuffer(new byte[BUFFER_SIZE], thePacketStartOffset);
 			readFully(theBuffer.array(), theLength);
 			theBuffer.position(0);
 			theBuffer.limit(theLength);
@@ -259,6 +267,26 @@ public abstract class DBSideIOThread
 			{
 				ThreadReplayerThread theReplayerThread = getReplayerThread(theThreadId);
 				theReplayerThread.push(theBuffer);
+			}
+			
+			if (itsReplayThreadId == theThreadId)
+			{
+				long theNextPacketOffset = RawTraceThreadIndex.getNextThreadPacketOffset(theThreadId, thePacketStartOffset);
+				if (theNextPacketOffset == -1) 
+				{
+					System.out.println("Partial replay: last packet for thread");
+					itsFinished = true;
+				}
+				else 
+				{
+					long theSkip = theNextPacketOffset - thePacketStartOffset - theLength - 9;
+					if (theSkip > 0)
+					{
+						Utils.println("Partial replay: skipping %d", theSkip);
+						skip(theSkip);
+						itsProcessedSize += theSkip;
+					}
+				}
 			}
 		}
 		else
@@ -277,24 +305,6 @@ public abstract class DBSideIOThread
 		if (itsStaticCollector != null) itsStaticCollector.registerString(new ObjectId(theObjectId), theString);
 		
 		itsProcessedSize += 8 + 4 + theString.length()*2;
-	}
-	
-	private void processModeChangesPacket() throws IOException
-	{
-		int theLength = ByteBuffer.getIntL(itsIn);
-		byte[] theData = new byte[theLength];
-		Utils.readFully(itsIn, theData);
-		
-		ByteBuffer b = ByteBuffer.wrap(theData);
-		while(b.remaining() > 0)
-		{
-			int theBehaviorId = b.getInt();
-			byte theMode = b.get();
-			
-			ModeChangesList.add(theBehaviorId, theMode);
-		}
-		
-		itsProcessedSize += 4 + theLength;
 	}
 	
 	public static void main(String[] args) throws InterruptedException

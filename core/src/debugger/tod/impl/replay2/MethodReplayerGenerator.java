@@ -256,7 +256,7 @@ public abstract class MethodReplayerGenerator
 		itsSaveArgsSlots = nextFreeVar(theSaveArgsSpace);
 
 		allocVars();
-		itsMethodNode.maxStack = itsMethodNode.maxLocals+4;
+		itsMethodNode.maxStack = itsMethodNode.maxLocals+8;
 		
 		itsTmpTargetVars = new int[itsMethodInfo.getMaxNewInvokeNesting()+1];
 //		for (int i=0;i<itsTmpTargetVars.length;i++) itsTmpTargetVars[i] = nextFreeVar(1);
@@ -302,7 +302,7 @@ public abstract class MethodReplayerGenerator
 		
 		byte[] theBytecode = theWriter.toByteArray();
 
-		BCIUtils.writeClass("/home/gpothier/tmp/tod/replayer/"+getClassDumpSubpath(), itsTarget.name, theBytecode);
+		BCIUtils.writeClass(TODConfig.TMPDIR+"/replayer/"+getClassDumpSubpath(), itsTarget.name, theBytecode);
 
 		// Check the methods
 		try

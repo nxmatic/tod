@@ -337,6 +337,11 @@ public class RangeMinMaxTree
 		return aValue >= aMin && aValue <= aMax;
 	}
 	
+	public int getCurrentDepth()
+	{
+		return itsCurrentSum;
+	}
+	
 	/**
 	 * Returns the ith bit
 	 */

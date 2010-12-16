@@ -49,7 +49,7 @@ public class Disassembler
 {
 	public static void main(String[] args) throws IOException
 	{
-		File f = new File("/home/gpothier/tmp/Fixtures.class");
+		File f = new File(TODConfig.TMPDIR+"/Fixtures.class");
 		byte[] theBytecode = Utils.readInputStream_byte(new FileInputStream(f));
 		
 		StructureDatabase theStructureDatabase = StructureDatabase.create(new TODConfig(), true);

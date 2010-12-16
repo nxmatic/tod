@@ -31,6 +31,7 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.replay2;
 
+import tod.core.DebugFlags;
 import tod.core.config.TODConfig;
 import tod.core.database.structure.IMutableStructureDatabase;
 import tod.impl.server.BufferStream;
@@ -40,7 +41,6 @@ public class ThreadReplayer_FirstPass extends ThreadReplayer
 {
 	
 	private int itsSnapshotSeq = 1;
-	private int itsMessagesSinceLastSnapshot = 0;
 	private long itsLastTimestamp = 0;
 	
 	public ThreadReplayer_FirstPass(
@@ -55,13 +55,6 @@ public class ThreadReplayer_FirstPass extends ThreadReplayer
 		super(aLoader, aThreadId, aConfig, aDatabase, aCollector, aTmpIdManager, aBuffer);
 	}
 
-	@Override
-	public byte getNextMessage()
-	{
-		itsMessagesSinceLastSnapshot++;
-		return super.getNextMessage();
-	}
-	
 	int itsSnapshotCount = 0;
 	
 	@Override
@@ -103,10 +96,9 @@ public class ThreadReplayer_FirstPass extends ThreadReplayer
 	}
 	
 	@Override
-	public void registerSnapshot(LocalsSnapshot aSnapshot)
+	public void registerSnapshot0(LocalsSnapshot aSnapshot)
 	{
 		getCollector().localsSnapshot(aSnapshot);
-		itsMessagesSinceLastSnapshot = 0;
 	}
 	
 	@Override
@@ -116,10 +108,9 @@ public class ThreadReplayer_FirstPass extends ThreadReplayer
 	}
 	
 	@Override
-	protected void processSync(long aTimestamp)
+	protected void processSync(long aTimestamp, boolean aSnapshotDue)
 	{
-		super.processSync(aTimestamp);
-		if (itsMessagesSinceLastSnapshot >= MIN_MESSAGES_BETWEEN_SNAPSHOTS) itsSnapshotSeq++;
+		if (aSnapshotDue) itsSnapshotSeq++;
 		itsLastTimestamp = aTimestamp;
 	}
 	

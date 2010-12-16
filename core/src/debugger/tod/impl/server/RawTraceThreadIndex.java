@@ -31,31 +31,39 @@ Inc. MD5 Message-Digest Algorithm".
 */
 package tod.impl.server;
 
-import java.util.ArrayList;
+import gnu.trove.TLongArrayList;
 
-public class ModeChangesList
+import java.util.ArrayList;
+import java.util.List;
+
+import zz.utils.Utils;
+
+/**
+ * A per-thread index of raw trace packets.
+ * For now this is a quickly hacked in-memory solution
+ * @author gpothier
+ */
+public class RawTraceThreadIndex
 {
-	private static ArrayList<ModeChange> itsChanges = new ArrayList<ModeChange>();
+	private static List<TLongArrayList> itsThreadIndexes = new ArrayList<TLongArrayList>();
 	
-	public static void add(int aBehaviorId, byte aMode)
+	public static void startThreadPacket(int aThreadId, long aOffset)
 	{
-		itsChanges.add(new ModeChange(aBehaviorId, aMode));
-	}
-	
-	public static ModeChange get(int aIndex)
-	{
-		return itsChanges.get(aIndex);
-	}
-	
-	public static class ModeChange
-	{
-		public final int behaviorId;
-		public final byte mode;
-		
-		public ModeChange(int aBehaviorId, byte aMode)
+		TLongArrayList theIndex = Utils.listGet(itsThreadIndexes, aThreadId);
+		if (theIndex == null)
 		{
-			behaviorId = aBehaviorId;
-			mode = aMode;
+			theIndex = new TLongArrayList();
+			Utils.listSet(itsThreadIndexes, aThreadId, theIndex);
 		}
+		theIndex.add(aOffset);
+	}
+	
+	public static long getNextThreadPacketOffset(int aThreadId, long aCurrentPacketOffset)
+	{
+		TLongArrayList theIndex = Utils.listGet(itsThreadIndexes, aThreadId);
+		int thePos = theIndex.binarySearch(aCurrentPacketOffset);
+		assert thePos >= 0;
+		if (thePos == theIndex.size()-1) return -1;
+		else return theIndex.get(thePos+1);
 	}
 }

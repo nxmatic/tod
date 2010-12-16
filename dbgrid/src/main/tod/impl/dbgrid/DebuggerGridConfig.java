@@ -32,9 +32,6 @@ import zz.utils.srpc.SRPCRemoteException;
 
 public class DebuggerGridConfig
 {
-	private static final String HOME = System.getProperty("user.home");
-
-	
 	/**
 	 * Port at which database nodes connect to the master.
 	 */
@@ -74,9 +71,6 @@ public class DebuggerGridConfig
 	
 	public static final String MASTER_HOST =
 		ConfigUtils.readString("master-host", "localhost");
-	
-	public static final String NODE_DATA_DIR =
-		ConfigUtils.readString("node-data-dir", HOME+"/tmp/tod");
 	
 	/**
 	 * Whether the grid master should prevent multiple database nodes

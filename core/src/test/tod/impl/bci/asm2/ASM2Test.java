@@ -77,7 +77,7 @@ public class ASM2Test
 		StructureDatabase theDatabase = StructureDatabase.create(theConfig, false);
 		ASMInstrumenter2 theInstrumenter = new ASMInstrumenter2(theConfig, theDatabase);
 		
-		instrument(theDatabase, theInstrumenter, "/home/gpothier/tmp/tod/eclipse/Main.class");
+		instrument(theDatabase, theInstrumenter, TODConfig.TMPDIR+"/eclipse/Main.class");
 		
 	}
 	

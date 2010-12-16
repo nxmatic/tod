@@ -499,8 +499,17 @@ public class MethodInstrumenter_InScope extends MethodInstrumenter
 		insertAfter(aNode, s);
 	}
 
+	private static final boolean NO_FIELD_CAPTURE = false;
+	
+	static
+	{
+	    if (NO_FIELD_CAPTURE) 
+	        System.err.println("*** WARNING: MethodInstrumenter_InScope.NO_FIELD_CAPTURE = true ***");
+	}
+	
 	private void processGetField(FieldInsnNode aNode)
 	{
+	    if (NO_FIELD_CAPTURE) return;
 		if (DebugFlags.USE_FIELD_CACHE) processGetField_Cache(aNode);
 		else processGetField_NoCache(aNode);
 	}

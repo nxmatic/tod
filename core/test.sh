@@ -1,4 +1,12 @@
-#! /bin/sh
+#! /bin/bash
+# test script for TOD trunk
+
+[ -e ~/.tod ] && . ~/.tod
+[ -n "$TMPDIR" ] || TMPDIR=~/tmp/tod
+echo TMPDIR=$TMPDIR
+
+TEST=$1
+NOTOD=$2
 
 PATH=$JAVA_HOME/bin/:$PATH
 # AGENT=../agng/libtod-agent.so
@@ -12,8 +20,9 @@ HOST=localhost
 
 
 VMARGS=''
-VMARGS="$VMARGS -agentpath:$AGENT"
+[ -n "$NOTOD" ] || VMARGS="$VMARGS -agentpath:$AGENT"
 #VMARGS="$VMARGS -noverify"
+VMARGS="$VMARGS -Dtod.tmpdir=$TMPDIR"   
 VMARGS="$VMARGS -Dcollector-host=$HOST -Dcollector-port=8058 -Dclient-name=tod-1"
 #VMARGS="$VMARGS -Dcollector-type=socket"
 VMARGS="$VMARGS -Xbootclasspath/p:../agent/bin" 
@@ -30,9 +39,14 @@ VMARGS="$VMARGS -Dagent-verbose=0"
 #VMARGS="$VMARGS -agentpath:/home/gpothier/tmp/yjp-9.0.5/bin/linux-x86-32/libyjpagent.so"
 #VMARGS="$VMARGS -verbose:jni"
 
+DCARGS="-t 2 -s small"
+	   
 #valgrind --leak-check=yes --smc-check=all \
-java $VMARGS -cp ./bin dummy.BurnTest
-#java $VMARGS -jar /home/2007/gpothier/dacapo-9.12-bach.jar -t 8 avrora
+case "$TEST" in
+	"BurnTest" ) java $VMARGS -cp ./bin dummy.BurnTest ;;
+	dc-* ) java $VMARGS -jar ./dacapo-9.12-bach.jar $DCARGS ${TEST:3} ;;
+	* ) echo Test not handled: $TEST
+esac
 #~/apps/eclipse-3.5.2/eclipse -data ~/devel/ws-todtest -vm ~/apps/java/jdk1.6.0_16/bin/java -consolelog -vmargs $VMARGS
 
 # /home/gpothier/apps/java/jdk1.6.0_01/bin/java $VMARGS -jar /home/gpothier/apps/eclipse-3.3.1.1/plugins/org.eclipse.equinox.launcher_1.0.1.R33x_v20070828.jar -os linux -ws gtk -arch x86 -showsplash -launcher /home/gpothier/apps/eclipse-3.3.1.1/eclipse -name Eclipse --launcher.library /home/gpothier/apps/eclipse-3.3.1.1/plugins/org.eclipse.equinox.launcher.gtk.linux.x86_1.0.2.R331_v20071019/eclipse_1021.so -startup /home/gpothier/apps/eclipse-3.3.1.1/plugins/org.eclipse.equinox.launcher_1.0.1.R33x_v20070828.jar -exitdata 2d88001 -data ~/eclipse/ws-tod -consolelog -vm /home/gpothier/apps/java/jdk1.5.0_08/bin/java -vmargs -Xmx256m -XX:MaxPermSize=128m -jar /home/gpothier/apps/eclipse-3.3.1.1/plugins/org.eclipse.equinox.launcher_1.0.1.R33x_v20070828.jar

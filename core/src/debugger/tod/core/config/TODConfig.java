@@ -57,7 +57,7 @@ public class TODConfig extends PublicCloneable implements Serializable
 
 	private static final long serialVersionUID = 4959079097346687404L;
 
-	private static final String HOME = System.getProperty("user.home");
+	public static final String TMPDIR = System.getProperty("tod.tmpdir", System.getProperty("user.home")+"/tmp/tod")+"/trunk";
 
 	/**
 	 * Defines levels of "detail" for configuration options.
@@ -100,7 +100,7 @@ public class TODConfig extends PublicCloneable implements Serializable
 					"class-cache-path",
 					"Instrumenter - class cache path",
 					"Defines the path where the instrumenter stores instrumented classes.",
-					HOME + File.separatorChar + "tmp" + File.separatorChar + "tod" + File.separatorChar + "classCache");
+					TMPDIR + File.separatorChar + "classCache");
 
 	public static final StringItem BAD_CLASSES_PATH =
 		new StringItem(
@@ -108,7 +108,7 @@ public class TODConfig extends PublicCloneable implements Serializable
 				"bas-classes-path",
 				"Instrumenter - bad classes path",
 				"Defines the path where the instrumenter stores classes that could not be instrumented.",
-				HOME + File.separatorChar + "tmp" + File.separatorChar + "tod" + File.separatorChar + "badClasses");
+				TMPDIR + File.separatorChar + "badClasses");
 	
 	public static final BooleanItem AGENT_CAPTURE_EXCEPTIONS =
 			new BooleanItem(
@@ -132,7 +132,7 @@ public class TODConfig extends PublicCloneable implements Serializable
 					"structure-db-loc",
 					"Structure database - location",
 					"Directory where the structure database is stored.",
-					HOME + "/tmp/tod/locations");
+					TMPDIR + "/locations");
 
 	public static final StringItem SCOPE_GLOBAL_FILTER =
 			new StringItem(
@@ -312,7 +312,7 @@ public class TODConfig extends PublicCloneable implements Serializable
 					"Defines the path where where the raw events file is stored (only valid "
 							+ "if two-phases recording is enabled). If possible, do not use the same disk as the"
 							+ "database files.",
-					HOME + File.separatorChar + "tmp" + File.separatorChar + "tod");
+					TMPDIR);
 
 	public static final BooleanItem ALLOW_HOMONYM_CLASSES =
 		new BooleanItem(

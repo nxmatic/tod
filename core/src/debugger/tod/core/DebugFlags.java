@@ -42,8 +42,6 @@ import zz.utils.bit.BitUtils;
  */
 public class DebugFlags
 {
-	private static final String HOME = System.getProperty("user.home");	
-	
 	/**
 	 * If this flag is true, the database just swallows everything that is sent to
 	 * it without even interpreting it.
@@ -199,6 +197,16 @@ public class DebugFlags
 	 * Whether the TOD servers threads (eg. JavaTODServer) should be daemons.
 	 */
 	public static final boolean TOD_SERVER_DAEMON = ConfigUtils.readBoolean("tod-server-daemon", false);
+	
+	/**
+	 * Minimum number of messages between snapshots.
+	 * Usually snapshots are taken (roughly) after each SYNC, but if there are too few
+	 * messages since the previous SYNC, the snapshot is deferred.
+	 */
+	public static final int STIQ_MIN_BLOCK_SIZE = ConfigUtils.readInt("stiq-min-block-size", 1000);
+	
+	public static final long STIQ_SNAPSHOT_INTERVAL = 1000000L*ConfigUtils.readInt("stiq-snapshot-interval", 10);
+
 	
 	private static PrintStream createStream(String aName)
 	{

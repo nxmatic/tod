@@ -207,11 +207,6 @@ public final class EventCollector
 		return theThreadData;
 	}
 
-	public void sendModeChanges(byte[] aChanges)
-	{
-		if (aChanges.length > 0) itsIOThread.pushPacket(new IOThread.ModeChangesPacket(aChanges));
-	}
-	
 	private ThreadData getControlThreadData()
 	{
 		if (itsControlThreadData == null)

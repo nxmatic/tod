@@ -44,12 +44,13 @@ import java.io.IOException;
 
 import org.python.modules.synchronize;
 
+import tod.core.config.TODConfig;
 import tod.core.database.structure.ObjectId;
 import tod.impl.replay2.EventCollector;
 
 public class ObjectWriteSerializeCollector extends EventCollector
 {
-	private static final String FILENAME = "/home/gpothier/tmp/tod/ow.tod";
+	private static final String FILENAME = TODConfig.TMPDIR+"/ow.tod";
 	private static DataOutputStream itsStream;
 	
 	private static void checkFile()

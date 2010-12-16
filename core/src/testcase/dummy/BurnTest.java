@@ -32,7 +32,7 @@ import tod.BenchBase.BenchResults;
 public class BurnTest
 {
 	private static int rndSeed = 1234598;
-	private static final int N = 10000;
+	private static final int N = 100000;
 	private static Node root;
 	
 	public static void main(String[] args)
@@ -123,6 +123,7 @@ public class BurnTest
 		private Node itsParent;
 		private Node[] itsChildren;
 		private Object itsValue;
+		private int itsVisitCount;
 
 		public Node(Node aParent, Node[] aChildren, Object aValue)
 		{
@@ -148,6 +149,7 @@ public class BurnTest
 		
 		public void visit()
 		{
+			itsVisitCount++;
 			if (itsChildren != null)
 			{
 				for (Node child : itsChildren) if (child != null) child.visit();

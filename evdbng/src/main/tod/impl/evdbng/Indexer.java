@@ -96,6 +96,7 @@ public class Indexer
 	
 	public void indexTrace() 
 	{
+		long t0 = System.currentTimeMillis();
 		DBSideIOThread theIOThread;
 		try
 		{
@@ -123,6 +124,8 @@ public class Indexer
 		}
 			
 		flush();
+		long t1 = System.currentTimeMillis();
+		Utils.println("Indexing took %d ms", t1-t0);
 		Stats.print();
 	}
 	
@@ -317,6 +320,20 @@ public class Indexer
 		return aTarget.getId() + 2*aIndex; 
 	}
 	
+	public static long localToSlotId(int aThreadId, int aDepth, int aSlot)
+	{
+		assert (aThreadId & ~0xffff) == 0; 
+		assert (aDepth & ~0xffff) == 0; 
+		assert (aSlot & ~0xff) == 0; 
+		
+		return 0x4000000000000000L 
+			+ ((aThreadId & 0xffff) << (8+16)) 
+			+ ((aDepth & 0xffff) << 8) 
+			+ (aSlot & 0xff);
+	}
+	
+	private static final boolean NO_INDEXING = false;
+	
 	/**
 	 * Event collector for a given thread.
 	 * @author gpothier
@@ -329,39 +346,63 @@ public class Indexer
 		private long itsLastSync;
 		private int itsSnapshotSeq = 0;
 		private final SnapshotIndex itsSnapshotIndex;
+		private int itsCurrentDepth = 0;
+		
+		private long itsLastSnapshotTimestamp;
+		private long itsTotalSnapshotDeltas;
+		private int itsSnapshotsCount;
 		
 		public Collector(int aThreadId)
 		{
 			itsThreadId = aThreadId;
-			if (aThreadId > 0)
-			{
-				itsFieldsIndex = itsFieldWritePipeline.getIndex(itsThreadId);
-				itsCFlowIndex = new CFlowIndex(createPidSlot());
-				itsSnapshotIndex = new SnapshotIndex("snapshots", createPidSlot());
-			}
-			else
+			if (NO_INDEXING)
 			{
 				itsFieldsIndex = null;
 				itsCFlowIndex = null;
 				itsSnapshotIndex = null;
+			}
+			else
+			{
+				if (aThreadId > 0)
+				{
+					itsFieldsIndex = itsFieldWritePipeline.getIndex(itsThreadId);
+					itsCFlowIndex = new CFlowIndex(createPidSlot());
+					itsSnapshotIndex = new SnapshotIndex("snapshots", createPidSlot());
+				}
+				else
+				{
+					itsFieldsIndex = null;
+					itsCFlowIndex = null;
+					itsSnapshotIndex = null;
+				}
 			}
 		}
 
 		@Override
 		public void fieldWrite(ObjectId aTarget, int aFieldSlotIndex)
 		{
+			if (NO_INDEXING) return;
 			itsFieldsIndex.registerAccess(fieldToSlotId(aTarget, aFieldSlotIndex));
 		}
 		
 		@Override
 		public void arrayWrite(ObjectId aTarget, int aIndex)
 		{
+			if (NO_INDEXING) return;
 			itsFieldsIndex.registerAccess(arrayToSlotId(aTarget, aIndex));
+		}
+		
+		@Override
+		public void localWrite(int aSlot)
+		{
+			if (NO_INDEXING) return;
+			itsFieldsIndex.registerAccess(localToSlotId(itsThreadId, itsCurrentDepth, aSlot));
 		}
 		
 		@Override
 		public void sync(long aTimestamp)
 		{
+			if (NO_INDEXING) return;
 			assert aTimestamp > itsLastSync : "last: "+itsLastSync+", current: "+aTimestamp;
 			itsLastSync = aTimestamp;
 			itsSnapshotSeq = 0;
@@ -370,8 +411,17 @@ public class Indexer
 		@Override
 		public void localsSnapshot(LocalsSnapshot aSnapshot)
 		{
+			if (NO_INDEXING) return;
 			if (itsSnapshotSeq == 0) 
 			{
+				if (itsLastSnapshotTimestamp > 0)
+				{
+					long theDelta = itsLastSync - itsLastSnapshotTimestamp;
+					itsTotalSnapshotDeltas += theDelta;
+					itsSnapshotsCount++;
+				}
+				itsLastSnapshotTimestamp = itsLastSync;
+
 				itsCFlowIndex.snapshot(itsLastSync);
 				itsFieldsIndex.startBlock(itsLastSync);
 			}
@@ -385,24 +435,31 @@ public class Indexer
 		@Override
 		public void enter(int aBehaviorId, int aArgsCount)
 		{
+			if (NO_INDEXING) return;
 			itsCFlowIndex.enter();
+			itsCurrentDepth++;
 		}
 		
 		@Override
 		public void exit()
 		{
+			if (NO_INDEXING) return;
 			itsCFlowIndex.exit();
+			itsCurrentDepth--;
 		}
 		
 		@Override
 		public void exitException()
 		{
+			if (NO_INDEXING) return;
 			itsCFlowIndex.exit();
+			itsCurrentDepth--;
 		}
 		
 		@Override
 		public void registerString(ObjectId aId, String aString)
 		{
+			if (NO_INDEXING) return;
 			// Only one collector receives these events so no synchronization issues
 			Indexer.this.registerString(aId, aString);
 		}
@@ -412,7 +469,9 @@ public class Indexer
 		 */
 		public void flush()
 		{
+			if (NO_INDEXING) return;
 			if (itsCFlowIndex != null) itsCFlowIndex.flush();
+			Utils.println("Avg. snapshot delta: %.02fms", 0.000001f*itsTotalSnapshotDeltas/itsSnapshotsCount);
 		}
 	}
 	
@@ -454,6 +513,12 @@ public class Indexer
 		private long itsTotalSkip;
 		private long itsMaxSkip;
 		private int itsOperations;
+		private int itsAttempts;
+		
+		public void attempt()
+		{
+			itsAttempts++;
+		}
 		
 		public void operation(long aTime, long aSkip)
 		{
@@ -469,12 +534,13 @@ public class Indexer
 		public void print()
 		{
 			Utils.println(
-					"Avg time: %f, Avg skip: %d, max time: %d, max skip: %d, operations: %d", 
+					"Avg time: %f, Avg skip: %d, max time: %d, max skip: %d, operations: %d (attempts: %d)", 
 					1f*itsTotalTime/itsOperations, 
 					itsTotalSkip/itsOperations,
 					itsMaxTime,
 					itsMaxSkip,
-					itsOperations);
+					itsOperations,
+					itsAttempts);
 		}
 	}
 	
@@ -580,7 +646,7 @@ public class Indexer
 
 					theAllFields.addAll(theFields);
 				}
-				catch (Exception e)
+				catch (Throwable e)
 				{
 					e.printStackTrace();
 				}
@@ -763,6 +829,7 @@ public class Indexer
 	
 	private EventRef cflow_findReturn(EventRef aEventRef)
 	{
+		itsStepBenchData.attempt();
 		long t0 = System.currentTimeMillis();
 
 		Collector theCollector = Utils.listGet(itsCollectors, aEventRef.threadId);
@@ -864,7 +931,7 @@ public class Indexer
 			final Indexer theIndexer = new Indexer(theConfig, theDatabase, theEventsFile, theIndexFile);
 
 			theIndexer.indexTrace();
-//			theIndexer.benchStepping();
+			theIndexer.benchStepping();
 			theIndexer.benchInspection();
 		}
 		catch (Throwable e)

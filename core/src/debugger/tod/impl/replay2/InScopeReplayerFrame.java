@@ -342,6 +342,7 @@ public class InScopeReplayerFrame
 				
 			case Message.OUTOFSCOPE_BEHAVIOR_EXIT_EXCEPTION:
 			case Message.INSCOPE_BEHAVIOR_EXIT_EXCEPTION:
+			case Message.CLASSLOADER_EXIT_EXCEPTION:
 				throw new BehaviorExitException();
 				
 			case Message.EXCEPTION:
@@ -351,7 +352,12 @@ public class InScopeReplayerFrame
 			default: throw new UnexpectedMessageException(m);
 			}
 		}
-		throw new UnexpectedMessageException(m); 
+		else if (m == Message.HANDLER_REACHED)
+		{
+			// TODO: For some reason the EXCEPTION message is not always generated, this should be investigated 
+			throw new HandlerReachedException(null, aReplayer.readInt());
+		}
+		else throw new UnexpectedMessageException(m); 
 	}
 	
 	public static void expectException_ClassLoader(ThreadReplayer aReplayer)

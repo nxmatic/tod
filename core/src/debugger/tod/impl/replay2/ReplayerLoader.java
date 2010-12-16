@@ -101,7 +101,7 @@ public class ReplayerLoader extends ClassLoader
 		itsFirstPass = aFirstPass;
 		modifyBaseClasses(aDatabase);
 		
-		itsCacheBase = new File("/home/gpothier/tmp/tod/replayer/"+itsDatabase.getId()+(itsFirstPass ? "/first" : "/partial"));
+		itsCacheBase = new File(TODConfig.TMPDIR+"/replayer/"+itsDatabase.getId()+(itsFirstPass ? "/first" : "/partial"));
 		
 		try
 		{
@@ -314,7 +314,7 @@ public class ReplayerLoader extends ClassLoader
 		{
 			String theSignature = aName.substring(MethodReplayerGenerator.SNAPSHOT_CLASS_PREFIX.length());
 			theBytecode = createSnapshotClass(theSignature);
-			BCIUtils.writeClass("/home/gpothier/tmp/tod/replayer", aName, theBytecode);
+			BCIUtils.writeClass(TODConfig.TMPDIR+"/replayer", aName, theBytecode);
 			assert theBytecode != null;
 		}
 		else
@@ -393,7 +393,7 @@ public class ReplayerLoader extends ClassLoader
 		byte[] theBytecode = theWriter.toByteArray();
 		try
 		{
-			File f = new File("/home/gpothier/tmp/tod/gen/"+aClassNode.name+".class");
+			File f = new File(TODConfig.TMPDIR+"/gen/"+aClassNode.name+".class");
 			f.getParentFile().mkdirs();
 			FileOutputStream fos = new FileOutputStream(f);
 			fos.write(theBytecode);
