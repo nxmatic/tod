@@ -60,6 +60,9 @@ public abstract class ThreadReplayer
 	static
 	{
 		if (ECHO) System.err.println("*** WARNING: ThreadReplayer.ECHO == true");
+		
+		Utils.println("STIQ - Min. block size: %d", DebugFlags.STIQ_MIN_BLOCK_SIZE);
+		Utils.println("STIQ - Snapshot interval: %d", DebugFlags.STIQ_SNAPSHOT_INTERVAL);
 	}
 	
 	private final int itsThreadId;
@@ -106,9 +109,6 @@ public abstract class ThreadReplayer
 		itsCollector = aCollector;
 		itsTmpIdManager = aTmpIdManager;
 		itsStream = aBuffer;
-		
-		Utils.println("STIQ - Min. block size: %d", DebugFlags.STIQ_MIN_BLOCK_SIZE);
-		Utils.println("STIQ - Snapshot interval: %d", DebugFlags.STIQ_SNAPSHOT_INTERVAL);
 	}
 	
 	public BufferStream getStream()
@@ -142,7 +142,7 @@ public abstract class ThreadReplayer
 	 * Only for partial replay. Should be called by snapshot probes.
 	 * Throws an {@link EndOfStreamException} when the execution should be stopped at a probe.
 	 */
-	public abstract void checkSnapshotKill();
+	public abstract void checkSnapshotKill(int aCurrentSnapshotSeq);
 	public abstract LocalsSnapshot getSnapshotForResume();
 	public abstract int getStartProbe();
 	
@@ -157,6 +157,11 @@ public abstract class ThreadReplayer
 		LocalsSnapshot theSnapshot = createSnapshot(aProbeId);
 		theSnapshot.alloc(aIntValuesCount, aLongValuesCount, aFloatValuesCount, aDoubleValuesCount, aRefValuesCount);
 		return theSnapshot;
+	}
+	
+	public void setLastSnapshotTimestamp(long aLastSnapshotTimestamp)
+	{
+		itsLastSnapshotTimestamp = aLastSnapshotTimestamp;
 	}
 
 
@@ -369,20 +374,37 @@ public abstract class ThreadReplayer
 		
 		itsLastSync = theTimestamp;
 		
-		Utils.println("tid: %d, delta: %.02f, msgs: %d", itsThreadId, 0.000001f*(theTimestamp-itsLastSnapshotTimestamp), itsMessagesSinceLastSnapshot);
-		processSync(
+		boolean theSnapshotDue = theTimestamp-itsLastSnapshotTimestamp >= DebugFlags.STIQ_SNAPSHOT_INTERVAL
+				&& itsMessagesSinceLastSnapshot >= DebugFlags.STIQ_MIN_BLOCK_SIZE;
+				
+//		Utils.println(
+//				"SYNC - tid: %d, ts: %d, delta: %.02f, msgs: %d, due: %s", 
+//				itsThreadId, 
+//				theTimestamp,
+//				0.000001f*(theTimestamp-itsLastSnapshotTimestamp), 
+//				itsMessagesSinceLastSnapshot,
+//				theSnapshotDue);
+		
+		processSync0(
 				theTimestamp,
-				theTimestamp-itsLastSnapshotTimestamp >= DebugFlags.STIQ_SNAPSHOT_INTERVAL
-				&& itsMessagesSinceLastSnapshot >= DebugFlags.STIQ_MIN_BLOCK_SIZE);
+				theSnapshotDue);
 	}
 	
-	protected void processSync(long aTimestamp, boolean aSnapshotDue)
+	protected void processSync0(long aTimestamp, boolean aSnapshotDue)
 	{
 	}
 	
 	public final void registerSnapshot(LocalsSnapshot aSnapshot)
 	{
-		Utils.println("tid: %d - ThreadReplayer.registerSnapshot()", itsThreadId);
+		assert itsLastSync == aSnapshot.getBlockId();
+		
+//		Utils.println(
+//				"SNAP - tid: %d, msgs: %d, blid: %d, delta: %.02f", 
+//				itsThreadId,
+//				itsMessagesSinceLastSnapshot,
+//				aSnapshot.getBlockId(),
+//				0.000001f*(itsLastSync-itsLastSnapshotTimestamp));
+		
 		itsMessagesSinceLastSnapshot = 0;
 		itsLastSnapshotTimestamp = itsLastSync;
 		

@@ -62,6 +62,7 @@ public class SnapshotIndex extends LongInsertableBTree
 		int theOffset = (int) (theValue & 0xffff);
 		
 		PageIOStream theStream = new PageIOStream(getFile().get(thePid), theOffset);
+		if (theStream.remaining()-2*PageIOStream.pagePointerSize() < PageIOStream.intSize()) theStream = ChainedPageIOStream.getNextPage(theStream);
 		int theSize = theStream.readInt();
 		byte[] theData = new byte[theSize];
 		if (theStream.remaining()-2*PageIOStream.pagePointerSize() < theSize) theStream = ChainedPageIOStream.getNextPage(theStream);

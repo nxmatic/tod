@@ -162,6 +162,7 @@ public abstract class InsertableBTree<T extends Tuple>
 	
 	private long getKeyAt(Page aPage, int aLevel, int aIndex)
 	{
+		assert aIndex >= 0 : "Negative index: "+aIndex;
 		int theOffset = getPageHeaderSize() + aIndex*getTupleSize(aLevel);
 		return aPage.readLong(theOffset);
 	}
@@ -237,6 +238,11 @@ public abstract class InsertableBTree<T extends Tuple>
 		{
 			if (aExact) return null;
 			else theIndex = -theIndex-2;
+		}
+		
+		if (theIndex < 0) 
+		{
+			return null;
 		}
 		
 		PageIOStream theStream = thePage.asIOStream();

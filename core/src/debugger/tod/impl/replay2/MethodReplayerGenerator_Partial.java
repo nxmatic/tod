@@ -48,6 +48,7 @@ import tod.impl.bci.asm2.MethodInfo.BCIFrame;
 
 public class MethodReplayerGenerator_Partial extends MethodReplayerGenerator
 {
+	private int itsSnapshotSeqVar;
 	private int itsSnapshotVar;
 	private final SnapshotProbeInfo itsResumeSnapshotProbeInfo;
 	
@@ -91,17 +92,25 @@ public class MethodReplayerGenerator_Partial extends MethodReplayerGenerator
 	protected void allocVars()
 	{
 		super.allocVars();
+		itsSnapshotSeqVar = nextFreeVar(1);
 		itsSnapshotVar = nextFreeVar(1);
 	}
 	
 	@Override
 	protected void addSnapshotSetup(InsnList aInsns)
 	{
-		if (itsResumeSnapshotProbeInfo == null || getBehaviorId() != itsResumeSnapshotProbeInfo.behaviorId) return;
-		
 		SList s = new SList();
-		s.add(itsResumeCode);
-		s.GOTO(itsStartProbe);
+		
+		s.ALOAD(getThreadReplayerSlot());
+		s.INVOKEVIRTUAL(CLS_THREADREPLAYER, "getSnapshotSeq", "()I");
+		s.ISTORE(itsSnapshotSeqVar);
+
+		if (itsResumeSnapshotProbeInfo != null && getBehaviorId() == itsResumeSnapshotProbeInfo.behaviorId)
+		{
+			s.add(itsResumeCode);
+			s.GOTO(itsStartProbe);
+		}
+		
 		aInsns.insert(s);
 	}
 	
@@ -155,7 +164,8 @@ public class MethodReplayerGenerator_Partial extends MethodReplayerGenerator
 		else
 		{
 			s.ALOAD(getThreadReplayerSlot());
-			s.INVOKEVIRTUAL(CLS_THREADREPLAYER, "checkSnapshotKill", "()V");
+			s.ILOAD(itsSnapshotSeqVar);
+			s.INVOKEVIRTUAL(CLS_THREADREPLAYER, "checkSnapshotKill", "(I)V");
 		}
 	}
 	

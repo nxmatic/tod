@@ -277,7 +277,7 @@ public class Indexer
 	{
 		public BlocksBuffer()
 		{
-			super(16);
+			super(8);
 		}
 
 		@Override
@@ -646,9 +646,13 @@ public class Indexer
 
 					theAllFields.addAll(theFields);
 				}
-				catch (Throwable e)
+				catch (Exception e)
 				{
-					e.printStackTrace();
+					System.err.println(e.getMessage());
+				}
+				catch(AssertionError e)
+				{
+					System.err.println(e.getMessage());
 				}
 			}
 		}
@@ -685,8 +689,14 @@ public class Indexer
 				{
 					theEvent = cflow_positionToEvent(i, thePosition);
 				}
-				catch (Throwable e)
+				catch (Exception e)
 				{
+					System.err.println(e.getMessage());
+					continue;
+				}
+				catch(AssertionError e)
+				{
+					System.err.println(e.getMessage());
 					continue;
 				}
 
@@ -700,8 +710,14 @@ public class Indexer
 						itsInspectionBenchData.operation(t1-t0, theEventRefs.length);
 						theSuccessCount++;
 					}
-					catch (Throwable e)
+					catch (Exception e)
 					{
+						System.err.println(e.getMessage());
+						theFailCount++;
+					}
+					catch(AssertionError e)
+					{
+						System.err.println(e.getMessage());
 						theFailCount++;
 					}
 					theCount++;
@@ -815,16 +831,22 @@ public class Indexer
 		{
 			EventRef theEventRef = cflow_positionToEvent(aThreadId, aPosition);
 			cflow_findReturn(theEventRef);
-			while(theEventRef != null) 
+			while(true) 
 			{
 				theEventRef = cflow_findParent(theEventRef);
+				if (theEventRef == null) break;
 				cflow_findReturn(theEventRef);
 			}
 		}
-		catch (Throwable e)
+		catch (Exception e)
+		{
+			e.printStackTrace();
+			System.err.println(e.getMessage());
+		}
+		catch(AssertionError e)
 		{
 			System.err.println(e.getMessage());
-		}			
+		}
 	}
 	
 	private EventRef cflow_findReturn(EventRef aEventRef)
@@ -887,8 +909,8 @@ public class Indexer
 		CFlowIndex theIndex = theCollector.itsCFlowIndex;
 
 		LongTuple theTuple = theIndex.getContainingBlock(aPosition);
-		long theBlockId = theTuple.getData();
-		long theStartPosition = theTuple.getKey();
+		long theBlockId = theTuple !=  null ? theTuple.getData() : 0;
+		long theStartPosition = theTuple != null ? theTuple.getKey() : 0;
 		
 		Block theBlock = getBlock(aThreadId, theBlockId);
 		EventList theEvents = theBlock.getEvents();
@@ -940,5 +962,6 @@ public class Indexer
 		}
 		Thread.sleep(1000);
 		System.err.println("END");
+		System.exit(0);
 	}
 }

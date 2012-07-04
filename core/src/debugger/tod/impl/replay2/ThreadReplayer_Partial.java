@@ -44,8 +44,8 @@ import zz.utils.Utils;
 
 public class ThreadReplayer_Partial extends ThreadReplayer
 {
+	private int itsSnapshotSeq = 1;
 	private LocalsSnapshot itsSnapshot;
-	private boolean itsKillOnSnapshot = false;
 
 	public ThreadReplayer_Partial(
 			ReplayerLoader aLoader,
@@ -59,6 +59,7 @@ public class ThreadReplayer_Partial extends ThreadReplayer
 	{
 		super(aLoader, aThreadId, aConfig, aDatabase, aCollector, aTmpIdManager, aBuffer);
 		itsSnapshot = aSnapshot;
+		setLastSnapshotTimestamp(itsSnapshot.getBlockId());
 	}
 
 	@Override
@@ -76,19 +77,19 @@ public class ThreadReplayer_Partial extends ThreadReplayer
 	@Override
 	public int getSnapshotSeq()
 	{
-		throw new UnsupportedOperationException();
+		return itsSnapshotSeq;
 	}
 	
 	@Override
-	public void checkSnapshotKill()
+	public void checkSnapshotKill(int aCurrentSnapshotSeq)
 	{
-		if (itsKillOnSnapshot) throw new EndOfStreamException();
+		if (itsSnapshotSeq > aCurrentSnapshotSeq) throw new EndOfStreamException();
 	}
 	
 	@Override
-	protected void processSync(long aTimestamp, boolean aSnapshotDue)
+	protected void processSync0(long aTimestamp, boolean aSnapshotDue)
 	{
-		if (aSnapshotDue) itsKillOnSnapshot = true;
+		if (aSnapshotDue) itsSnapshotSeq++;
 	}
 
 	@Override
@@ -108,37 +109,46 @@ public class ThreadReplayer_Partial extends ThreadReplayer
 	@Override
 	public void replay()
 	{
+		System.out.println("ThreadReplayer_Partial.replay()");
 		getBehIdReceiver().setCurrentValue(itsSnapshot.getBehIdCurrentValue());
 		getObjIdReceiver().setCurrentValue(itsSnapshot.getObjIdCurrentValue());
 		
 		try
 		{
-			SnapshotProbeInfo theSnapshotProbeInfo = getDatabase().getSnapshotProbeInfo(itsSnapshot.getProbeId());
-			assert theSnapshotProbeInfo != null : ""+itsSnapshot.getProbeId();
-			
-			String theClassName = 
-				MethodReplayerGenerator.REPLAY_CLASS_PREFIX 
-				+ theSnapshotProbeInfo.behaviorId
-				+ "_" + theSnapshotProbeInfo.id;
-			
-			Class theClass = Class.forName(theClassName);
-			Method theInvokeMethod = theClass.getDeclaredMethod("invoke_PartialReplay", ThreadReplayer.class);
-			try
+			if (itsSnapshot.getProbeId() == -1)
 			{
-				theInvokeMethod.invoke(null, this);
-				while(true)
-				{
-					byte theMessage = peekNextMessage();
-					if (theMessage != Message.INSCOPE_BEHAVIOR_ENTER_FROM_OUTOFSCOPE
-							&& theMessage != Message.INSCOPE_BEHAVIOR_ENTER_DELTA_FROM_OUTOFSCOPE
-							&& theMessage != Message.INSCOPE_CLINIT_ENTER_FROM_OUTOFSCOPE) break;
-					replay_OOS_loop();
-				}
+				// Start from the beginning of the thread.
+				replay_main();
 			}
-			catch (InvocationTargetException e)
+			else
 			{
-				if (e.getCause() instanceof Exception) throw (Exception) e.getCause();
-				else throw e;
+				SnapshotProbeInfo theSnapshotProbeInfo = getDatabase().getSnapshotProbeInfo(itsSnapshot.getProbeId());
+				assert theSnapshotProbeInfo != null : ""+itsSnapshot.getProbeId();
+				
+				String theClassName = 
+					MethodReplayerGenerator.REPLAY_CLASS_PREFIX 
+					+ theSnapshotProbeInfo.behaviorId
+					+ "_" + theSnapshotProbeInfo.id;
+				
+				Class theClass = Class.forName(theClassName);
+				Method theInvokeMethod = theClass.getDeclaredMethod("invoke_PartialReplay", ThreadReplayer.class);
+				try
+				{
+					theInvokeMethod.invoke(null, this);
+					while(true)
+					{
+						byte theMessage = peekNextMessage();
+						if (theMessage != Message.INSCOPE_BEHAVIOR_ENTER_FROM_OUTOFSCOPE
+								&& theMessage != Message.INSCOPE_BEHAVIOR_ENTER_DELTA_FROM_OUTOFSCOPE
+								&& theMessage != Message.INSCOPE_CLINIT_ENTER_FROM_OUTOFSCOPE) break;
+						replay_OOS_loop();
+					}
+				}
+				catch (InvocationTargetException e)
+				{
+					if (e.getCause() instanceof Exception) throw (Exception) e.getCause();
+					else throw e;
+				}
 			}
 		}
 		catch (EndOfStreamException e)

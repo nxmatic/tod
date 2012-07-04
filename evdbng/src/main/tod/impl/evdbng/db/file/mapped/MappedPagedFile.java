@@ -54,6 +54,10 @@ public class MappedPagedFile extends PagedFile
 
 	private MappedByteBuffer getChunkBuffer(int aChunkId)
 	{
+		if (aChunkId < 0)
+		{
+			System.out.println("MappedPagedFile.getChunkBuffer()");
+		}
 		assert aChunkId >= 0;
 		MappedByteBuffer theBuffer = Utils.listGet(itsBuffers, aChunkId);
 		if (theBuffer == null)

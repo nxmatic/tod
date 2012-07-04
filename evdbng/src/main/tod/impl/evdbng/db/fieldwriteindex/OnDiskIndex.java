@@ -406,6 +406,7 @@ public class OnDiskIndex
 		
 		public void setSinglesPage(SinglesPage aPage)
 		{
+			assert ! aPage.isEmpty();
 			setPid((aPage.getPageId() << PID_TYPE_BITS) + PID_TYPE_SINGLES);
 		}
 		
@@ -455,6 +456,8 @@ public class OnDiskIndex
 		private BitBuffer itsBuffer;
 		private DecodedSinglesPage itsDecodedEntries;
 		
+		private boolean itsDumped = true;
+		
 		public SinglesPage(OnDiskIndex aIndex, BitBuffer aBuffer)
 		{
 			itsIndex = aIndex;
@@ -490,8 +493,14 @@ public class OnDiskIndex
 			return itsBuffer.remaining() < 2*(64+64+32); // The maximum size of an entry (2* is because of gamma codes)
 		}
 		
+		public boolean isEmpty()
+		{
+			return itsEntriesCount == 0;
+		}
+		
 		public void dump()
 		{
+			if (itsDumped) return;
 			assert itsDecodedEntries == null; // decoded means read-only
 
 			itsPage.writeInt(0, itsEntriesCount);
@@ -502,8 +511,10 @@ public class OnDiskIndex
 		
 		public void append(long aSlotId, long aBlockId, int aThreadId)
 		{
-			assert aBlockId > 0;
+			assert aBlockId >= 0;
 			assert itsDecodedEntries == null; // decoded means read-only
+			
+			itsDumped = false;
 			
 			itsBuffer.putGamma(aSlotId-itsLastSlotId);
 			itsBuffer.putGamma(aBlockId-itsLastBlockId);
@@ -514,6 +525,11 @@ public class OnDiskIndex
 			itsLastThreadId = aThreadId;
 			
 			itsEntriesCount++;
+		}
+		
+		public int getEntriesCount()
+		{
+			return itsEntriesCount;
 		}
 		
 		public int getPageId()
@@ -1073,7 +1089,9 @@ public class OnDiskIndex
 			else if (itsSlot.isSinglesPage())
 			{
 				if (Stats.COLLECT) Stats.NO_LONGER_SINGLES++;
+				itsCurrentSinglesPage.dump();
 				itsSinglesPage = itsSlot.getSinglesPage(OnDiskIndex.this);
+				assert ! itsSinglesPage.isEmpty();
 			}
 			else if (itsSlot.isSharedPage())
 			{
@@ -1120,8 +1138,9 @@ public class OnDiskIndex
 			if (itsSinglesPage != null)
 			{
 				// We are not single anymore
+				assert ! itsSinglesPage.isEmpty();
 				Entry theEntry = itsSinglesPage.getEntry(itsSlotId);
-				assert theEntry.slotId == itsSlotId;
+				assert theEntry.slotId == itsSlotId : "entry: "+theEntry.slotId+" != "+itsSlotId;
 				aBlockIds = insert(theEntry.blockId, aBlockIds, aOffset, aCount);
 				aThreadIds = insert(theEntry.threadId, aThreadIds, aOffset, aCount);
 				aCount++;

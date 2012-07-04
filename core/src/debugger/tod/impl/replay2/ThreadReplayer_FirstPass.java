@@ -78,7 +78,7 @@ public class ThreadReplayer_FirstPass extends ThreadReplayer
 	}
 	
 	@Override
-	public void checkSnapshotKill()
+	public void checkSnapshotKill(int aCurrentSnapshotSeq)
 	{
 		throw new UnsupportedOperationException();
 	}
@@ -104,11 +104,12 @@ public class ThreadReplayer_FirstPass extends ThreadReplayer
 	@Override
 	public void replay()
 	{
+		getCollector().localsSnapshot(createSnapshot(-1));
 		replay_main();
 	}
 	
 	@Override
-	protected void processSync(long aTimestamp, boolean aSnapshotDue)
+	protected void processSync0(long aTimestamp, boolean aSnapshotDue)
 	{
 		if (aSnapshotDue) itsSnapshotSeq++;
 		itsLastTimestamp = aTimestamp;

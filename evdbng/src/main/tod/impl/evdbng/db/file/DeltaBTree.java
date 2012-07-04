@@ -476,6 +476,14 @@ public class DeltaBTree
 		// Extract the values from the BTree and at the same time merge with the new values.
 		while(true)
 		{
+			if (theIndex >= theDecodedPage.getTupleCount())
+			{
+				thePage = moveToNextPage(0, thePages, theIndexes);
+				if (thePage == null) break;
+				theDecodedPage = getDecodedPage(thePage);
+				theIndex = 0;
+			}
+
 			long theKey = theDecodedPage.getKeyAt(theIndex);
 			int theValue = theDecodedPage.getValueAt(theIndex);
 			
@@ -490,13 +498,6 @@ public class DeltaBTree
 			theKeys.add(theKey);
 			theValues.add(theValue);
 			theIndex++;
-			if (theIndex >= theDecodedPage.getTupleCount())
-			{
-				thePage = moveToNextPage(0, thePages, theIndexes);
-				if (thePage == null) break;
-				theDecodedPage = getDecodedPage(thePage);
-				theIndex = 0;
-			}
 		} 
 		
 		while(aCount > 0)

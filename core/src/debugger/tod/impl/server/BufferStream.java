@@ -55,7 +55,7 @@ public class BufferStream
 	 */
 	public long getPacketStartOffset()
 	{
-		return itsCurrentBuffer.getPacketStartOffset();
+		return itsCurrentBuffer != null ? itsCurrentBuffer.getPacketStartOffset() : 0;
 	}
 	
 	private void checkBuffer()
@@ -110,7 +110,7 @@ public class BufferStream
 	
 	public final int position()
 	{
-		return itsCurrentBuffer.position();
+		return itsCurrentBuffer != null ? itsCurrentBuffer.position() : 0;
 	}	
 	
 	public final void get(byte[] aBuffer, int aOffset, int aLength)

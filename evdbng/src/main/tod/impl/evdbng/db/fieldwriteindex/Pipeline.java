@@ -278,7 +278,7 @@ public class Pipeline
 		
 		public AbstractBlockData(int aThreadId, long aBlockId)
 		{
-			assert aBlockId > 0;
+			assert aBlockId >= 0 : ""+aBlockId;
 			itsThreadId = aThreadId;
 			itsBlockId = aBlockId;
 		}

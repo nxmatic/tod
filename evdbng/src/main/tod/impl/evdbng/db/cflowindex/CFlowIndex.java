@@ -128,7 +128,8 @@ public class CFlowIndex
 	
 	public long getBlockStartPosition(long aBlockId)
 	{
-		return itsBlockToRankTree.get(aBlockId);
+		assert aBlockId >= 0;
+		return aBlockId > 0 ? itsBlockToRankTree.get(aBlockId) : 0;
 	}
 
 	/**

@@ -174,10 +174,18 @@ public abstract class DBSideIOThread
 		}
 		catch (RuntimeException e)
 		{
+			for (ThreadReplayerThread theThread : itsReplayerThreads)
+			{
+				if (theThread != null) theThread.push(null);
+			}
 			throw e;
 		}
 		catch (Throwable t)
 		{
+			for (ThreadReplayerThread theThread : itsReplayerThreads)
+			{
+				if (theThread != null) theThread.push(null);
+			}
 			throw new RuntimeException(t);
 		}
 		finally
@@ -282,7 +290,7 @@ public abstract class DBSideIOThread
 					long theSkip = theNextPacketOffset - thePacketStartOffset - theLength - 9;
 					if (theSkip > 0)
 					{
-						Utils.println("Partial replay: skipping %d", theSkip);
+//						Utils.println("Partial replay: skipping %d", theSkip);
 						skip(theSkip);
 						itsProcessedSize += theSkip;
 					}
@@ -404,6 +412,7 @@ public abstract class DBSideIOThread
 			}
 			catch (Throwable t)
 			{
+				t.printStackTrace();
 				itsThrown = t;
 			}
 		}
